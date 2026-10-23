@@ -838,6 +838,7 @@ function Team({ data, t, lang, busy, call, reload, showLink }: {
                   <td><strong>{m.name}</strong><br /><small dir="ltr">{m.email}</small></td>
                   <td>
                     <span className="pill">{m.role === "owner" ? t("roleOwner") : t("roleStaff")}</span>
+                    <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>{t("broughtCustomers")}: {m.brought ?? 0}</div>
                     {m.role === "staff" && !m.revoked && !!data.branches?.length && (
                       <select className="inline-select" aria-label={t("staffBranch")} value={m.branch ?? ""} disabled={busy}
                         onChange={async (e) => { if (await call({ action: "set_member_branch", user: m.id, branch: e.target.value || null })) reload(); }}>

@@ -46,6 +46,8 @@ export const customers = sqliteTable(
     consentTerms: text("consent_terms"),
     consentMarketing: integer("consent_marketing").notNull().default(0),
     source: text("source").notNull().default("staff"),
+    // The staff member (user id) who registered this customer. Used for field-manager attribution.
+    referredBy: text("referred_by"),
     // Set when the owner removes the customer. Hidden everywhere, history kept, card link disabled.
     archived: text("archived"),
   },
