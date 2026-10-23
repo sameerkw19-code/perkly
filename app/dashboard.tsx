@@ -236,6 +236,7 @@ export default function Dashboard() {
                     </select>
                   )}
                   <button className="btn primary" onClick={() => setModal({ type: "customer" })}><Plus size={18} />{t("newCustomer")}</button>
+                  <button className="btn soft" onClick={() => { setView("station"); setQuery(""); }}><ScanLine size={18} />{t("station")}</button>
                 </div>
               </div>
               {!!data.alerts?.length && (
