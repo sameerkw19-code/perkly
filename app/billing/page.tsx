@@ -2,12 +2,12 @@ import { redirect } from "next/navigation";
 import { getD1 } from "../../db";
 import { currentUser } from "../../lib/server/page-session";
 import { getMemberships } from "../../lib/server/auth";
-import { billingConfigured } from "../../lib/server/billing";
 import BillingView, { type BillingBusiness } from "./billing-view";
 
 export const dynamic = "force-dynamic";
 
-// Owner's subscription page. Shows each business the owner runs and its subscription state.
+// Owner's subscription page. Shows each business the owner runs and its subscription status.
+// Payment is not connected yet.
 export default async function BillingPage() {
   const user = await currentUser();
   if (!user) redirect("/login");
@@ -27,10 +27,5 @@ export default async function BillingPage() {
     status: b.status ?? "none",
     periodEnd: b.periodEnd,
   }));
-  const configured = billingConfigured({
-    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
-    STRIPE_PRICE_ID: process.env.STRIPE_PRICE_ID,
-    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
-  });
-  return <BillingView businesses={businesses} configured={configured} />;
+  return <BillingView businesses={businesses} />;
 }
