@@ -25,7 +25,7 @@ export default function Landing() {
 <a href="#pricing" className="lp-hide-sm" style={{ color: "#3D3657", textDecoration: "none" }}>מחיר</a>
 <a href="#faq" className="lp-hide-sm" style={{ color: "#3D3657", textDecoration: "none" }}>שאלות</a>
 <a href="/login" style={{ color: "#17132B", textDecoration: "none", fontWeight: "700", minHeight: "44px", display: "inline-flex", alignItems: "center" }}>כניסה</a>
-<a href="/login?signup=1" style={{ background: "#17132B", color: "#FFFFFF", textDecoration: "none", padding: "11px 20px", borderRadius: "999px", fontWeight: "700", minHeight: "44px", boxSizing: "border-box", display: "inline-flex", alignItems: "center" }}>פתחו כרטיס</a>
+<a href="/signup" style={{ background: "#17132B", color: "#FFFFFF", textDecoration: "none", padding: "11px 20px", borderRadius: "999px", fontWeight: "700", minHeight: "44px", boxSizing: "border-box", display: "inline-flex", alignItems: "center" }}>פתחו כרטיס</a>
 </nav>
 </div>
 </header>
@@ -36,7 +36,7 @@ export default function Landing() {
 <h1 style={{ margin: "0", fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "clamp(40px, 6vw, 72px)", lineHeight: "1.05", letterSpacing: "-1.5px" }}>הלקוחות שלכם חוזרים.<br /><span style={{ color: "#6A4DE3" }}>כל פעם מחדש.</span></h1>
 <p style={{ margin: "0", fontSize: "clamp(18px, 2vw, 21px)", color: "#4A4462", maxWidth: "560px" }}>כרטיס החותמות של העסק שלכם עובר לטלפון של הלקוח. אין אפליקציה להוריד, אין כרטיס נייר לאבד ואין חותמות מזויפות. הלקוח סורק QR בקופה, אוסף חותמות, וחוזר לקחת את המתנה.</p>
 <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", marginTop: "4px" }}>
-<a href="/login?signup=1" style={{ background: "#7558E8", color: "#FFFFFF", textDecoration: "none", fontWeight: "700", fontSize: "18px", padding: "16px 28px", borderRadius: "14px", display: "inline-flex", alignItems: "center", gap: "10px", minHeight: "56px", boxSizing: "border-box", boxShadow: "0 10px 24px rgba(117,88,232,0.32)" }}>צרו את הכרטיס שלכם
+<a href="/signup" style={{ background: "#7558E8", color: "#FFFFFF", textDecoration: "none", fontWeight: "700", fontSize: "18px", padding: "16px 28px", borderRadius: "14px", display: "inline-flex", alignItems: "center", gap: "10px", minHeight: "56px", boxSizing: "border-box", boxShadow: "0 10px 24px rgba(117,88,232,0.32)" }}>צרו את הכרטיס שלכם
 <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
 </a>
 <a href="#how" style={{ background: "#FFFFFF", color: "#17132B", textDecoration: "none", fontWeight: "700", fontSize: "18px", padding: "16px 26px", borderRadius: "14px", border: "1.5px solid #DCD5F2", display: "inline-flex", alignItems: "center", minHeight: "56px", boxSizing: "border-box" }}>איך זה עובד?</a>
@@ -45,6 +45,7 @@ export default function Landing() {
 <span style={{ display: "flex", alignItems: "center", gap: "7px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>מוכן בכמה דקות</span>
 <span style={{ display: "flex", alignItems: "center", gap: "7px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>בלי ציוד: מספיק טלפון בקופה</span>
 <span style={{ display: "flex", alignItems: "center", gap: "7px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>עברית, ערבית ואנגלית</span>
+<span style={{ display: "flex", alignItems: "center", gap: "7px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>Apple Wallet ו־Google Wallet</span>
 </div>
 </div>
 
@@ -88,7 +89,7 @@ export default function Landing() {
 <span style={{ display: "flex", alignItems: "center", gap: "12px" }}><span style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#17132B", color: "#FFFFFF", fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "15px", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>3</span>העובד מוסיף חותמת בלחיצה</span>
 <span style={{ display: "flex", alignItems: "center", gap: "12px" }}><span style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#FFC24B", color: "#2B1F00", fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "15px", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>4</span>הכרטיס מתמלא, והלקוח חוזר</span>
 </div>
-<a href="/login?signup=1" style={{ alignSelf: "flex-start", marginTop: "8px", background: "#7558E8", color: "#FFFFFF", textDecoration: "none", fontWeight: "700", fontSize: "18px", padding: "16px 28px", borderRadius: "14px", display: "inline-flex", alignItems: "center", gap: "10px", minHeight: "56px", boxSizing: "border-box" }}>רוצים כזה לעסק שלכם?
+<a href="/signup" style={{ alignSelf: "flex-start", marginTop: "8px", background: "#7558E8", color: "#FFFFFF", textDecoration: "none", fontWeight: "700", fontSize: "18px", padding: "16px 28px", borderRadius: "14px", display: "inline-flex", alignItems: "center", gap: "10px", minHeight: "56px", boxSizing: "border-box" }}>רוצים כזה לעסק שלכם?
 <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
 </a>
 </div>
@@ -107,7 +108,7 @@ export default function Landing() {
 <h2 id="cards-title" style={{ margin: "0", fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "clamp(30px, 4vw, 46px)", lineHeight: "1.15" }}>כרטיס שהלקוחות שלכם ירצו לשמור.</h2>
 <p style={{ margin: "0", fontSize: "18px", color: "#4A4462" }}>לוגו, צבעים, 17 סמלי חותמת ושלושה סגנונות. ואם רוצים, הלוגו שלכם הוא החותמת.</p>
 </div>
-<a href="/login?signup=1" style={{ fontWeight: "700", fontSize: "16px", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "6px", minHeight: "44px" }}>עצבו את שלכם
+<a href="/signup" style={{ fontWeight: "700", fontSize: "16px", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "6px", minHeight: "44px" }}>עצבו את שלכם
 <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
 </a>
 </div>
@@ -234,7 +235,7 @@ export default function Landing() {
 <div style={{ flex: "1 1 320px", background: "#241E40", borderRadius: "22px", padding: "26px", display: "flex", flexDirection: "column", gap: "10px" }}>
 <svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FFC24B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="20" x="5" y="2" rx="2"></rect><path d="M12 18h.01"></path></svg>
 <h3 style={{ margin: "0", fontFamily: "'Rubik', sans-serif", fontSize: "20px", fontWeight: "700" }}>בלי אפליקציה, בלי חסמים</h3>
-<p style={{ margin: "0", color: "#C9C3DE", fontSize: "16px" }}>הכרטיס נפתח מקישור אישי ונשמר במסך הבית בלחיצה. גם מי שלא מוריד אפליקציות בשביל קפה מצטרף בלי לחשוב פעמיים.</p>
+<p style={{ margin: "0", color: "#C9C3DE", fontSize: "16px" }}>הלקוח שומר את הכרטיס ב־Apple Wallet או ב־Google Wallet, או פותח אותו מקישור אישי. גם מי שלא מוריד אפליקציות בשביל קפה מצטרף בלי לחשוב פעמיים.</p>
 </div>
 <div style={{ flex: "1 1 320px", background: "#241E40", borderRadius: "22px", padding: "26px", display: "flex", flexDirection: "column", gap: "10px" }}>
 <svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FFC24B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path></svg>
@@ -341,13 +342,14 @@ export default function Landing() {
 <div style={{ display: "flex", flexDirection: "column", gap: "11px", fontSize: "16px" }}>
 <span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>ערכת קופה: 2 פוסטרים וסטנד עם הלוגו שלכם</span>
 <span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>עורך עיצוב מלא לכרטיס</span>
+<span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>כרטיס ב־Apple Wallet וב־Google Wallet</span>
 <span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>הצטרפות לקוחות ב־QR</span>
 <span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>עמדת עובד וצוות בהזמנה</span>
 <span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>לוח בקרה, היסטוריה וייצוא ל־CSV</span>
 <span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>התראות על פעילות חריגה</span>
 <span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>עברית, ערבית ואנגלית</span>
 </div>
-<a href="/login?signup=1" style={{ background: "#7558E8", color: "#FFFFFF", textDecoration: "none", fontWeight: "700", fontSize: "18px", padding: "16px 24px", borderRadius: "14px", textAlign: "center", minHeight: "56px", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center" }}>פתחו חשבון לעסק</a>
+<a href="/signup" style={{ background: "#7558E8", color: "#FFFFFF", textDecoration: "none", fontWeight: "700", fontSize: "18px", padding: "16px 24px", borderRadius: "14px", textAlign: "center", minHeight: "56px", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center" }}>פתחו חשבון לעסק</a>
 </div>
 </div>
 </section>
@@ -357,7 +359,7 @@ export default function Landing() {
 <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
 <details style={{ background: "#FFFFFF", border: "1px solid #E8E3F7", borderRadius: "18px", padding: "20px 24px" }}>
 <summary style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "19px" }}>הלקוחות צריכים להוריד אפליקציה?</summary>
-<p style={{ margin: "12px 0 0", color: "#4A4462", fontSize: "16px" }}>לא. הלקוח סורק את ה־QR בקופה, נרשם בכמה שניות ומקבל קישור אישי לכרטיס. אפשר להוסיף אותו למסך הבית בלחיצה, והוא נפתח כמו אפליקציה. זה עובד בכל טלפון.</p>
+<p style={{ margin: "12px 0 0", color: "#4A4462", fontSize: "16px" }}>לא. הלקוח סורק את ה־QR בקופה, נרשם בכמה שניות ומקבל קישור אישי לכרטיס. אפשר לשמור אותו ב־Apple Wallet או ב־Google Wallet, או להוסיף אותו למסך הבית. זה עובד בכל טלפון.</p>
 </details>
 <details style={{ background: "#FFFFFF", border: "1px solid #E8E3F7", borderRadius: "18px", padding: "20px 24px" }}>
 <summary style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "19px" }}>צריך לקנות ציוד?</summary>
@@ -385,7 +387,7 @@ export default function Landing() {
 </details>
 <details style={{ background: "#FFFFFF", border: "1px solid #E8E3F7", borderRadius: "18px", padding: "20px 24px" }}>
 <summary style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "19px" }}>יש חיבור ל־Apple Wallet ול־Google Wallet?</summary>
-<p style={{ margin: "12px 0 0", color: "#4A4462", fontSize: "16px" }}>עדיין לא, זה בפיתוח. בינתיים הכרטיס נפתח מהקישור האישי או מקיצור במסך הבית, בכל טלפון.</p>
+<p style={{ margin: "12px 0 0", color: "#4A4462", fontSize: "16px" }}>כן. הלקוח שומר את הכרטיס ב־Apple Wallet או ב־Google Wallet בלחיצה, והחותמות מתעדכנות בו. מי שמעדיף יכול לפתוח את הכרטיס מהקישור האישי או מקיצור במסך הבית.</p>
 </details>
 </div>
 </section>
@@ -399,7 +401,7 @@ export default function Landing() {
 <p style={{ margin: "0", fontSize: "19px", color: "#F1EDFF" }}>פותחים חשבון, מעצבים כרטיס, תולים QR ליד הקופה. עוד היום.</p>
 </div>
 <div style={{ flex: "1 1 260px", display: "flex", flexDirection: "column", gap: "12px", alignItems: "stretch", position: "relative" }}>
-<a href="/login?signup=1" style={{ background: "#FFFFFF", color: "#17132B", textDecoration: "none", fontWeight: "800", fontSize: "19px", padding: "18px 28px", borderRadius: "16px", textAlign: "center", minHeight: "60px", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center" }}>צרו את הכרטיס הראשון שלכם</a>
+<a href="/signup" style={{ background: "#FFFFFF", color: "#17132B", textDecoration: "none", fontWeight: "800", fontSize: "19px", padding: "18px 28px", borderRadius: "16px", textAlign: "center", minHeight: "60px", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center" }}>צרו את הכרטיס הראשון שלכם</a>
 <WhatsAppLine style={{ fontSize: "14px", color: "#F1EDFF", textAlign: "center" }} />
 </div>
 </div>

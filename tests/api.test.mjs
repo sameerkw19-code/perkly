@@ -61,6 +61,9 @@ test("forged identity headers are ignored; pages require sign-in", async () => {
   const html = await page.text();
   assert.match(html, /הלקוחות שלכם חוזרים/);
   assert.doesNotMatch(html, /oai-authenticated|join_code/);
+  const signup = await fetch(BASE + "/signup", { redirect: "manual" });
+  assert.equal(signup.status, 200);
+  assert.match(await signup.text(), /מצב הדגמה/);
 });
 
 test("mutations from another site are rejected", async () => {
