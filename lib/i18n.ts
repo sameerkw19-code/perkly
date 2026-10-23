@@ -158,6 +158,7 @@ const words: Record<string, Entry> = {
   myRecent: ["הפעולות האחרונות שלי", "آخر عملياتي", "My recent actions"],
 
   // Team
+  broughtCustomers: ["הביא/ה לקוחות פעילים", "أحضر عملاء نشطين", "Active customers brought"],
   teamHint: ["עובדים יכולים לסרוק, להוסיף חותמות, לממש הטבות ולרשום לקוחות. הם לא רואים את רשימת הלקוחות המלאה ולא משנים הגדרות.", "يمكن للموظفين المسح وإضافة الأختام واستخدام المكافآت وتسجيل الزبائن. لا يرون القائمة الكاملة ولا يغيرون الإعدادات.", "Staff can scan, add stamps, redeem rewards and register customers. They can't see the full customer list or change settings."],
   inviteStaff: ["הזמנת עובד", "دعوة موظف", "Invite staff"],
   inviteLabel: ["שם העובד (לזיהוי שלך)", "اسم الموظف (للتعريف)", "Staff name (for your reference)"],

@@ -112,7 +112,9 @@ export async function GET(request: Request) {
          (SELECT COUNT(*) FROM events WHERE business = ?1 AND kind = 'redeem' AND created >= ?2 AND (?3 = '' OR branch = ?3)) AS redemptions`,
     ).bind(business!.id, since, branchFilter, new Date().toISOString(), business!.reward_mode),
     db.prepare(
-      `SELECT u.id, u.name, u.email, m.role, m.created, m.revoked, m.branch FROM memberships m JOIN users u ON u.id = m.user
+      `SELECT u.id, u.name, u.email, m.role, m.created, m.revoked, m.branch,
+         (SELECT COUNT(*) FROM customers c WHERE c.business = m.business AND c.referred_by = m.user AND c.archived IS NULL) AS brought
+       FROM memberships m JOIN users u ON u.id = m.user
        WHERE m.business = ? ORDER BY m.role, m.created`,
     ).bind(business!.id),
     db.prepare(
@@ -250,10 +252,10 @@ export async function POST(request: Request) {
       const card = await newCardSecret();
       const insert = db
         .prepare(
-          `INSERT OR IGNORE INTO customers(id, business, name, phone, token, stamps, target, created, card_hash, scan_code, source, consent_marketing)
-           VALUES(?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 0)`,
+          `INSERT OR IGNORE INTO customers(id, business, name, phone, token, stamps, target, created, card_hash, scan_code, source, consent_marketing, referred_by)
+           VALUES(?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 0, ?)`,
         )
-        .bind(id, business.id, name, phone, scan, business.target, now, card.hash, scan, role);
+        .bind(id, business.id, name, phone, scan, business.target, now, card.hash, scan, role, user.id);
       const [, r] = await db.batch([releaseArchivedPhone(db, business.id, phone), insert]);
       if (!r.meta.changes) return fail("phone_exists", 409, "Phone already registered");
       return json({ id, cardUrl: `${origin}/c/${card.secret}` });
