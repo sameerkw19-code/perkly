@@ -32,6 +32,8 @@
     },
     "production": {
       "name": "perkly",
+      // Your own domain. Works once perkly.shop is active in the same Cloudflare account.
+      "routes": [{ "pattern": "perkly.shop", "custom_domain": true }],
       "d1_databases": [
         {
           "binding": "DB",
