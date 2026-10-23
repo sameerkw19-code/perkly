@@ -6,7 +6,6 @@ import { useState } from "react";
 // charged and nothing is sent to the server. Replace step 2 with the Tranzila hosted page
 // once the terminal is set up.
 
-const SETUP_TOTAL = 200;
 const MONTHLY = 99;
 
 const C = { ink: "#17132B", purple: "#7558E8", purpleDeep: "#5B3FD6", lav: "#F1EDFC", muted: "#4A4462", line: "#E1DAF5", yellow: "#FFC24B" };
@@ -60,10 +59,10 @@ function Summary() {
       </div>
       <div style={{ borderTop: `1px solid ${C.line}`, paddingTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <span style={{ fontWeight: 700 }}>לתשלום היום</span>
-          <span style={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: 34 }}>{SETUP_TOTAL} ₪</span>
+          <span style={{ fontWeight: 700 }}>מחיר</span>
+          <span style={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: 34 }}>{MONTHLY} ₪</span>
         </div>
-        <span style={{ fontSize: 14, color: C.muted }}>מהחודש השני: {MONTHLY} ₪ לחודש</span>
+        <span style={{ fontSize: 14, color: C.muted }}>לחודש, בלי דמי הקמה</span>
       </div>
     </aside>
   );
@@ -157,10 +156,10 @@ export default function SignupFlow() {
               </div>
               <span style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14, color: C.muted }}>
                 <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-                פרטי האשראי לא נשמרים אצלנו. מהחודש השני החיוב של {MONTHLY} ₪ מתבצע אוטומטית.
+                פרטי האשראי לא נשמרים אצלנו. החיוב של {MONTHLY} ₪ לחודש מתבצע אוטומטית.
               </span>
               <button type="button" onClick={pay} disabled={paying} style={{ ...primary, opacity: paying ? 0.7 : 1 }}>
-                {paying ? "מעבד תשלום…" : `תשלום ${SETUP_TOTAL} ₪ (הדגמה)`}
+                {paying ? "מעבד תשלום…" : `תשלום ${MONTHLY} ₪ (הדגמה)`}
               </button>
               <button type="button" onClick={() => setStep(1)} style={{ background: "none", border: 0, color: C.purpleDeep, fontWeight: 700, fontSize: 15, cursor: "pointer", minHeight: 44, fontFamily: "inherit" }}>חזרה לפרטי העסק</button>
             </div>
