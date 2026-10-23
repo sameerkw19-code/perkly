@@ -15,7 +15,7 @@ const STATUS_LABEL: Record<string, string> = {
   incomplete: "לא הושלם",
 };
 
-const PRICE_TEXT = "250 ₪ לחודש · 14 ימי ניסיון";
+const PRICE_TEXT = "בחודש הראשון 200 ₪, ומהחודש השני 99 ₪ לחודש";
 
 export default function BillingView({ businesses, configured }: { businesses: BillingBusiness[]; configured: boolean }) {
   const [error, setError] = useState("");
