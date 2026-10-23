@@ -193,3 +193,18 @@ export const rewards = sqliteTable(
   },
   (t) => [index("rewards_customer").on(t.customer, t.redeemed), index("rewards_business").on(t.business, t.redeemed)],
 );
+
+// Subscription state per business, kept in sync by the Stripe webhook. Never written by the browser.
+export const subscriptions = sqliteTable(
+  "subscriptions",
+  {
+    business: text("business").primaryKey().references(() => businesses.id),
+    status: text("status").notNull().default("none"),
+    plan: text("plan"),
+    stripeCustomer: text("stripe_customer"),
+    stripeSubscription: text("stripe_subscription"),
+    currentPeriodEnd: text("current_period_end"),
+    updated: text("updated").notNull(),
+  },
+  (t) => [uniqueIndex("subscriptions_stripe_subscription").on(t.stripeSubscription)],
+);
