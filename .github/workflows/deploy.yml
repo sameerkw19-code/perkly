@@ -70,7 +70,7 @@ jobs:
       - name: Build
         run: node scripts/build.mjs "$TARGET"
       - name: Deploy
-        run: npx wrangler deploy --config dist/server/wrangler.json
+        run: node scripts/ci-deploy.mjs
       - name: Optional settings
         env:
           SIGNUP_CODE: ${{ secrets.PERKLY_SIGNUP_CODE }}
