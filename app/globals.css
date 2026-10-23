@@ -169,3 +169,11 @@ label.btn{cursor:pointer}
 .stamp-grid.product .stamp .stamp-img{width:100%;height:auto}
 .loyalty-card .stamp,.wallet .stamp{width:min(100%,46px);max-width:none;min-height:0;min-width:0}
 .wallet .stamp{width:min(100%,40px)}
+
+/* v0.4 branches */
+.inline-form{display:flex;gap:8px;align-items:center;flex-wrap:wrap;width:100%}
+.inline-form input{flex:1;min-width:140px}
+.inline-select{margin-inline-start:8px;font-size:11px;padding:5px 8px;border-radius:7px}
+.branch-pill{background:#eef6de;color:#56732f;border-color:transparent;font-size:12px;padding:8px 12px}
+select.needs-choice{border-color:#f0a050;box-shadow:0 0 0 3px #f0a05022}
+.modal select{display:block;width:100%;margin-top:8px}

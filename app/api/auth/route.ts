@@ -75,9 +75,9 @@ export async function POST(request: Request) {
       const inviteId = await sha256(tokenText);
       const now = new Date().toISOString();
       const invite = await db
-        .prepare("SELECT business, role FROM invites WHERE id = ? AND used IS NULL AND revoked IS NULL AND expires > ?")
+        .prepare("SELECT business, role, branch FROM invites WHERE id = ? AND used IS NULL AND revoked IS NULL AND expires > ?")
         .bind(inviteId, now)
-        .first<{ business: string; role: string }>();
+        .first<{ business: string; role: string; branch: string | null }>();
       if (!tokenText || !invite) return fail("invite_invalid", 404, "Invite expired or already used");
 
       let user = await getUser(db, request.headers.get("cookie"));
@@ -98,11 +98,12 @@ export async function POST(request: Request) {
         db.prepare("UPDATE invites SET used = ?, used_by = ? WHERE id = ? AND used IS NULL AND revoked IS NULL AND expires > ?")
           .bind(now, user.id, inviteId, now),
         db.prepare(
-          `INSERT INTO memberships(id, business, user, role, created)
-           SELECT ?, ?, ?, ?, ? WHERE changes() = 1
+          `INSERT INTO memberships(id, business, user, role, created, branch)
+           SELECT ?, ?, ?, ?, ?, ? WHERE changes() = 1
            ON CONFLICT(business, user) DO UPDATE SET revoked = NULL,
-             role = CASE WHEN memberships.role = 'owner' THEN 'owner' ELSE excluded.role END`,
-        ).bind(crypto.randomUUID(), invite.business, user.id, invite.role, now),
+             role = CASE WHEN memberships.role = 'owner' THEN 'owner' ELSE excluded.role END,
+             branch = CASE WHEN memberships.role = 'owner' THEN memberships.branch ELSE excluded.branch END`,
+        ).bind(crypto.randomUUID(), invite.business, user.id, invite.role, now, invite.branch),
       ]);
       if (!result[0].meta.changes) return fail("invite_invalid", 404, "Invite expired or already used");
       return json({ ok: true, business: invite.business }, 200, setCookie ? { "Set-Cookie": setCookie } : undefined);

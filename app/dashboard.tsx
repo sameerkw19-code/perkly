@@ -18,7 +18,11 @@ type Business = { id: string; name: string; reward: string; target: number; colo
 type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; phone?: string };
 type Data = {
   me: { name: string; email: string };
-  memberships: { business: string; role: Role; businessName: string }[];
+  memberships: { business: string; role: Role; businessName: string; branch: string | null }[];
+  branches?: { id: string; name: string }[];
+  myBranch?: string | null;
+  branchFilter?: string;
+  perBranch?: { branch: string | null; branch_name: string | null; stamps: number; redemptions: number }[];
   role: Role | null;
   business: Business | null;
   design?: Design;
@@ -44,6 +48,7 @@ export default function Dashboard() {
   const [loadError, setLoadError] = useState("");
   const [businessId, setBusinessId] = useState<string | null>(null);
   const [days, setDays] = useState<string>("30");
+  const [branchView, setBranchView] = useState<string>("");
   const [view, setView] = useState("overview");
   const [modal, setModal] = useState<Modal | null>(null);
   const [toast, setToast] = useState<{ text: string; bad?: boolean } | null>(null);
@@ -83,6 +88,7 @@ export default function Dashboard() {
       const params = new URLSearchParams();
       if (businessId) params.set("business", businessId);
       params.set("days", days);
+      if (branchView) params.set("branch", branchView);
       const r = await fetch("/api/loyalty?" + params, { credentials: "same-origin" });
       if (r.status === 401) { window.location.href = "/login"; return; }
       if (!r.ok) throw new Error();
@@ -94,7 +100,7 @@ export default function Dashboard() {
     } catch {
       setLoadError(t("err_network"));
     }
-  }, [businessId, days]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [businessId, days, branchView]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
@@ -223,6 +229,12 @@ export default function Dashboard() {
                     <option value="7">{t("range7")}</option><option value="30">{t("range30")}</option>
                     <option value="90">{t("range90")}</option><option value="all">{t("rangeAll")}</option>
                   </select>
+                  {!!data.branches?.length && (
+                    <select aria-label={t("branch")} value={branchView} onChange={(e) => setBranchView(e.target.value)}>
+                      <option value="">{t("allBranches")}</option>
+                      {data.branches.map((br) => <option key={br.id} value={br.id}>{br.name}</option>)}
+                    </select>
+                  )}
                   <button className="btn primary" onClick={() => setModal({ type: "customer" })}><Plus size={18} />{t("newCustomer")}</button>
                 </div>
               </div>
@@ -249,6 +261,21 @@ export default function Dashboard() {
                   <EventList events={data.events ?? []} t={t} lang={lang} />
                 </div>
               </section>
+              {!!data.branches?.length && !!data.perBranch?.length && (
+                <section className="panel" style={{ marginBottom: 22 }}>
+                  <div className="section-head"><h2>{t("byBranch")}</h2><span className="pill">{t("inRange")}</span></div>
+                  <div className="table-wrap">
+                    <table>
+                      <thead><tr><th>{t("branch")}</th><th>{t("statStamps")}</th><th>{t("statRedeemed")}</th></tr></thead>
+                      <tbody>
+                        {data.perBranch.map((r, i) => (
+                          <tr key={i}><td><strong>{r.branch_name ?? t("noBranch")}</strong></td><td><Num>{r.stamps}</Num></td><td><Num>{r.redemptions}</Num></td></tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              )}
             </>
           )}
 
@@ -305,7 +332,7 @@ export default function Dashboard() {
           )}
 
           {view === "station" && (
-            <Station key={b.id} business={b} design={data.design!} t={t} lang={lang} initial={stationPick} onDone={() => load()} notify={notify}
+            <Station key={b.id} business={b} design={data.design!} branches={data.branches ?? []} myBranch={isOwner ? null : data.myBranch ?? null} t={t} lang={lang} initial={stationPick} onDone={() => load()} notify={notify}
               onRegister={() => setModal({ type: "customer" })} myRecent={data.myRecent} />
           )}
 
@@ -341,13 +368,14 @@ export default function Dashboard() {
                   if (await call({ action: "new_join_code" })) load();
                 }}><RefreshCw size={14} />{t("newJoinCode")}</button>
               </section>
+              <Branches branches={data.branches ?? []} t={t} busy={busy} call={call} reload={load} />
               <section className="panel">
                 <button className="btn soft" onClick={() => setModal({ type: "business" })}><Store size={16} />{t("newBusiness")}</button>
               </section>
             </div>
           )}
 
-          <footer><span>perkly. <span className="muted">Small card. Big connection.</span></span><span>{t("pilot")} · v0.3</span></footer>
+          <footer><span>perkly. <span className="muted">Small card. Big connection.</span></span><span>{t("pilot")} · v0.4</span></footer>
         </main>
       </div>
 
@@ -390,7 +418,7 @@ export default function Dashboard() {
                 e.preventDefault();
                 const form = new FormData(e.currentTarget);
                 const delta = Number(form.get("delta"));
-                const r = await call({ action: "adjust", customer: modal.customer.id, delta, note: form.get("note"), requestId: crypto.randomUUID() });
+                const r = await call({ action: "adjust", customer: modal.customer.id, delta, note: form.get("note"), branch: form.get("branch") || undefined, requestId: crypto.randomUUID() });
                 if (r) { notify(t("saved")); load(); setModal(null); }
               }}>
                 <span className="modal-icon"><Activity /></span>
@@ -401,6 +429,14 @@ export default function Dashboard() {
                   <label className="check"><input type="radio" name="delta" value="-1" /><Minus size={14} />{t("removeOne")}</label>
                 </div>
                 <label>{t("reason")}<input name="note" required maxLength={200} /></label>
+                {!!data.branches?.length && (
+                  <label>{t("branch")}
+                    <select name="branch" required defaultValue="">
+                      <option value="" disabled>{t("chooseBranch")}</option>
+                      {data.branches.map((br) => <option key={br.id} value={br.id}>{br.name}</option>)}
+                    </select>
+                  </label>
+                )}
                 <p className="form-hint">{t("correctHint")}</p>
                 <div className="form-actions">
                   <button className="btn primary" disabled={busy}>{t("save")}</button>
@@ -454,6 +490,7 @@ function EventList({ events, t, lang }: { events: any[]; t: any; lang: string })
             <small>
               {t("ev_" + e.kind)} <Num>{e.delta > 0 ? "+" + e.delta : e.delta}</Num>
               {e.actor_name ? " · " + t("by", { name: e.actor_name }) : ""}
+              {e.branch_name ? " · " + e.branch_name : ""}
               {e.note ? " · " + e.note : ""}
             </small>
           </div>
@@ -499,8 +536,8 @@ function BusinessForm({ t, busy, initial, submitLabel, onSubmit }: {
 
 // ---------- Staff station: scan or search, then confirm. The server is the source of truth. ----------
 
-function Station({ business, design, t, lang, initial, onDone, notify, onRegister, myRecent }: {
-  business: Business; design: Design; t: any; lang: any; initial: CardState | null; onDone: () => void;
+function Station({ business, design, branches, myBranch, t, lang, initial, onDone, notify, onRegister, myRecent }: {
+  business: Business; design: Design; branches: { id: string; name: string }[]; myBranch: string | null; t: any; lang: any; initial: CardState | null; onDone: () => void;
   notify: (s: string, bad?: boolean) => void; onRegister: () => void; myRecent?: any[];
 }) {
   const [selected, setSelected] = useState<CardState | null>(initial);
@@ -508,6 +545,17 @@ function Station({ business, design, t, lang, initial, onDone, notify, onRegiste
   const [results, setResults] = useState<CardState[]>([]);
   const [scanning, setScanning] = useState(false);
   const [busy, setBusy] = useState(false);
+  // The branch this device works at (remembered per business on this device).
+  const [branch, setBranch] = useState<string>("");
+  useEffect(() => {
+    let saved = "";
+    try { saved = localStorage.getItem("perkly-branch:" + business.id) || ""; } catch {}
+    setBranch(branches.some((x) => x.id === saved) ? saved : "");
+  }, [business.id, branches]);
+  function pickBranch(id: string) {
+    setBranch(id);
+    try { localStorage.setItem("perkly-branch:" + business.id, id); } catch {}
+  }
   // Kept after a network failure so a retry reuses the same request id and can never count twice.
   const [pending, setPending] = useState<{ kind: string; customer: string; requestId: string } | null>(null);
   const video = useRef<HTMLVideoElement>(null);
@@ -570,11 +618,12 @@ function Station({ business, design, t, lang, initial, onDone, notify, onRegiste
 
   async function act(kind: "stamp" | "redeem") {
     if (!selected || busy) return;
+    if (branches.length && !myBranch && !branch) { notify(t("err_branch_required"), true); return; }
     if (kind === "redeem" && !confirm(t("confirmRedeem", { name: selected.name }))) return;
     const requestId = pending && pending.kind === kind && pending.customer === selected.id ? pending.requestId : crypto.randomUUID();
     setPending({ kind, customer: selected.id, requestId });
     setBusy(true);
-    const r = await post("/api/loyalty", { action: kind, business: business.id, customer: selected.id, requestId });
+    const r = await post("/api/loyalty", { action: kind, business: business.id, customer: selected.id, requestId, branch: myBranch ? undefined : branch || undefined });
     setBusy(false);
     if (r.ok) {
       setPending(null);
@@ -591,11 +640,19 @@ function Station({ business, design, t, lang, initial, onDone, notify, onRegiste
   }
 
   const retrying = pending && selected && pending.customer === selected.id;
+  const fixedBranch = myBranch ? branches.find((x) => x.id === myBranch) : null;
 
   return (
     <>
       <div className="page-head"><div><h1>{t("stationTitle")}</h1><p className="muted">{t("stationSubtitle")}</p></div>
-        <div className="head-actions"><button className="btn soft" onClick={onRegister}><Plus size={16} />{t("newCustomer")}</button></div>
+        <div className="head-actions">
+          {fixedBranch ? <span className="pill branch-pill">{t("workingAt", { b: fixedBranch.name })}</span>
+            : branches.length > 0 && (
+              <select aria-label={t("branch")} value={branch} onChange={(e) => pickBranch(e.target.value)} className={branch ? "" : "needs-choice"}>
+                <option value="">{t("chooseBranch")}</option>
+                {branches.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+              </select>
+            )}<button className="btn soft" onClick={onRegister}><Plus size={16} />{t("newCustomer")}</button></div>
       </div>
       <section className="staff-grid">
         <div className="panel scanner">
@@ -666,7 +723,16 @@ function Team({ data, t, lang, busy, call, reload, showLink }: {
               {(data.team ?? []).map((m: any) => (
                 <tr key={m.id}>
                   <td><strong>{m.name}</strong><br /><small dir="ltr">{m.email}</small></td>
-                  <td><span className="pill">{m.role === "owner" ? t("roleOwner") : t("roleStaff")}</span></td>
+                  <td>
+                    <span className="pill">{m.role === "owner" ? t("roleOwner") : t("roleStaff")}</span>
+                    {m.role === "staff" && !m.revoked && !!data.branches?.length && (
+                      <select className="inline-select" aria-label={t("staffBranch")} value={m.branch ?? ""} disabled={busy}
+                        onChange={async (e) => { if (await call({ action: "set_member_branch", user: m.id, branch: e.target.value || null })) reload(); }}>
+                        <option value="">{t("anyBranch")}</option>
+                        {data.branches.map((br) => <option key={br.id} value={br.id}>{br.name}</option>)}
+                      </select>
+                    )}
+                  </td>
                   <td>
                     {m.revoked ? <span className="muted">{t("revokedOn")}</span> : m.role === "staff" ? (
                       <button className="btn soft small danger" disabled={busy} onClick={async () => {
@@ -686,10 +752,19 @@ function Team({ data, t, lang, busy, call, reload, showLink }: {
         <form className="stack-form" onSubmit={async (e) => {
           e.preventDefault();
           const form = e.currentTarget;
-          const r = await call({ action: "invite_staff", label: new FormData(form).get("label") });
+          const f = new FormData(form);
+          const r = await call({ action: "invite_staff", label: f.get("label"), branch: f.get("branch") || null });
           if (r) { form.reset(); reload(); showLink(r.inviteUrl); }
         }}>
           <label>{t("inviteLabel")}<input name="label" required maxLength={60} /></label>
+          {!!data.branches?.length && (
+            <label>{t("staffBranch")}
+              <select name="branch" defaultValue="">
+                <option value="">{t("anyBranch")}</option>
+                {data.branches.map((br) => <option key={br.id} value={br.id}>{br.name}</option>)}
+              </select>
+            </label>
+          )}
           <button className="btn primary" disabled={busy}><Plus size={16} />{t("inviteStaff")}</button>
         </form>
         {!!data.invites?.length && (
@@ -705,5 +780,53 @@ function Team({ data, t, lang, busy, call, reload, showLink }: {
         )}
       </section>
     </div>
+  );
+}
+
+// ---------- Branches (owner) ----------
+
+function Branches({ branches, t, busy, call, reload }: {
+  branches: { id: string; name: string }[]; t: any; busy: boolean; call: (b: Record<string, unknown>) => Promise<any>; reload: () => void;
+}) {
+  const [editing, setEditing] = useState<string | null>(null);
+  return (
+    <section className="panel">
+      <div className="section-head"><h2><Store size={18} /> {t("branches")}</h2></div>
+      <p className="form-hint">{t("branchHint")}</p>
+      {!branches.length && <p className="muted">{t("noBranches")}</p>}
+      {branches.map((br) => (
+        <div className="invite-row" key={br.id}>
+          {editing === br.id ? (
+            <form className="inline-form" onSubmit={async (e) => {
+              e.preventDefault();
+              if (await call({ action: "rename_branch", branch: br.id, name: new FormData(e.currentTarget).get("name") })) { setEditing(null); reload(); }
+            }}>
+              <input name="name" defaultValue={br.name} required maxLength={60} autoFocus aria-label={t("branchName")} />
+              <button className="btn primary small" disabled={busy}>{t("save")}</button>
+              <button type="button" className="btn soft small" onClick={() => setEditing(null)}>{t("cancel")}</button>
+            </form>
+          ) : (
+            <>
+              <strong>{br.name}</strong>
+              <div className="row-actions">
+                <button className="btn soft small" onClick={() => setEditing(br.id)}>{t("rename")}</button>
+                <button className="btn soft small danger" disabled={busy} onClick={async () => {
+                  if (!confirm(t("archiveConfirm", { b: br.name }))) return;
+                  if (await call({ action: "archive_branch", branch: br.id })) reload();
+                }}>{t("archive")}</button>
+              </div>
+            </>
+          )}
+        </div>
+      ))}
+      <form className="inline-form" style={{ marginTop: 14 }} onSubmit={async (e) => {
+        e.preventDefault();
+        const form = e.currentTarget;
+        if (await call({ action: "create_branch", name: new FormData(form).get("name") })) { form.reset(); reload(); }
+      }}>
+        <input name="name" required maxLength={60} placeholder={t("branchName")} aria-label={t("branchName")} />
+        <button className="btn primary small" disabled={busy}><Plus size={14} />{t("addBranch")}</button>
+      </form>
+    </section>
   );
 }

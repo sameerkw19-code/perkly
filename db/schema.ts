@@ -64,7 +64,7 @@ export const events = sqliteTable(
     stampsAfter: integer("stamps_after"),
     note: text("note"),
   },
-  (t) => [index("events_business_created").on(t.business, t.created)],
+  (t) => [index("events_business_created").on(t.business, t.created), index("events_business_branch").on(t.business, t.branch, t.created)],
 );
 
 export const users = sqliteTable("users", {
@@ -96,6 +96,8 @@ export const memberships = sqliteTable(
     role: text("role").notNull(), // 'owner' | 'staff'
     created: text("created").notNull(),
     revoked: text("revoked"),
+    // Staff tied to one branch record every action there. Null = may work in any branch.
+    branch: text("branch"),
   },
   (t) => [uniqueIndex("membership_unique").on(t.business, t.user)],
 );
@@ -109,6 +111,7 @@ export const invites = sqliteTable("invites", {
   createdBy: text("created_by").notNull(),
   created: text("created").notNull(),
   expires: text("expires").notNull(),
+  branch: text("branch"),
   usedBy: text("used_by"),
   used: text("used"),
   revoked: text("revoked"),
@@ -150,4 +153,18 @@ export const assets = sqliteTable(
     createdBy: text("created_by").notNull(),
   },
   (t) => [index("assets_business").on(t.business)],
+);
+
+// Branches of a business. Customers and cards are shared by all branches;
+// every stamp, redemption and correction records the branch where it happened.
+export const branches = sqliteTable(
+  "branches",
+  {
+    id: text("id").primaryKey(),
+    business: text("business").notNull().references(() => businesses.id),
+    name: text("name").notNull(),
+    created: text("created").notNull(),
+    archived: text("archived"),
+  },
+  (t) => [index("branches_business").on(t.business)],
 );

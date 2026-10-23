@@ -319,3 +319,56 @@ test("design: staff and other businesses cannot edit or borrow images", async ()
   assert.equal((await ownerC.act(bizC, "save_design", { design: cDesign })).status, 404, "cannot use another business's image");
   assert.equal((await upload(ownerC, bizA, "logo", PNG_1x1)).status, 404, "cannot upload into another business");
 });
+
+// ---------------- Branches ----------------
+test("branches: required once they exist, staff locked to their branch, reports by branch", async () => {
+  const owner = new Client();
+  await signup(owner, "branchOwner");
+  const biz = (await owner.post("/api/loyalty", { action: "create_business", name: "Chain", reward: "Free", target: 5, color: "#123456" })).body.id;
+  const cust = (await owner.act(biz, "register_customer", { name: "Lea", phone: "0531234567" })).body.id;
+
+  // Without branches, actions work without one.
+  assert.equal((await owner.act(biz, "stamp", { customer: cust, requestId: id() })).status, 200);
+
+  const north = (await owner.act(biz, "create_branch", { name: "North" })).body.id;
+  const south = (await owner.act(biz, "create_branch", { name: "South" })).body.id;
+  const noBranch = await owner.act(biz, "stamp", { customer: cust, requestId: id() });
+  assert.equal(noBranch.status, 400);
+  assert.equal(noBranch.body.code, "branch_required");
+  assert.equal((await owner.act(biz, "stamp", { customer: cust, branch: south, requestId: id() })).status, 200);
+
+  // Staff invited to North: whatever branch they send, North is recorded.
+  const inv = await owner.act(biz, "invite_staff", { label: "N", branch: north });
+  const st = new Client();
+  await st.post("/api/auth", { action: "accept_invite", token: new URL(inv.body.inviteUrl).pathname.split("/").pop(), name: "North Staff", email: `north-${run}@test.perkly`, password: "north pass 1" });
+  const me = (await st.get(`/api/loyalty?business=${biz}`)).body;
+  assert.equal(me.myBranch, north);
+  assert.equal((await st.act(biz, "stamp", { customer: cust, branch: south, requestId: id() })).status, 200);
+
+  const view = (await owner.get(`/api/loyalty?business=${biz}&days=all`)).body;
+  const byName = Object.fromEntries(view.perBranch.map((r) => [r.branch_name ?? "none", r.stamps]));
+  assert.deepEqual(byName, { North: 1, South: 1, none: 1 });
+  const onlyNorth = (await owner.get(`/api/loyalty?business=${biz}&days=all&branch=${north}`)).body;
+  assert.equal(onlyNorth.stats.stamps, 1);
+  assert.ok(onlyNorth.events.every((e) => e.branch_name === "North"));
+
+  // Another business's branch id is rejected.
+  const otherBranch = (await ownerA.act(bizA, "create_branch", { name: "A-branch" })).body.id;
+  assert.equal((await owner.act(biz, "stamp", { customer: cust, branch: otherBranch, requestId: id() })).status, 400);
+  assert.equal((await owner.act(biz, "set_member_branch", { user: "x", branch: otherBranch })).status, 400);
+
+  // Staff cannot manage branches.
+  assert.equal((await st.act(biz, "create_branch", { name: "Hack" })).status, 403);
+  assert.equal((await st.act(biz, "archive_branch", { branch: north })).status, 403);
+
+  // Closing North blocks its staff until the owner moves them.
+  assert.equal((await owner.act(biz, "archive_branch", { branch: north })).status, 200);
+  const blocked = await st.act(biz, "stamp", { customer: cust, requestId: id() });
+  assert.equal(blocked.status, 409);
+  assert.equal(blocked.body.code, "branch_invalid");
+  const staffId = view.team.find((m) => m.role === "staff").id;
+  assert.equal((await owner.act(biz, "set_member_branch", { user: staffId, branch: south })).status, 200);
+  assert.equal((await st.act(biz, "stamp", { customer: cust, requestId: id() })).status, 200);
+  const hist = (await owner.get(`/api/loyalty?business=${biz}&days=all`)).body.events;
+  assert.equal(hist.filter((e) => e.branch_name === "North").length, 1, "closed branch keeps its history");
+});

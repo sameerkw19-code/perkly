@@ -281,6 +281,28 @@ Object.assign(words, {
   err_nothing_to_publish: ["אין טיוטה לפרסם.", "لا توجد مسودة للنشر.", "There's no draft to publish."],
 } satisfies Record<string, Entry>);
 
+// ---- Branches ----
+Object.assign(words, {
+  branches: ["סניפים", "الفروع", "Branches"],
+  branch: ["סניף", "الفرع", "Branch"],
+  allBranches: ["כל הסניפים", "كل الفروع", "All branches"],
+  anyBranch: ["כל סניף", "أي فرع", "Any branch"],
+  addBranch: ["הוספת סניף", "إضافة فرع", "Add branch"],
+  branchName: ["שם הסניף", "اسم الفرع", "Branch name"],
+  rename: ["שינוי שם", "تغيير الاسم", "Rename"],
+  archive: ["סגירת סניף", "إغلاق الفرع", "Close branch"],
+  archiveConfirm: ["לסגור את הסניף {b}? ההיסטוריה נשמרת. עובדים שמשויכים אליו לא יוכלו לפעול עד שתעבירו אותם לסניף אחר.", "إغلاق فرع {b}؟ يبقى السجل محفوظاً. الموظفون المرتبطون به لن يتمكنوا من العمل حتى تنقلهم لفرع آخر.", "Close the {b} branch? History is kept. Staff tied to it can't act until you move them to another branch."],
+  branchHint: ["לקוחות וכרטיסים משותפים לכל הסניפים. כל חותמת, מימוש ותיקון נרשמים עם הסניף שבו בוצעו.", "الزبائن والبطاقات مشتركة بين كل الفروع. كل ختم واستخدام وتصحيح يُسجَّل مع الفرع الذي تم فيه.", "Customers and cards are shared by all branches. Every stamp, redemption and correction is recorded with its branch."],
+  noBranches: ["אין סניפים. אפשר לעבוד גם בלי, ואז הפעולות לא משויכות לסניף.", "لا توجد فروع. يمكن العمل بدونها، فلا تُنسب العمليات لفرع.", "No branches. You can work without them; actions then aren't tied to a branch."],
+  staffBranch: ["סניף העובד", "فرع الموظف", "Staff branch"],
+  chooseBranch: ["בחרו סניף", "اختر الفرع", "Choose a branch"],
+  workingAt: ["עובד/ת בסניף: {b}", "تعمل في فرع: {b}", "Working at: {b}"],
+  byBranch: ["לפי סניף", "حسب الفرع", "By branch"],
+  noBranch: ["ללא סניף", "بدون فرع", "No branch"],
+  err_branch_required: ["בחרו סניף לפני הפעולה.", "اختر فرعاً قبل العملية.", "Choose a branch first."],
+  err_branch_invalid: ["הסניף לא פעיל. בקשו מבעל העסק לשייך אתכם לסניף פעיל.", "الفرع غير فعال. اطلب من صاحب المشروع ربطك بفرع فعال.", "That branch isn't active. Ask the owner to assign you to an active branch."],
+} satisfies Record<string, Entry>);
+
 export function translate(lang: Lang, key: string, vars?: Record<string, string | number>): string {
   const entry = words[key];
   let text = entry ? entry[LANGS.indexOf(lang)] : key;

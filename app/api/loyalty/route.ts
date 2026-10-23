@@ -1,5 +1,5 @@
 import { getD1 } from "../../../db";
-import { getMemberships, getRole, getUser } from "../../../lib/server/auth";
+import { getMembership, getMemberships, getUser } from "../../../lib/server/auth";
 import { randomCode, randomToken, sha256 } from "../../../lib/server/crypto";
 import { fail, json, readJson, sameOrigin, str } from "../../../lib/server/http";
 import { allow } from "../../../lib/server/rate-limit";
@@ -27,6 +27,11 @@ function cardState(c: Customer) {
   return { id: c.id, name: c.name, stamps: c.stamps, target: c.target, rewardReady: c.stamps >= c.target };
 }
 
+type Branch = { id: string; name: string };
+async function activeBranches(db: D1Database, businessId: string) {
+  return (await db.prepare("SELECT id, name FROM branches WHERE business = ? AND archived IS NULL ORDER BY created").bind(businessId).all<Branch>()).results;
+}
+
 async function newCardSecret() {
   const secret = randomToken(24);
   return { secret, hash: await sha256(secret) };
@@ -47,12 +52,14 @@ export async function GET(request: Request) {
 
   const business = await loadBusiness(db, membership.business);
   const role = membership.role;
-  const base = { me, memberships, role, business, design: await liveDesign(db, business!) };
+  const branches = await activeBranches(db, business!.id);
+  const base = { me, memberships, role, business, branches, myBranch: membership.branch, design: await liveDesign(db, business!) };
 
   if (role === "staff") {
     const mine = await db
       .prepare(
-        `SELECT e.kind, e.delta, e.created, c.name AS customer FROM events e JOIN customers c ON c.id = e.customer
+        `SELECT e.kind, e.delta, e.created, c.name AS customer, br.name AS branch_name FROM events e
+         JOIN customers c ON c.id = e.customer LEFT JOIN branches br ON br.id = e.branch
          WHERE e.business = ? AND e.actor = ? ORDER BY e.created DESC LIMIT 10`,
       )
       .bind(business!.id, user.id)
@@ -65,31 +72,34 @@ export async function GET(request: Request) {
   const days = daysParam === "all" ? null : [7, 30, 90].includes(Number(daysParam)) ? Number(daysParam) : 30;
   const since = days ? new Date(Date.now() - days * 86_400_000).toISOString() : "0000";
   const hourAgo = new Date(Date.now() - 3_600_000).toISOString();
+  // Optional branch filter for activity and stamp/redemption counts ("" = all branches).
+  const branchParam = url.searchParams.get("branch") || "";
+  const branchFilter = branches.some((b) => b.id === branchParam) ? branchParam : "";
 
-  const [customers, events, stats, team, invites, busyCustomers, busyStaff] = await db.batch([
+  const [customers, events, stats, team, invites, busyCustomers, busyStaff, perBranch] = await db.batch([
     db.prepare(
       `SELECT id, name, phone, stamps, target, created, source, consent_marketing, card_hash IS NOT NULL AS has_link
        FROM customers WHERE business = ? ORDER BY created DESC LIMIT 5000`,
     ).bind(business!.id),
     db.prepare(
-      `SELECT e.id, e.kind, e.delta, e.created, e.actor_role, e.stamps_after, e.note, c.name AS customer, u.name AS actor_name
-       FROM events e JOIN customers c ON c.id = e.customer LEFT JOIN users u ON u.id = e.actor
-       WHERE e.business = ? ORDER BY e.created DESC LIMIT 50`,
-    ).bind(business!.id),
+      `SELECT e.id, e.kind, e.delta, e.created, e.actor_role, e.stamps_after, e.note, c.name AS customer, u.name AS actor_name, br.name AS branch_name
+       FROM events e JOIN customers c ON c.id = e.customer LEFT JOIN users u ON u.id = e.actor LEFT JOIN branches br ON br.id = e.branch
+       WHERE e.business = ?1 AND (?2 = '' OR e.branch = ?2) ORDER BY e.created DESC LIMIT 50`,
+    ).bind(business!.id, branchFilter),
     db.prepare(
       `SELECT
          (SELECT COUNT(*) FROM customers WHERE business = ?1) AS customers,
          (SELECT COUNT(*) FROM customers WHERE business = ?1 AND created >= ?2) AS new_customers,
          (SELECT COUNT(*) FROM customers WHERE business = ?1 AND stamps >= target) AS rewards_ready,
-         (SELECT COUNT(*) FROM events WHERE business = ?1 AND kind = 'stamp' AND created >= ?2) AS stamps,
-         (SELECT COUNT(*) FROM events WHERE business = ?1 AND kind = 'redeem' AND created >= ?2) AS redemptions`,
-    ).bind(business!.id, since),
+         (SELECT COUNT(*) FROM events WHERE business = ?1 AND kind = 'stamp' AND created >= ?2 AND (?3 = '' OR branch = ?3)) AS stamps,
+         (SELECT COUNT(*) FROM events WHERE business = ?1 AND kind = 'redeem' AND created >= ?2 AND (?3 = '' OR branch = ?3)) AS redemptions`,
+    ).bind(business!.id, since, branchFilter),
     db.prepare(
-      `SELECT u.id, u.name, u.email, m.role, m.created, m.revoked FROM memberships m JOIN users u ON u.id = m.user
+      `SELECT u.id, u.name, u.email, m.role, m.created, m.revoked, m.branch FROM memberships m JOIN users u ON u.id = m.user
        WHERE m.business = ? ORDER BY m.role, m.created`,
     ).bind(business!.id),
     db.prepare(
-      `SELECT id, label, role, created, expires FROM invites
+      `SELECT id, label, role, created, expires, branch FROM invites
        WHERE business = ? AND used IS NULL AND revoked IS NULL AND expires > ? ORDER BY created DESC`,
     ).bind(business!.id, new Date().toISOString()),
     db.prepare(
@@ -100,6 +110,12 @@ export async function GET(request: Request) {
       `SELECT u.name, COUNT(*) AS n FROM events e JOIN users u ON u.id = e.actor
        WHERE e.business = ? AND e.created >= ? GROUP BY e.actor HAVING n >= 40`,
     ).bind(business!.id, hourAgo),
+    db.prepare(
+      `SELECT e.branch, br.name AS branch_name,
+         SUM(e.kind = 'stamp') AS stamps, SUM(e.kind = 'redeem') AS redemptions
+       FROM events e LEFT JOIN branches br ON br.id = e.branch
+       WHERE e.business = ? AND e.created >= ? GROUP BY e.branch ORDER BY stamps DESC`,
+    ).bind(business!.id, since),
   ]);
 
   // Card editor data (owner only): draft, live version and uploaded images.
@@ -118,6 +134,8 @@ export async function GET(request: Request) {
       images: images.results,
     },
     range: days ?? "all",
+    branchFilter,
+    perBranch: perBranch.results,
     customers: (customers.results as any[]).map((c) => ({ ...c, phone: formatPhone(c.phone), has_link: !!c.has_link })),
     events: events.results,
     stats: stats.results[0],
@@ -160,8 +178,9 @@ export async function POST(request: Request) {
   }
 
   // Every other action: the server checks the user's role in this business.
-  const role = await getRole(db, user.id, p.business);
-  if (!role) return fail("not_found", 404, "Business not found");
+  const membership = await getMembership(db, user.id, p.business);
+  if (!membership) return fail("not_found", 404, "Business not found");
+  const role = membership.role;
   const business = (await loadBusiness(db, p.business as string))!;
   const ownerOnly = () => (role === "owner" ? null : fail("forbidden", 403, "Owner permission required"));
 
@@ -231,6 +250,19 @@ export async function POST(request: Request) {
       const c = await db.prepare("SELECT * FROM customers WHERE id = ? AND business = ?").bind(p.customer ?? "", business.id).first<Customer>();
       if (!c) return fail("unknown_card", 404, "Customer not found");
 
+      // Which branch this happened in. Staff tied to a branch always record their own branch.
+      const list = await activeBranches(db, business.id);
+      let branch: string | null = null;
+      if (role === "staff" && membership.branch) {
+        if (!list.some((b) => b.id === membership.branch)) return fail("branch_invalid", 409, "Your branch is closed. Ask the owner.");
+        branch = membership.branch;
+      } else if (typeof p.branch === "string" && p.branch) {
+        if (!list.some((b) => b.id === p.branch)) return fail("branch_invalid", 400, "Unknown branch");
+        branch = p.branch;
+      } else if (list.length) {
+        return fail("branch_required", 400, "Choose a branch");
+      }
+
       let update: D1PreparedStatement;
       let delta: number;
       let note: string | null = null;
@@ -260,9 +292,9 @@ export async function POST(request: Request) {
       const result = await db.batch([
         update,
         db.prepare(
-          `INSERT INTO events(id, customer, actor, kind, delta, created, business, actor_role, stamps_after, note)
-           SELECT ?, ?, ?, ?, ?, ?, ?, ?, (SELECT stamps FROM customers WHERE id = ?), ? WHERE changes() = 1`,
-        ).bind(p.requestId, c.id, user.id, p.action, delta, now, business.id, role, c.id, note),
+          `INSERT INTO events(id, customer, actor, kind, delta, created, business, branch, actor_role, stamps_after, note)
+           SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT stamps FROM customers WHERE id = ?), ? WHERE changes() = 1`,
+        ).bind(p.requestId, c.id, user.id, p.action, delta, now, business.id, branch, role, c.id, note),
       ]);
 
       const fresh = (await db.prepare("SELECT * FROM customers WHERE id = ?").bind(c.id).first<Customer>())!;
@@ -287,10 +319,12 @@ export async function POST(request: Request) {
       const denied = ownerOnly(); if (denied) return denied;
       if (!(await allow(db, `invite-create:${user.id}`, 30, 86_400))) return fail("rate_limited", 429);
       const label = str(p.label, 60);
+      const branch = typeof p.branch === "string" && p.branch ? p.branch : null;
+      if (branch && !(await activeBranches(db, business.id)).some((b) => b.id === branch)) return fail("branch_invalid", 400);
       const token = randomToken(24);
       const expires = new Date(Date.now() + 7 * 86_400_000).toISOString();
-      await db.prepare("INSERT INTO invites(id, business, role, label, created_by, created, expires) VALUES(?, ?, 'staff', ?, ?, ?, ?)")
-        .bind(await sha256(token), business.id, label, user.id, now, expires).run();
+      await db.prepare("INSERT INTO invites(id, business, role, label, created_by, created, expires, branch) VALUES(?, ?, 'staff', ?, ?, ?, ?, ?)")
+        .bind(await sha256(token), business.id, label, user.id, now, expires, branch).run();
       return json({ inviteUrl: `${origin}/invite/${token}`, expires });
     }
 
@@ -311,6 +345,41 @@ export async function POST(request: Request) {
       const others = await db.prepare("SELECT COUNT(*) AS n FROM memberships WHERE user = ? AND revoked IS NULL").bind(p.user ?? "").first<{ n: number }>();
       if (!others?.n) await db.prepare("DELETE FROM sessions WHERE user = ?").bind(p.user ?? "").run();
       return json({ ok: true });
+    }
+
+    case "create_branch": {
+      const denied = ownerOnly(); if (denied) return denied;
+      const name = str(p.name, 60);
+      if (!name) return fail("bad_details", 400);
+      const count = await db.prepare("SELECT COUNT(*) AS n FROM branches WHERE business = ?").bind(business.id).first<{ n: number }>();
+      if ((count?.n ?? 0) >= 50) return fail("rate_limited", 429, "Too many branches");
+      const id = crypto.randomUUID();
+      await db.prepare("INSERT INTO branches(id, business, name, created) VALUES(?, ?, ?, ?)").bind(id, business.id, name, now).run();
+      return json({ id });
+    }
+
+    case "rename_branch": {
+      const denied = ownerOnly(); if (denied) return denied;
+      const name = str(p.name, 60);
+      if (!name) return fail("bad_details", 400);
+      const r = await db.prepare("UPDATE branches SET name = ? WHERE id = ? AND business = ? AND archived IS NULL").bind(name, p.branch ?? "", business.id).run();
+      return r.meta.changes ? json({ ok: true }) : fail("branch_invalid", 404);
+    }
+
+    case "archive_branch": {
+      const denied = ownerOnly(); if (denied) return denied;
+      // History keeps the branch name; staff tied to it must be moved before they can act again.
+      const r = await db.prepare("UPDATE branches SET archived = ? WHERE id = ? AND business = ? AND archived IS NULL").bind(now, p.branch ?? "", business.id).run();
+      return r.meta.changes ? json({ ok: true }) : fail("branch_invalid", 404);
+    }
+
+    case "set_member_branch": {
+      const denied = ownerOnly(); if (denied) return denied;
+      const branch = typeof p.branch === "string" && p.branch ? p.branch : null;
+      if (branch && !(await activeBranches(db, business.id)).some((b) => b.id === branch)) return fail("branch_invalid", 400);
+      const r = await db.prepare("UPDATE memberships SET branch = ? WHERE business = ? AND user = ? AND role = 'staff' AND revoked IS NULL")
+        .bind(branch, business.id, p.user ?? "").run();
+      return r.meta.changes ? json({ ok: true }) : fail("not_found", 404);
     }
 
     case "save_design": {

@@ -5,7 +5,7 @@ const SESSION_DAYS = 30;
 
 export type User = { id: string; email: string; name: string };
 export type Role = "owner" | "staff";
-export type Membership = { business: string; role: Role; businessName: string };
+export type Membership = { business: string; role: Role; businessName: string; branch: string | null };
 
 export function readCookie(cookieHeader: string | null, name: string): string | null {
   if (!cookieHeader) return null;
@@ -66,7 +66,7 @@ export async function getUser(db: D1Database, cookieHeader: string | null): Prom
 export async function getMemberships(db: D1Database, userId: string): Promise<Membership[]> {
   const rows = await db
     .prepare(
-      `SELECT m.business, m.role, b.name AS businessName FROM memberships m
+      `SELECT m.business, m.role, m.branch, b.name AS businessName FROM memberships m
        JOIN businesses b ON b.id = m.business
        WHERE m.user = ? AND m.revoked IS NULL ORDER BY b.created`,
     )
@@ -75,7 +75,16 @@ export async function getMemberships(db: D1Database, userId: string): Promise<Me
   return rows.results;
 }
 
-/** Role of the user in one business, or null. Checked on every request. */
+/** Role and branch of the user in one business, or null. Checked on every request. */
+export async function getMembership(db: D1Database, userId: string, businessId: unknown): Promise<{ role: Role; branch: string | null } | null> {
+  if (typeof businessId !== "string" || !businessId) return null;
+  return db
+    .prepare("SELECT role, branch FROM memberships WHERE user = ? AND business = ? AND revoked IS NULL")
+    .bind(userId, businessId)
+    .first<{ role: Role; branch: string | null }>();
+}
+
+/** Role of the user in one business, or null. */
 export async function getRole(db: D1Database, userId: string, businessId: unknown): Promise<Role | null> {
   if (typeof businessId !== "string" || !businessId) return null;
   const row = await db
