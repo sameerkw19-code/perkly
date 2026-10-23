@@ -193,3 +193,11 @@ select.needs-choice{border-color:#f0a050;box-shadow:0 0 0 3px #f0a05022}
 .fix-reason{display:grid;gap:6px;width:100%;font-size:13px;font-weight:bold}
 .center-row{justify-content:center;flex-wrap:wrap}
 .stepper output{color:var(--ink)}
+
+/* v0.6 saved rewards */
+.rewards-badge{display:flex;align-items:center;gap:8px;justify-content:center;background:var(--c-st);color:var(--c-st-ink);border-radius:12px;padding:9px 12px;font-weight:bold;font-size:14px}
+.staff-actions{display:grid;gap:12px;width:100%;max-width:465px;justify-items:center}
+.mode-set{border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:10px;margin:0}
+.mode-set legend{font-size:13px;font-weight:bold;padding:0 6px}
+.stack-form select{width:100%}
+.ready-expiry{display:block;font-weight:normal;font-size:12px;margin-top:4px}

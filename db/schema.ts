@@ -17,6 +17,10 @@ export const businesses = sqliteTable(
     designDraft: text("design_draft"),
     // 1 = staff may correct a card's stamp count (always with a reason, always logged).
     staffAdjust: integer("staff_adjust").notNull().default(1),
+    // 'bank' = a full card saves a reward and starts a new round; 'block' = redeem before collecting more.
+    rewardMode: text("reward_mode").notNull().default("block"),
+    // Days a saved reward stays valid (0 = no expiry). Applies to rewards earned after the change.
+    rewardExpiryDays: integer("reward_expiry_days").notNull().default(0),
   },
   (t) => [uniqueIndex("businesses_join_code").on(t.joinCode)],
 );
@@ -169,4 +173,21 @@ export const branches = sqliteTable(
     archived: text("archived"),
   },
   (t) => [index("branches_business").on(t.business)],
+);
+
+// Saved rewards (bank mode). One row per earned reward; never deleted.
+export const rewards = sqliteTable(
+  "rewards",
+  {
+    // `${requestId}:${n}` so repeating a request can never create a reward twice.
+    id: text("id").primaryKey(),
+    business: text("business").notNull().references(() => businesses.id),
+    customer: text("customer").notNull().references(() => customers.id),
+    earned: text("earned").notNull(),
+    earnedEvent: text("earned_event").notNull(),
+    expires: text("expires"),
+    redeemed: text("redeemed"),
+    redeemEvent: text("redeem_event"),
+  },
+  (t) => [index("rewards_customer").on(t.customer, t.redeemed), index("rewards_business").on(t.business, t.redeemed)],
 );

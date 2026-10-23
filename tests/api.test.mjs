@@ -67,7 +67,7 @@ test("mutations from another site are rejected", async () => {
 
 test("1. create a business and add a customer", async () => {
   await signup(ownerA, "ownerA");
-  const b = await ownerA.post("/api/loyalty", { action: "create_business", name: "Corner Cafe", reward: "Free coffee", target: 9, color: "#7558E8" });
+  const b = await ownerA.post("/api/loyalty", { action: "create_business", name: "Corner Cafe", reward: "Free coffee", target: 9, color: "#7558E8", rewardMode: "block" });
   assert.equal(b.status, 200);
   bizA = b.body.id;
   const c = await ownerA.act(bizA, "register_customer", { name: "Dana", phone: "050-123 4567" });
@@ -324,7 +324,7 @@ test("design: staff and other businesses cannot edit or borrow images", async ()
 test("branches: required once they exist, staff locked to their branch, reports by branch", async () => {
   const owner = new Client();
   await signup(owner, "branchOwner");
-  const biz = (await owner.post("/api/loyalty", { action: "create_business", name: "Chain", reward: "Free", target: 5, color: "#123456" })).body.id;
+  const biz = (await owner.post("/api/loyalty", { action: "create_business", name: "Chain", reward: "Free", target: 5, color: "#123456", rewardMode: "block" })).body.id;
   const cust = (await owner.act(biz, "register_customer", { name: "Lea", phone: "0531234567" })).body.id;
 
   // Without branches, actions work without one.
@@ -378,7 +378,7 @@ test("branches: required once they exist, staff locked to their branch, reports 
 test("station: several purchases in one action; staff can fix the count with a reason; owner can switch that off", async () => {
   const owner = new Client();
   await signup(owner, "stationOwner");
-  const biz = (await owner.post("/api/loyalty", { action: "create_business", name: "Cafe2", reward: "Free", target: 9, color: "#123456" })).body.id;
+  const biz = (await owner.post("/api/loyalty", { action: "create_business", name: "Cafe2", reward: "Free", target: 9, color: "#123456", rewardMode: "block" })).body.id;
   const cust = (await owner.act(biz, "register_customer", { name: "Omer", phone: "0549876543" })).body.id;
   const inv = await owner.act(biz, "invite_staff", { label: "S" });
   const st = new Client();
@@ -421,4 +421,78 @@ test("station: several purchases in one action; staff can fix the count with a r
   assert.equal(off.status, 200);
   assert.equal((await st.act(biz, "adjust", { customer: cust, delta: 1, from: 4, note: "x", requestId: id() })).status, 403);
   assert.equal((await owner.act(biz, "adjust", { customer: cust, delta: 1, from: 4, note: "owner fix", requestId: id() })).status, 200);
+});
+
+
+// ---------------- Collect mode (saved rewards) ----------------
+test("collect mode: full cards save rewards, several can wait, redeem uses one, never double", async () => {
+  const owner = new Client();
+  await signup(owner, "bankOwner");
+  const biz = (await owner.post("/api/loyalty", { action: "create_business", name: "Bank", reward: "Free", target: 3, color: "#123456" })).body.id;
+  assert.equal((await owner.get(`/api/loyalty?business=${biz}`)).body.business.reward_mode, "bank", "new businesses collect by default");
+  const cust = (await owner.act(biz, "register_customer", { name: "Rina", phone: "0551112233" })).body.id;
+
+  let r = await owner.act(biz, "stamp", { customer: cust, count: 2, requestId: id() });
+  assert.deepEqual([r.body.card.stamps, r.body.card.rewards], [2, 0]);
+  const rid = id();
+  r = await owner.act(biz, "stamp", { customer: cust, count: 2, requestId: rid });
+  assert.deepEqual([r.body.card.stamps, r.body.card.rewards, r.body.earned], [1, 1, 1], "rolls over into a saved reward");
+  r = await owner.act(biz, "stamp", { customer: cust, count: 2, requestId: rid });
+  assert.equal(r.body.replayed, true);
+  assert.equal(r.body.card.rewards, 1, "repeating the request does not save another reward");
+  r = await owner.act(biz, "stamp", { customer: cust, count: 5, requestId: id() });
+  assert.deepEqual([r.body.card.stamps, r.body.card.rewards, r.body.earned], [0, 3, 2], "6 stamps on a 3-card = 2 more rewards");
+
+  // Stamps keep working while rewards wait.
+  r = await owner.act(biz, "stamp", { customer: cust, requestId: id() });
+  assert.deepEqual([r.body.card.stamps, r.body.card.rewards], [1, 3]);
+
+  r = await owner.act(biz, "redeem", { customer: cust, requestId: id() });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.card.rewards, 2);
+  const many = await Promise.all([1, 2, 3].map(() => owner.act(biz, "redeem", { customer: cust, requestId: id() })));
+  assert.equal(many.filter((x) => x.status === 200).length, 2, "only the 2 saved rewards can be used");
+  const none = await owner.act(biz, "redeem", { customer: cust, requestId: id() });
+  assert.equal(none.status, 409);
+  assert.equal(none.body.code, "not_ready");
+  assert.equal(none.body.card.stamps, 1, "redeeming never touches the current stamps");
+});
+
+test("collect mode: parallel stamps from several devices roll over exactly", async () => {
+  const owner = new Client();
+  await signup(owner, "bankPar");
+  const biz = (await owner.post("/api/loyalty", { action: "create_business", name: "Par", reward: "Free", target: 3, color: "#123456" })).body.id;
+  const cust = (await owner.act(biz, "register_customer", { name: "Par", phone: "0551112244" })).body.id;
+  await Promise.all(Array.from({ length: 9 }, () => owner.act(biz, "stamp", { customer: cust, requestId: id() })));
+  const c = (await owner.get(`/api/loyalty?business=${biz}&days=all`)).body.customers.find((x) => x.id === cust);
+  assert.deepEqual([c.stamps, c.rewards], [0, 3]);
+});
+
+test("collect mode: expiry applies to new rewards only; switching modes converts full cards", async () => {
+  const owner = new Client();
+  await signup(owner, "bankExp");
+  const biz = (await owner.post("/api/loyalty", { action: "create_business", name: "Exp", reward: "Free", target: 2, color: "#123456", rewardMode: "block" })).body.id;
+  const cust = (await owner.act(biz, "register_customer", { name: "Exp", phone: "0551112255" })).body.id;
+  await owner.act(biz, "stamp", { customer: cust, count: 2, requestId: id() });
+  const full = await owner.act(biz, "stamp", { customer: cust, requestId: id() });
+  assert.equal(full.body.code, "reward_ready", "redeem-first mode stops at a full card");
+
+  const sw = await owner.act(biz, "update_business", { name: "Exp", reward: "Free", target: 2, color: "#123456", rewardMode: "bank", rewardExpiryDays: 30 });
+  assert.equal(sw.status, 200);
+  let c = (await owner.get(`/api/loyalty?business=${biz}&days=all`)).body.customers.find((x) => x.id === cust);
+  assert.deepEqual([c.stamps, c.rewards], [0, 1], "full card became a saved reward");
+
+  const r = await owner.act(biz, "stamp", { customer: cust, count: 2, requestId: id() });
+  assert.equal(r.body.card.rewards, 2);
+  const days = (Date.parse(r.body.card.nextExpiry) - Date.now()) / 86_400_000;
+  assert.ok(days > 29 && days <= 30.01, "new reward expires in 30 days");
+  assert.equal((await owner.act(biz, "update_business", { name: "Exp", reward: "Free", target: 2, color: "#123456", rewardExpiryDays: 7 })).status, 400, "only listed expiry values");
+
+  // Staff can use saved rewards too.
+  const inv = await owner.act(biz, "invite_staff", { label: "S" });
+  const st = new Client();
+  await st.post("/api/auth", { action: "accept_invite", token: new URL(inv.body.inviteUrl).pathname.split("/").pop(), name: "Exp Staff", email: `exp-${run}@test.perkly`, password: "exp staff 1" });
+  const used = await st.act(biz, "redeem", { customer: cust, requestId: id() });
+  assert.equal(used.status, 200);
+  assert.equal(used.body.card.rewards, 1);
 });

@@ -9,7 +9,7 @@ import { assetMeta, liveDesign, ownsAssets, publishedDesign } from "../../../lib
 
 export const dynamic = "force-dynamic";
 
-type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust: number };
+type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust: number; reward_mode: "bank" | "block"; reward_expiry_days: number };
 type Customer = { id: string; business: string; name: string; phone: string; stamps: number; target: number; scan_code: string };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -20,11 +20,22 @@ function validTarget(v: unknown): v is number {
 }
 
 async function loadBusiness(db: D1Database, id: string) {
-  return db.prepare("SELECT id, name, reward, target, color, join_code, staff_adjust FROM businesses WHERE id = ?").bind(id).first<Business>();
+  return db.prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days FROM businesses WHERE id = ?").bind(id).first<Business>();
 }
 
-function cardState(c: Customer) {
-  return { id: c.id, name: c.name, stamps: c.stamps, target: c.target, rewardReady: c.stamps >= c.target };
+/** Saved rewards that can be used now, and the nearest expiry. */
+async function savedRewards(db: D1Database, customerId: string) {
+  const row = await db
+    .prepare("SELECT COUNT(*) AS n, MIN(expires) AS next_expiry FROM rewards WHERE customer = ? AND redeemed IS NULL AND (expires IS NULL OR expires > ?)")
+    .bind(customerId, new Date().toISOString())
+    .first<{ n: number; next_expiry: string | null }>();
+  return { n: row?.n ?? 0, nextExpiry: row?.next_expiry ?? null };
+}
+
+async function cardState(db: D1Database, c: Customer, mode: Business["reward_mode"]) {
+  const saved = await savedRewards(db, c.id);
+  const rewards = saved.n + (mode === "block" && c.stamps >= c.target ? 1 : 0);
+  return { id: c.id, name: c.name, stamps: c.stamps, target: c.target, rewards, rewardReady: rewards > 0, nextExpiry: saved.nextExpiry, mode };
 }
 
 type Branch = { id: string; name: string };
@@ -79,11 +90,14 @@ export async function GET(request: Request) {
   const dayAgo = new Date(Date.now() - 86_400_000).toISOString();
   const [customers, events, stats, team, invites, busyCustomers, busyStaff, perBranch, staffFixes] = await db.batch([
     db.prepare(
-      `SELECT id, name, phone, stamps, target, created, source, consent_marketing, card_hash IS NOT NULL AS has_link
-       FROM customers WHERE business = ? ORDER BY created DESC LIMIT 5000`,
-    ).bind(business!.id),
+      `SELECT c.id, c.name, c.phone, c.stamps, c.target, c.created, c.source, c.consent_marketing, c.card_hash IS NOT NULL AS has_link,
+         (SELECT COUNT(*) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2))
+           + (CASE WHEN ?3 = 'block' AND c.stamps >= c.target THEN 1 ELSE 0 END) AS rewards
+       FROM customers c WHERE c.business = ?1 ORDER BY c.created DESC LIMIT 5000`,
+    ).bind(business!.id, new Date().toISOString(), business!.reward_mode),
     db.prepare(
-      `SELECT e.id, e.kind, e.delta, e.created, e.actor_role, e.stamps_after, e.note, c.name AS customer, u.name AS actor_name, br.name AS branch_name
+      `SELECT e.id, e.kind, e.delta, e.created, e.actor_role, e.stamps_after, e.note, c.name AS customer, u.name AS actor_name, br.name AS branch_name,
+         (SELECT COUNT(*) FROM rewards r WHERE r.earned_event = e.id) AS rewards_earned
        FROM events e JOIN customers c ON c.id = e.customer LEFT JOIN users u ON u.id = e.actor LEFT JOIN branches br ON br.id = e.branch
        WHERE e.business = ?1 AND (?2 = '' OR e.branch = ?2) ORDER BY e.created DESC LIMIT 50`,
     ).bind(business!.id, branchFilter),
@@ -91,10 +105,11 @@ export async function GET(request: Request) {
       `SELECT
          (SELECT COUNT(*) FROM customers WHERE business = ?1) AS customers,
          (SELECT COUNT(*) FROM customers WHERE business = ?1 AND created >= ?2) AS new_customers,
-         (SELECT COUNT(*) FROM customers WHERE business = ?1 AND stamps >= target) AS rewards_ready,
+         (SELECT COUNT(*) FROM rewards WHERE business = ?1 AND redeemed IS NULL AND (expires IS NULL OR expires > ?4))
+           + (CASE WHEN ?5 = 'block' THEN (SELECT COUNT(*) FROM customers WHERE business = ?1 AND stamps >= target) ELSE 0 END) AS rewards_ready,
          (SELECT COUNT(*) FROM events WHERE business = ?1 AND kind = 'stamp' AND created >= ?2 AND (?3 = '' OR branch = ?3)) AS stamps,
          (SELECT COUNT(*) FROM events WHERE business = ?1 AND kind = 'redeem' AND created >= ?2 AND (?3 = '' OR branch = ?3)) AS redemptions`,
-    ).bind(business!.id, since, branchFilter),
+    ).bind(business!.id, since, branchFilter, new Date().toISOString(), business!.reward_mode),
     db.prepare(
       `SELECT u.id, u.name, u.email, m.role, m.created, m.revoked, m.branch FROM memberships m JOIN users u ON u.id = m.user
        WHERE m.business = ? ORDER BY m.role, m.created`,
@@ -143,7 +158,7 @@ export async function GET(request: Request) {
     perBranch: perBranch.results,
     customers: (customers.results as any[]).map((c) => ({ ...c, phone: formatPhone(c.phone), has_link: !!c.has_link })),
     events: events.results,
-    stats: stats.results[0],
+    stats: { ...(stats.results[0] as any), redemptions: (stats.results[0] as any).redemptions },
     team: team.results,
     invites: invites.results,
     alerts: [
@@ -173,10 +188,12 @@ export async function POST(request: Request) {
     if (!name || !reward || !validTarget(p.target) || typeof p.color !== "string" || !COLOR.test(p.color)) {
       return fail("bad_details", 400, "Invalid business details");
     }
+    // New businesses collect rewards by default (customers keep earning while a reward waits).
+    const mode = p.rewardMode === "block" ? "block" : "bank";
     const id = crypto.randomUUID();
     await db.batch([
-      db.prepare("INSERT INTO businesses(id, owner, name, reward, target, color, created, join_code) VALUES(?, ?, ?, ?, ?, ?, ?, ?)")
-        .bind(id, user.id, name, reward, p.target, p.color, now, randomCode(10)),
+      db.prepare("INSERT INTO businesses(id, owner, name, reward, target, color, created, join_code, reward_mode) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .bind(id, user.id, name, reward, p.target, p.color, now, randomCode(10), mode),
       db.prepare("INSERT INTO memberships(id, business, user, role, created) VALUES(?, ?, ?, 'owner', ?)")
         .bind(crypto.randomUUID(), id, user.id, now),
     ]);
@@ -200,8 +217,25 @@ export async function POST(request: Request) {
       }
       // A new target applies to new cards and to existing cards from their next round (after redemption).
       const staffAdjust = typeof p.staffAdjust === "boolean" ? (p.staffAdjust ? 1 : 0) : business.staff_adjust;
-      await db.prepare("UPDATE businesses SET name = ?, reward = ?, target = ?, color = ?, staff_adjust = ? WHERE id = ?")
-        .bind(name, reward, p.target, p.color, staffAdjust, business.id).run();
+      const mode = p.rewardMode === "bank" || p.rewardMode === "block" ? p.rewardMode : business.reward_mode;
+      const expiry = p.rewardExpiryDays === undefined ? business.reward_expiry_days : p.rewardExpiryDays;
+      if (![0, 30, 60, 90, 180, 365].includes(expiry as number)) return fail("bad_details", 400, "Invalid expiry");
+      const statements = [
+        db.prepare("UPDATE businesses SET name = ?, reward = ?, target = ?, color = ?, staff_adjust = ?, reward_mode = ?, reward_expiry_days = ? WHERE id = ?")
+          .bind(name, reward, p.target, p.color, staffAdjust, mode, expiry, business.id),
+      ];
+      if (business.reward_mode === "block" && mode === "bank") {
+        // Switching to collect mode: cards that are full now become a saved reward and start a new round.
+        const expires = (expiry as number) > 0 ? new Date(Date.now() + (expiry as number) * 86_400_000).toISOString() : null;
+        statements.push(
+          db.prepare(
+            `INSERT OR IGNORE INTO rewards(id, business, customer, earned, earned_event, expires)
+             SELECT 'switch:' || id || ':' || ?, business, id, ?, 'mode-switch', ? FROM customers WHERE business = ? AND stamps >= target`,
+          ).bind(now, now, expires, business.id),
+          db.prepare("UPDATE customers SET stamps = stamps - target, target = ? WHERE business = ? AND stamps >= target").bind(p.target, business.id),
+        );
+      }
+      await db.batch(statements);
       return json({ ok: true });
     }
 
@@ -230,7 +264,7 @@ export async function POST(request: Request) {
         const code = p.scan.replace(/^perkly:/, "").slice(0, 100);
         const c = await db.prepare("SELECT * FROM customers WHERE business = ? AND scan_code = ?").bind(business.id, code).first<Customer>();
         if (!c) return fail("unknown_card", 404, "Card not found in this business");
-        return json({ results: [{ ...cardState(c), phone: role === "owner" ? formatPhone(c.phone) : maskPhone(c.phone) }] });
+        return json({ results: [{ ...(await cardState(db, c, business.reward_mode)), phone: role === "owner" ? formatPhone(c.phone) : maskPhone(c.phone) }] });
       }
       const q = typeof p.query === "string" ? p.query.trim().slice(0, 60) : "";
       const digits = q.replace(/\D/g, "");
@@ -244,7 +278,7 @@ export async function POST(request: Request) {
         .bind(business.id, "%" + q.replace(/[\\%_]/g, (m) => "\\" + m) + "%", ...(phoneTail ? [phoneTail] : []))
         .all<Customer>();
       return json({
-        results: rows.results.map((c) => ({ ...cardState(c), phone: role === "owner" ? formatPhone(c.phone) : maskPhone(c.phone) })),
+        results: await Promise.all(rows.results.map(async (c) => ({ ...(await cardState(db, c, business.reward_mode)), phone: role === "owner" ? formatPhone(c.phone) : maskPhone(c.phone) }))),
       });
     }
 
@@ -253,8 +287,9 @@ export async function POST(request: Request) {
     case "adjust": {
       if (p.action === "adjust" && role === "staff" && !business.staff_adjust) return fail("forbidden", 403, "Corrections are owner-only in this business");
       if (typeof p.requestId !== "string" || !UUID.test(p.requestId)) return fail("bad_request", 400, "Invalid request id");
+      const requestId = p.requestId;
       if (!(await allow(db, `act:${user.id}`, 60, 60))) return fail("rate_limited", 429, "Too many actions");
-      const c = await db.prepare("SELECT * FROM customers WHERE id = ? AND business = ?").bind(p.customer ?? "", business.id).first<Customer>();
+      let c = await db.prepare("SELECT * FROM customers WHERE id = ? AND business = ?").bind(p.customer ?? "", business.id).first<Customer>();
       if (!c) return fail("unknown_card", 404, "Customer not found");
 
       // Which branch this happened in. Staff tied to a branch always record their own branch.
@@ -270,59 +305,125 @@ export async function POST(request: Request) {
         return fail("branch_required", 400, "Choose a branch");
       }
 
-      let update: D1PreparedStatement;
-      let delta: number;
-      let note: string | null = null;
+      const event = (kind: string, delta: number, note: string | null) =>
+        db.prepare(
+          `INSERT INTO events(id, customer, actor, kind, delta, created, business, branch, actor_role, stamps_after, note)
+           SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT stamps FROM customers WHERE id = ?), ? WHERE changes() = 1`,
+        ).bind(requestId, c!.id, user.id, kind, delta, now, business.id, branch, role, c!.id, note);
+      const replayed = async () => !!(await db.prepare("SELECT id FROM events WHERE id = ? AND customer = ?").bind(requestId, c!.id).first());
+      const done = async (extra: Record<string, unknown> = {}) => {
+        const fresh = (await db.prepare("SELECT * FROM customers WHERE id = ?").bind(c!.id).first<Customer>())!;
+        return json({ ok: true, card: await cardState(db, fresh, business.reward_mode), ...extra });
+      };
+      const refuse = async (code: string) => {
+        const fresh = (await db.prepare("SELECT * FROM customers WHERE id = ?").bind(c!.id).first<Customer>())!;
+        return json({ error: code, code, card: await cardState(db, fresh, business.reward_mode) }, 409);
+      };
+
       if (p.action === "stamp") {
         // Several purchases at once (e.g. 3 coffees) are one action and one history entry.
         const count = p.count === undefined ? 1 : p.count;
         if (!Number.isInteger(count) || (count as number) < 1 || (count as number) > 10) return fail("bad_request", 400, "Count must be 1-10");
-        delta = count as number;
-        update = db.prepare(
-          "UPDATE customers SET stamps = stamps + ? WHERE id = ? AND business = ? AND stamps + ? <= target AND NOT EXISTS(SELECT 1 FROM events WHERE id = ?)",
-        ).bind(delta, c.id, business.id, delta, p.requestId);
-      } else if (p.action === "redeem") {
-        delta = -c.target;
-        // The next round uses the business's current target.
-        update = db.prepare(
-          `UPDATE customers SET stamps = stamps - target, target = (SELECT target FROM businesses WHERE id = ?)
-           WHERE id = ? AND business = ? AND stamps >= target AND NOT EXISTS(SELECT 1 FROM events WHERE id = ?)`,
-        ).bind(business.id, c.id, business.id, p.requestId);
-      } else {
-        // Staff corrections are smaller; everyone must give a reason; nothing is ever deleted.
-        const max = role === "owner" ? 30 : 5;
-        if (!Number.isInteger(p.delta) || p.delta === 0 || Math.abs(p.delta as number) > max) return fail("bad_request", 400, `Correction must be between -${max} and ${max}`);
-        note = str(p.note, 200);
-        if (!note) return fail("note_required", 400, "A reason is required for corrections");
-        delta = p.delta as number;
-        // `from` = the count the person saw. If the card changed meanwhile, nothing is applied.
-        const from = Number.isInteger(p.from) ? (p.from as number) : null;
-        update = db.prepare(
-          `UPDATE customers SET stamps = stamps + ? WHERE id = ? AND business = ? AND stamps + ? BETWEEN 0 AND target
-           AND (? IS NULL OR stamps = ?) AND NOT EXISTS(SELECT 1 FROM events WHERE id = ?)`,
-        ).bind(delta, c.id, business.id, delta, from, from, p.requestId);
+        const n = count as number;
+
+        if (business.reward_mode === "block") {
+          const result = await db.batch([
+            db.prepare(
+              "UPDATE customers SET stamps = stamps + ? WHERE id = ? AND business = ? AND stamps + ? <= target AND NOT EXISTS(SELECT 1 FROM events WHERE id = ?)",
+            ).bind(n, c.id, business.id, n, requestId),
+            event("stamp", n, null),
+          ]);
+          if (result[0].meta.changes) return done();
+          if (await replayed()) return done({ replayed: true });
+          return refuse(c.stamps >= c.target ? "reward_ready" : "too_many");
+        }
+
+        // Collect mode: a full card saves a reward and the next round starts right away.
+        // Optimistic update on the exact count we read; retried if another device changed the card meanwhile.
+        for (let attempt = 0; attempt < 8; attempt++) {
+          let total = c.stamps + n;
+          let target = c.target;
+          let earned = 0;
+          while (total >= target) {
+            total -= target;
+            earned++;
+            target = business.target; // new rounds use the current program
+          }
+          const expires = business.reward_expiry_days > 0 ? new Date(Date.now() + business.reward_expiry_days * 86_400_000).toISOString() : null;
+          const statements = [
+            db.prepare(
+              `UPDATE customers SET stamps = ?, target = ? WHERE id = ? AND business = ? AND stamps = ? AND target = ?
+               AND NOT EXISTS(SELECT 1 FROM events WHERE id = ?)`,
+            ).bind(total, target, c.id, business.id, c.stamps, c.target, requestId),
+            event("stamp", n, null),
+          ];
+          if (earned) {
+            const ids = Array.from({ length: earned }, (_, i) => `${requestId}:${i}`);
+            statements.push(
+              db.prepare(
+                `INSERT OR IGNORE INTO rewards(id, business, customer, earned, earned_event, expires)
+                 SELECT v.column1, ?, ?, ?, ?, ? FROM (VALUES ${ids.map(() => "(?)").join(",")}) v
+                 WHERE EXISTS(SELECT 1 FROM events WHERE id = ? AND created = ?)`,
+              ).bind(business.id, c.id, now, requestId, expires, ...ids, requestId, now),
+            );
+          }
+          const result = await db.batch(statements);
+          if (result[0].meta.changes) return done({ earned });
+          if (await replayed()) return done({ replayed: true });
+          c = (await db.prepare("SELECT * FROM customers WHERE id = ?").bind(c.id).first<Customer>())!;
+        }
+        return refuse("busy_retry");
       }
 
-      // Balance change and history entry are written together, or not at all.
+      if (p.action === "redeem") {
+        // First use the oldest saved reward that is still valid (any mode).
+        const result = await db.batch([
+          db.prepare(
+            `UPDATE rewards SET redeemed = ?, redeem_event = ? WHERE redeemed IS NULL AND id = (
+               SELECT id FROM rewards WHERE customer = ? AND business = ? AND redeemed IS NULL AND (expires IS NULL OR expires > ?)
+               ORDER BY earned, id LIMIT 1)
+             AND NOT EXISTS(SELECT 1 FROM events WHERE id = ?)`,
+          ).bind(now, requestId, c.id, business.id, now, requestId),
+          event("redeem", 0, null),
+        ]);
+        if (result[0].meta.changes) return done();
+        if (await replayed()) return done({ replayed: true });
+        if (business.reward_mode === "block") {
+          // Redeem-first mode: the full card itself is the reward; the next round uses the current program.
+          const r2 = await db.batch([
+            db.prepare(
+              `UPDATE customers SET stamps = stamps - target, target = (SELECT target FROM businesses WHERE id = ?)
+               WHERE id = ? AND business = ? AND stamps >= target AND NOT EXISTS(SELECT 1 FROM events WHERE id = ?)`,
+            ).bind(business.id, c.id, business.id, requestId),
+            event("redeem", -c.target, null),
+          ]);
+          if (r2[0].meta.changes) return done();
+          if (await replayed()) return done({ replayed: true });
+        }
+        return refuse("not_ready");
+      }
+
+      // Correction: staff are limited to 5; everyone must give a reason; nothing is ever deleted.
+      const max = role === "owner" ? 30 : 5;
+      if (!Number.isInteger(p.delta) || p.delta === 0 || Math.abs(p.delta as number) > max) return fail("bad_request", 400, `Correction must be between -${max} and ${max}`);
+      const note = str(p.note, 200);
+      if (!note) return fail("note_required", 400, "A reason is required for corrections");
+      const delta = p.delta as number;
+      // `from` = the count the person saw. If the card changed meanwhile, nothing is applied.
+      const from = Number.isInteger(p.from) ? (p.from as number) : null;
+      // In collect mode a card never sits full; it must stay below the target.
+      const top = business.reward_mode === "bank" ? "target - 1" : "target";
       const result = await db.batch([
-        update,
         db.prepare(
-          `INSERT INTO events(id, customer, actor, kind, delta, created, business, branch, actor_role, stamps_after, note)
-           SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT stamps FROM customers WHERE id = ?), ? WHERE changes() = 1`,
-        ).bind(p.requestId, c.id, user.id, p.action, delta, now, business.id, branch, role, c.id, note),
+          `UPDATE customers SET stamps = stamps + ? WHERE id = ? AND business = ? AND stamps + ? BETWEEN 0 AND ${top}
+           AND (? IS NULL OR stamps = ?) AND NOT EXISTS(SELECT 1 FROM events WHERE id = ?)`,
+        ).bind(delta, c.id, business.id, delta, from, from, requestId),
+        event("adjust", delta, note),
       ]);
-
-      const fresh = (await db.prepare("SELECT * FROM customers WHERE id = ?").bind(c.id).first<Customer>())!;
-      if (!result[0].meta.changes) {
-        const previous = await db.prepare("SELECT id FROM events WHERE id = ? AND customer = ?").bind(p.requestId, c.id).first();
-        if (previous) return json({ ok: true, replayed: true, card: cardState(fresh) });
-        const code =
-          p.action === "stamp" ? (fresh.stamps >= fresh.target ? "reward_ready" : "too_many")
-          : p.action === "redeem" ? "not_ready"
-          : Number.isInteger(p.from) && p.from !== fresh.stamps ? "card_changed" : "out_of_range";
-        return json({ error: code, code, card: cardState(fresh) }, 409);
-      }
-      return json({ ok: true, card: cardState(fresh) });
+      if (result[0].meta.changes) return done();
+      if (await replayed()) return done({ replayed: true });
+      const fresh = (await db.prepare("SELECT stamps FROM customers WHERE id = ?").bind(c.id).first<{ stamps: number }>())!;
+      return refuse(from !== null && from !== fresh.stamps ? "card_changed" : "out_of_range");
     }
 
     case "new_card_link": {

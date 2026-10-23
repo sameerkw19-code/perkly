@@ -7,7 +7,7 @@ import { QrImage } from "../../../components/qr";
 
 import type { Design } from "../../../lib/design";
 
-type Card = { name: string; stamps: number; target: number; scan_code: string; design: Design };
+type Card = { name: string; stamps: number; target: number; scan_code: string; design: Design; rewards: number; nextExpiry: string | null };
 
 export default function CardView({ card }: { card: Card | null }) {
   const { lang, setLang, t, dir } = useLang();
@@ -21,8 +21,14 @@ export default function CardView({ card }: { card: Card | null }) {
         <div className="auth-card panel"><h1>{t("cardNotFound")}</h1></div>
       ) : (
         <div className="card-stack">
-          <LoyaltyCard design={card.design} lang={lang} stamps={card.stamps} target={card.target} customerName={card.name} t={t} />
-          {card.stamps >= card.target && <div className="ready-banner" role="status">{t("earned")}</div>}
+          <LoyaltyCard design={card.design} lang={lang} stamps={card.stamps} target={card.target} customerName={card.name} rewards={card.rewards} t={t} />
+          {card.rewards > 0 && (
+            <div className="ready-banner" role="status">
+              {t("earned")}
+              {card.rewards > 1 && <> · {t("rewardsAvail", { n: card.rewards })}</>}
+              {card.nextExpiry && <small className="ready-expiry">{t("expiresOnShort", { d: new Date(card.nextExpiry).toLocaleDateString(lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB") })}</small>}
+            </div>
+          )}
           <div className="panel qr-panel">
             <QrImage text={"perkly:" + card.scan_code} size={210} label={t("showQr")} />
             <p>{t("showQr")}</p>

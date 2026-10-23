@@ -14,8 +14,8 @@ import { LoyaltyCard, Num } from "../components/loyalty-card";
 import { QrImage } from "../components/qr";
 
 type Role = "owner" | "staff";
-type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number };
-type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; phone?: string };
+type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number };
+type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; rewards?: number; nextExpiry?: string | null; phone?: string };
 type Data = {
   me: { name: string; email: string };
   memberships: { business: string; role: Role; businessName: string; branch: string | null }[];
@@ -304,13 +304,13 @@ export default function Dashboard() {
                             <div className="progress-cell">
                               <span className="progress-track"><i style={{ width: Math.min(100, (c.stamps / c.target) * 100) + "%" }} /></span>
                               <Num>{c.stamps}/{c.target}</Num>
-                              {c.stamps >= c.target && <span className="pill ready-pill">{t("statReady")}</span>}
+                              {c.rewards > 0 && <span className="pill ready-pill"><Gift size={11} /> <Num>{c.rewards}</Num></span>}
                             </div>
                           </td>
                           <td>{c.consent_marketing ? t("yes") : t("no")}</td>
                           <td>
                             <div className="row-actions">
-                              <button className="btn soft small" onClick={() => { setStationPick({ id: c.id, name: c.name, stamps: c.stamps, target: c.target, rewardReady: c.stamps >= c.target, phone: c.phone }); setView("station"); }}>
+                              <button className="btn soft small" onClick={() => { setStationPick({ id: c.id, name: c.name, stamps: c.stamps, target: c.target, rewards: c.rewards, rewardReady: c.rewards > 0, phone: c.phone }); setView("station"); }}>
                                 <ScanLine size={14} />{t("station")}
                               </button>
                               <button className="icon-btn" title={t("newLink")} aria-label={t("newLink")} disabled={busy} onClick={async () => {
@@ -375,7 +375,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          <footer><span>perkly. <span className="muted">Small card. Big connection.</span></span><span>{t("pilot")} · v0.5</span></footer>
+          <footer><span>perkly. <span className="muted">Small card. Big connection.</span></span><span>{t("pilot")} · v0.6</span></footer>
         </main>
       </div>
 
@@ -489,6 +489,7 @@ function EventList({ events, t, lang }: { events: any[]; t: any; lang: string })
               {t("ev_" + e.kind)} <Num>{e.delta > 0 ? "+" + e.delta : e.delta}</Num>
               {e.actor_name ? " · " + t("by", { name: e.actor_name }) : ""}
               {e.branch_name ? " · " + e.branch_name : ""}
+              {e.rewards_earned ? " · 🎁 " + t("rewardEarnedEv") + (e.rewards_earned > 1 ? " ×" + e.rewards_earned : "") : ""}
               {e.note ? " · " + e.note : ""}
             </small>
           </div>
@@ -513,7 +514,7 @@ function LinkBox({ url, t, notify }: { url: string; t: any; notify: (s: string, 
 
 function BusinessForm({ t, busy, initial, submitLabel, onSubmit }: {
   t: any; busy: boolean; initial?: Business; submitLabel: string;
-  onSubmit: (v: { name: string; reward: string; target: number; color: string; staffAdjust?: boolean }) => void;
+  onSubmit: (v: { name: string; reward: string; target: number; color: string; staffAdjust?: boolean; rewardMode?: string; rewardExpiryDays?: number }) => void;
 }) {
   return (
     <form className="stack-form" onSubmit={(e) => {
@@ -521,7 +522,7 @@ function BusinessForm({ t, busy, initial, submitLabel, onSubmit }: {
       const f = new FormData(e.currentTarget);
       onSubmit({
         name: String(f.get("name")), reward: String(f.get("reward")), target: Number(f.get("target")), color: String(f.get("color")),
-        ...(initial ? { staffAdjust: f.get("staffAdjust") === "on" } : {}),
+        ...(initial ? { staffAdjust: f.get("staffAdjust") === "on", rewardMode: String(f.get("rewardMode")), rewardExpiryDays: Number(f.get("rewardExpiryDays")) } : {}),
       });
     }}>
       <label>{t("businessName")}<input name="name" required maxLength={80} defaultValue={initial?.name} /></label>
@@ -531,7 +532,22 @@ function BusinessForm({ t, busy, initial, submitLabel, onSubmit }: {
         <label>{t("color")}<input name="color" type="color" defaultValue={initial?.color ?? "#7558E8"} /></label>
       </div>
       {initial && (
-        <label className="check"><input type="checkbox" name="staffAdjust" defaultChecked={!!initial.staff_adjust} /><span>{t("staffAdjustSetting")}</span></label>
+        <>
+          <fieldset className="mode-set">
+            <legend>{t("rewardModeLabel")}</legend>
+            <label className="check"><input type="radio" name="rewardMode" value="bank" defaultChecked={initial.reward_mode !== "block"} /><span>{t("modeBank")}</span></label>
+            <label className="check"><input type="radio" name="rewardMode" value="block" defaultChecked={initial.reward_mode === "block"} /><span>{t("modeBlock")}</span></label>
+            <small className="form-hint">{t("modeSwitchNote")}</small>
+          </fieldset>
+          <label>{t("expiryLabel")}
+            <select name="rewardExpiryDays" defaultValue={String(initial.reward_expiry_days ?? 0)}>
+              <option value="0">{t("expiryNone")}</option>
+              {[30, 60, 90, 180, 365].map((d) => <option key={d} value={d}>{t("expiryDays", { n: d })}</option>)}
+            </select>
+            <small className="form-hint">{t("expiryNote")}</small>
+          </label>
+          <label className="check"><input type="checkbox" name="staffAdjust" defaultChecked={!!initial.staff_adjust} /><span>{t("staffAdjustSetting")}</span></label>
+        </>
       )}
       <button className="btn primary" disabled={busy}>{submitLabel}</button>
     </form>
@@ -646,7 +662,10 @@ function Station({ business, design, branches, myBranch, canFix, t, lang, initia
       setPending(null);
       setSelected({ ...selected, ...r.data.card });
       setQty(1);
-      notify(r.data.replayed ? t("replayed") : kind === "stamp" ? (count === 1 ? t("stampOk") : t("stampsOk", { n: count! })) : t("redeemOk"));
+      const earned = r.data.earned as number | undefined;
+      notify(r.data.replayed ? t("replayed")
+        : earned ? (earned === 1 ? t("earnedSaved") : t("earnedSavedN", { n: earned }))
+        : kind === "stamp" ? (count === 1 ? t("stampOk") : t("stampsOk", { n: count! })) : t("redeemOk"));
       onDone();
     } else if (r.network) {
       notify(t("err_network"), true); // outcome unknown: keep the request id for a safe retry
@@ -722,13 +741,14 @@ function Station({ business, design, branches, myBranch, canFix, t, lang, initia
                 <h2>{selected.name}</h2>
                 {selected.phone && <small dir="ltr">{selected.phone}</small>}
               </div>
-              <LoyaltyCard design={design} lang={lang} stamps={selected.stamps} target={selected.target} customerName={selected.name} t={t} />
+              <LoyaltyCard design={design} lang={lang} stamps={selected.stamps} target={selected.target} customerName={selected.name} rewards={selected.rewards} t={t} />
+              {!!selected.rewards && selected.nextExpiry && <small className="form-hint">{t("expiresOnShort", { d: new Date(selected.nextExpiry).toLocaleDateString(lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB") })}</small>}
 
               {fixing ? (
                 <div className="fix-panel">
                   <h3>{t("fixTitle")}</h3>
                   <span className="qty-label">{t("correctCount")}</span>
-                  <Stepper value={fixing.value} min={Math.max(0, canFixMin(selected.stamps))} max={Math.min(selected.target, canFixMax(selected.stamps, selected.target))}
+                  <Stepper value={fixing.value} min={Math.max(0, canFixMin(selected.stamps))} max={Math.min(business.reward_mode === "bank" ? selected.target - 1 : selected.target, canFixMax(selected.stamps, selected.target))}
                     onChange={(v) => setFixing({ ...fixing, value: v })} label={t("correctCount")} />
                   <label className="fix-reason">{t("reason")}
                     <input value={fixing.note} maxLength={200} onChange={(e) => setFixing({ ...fixing, note: e.target.value })} />
@@ -743,9 +763,12 @@ function Station({ business, design, branches, myBranch, canFix, t, lang, initia
                 <button className="btn lime big" disabled={busy} onClick={() => act("redeem")}><Gift size={18} />{busy ? t("sending") : retrying ? t("retry") : t("redeem")}</button>
               ) : (
                 <>
+                  {!!selected.rewards && (
+                    <button className="btn lime big" disabled={busy} onClick={() => act("redeem")}><Gift size={18} />{busy ? t("sending") : t("redeem")}</button>
+                  )}
                   <div className="qty-row">
                     <span className="qty-label">{t("qtyLabel")}</span>
-                    <Stepper value={qty} min={1} max={Math.min(10, remaining)} onChange={setQty} label={t("qtyLabel")} />
+                    <Stepper value={qty} min={1} max={business.reward_mode === "bank" ? 10 : Math.min(10, remaining)} onChange={setQty} label={t("qtyLabel")} />
                     <small className="form-hint">{t("remainingHint", { k: remaining })}</small>
                   </div>
                   <button className="btn primary big" disabled={busy} onClick={() => act("stamp")}>

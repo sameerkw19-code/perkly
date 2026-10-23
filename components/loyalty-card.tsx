@@ -35,7 +35,7 @@ export function Logo({ design, title, className = "card-logo" }: { design: Desig
 }
 
 /** The stamp grid, shared by the browser card and the wallet previews. */
-export function StampGrid({ design, stamps, target, giftLabel }: { design: Design; stamps: number; target: number; giftLabel: string }) {
+export function StampGrid({ design, stamps, target, giftLabel, ready }: { design: Design; stamps: number; target: number; giftLabel: string; ready?: boolean }) {
   const total = target + 1;
   const columns = total <= 6 ? total : Math.ceil(total / 2);
   const productImage = design.stamp.icon === "image";
@@ -46,7 +46,7 @@ export function StampGrid({ design, stamps, target, giftLabel }: { design: Desig
           <StampMark design={design} />
         </span>
       ))}
-      <span className={"stamp gift" + (stamps >= target ? " filled" : "")} aria-hidden="true">
+      <span className={"stamp gift" + ((ready ?? stamps >= target) ? " filled" : "")} aria-hidden="true">
         <Gift size={18} />
         {giftLabel && <em className="gift-label">{giftLabel}</em>}
       </span>
@@ -60,6 +60,8 @@ type Props = {
   stamps: number;
   target: number;
   customerName?: string | null;
+  /** Rewards available now (saved rewards, or a full card in redeem-first mode). */
+  rewards?: number;
   t: T;
 };
 
@@ -74,9 +76,11 @@ export function cardStyle(design: Design): React.CSSProperties {
 }
 
 /** Customer card as shown in the browser. */
-export function LoyaltyCard({ design, lang, stamps, target, customerName, t }: Props) {
+export function LoyaltyCard({ design, lang, stamps, target, customerName, rewards, t }: Props) {
   const text = textsFor(design, lang);
-  const ready = stamps >= target;
+  const available = rewards ?? (stamps >= target ? 1 : 0);
+  const ready = available > 0;
+  const full = stamps >= target;
   return (
     <div className={`loyalty-card layout-${design.layout}`} style={cardStyle(design)}>
       <div className="card-top">
@@ -92,9 +96,12 @@ export function LoyaltyCard({ design, lang, stamps, target, customerName, t }: P
       <div className="card-title">{text.reward}</div>
       <div className="card-progress">
         <span><Num>{stamps}/{target}</Num></span>
-        <span>{ready ? t("earnedShort") : t("toGo", { k: Math.max(0, target - stamps) })}</span>
+        <span>{full ? t("earnedShort") : t("toGo", { k: Math.max(0, target - stamps) })}</span>
       </div>
-      <StampGrid design={design} stamps={stamps} target={target} giftLabel={text.gift} />
+      <StampGrid design={design} stamps={stamps} target={target} giftLabel={text.gift} ready={ready} />
+      {ready && !full && (
+        <div className="rewards-badge"><Gift size={16} />{available === 1 ? t("rewardAvail1") : t("rewardsAvail", { n: available })}</div>
+      )}
       <p className="sr-only">{t("stampsOf", { n: stamps, t: target })}</p>
     </div>
   );

@@ -322,6 +322,26 @@ Object.assign(words, {
   err_card_changed: ["הכרטיס השתנה בינתיים. בדקו את המספר העדכני ונסו שוב.", "تغيّرت البطاقة في هذه الأثناء. تحقق من العدد الحالي وحاول مجدداً.", "The card changed meanwhile. Check the current number and try again."],
 } satisfies Record<string, Entry>);
 
+// ---- Reward modes ----
+Object.assign(words, {
+  rewardsAvail: ["{n} מתנות זמינות", "{n} مكافآت متاحة", "{n} rewards available"],
+  rewardAvail1: ["מתנה אחת זמינה", "مكافأة واحدة متاحة", "1 reward available"],
+  expiresOnShort: ["בתוקף עד {d}", "صالحة حتى {d}", "valid until {d}"],
+  earnedSaved: ["מתנה נשמרה! הסבב הבא התחיל.", "تم حفظ مكافأة! بدأت الجولة التالية.", "Reward saved! The next round has started."],
+  earnedSavedN: ["{n} מתנות נשמרו! הסבב הבא התחיל.", "تم حفظ {n} مكافآت! بدأت الجولة التالية.", "{n} rewards saved! The next round has started."],
+  rewardEarnedEv: ["נצברה מתנה", "تم كسب مكافأة", "reward saved"],
+  rewardModeLabel: ["מה קורה כשהכרטיס מתמלא?", "ماذا يحدث عند امتلاء البطاقة؟", "What happens when a card is full?"],
+  modeBank: ["המתנה נשמרת והסבב הבא מתחיל מיד (אפשר לצבור כמה מתנות)", "تُحفظ المكافأة وتبدأ الجولة التالية فوراً (يمكن جمع عدة مكافآت)", "The reward is saved and the next round starts right away (several can be collected)"],
+  modeBlock: ["צריך לממש לפני שממשיכים לצבור", "يجب الاستخدام قبل متابعة الجمع", "Redeem before collecting more"],
+  expiryLabel: ["תוקף מתנה שנצברה", "صلاحية المكافأة المحفوظة", "Saved reward valid for"],
+  expiryNone: ["ללא הגבלה", "بلا حد", "No limit"],
+  expiryDays: ["{n} ימים", "{n} يوماً", "{n} days"],
+  expiryNote: ["שינוי התוקף חל רק על מתנות שייצברו מעכשיו.", "تغيير الصلاحية يسري فقط على المكافآت الجديدة.", "A new validity applies only to rewards saved from now on."],
+  modeSwitchNote: ["במעבר לצבירה, כרטיסים מלאים יהפכו למתנה שמורה ויתחילו סבב חדש.", "عند التحويل للجمع، تتحول البطاقات الممتلئة لمكافأة محفوظة وتبدأ جولة جديدة.", "Switching to collecting turns full cards into a saved reward and starts a new round."],
+  rewardsCol: ["מתנות", "مكافآت", "Rewards"],
+  err_busy_retry: ["הכרטיס מתעדכן ממכשיר אחר. נסו שוב.", "البطاقة تتحدث من جهاز آخر. حاول مجدداً.", "The card is being updated from another device. Try again."],
+} satisfies Record<string, Entry>);
+
 export function translate(lang: Lang, key: string, vars?: Record<string, string | number>): string {
   const entry = words[key];
   let text = entry ? entry[LANGS.indexOf(lang)] : key;
