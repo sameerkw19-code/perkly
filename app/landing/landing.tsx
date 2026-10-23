@@ -336,8 +336,8 @@ export default function Landing() {
 <span style={{ color: "#5E5873", fontSize: "17px" }}>לחודש</span>
 </div>
 <div style={{ background: "#F6F3FF", borderRadius: "16px", padding: "14px 16px", display: "flex", flexDirection: "column", gap: "4px", marginTop: "-6px" }}>
-<span style={{ fontWeight: "700", fontSize: "16px" }}>בחודש הראשון: 200 ₪</span>
-<span style={{ fontSize: "14px", color: "#4A4462" }}>כולל דמי הקמה, ערכת קופה עם הלוגו שלכם והחודש הראשון. מהחודש השני 99 ₪.</span>
+<span style={{ fontWeight: "700", fontSize: "16px" }}>בלי דמי הקמה</span>
+<span style={{ fontSize: "14px", color: "#4A4462" }}>כולל ערכת קופה עם הלוגו שלכם. מחיר אחד, כל חודש.</span>
 </div>
 <div style={{ display: "flex", flexDirection: "column", gap: "11px", fontSize: "16px" }}>
 <span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>ערכת קופה: 2 פוסטרים וסטנד עם הלוגו שלכם</span>
@@ -367,7 +367,7 @@ export default function Landing() {
 </details>
 <details style={{ background: "#FFFFFF", border: "1px solid #E8E3F7", borderRadius: "18px", padding: "20px 24px" }}>
 <summary style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "19px" }}>כמה זה עולה?</summary>
-<p style={{ margin: "12px 0 0", color: "#4A4462", fontSize: "16px" }}>בחודש הראשון 200 ₪. זה כולל את דמי ההקמה, ערכת קופה עם הלוגו שלכם (שני פוסטרים וסטנד לדלפק) ואת החודש הראשון עצמו. מהחודש השני המחיר הוא 99 ₪ לחודש.</p>
+<p style={{ margin: "12px 0 0", color: "#4A4462", fontSize: "16px" }}>המחיר הוא 99 ₪ לחודש, בלי דמי הקמה. המנוי כולל ערכת קופה עם הלוגו שלכם (שני פוסטרים וסטנד לדלפק).</p>
 </details>
 <details style={{ background: "#FFFFFF", border: "1px solid #E8E3F7", borderRadius: "18px", padding: "20px 24px" }}>
 <summary style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "19px" }}>מה מונע מעובד לחלק חותמות לחברים?</summary>
