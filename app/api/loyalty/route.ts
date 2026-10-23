@@ -162,7 +162,8 @@ export async function GET(request: Request) {
     customers: (customers.results as { phone: string; has_link: unknown }[]).map((c) => ({ ...c, phone: formatPhone(c.phone), has_link: !!c.has_link })),
     events: events.results,
     stats: stats.results[0],
-    team: team.results,
+    // Team list (with each member's attributed customer count) is owner-only. Staff get nothing here.
+    team: role === "owner" ? team.results : [],
     invites: invites.results,
     alerts: [
       ...(busyCustomers.results as { name: string; n: number }[]).map((r) => ({ type: "customer", name: r.name, count: r.n })),
