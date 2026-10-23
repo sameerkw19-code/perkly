@@ -272,13 +272,17 @@ export default function Landing() {
 <div style={{ flex: "1 1 380px", minWidth: "0", display: "flex", flexDirection: "column", gap: "16px" }}>
 <span style={{ color: "#5B3FD6", fontWeight: "700", fontSize: "15px" }}>ערכת קופה</span>
 <h2 id="kit-title" style={{ margin: "0", fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "clamp(30px, 4vw, 46px)", lineHeight: "1.15" }}>הכל מוכן לקופה<br />מהיום הראשון.</h2>
-<p style={{ margin: "0", fontSize: "19px", color: "#4A4462", maxWidth: "500px" }}>עם ההצטרפות מקבלים ערכה מודפסת עם הלוגו שלכם וקוד ה־QR האישי של העסק. תולים, מעמידים ליד הקופה, והלקוחות מתחילים להצטרף.</p>
+<p style={{ margin: "0", fontSize: "19px", color: "#4A4462", maxWidth: "500px" }}>רוצים להתחיל מוכנים? מזמינים ערכה מודפסת עם הלוגו שלכם וקוד ה־QR האישי של העסק. תולים, מעמידים ליד הקופה, והלקוחות מתחילים להצטרף. הערכה לא חובה, ואפשר להזמין אותה גם בלי מנוי.</p>
 <div style={{ display: "flex", flexDirection: "column", gap: "10px", fontSize: "17px", marginTop: "4px" }}>
 <span style={{ display: "flex", alignItems: "center", gap: "10px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>2 פוסטרים מעוצבים עם הלוגו שלכם</span>
 <span style={{ display: "flex", alignItems: "center", gap: "10px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>סטנד QR לדלפק</span>
 <span style={{ display: "flex", alignItems: "center", gap: "10px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>QR אישי שמוביל ישר להצטרפות לכרטיס שלכם</span>
 </div>
-<span style={{ alignSelf: "flex-start", marginTop: "6px", background: "#17132B", color: "#FFFFFF", fontWeight: "700", fontSize: "15px", padding: "10px 18px", borderRadius: "999px" }}>כלול ב־200 ₪ של החודש הראשון</span>
+<div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "14px", marginTop: "6px" }}>
+<span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "34px", lineHeight: "1" }}>99 ₪</span>
+<span style={{ fontSize: "15px", color: "#4A4462" }}>תשלום חד־פעמי</span>
+</div>
+<a href="https://wa.me/972526028291?text=%D7%94%D7%99%D7%99%2C%20%D7%90%D7%A9%D7%9E%D7%97%20%D7%9C%D7%94%D7%96%D7%9E%D7%99%D7%9F%20%D7%A2%D7%A8%D7%9B%D7%AA%20%D7%A7%D7%95%D7%A4%D7%94%20%D7%A9%D7%9C%20Perkly%20%2899%20%E2%82%AA%29" style={{ alignSelf: "flex-start", background: "#17132B", color: "#FFFFFF", textDecoration: "none", fontWeight: "700", fontSize: "17px", padding: "14px 24px", borderRadius: "14px", minHeight: "52px", boxSizing: "border-box", display: "inline-flex", alignItems: "center", gap: "10px" }}>הזמינו ערכה בוואטסאפ</a>
 </div>
 <div role="img" aria-label="ערכת הקופה: שני פוסטרים וסטנד לדלפק עם הלוגו של העסק וקוד QR" style={{ flex: "999 1 520px", minWidth: "0", background: "#F1EDFC", borderRadius: "32px", padding: "clamp(24px, 4vw, 40px) clamp(16px, 3vw, 32px) 28px", display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "flex-end", gap: "22px" }}>
 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
@@ -321,26 +325,25 @@ export default function Landing() {
 <h2 id="price-title" style={{ margin: "0", fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "clamp(30px, 4vw, 46px)", lineHeight: "1.15" }}>מחיר פשוט. בלי הפתעות.</h2>
 <p style={{ margin: "0", fontSize: "19px", color: "#4A4462", maxWidth: "480px" }}>בלי חבילות מסובכות ובלי תוספות. מספיק לקוח קבוע אחד שחזר בזכות המתנה, והחודש כבר שילם את עצמו.</p>
 <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "16px", color: "#3D3657", marginTop: "6px" }}>
-<span style={{ display: "flex", alignItems: "center", gap: "8px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>חודש ראשון 200 ₪: הקמה, ערכת קופה והחודש עצמו</span>
-<span style={{ display: "flex", alignItems: "center", gap: "8px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>מהחודש השני 99 ₪ לחודש, וזהו</span>
+<span style={{ display: "flex", alignItems: "center", gap: "8px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>99 ₪ לחודש, בלי דמי הקמה</span>
+<span style={{ display: "flex", alignItems: "center", gap: "8px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>ערכת קופה מודפסת לבחירה: 99 ₪ חד־פעמי</span>
 <span style={{ display: "flex", alignItems: "center", gap: "8px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>בלי ציוד לקנות: מספיק טלפון בקופה</span>
 </div>
 </div>
 <div style={{ flex: "1 1 360px", maxWidth: "460px", background: "#FFFFFF", borderRadius: "28px", padding: "clamp(26px, 4vw, 36px)", boxShadow: "0 24px 50px rgba(23,19,43,0.12)", border: "2px solid #7558E8", display: "flex", flexDirection: "column", gap: "20px" }}>
 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
 <span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "22px" }}>Perkly לעסק</span>
-<span style={{ background: "#FFF1D1", color: "#6B4600", fontWeight: "700", fontSize: "13px", padding: "6px 12px", borderRadius: "999px" }}>כולל ערכת קופה</span>
+<span style={{ background: "#FFF1D1", color: "#6B4600", fontWeight: "700", fontSize: "13px", padding: "6px 12px", borderRadius: "999px" }}>בלי דמי הקמה</span>
 </div>
 <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
 <span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "56px", lineHeight: "1" }}>99 ₪</span>
 <span style={{ color: "#5E5873", fontSize: "17px" }}>לחודש</span>
 </div>
 <div style={{ background: "#F6F3FF", borderRadius: "16px", padding: "14px 16px", display: "flex", flexDirection: "column", gap: "4px", marginTop: "-6px" }}>
-<span style={{ fontWeight: "700", fontSize: "16px" }}>בלי דמי הקמה</span>
-<span style={{ fontSize: "14px", color: "#4A4462" }}>כולל ערכת קופה עם הלוגו שלכם. מחיר אחד, כל חודש.</span>
+<span style={{ fontWeight: "700", fontSize: "16px" }}>תוספת לבחירה: ערכת קופה, 99 ₪</span>
+<span style={{ fontSize: "14px", color: "#4A4462" }}>2 פוסטרים וסטנד לדלפק עם הלוגו שלכם. תשלום חד־פעמי, לא חובה.</span>
 </div>
 <div style={{ display: "flex", flexDirection: "column", gap: "11px", fontSize: "16px" }}>
-<span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>ערכת קופה: 2 פוסטרים וסטנד עם הלוגו שלכם</span>
 <span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>עורך עיצוב מלא לכרטיס</span>
 <span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>כרטיס ב־Apple Wallet וב־Google Wallet</span>
 <span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>הצטרפות לקוחות ב־QR</span>
@@ -363,11 +366,11 @@ export default function Landing() {
 </details>
 <details style={{ background: "#FFFFFF", border: "1px solid #E8E3F7", borderRadius: "18px", padding: "20px 24px" }}>
 <summary style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "19px" }}>צריך לקנות ציוד?</summary>
-<p style={{ margin: "12px 0 0", color: "#4A4462", fontSize: "16px" }}>לא. עמדת העובד רצה בדפדפן של הטלפון או הטאבלט שכבר יש לכם בקופה, ומשתמשת במצלמה שלו לסריקה. את הפוסטרים והסטנד עם ה־QR אנחנו מכינים לכם, בערכת הקופה.</p>
+<p style={{ margin: "12px 0 0", color: "#4A4462", fontSize: "16px" }}>לא. עמדת העובד רצה בדפדפן של הטלפון או הטאבלט שכבר יש לכם בקופה, ומשתמשת במצלמה שלו לסריקה. את שלט ה־QR אפשר להדפיס בעצמכם, או להזמין מאיתנו ערכת קופה מעוצבת ב־99 ₪.</p>
 </details>
 <details style={{ background: "#FFFFFF", border: "1px solid #E8E3F7", borderRadius: "18px", padding: "20px 24px" }}>
 <summary style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "19px" }}>כמה זה עולה?</summary>
-<p style={{ margin: "12px 0 0", color: "#4A4462", fontSize: "16px" }}>המחיר הוא 99 ₪ לחודש, בלי דמי הקמה. המנוי כולל ערכת קופה עם הלוגו שלכם (שני פוסטרים וסטנד לדלפק).</p>
+<p style={{ margin: "12px 0 0", color: "#4A4462", fontSize: "16px" }}>99 ₪ לחודש, בלי דמי הקמה. ערכת קופה מודפסת, עם שני פוסטרים וסטנד לדלפק עם הלוגו שלכם, אפשר להזמין בנפרד ב־99 ₪ חד־פעמי. היא לא חובה, ואפשר להזמין אותה גם בלי מנוי.</p>
 </details>
 <details style={{ background: "#FFFFFF", border: "1px solid #E8E3F7", borderRadius: "18px", padding: "20px 24px" }}>
 <summary style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "19px" }}>מה מונע מעובד לחלק חותמות לחברים?</summary>
