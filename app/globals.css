@@ -177,3 +177,19 @@ label.btn{cursor:pointer}
 .branch-pill{background:#eef6de;color:#56732f;border-color:transparent;font-size:12px;padding:8px 12px}
 select.needs-choice{border-color:#f0a050;box-shadow:0 0 0 3px #f0a05022}
 .modal select{display:block;width:100%;margin-top:8px}
+
+/* v0.5 staff station */
+.staff-who{text-align:center;display:grid;gap:2px}
+.staff-who h2{font-size:24px}
+.staff-who small{color:var(--muted);font-size:12px}
+.qty-row{display:grid;justify-items:center;gap:8px}
+.qty-label{font-size:13px;font-weight:bold;color:var(--ink)}
+.stepper{display:flex;align-items:center;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff}
+.stepper button{width:56px;height:52px;border:0;background:#faf9fc;display:grid;place-items:center;color:var(--ink)}
+.stepper button:disabled{opacity:.35;cursor:not-allowed}
+.stepper output{min-width:64px;text-align:center;font-size:24px;font-weight:bold}
+.fix-panel{width:100%;max-width:465px;display:grid;justify-items:center;gap:10px;border:1px dashed #f0a050;border-radius:14px;padding:16px;background:#fffaf2;color:var(--ink)}
+.fix-panel h3{margin:0;font-size:16px}
+.fix-reason{display:grid;gap:6px;width:100%;font-size:13px;font-weight:bold}
+.center-row{justify-content:center;flex-wrap:wrap}
+.stepper output{color:var(--ink)}

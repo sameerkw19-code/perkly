@@ -15,6 +15,8 @@ export const businesses = sqliteTable(
     joinCode: text("join_code"),
     // Card design being edited (JSON). Customers only ever see a published version (card_designs).
     designDraft: text("design_draft"),
+    // 1 = staff may correct a card's stamp count (always with a reason, always logged).
+    staffAdjust: integer("staff_adjust").notNull().default(1),
   },
   (t) => [uniqueIndex("businesses_join_code").on(t.joinCode)],
 );

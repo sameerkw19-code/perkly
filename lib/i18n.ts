@@ -91,9 +91,9 @@ const words: Record<string, Entry> = {
   ev_redeem: ["מימוש הטבה", "استخدام مكافأة", "Reward redeemed"],
   ev_adjust: ["תיקון", "تصحيح", "Correction"],
   by: ["על ידי {name}", "بواسطة {name}", "by {name}"],
-  alerts: ["פעילות חריגה בשעה האחרונה", "نشاط غير عادي في الساعة الأخيرة", "Unusual activity in the last hour"],
-  alertCustomer: ["{name} קיבל/ה {n} חותמות", "{name} حصل على {n} أختام", "{name} received {n} stamps"],
-  alertStaff: ["{name} ביצע/ה {n} פעולות", "{name} نفّذ {n} عمليات", "{name} performed {n} actions"],
+  alerts: ["פעילות שכדאי לבדוק", "نشاط يستحق المراجعة", "Activity worth checking"],
+  alertCustomer: ["{name} קיבל/ה {n} חותמות בשעה האחרונה", "{name} حصل على {n} أختام في الساعة الأخيرة", "{name} received {n} stamps in the last hour"],
+  alertStaff: ["{name} ביצע/ה {n} פעולות בשעה האחרונה", "{name} نفّذ {n} عمليات في الساعة الأخيرة", "{name} performed {n} actions in the last hour"],
 
   // Card
   card: ["הכרטיס של העסק שלך", "بطاقة مشروعك", "Your business card"],
@@ -301,6 +301,25 @@ Object.assign(words, {
   noBranch: ["ללא סניף", "بدون فرع", "No branch"],
   err_branch_required: ["בחרו סניף לפני הפעולה.", "اختر فرعاً قبل العملية.", "Choose a branch first."],
   err_branch_invalid: ["הסניף לא פעיל. בקשו מבעל העסק לשייך אתכם לסניף פעיל.", "الفرع غير فعال. اطلب من صاحب المشروع ربطك بفرع فعال.", "That branch isn't active. Ask the owner to assign you to an active branch."],
+} satisfies Record<string, Entry>);
+
+// ---- Staff station v2 ----
+Object.assign(words, {
+  qtyLabel: ["כמה רכישות?", "كم عملية شراء؟", "How many purchases?"],
+  addStamps: ["אישור {n} חותמות", "تأكيد {n} أختام", "Confirm {n} stamps"],
+  stampsOk: ["נוספו {n} חותמות ונשמרו בשרת", "أُضيفت {n} أختام وحُفظت في الخادم", "{n} stamps added and saved on the server"],
+  remainingHint: ["נשארו {k} עד ההטבה", "باقي {k} للمكافأة", "{k} left until the reward"],
+  fixCount: ["תיקון כמות", "تصحيح العدد", "Fix the count"],
+  fixTitle: ["תיקון כמות החותמות", "تصحيح عدد الأختام", "Fix the stamp count"],
+  correctCount: ["הכמות הנכונה בכרטיס", "العدد الصحيح في البطاقة", "Correct count on the card"],
+  saveFix: ["שמירת התיקון", "حفظ التصحيح", "Save correction"],
+  fixHint: ["התיקון נשמר בהיסטוריה עם הסיבה ושם המבצע. בעל העסק רואה כל תיקון.", "يُحفظ التصحيح في السجل مع السبب واسم المنفّذ. يرى صاحب المشروع كل تصحيح.", "The correction is logged with the reason and your name. The owner sees every correction."],
+  fixSaved: ["התיקון נשמר", "تم حفظ التصحيح", "Correction saved"],
+  nextCustomer: ["לקוח הבא", "الزبون التالي", "Next customer"],
+  staffAdjustSetting: ["עובדים רשאים לתקן כמות בכרטיס (עם סיבה, עד 5 בכל פעם, נרשם בהיסטוריה)", "يسمح للموظفين بتصحيح عدد الأختام (مع سبب، حتى 5 كل مرة، يُسجَّل)", "Staff may fix a card's count (with a reason, up to 5 at a time, logged)"],
+  alertStaffFix: ["{name} ביצע/ה {n} תיקוני כמות ב־24 השעות האחרונות", "{name} أجرى {n} تصحيحات خلال 24 ساعة", "{name} made {n} count corrections in the last 24 hours"],
+  err_too_many: ["זה יותר ממה שנשאר עד ההטבה. הקטינו את הכמות.", "هذا أكثر مما تبقى للمكافأة. قلّل العدد.", "That's more than what's left until the reward. Lower the number."],
+  err_card_changed: ["הכרטיס השתנה בינתיים. בדקו את המספר העדכני ונסו שוב.", "تغيّرت البطاقة في هذه الأثناء. تحقق من العدد الحالي وحاول مجدداً.", "The card changed meanwhile. Check the current number and try again."],
 } satisfies Record<string, Entry>);
 
 export function translate(lang: Lang, key: string, vars?: Record<string, string | number>): string {

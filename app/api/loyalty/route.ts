@@ -9,7 +9,7 @@ import { assetMeta, liveDesign, ownsAssets, publishedDesign } from "../../../lib
 
 export const dynamic = "force-dynamic";
 
-type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null };
+type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust: number };
 type Customer = { id: string; business: string; name: string; phone: string; stamps: number; target: number; scan_code: string };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -20,7 +20,7 @@ function validTarget(v: unknown): v is number {
 }
 
 async function loadBusiness(db: D1Database, id: string) {
-  return db.prepare("SELECT id, name, reward, target, color, join_code FROM businesses WHERE id = ?").bind(id).first<Business>();
+  return db.prepare("SELECT id, name, reward, target, color, join_code, staff_adjust FROM businesses WHERE id = ?").bind(id).first<Business>();
 }
 
 function cardState(c: Customer) {
@@ -76,7 +76,8 @@ export async function GET(request: Request) {
   const branchParam = url.searchParams.get("branch") || "";
   const branchFilter = branches.some((b) => b.id === branchParam) ? branchParam : "";
 
-  const [customers, events, stats, team, invites, busyCustomers, busyStaff, perBranch] = await db.batch([
+  const dayAgo = new Date(Date.now() - 86_400_000).toISOString();
+  const [customers, events, stats, team, invites, busyCustomers, busyStaff, perBranch, staffFixes] = await db.batch([
     db.prepare(
       `SELECT id, name, phone, stamps, target, created, source, consent_marketing, card_hash IS NOT NULL AS has_link
        FROM customers WHERE business = ? ORDER BY created DESC LIMIT 5000`,
@@ -116,6 +117,10 @@ export async function GET(request: Request) {
        FROM events e LEFT JOIN branches br ON br.id = e.branch
        WHERE e.business = ? AND e.created >= ? GROUP BY e.branch ORDER BY stamps DESC`,
     ).bind(business!.id, since),
+    db.prepare(
+      `SELECT u.name, COUNT(*) AS n FROM events e JOIN users u ON u.id = e.actor
+       WHERE e.business = ? AND e.kind = 'adjust' AND e.actor_role = 'staff' AND e.created >= ? GROUP BY e.actor`,
+    ).bind(business!.id, dayAgo),
   ]);
 
   // Card editor data (owner only): draft, live version and uploaded images.
@@ -144,6 +149,7 @@ export async function GET(request: Request) {
     alerts: [
       ...(busyCustomers.results as any[]).map((r) => ({ type: "customer", name: r.name, count: r.n })),
       ...(busyStaff.results as any[]).map((r) => ({ type: "staff", name: r.name, count: r.n })),
+      ...(staffFixes.results as any[]).map((r) => ({ type: "staffFix", name: r.name, count: r.n })),
     ],
   });
 }
@@ -193,8 +199,9 @@ export async function POST(request: Request) {
         return fail("bad_details", 400, "Invalid business details");
       }
       // A new target applies to new cards and to existing cards from their next round (after redemption).
-      await db.prepare("UPDATE businesses SET name = ?, reward = ?, target = ?, color = ? WHERE id = ?")
-        .bind(name, reward, p.target, p.color, business.id).run();
+      const staffAdjust = typeof p.staffAdjust === "boolean" ? (p.staffAdjust ? 1 : 0) : business.staff_adjust;
+      await db.prepare("UPDATE businesses SET name = ?, reward = ?, target = ?, color = ?, staff_adjust = ? WHERE id = ?")
+        .bind(name, reward, p.target, p.color, staffAdjust, business.id).run();
       return json({ ok: true });
     }
 
@@ -244,7 +251,7 @@ export async function POST(request: Request) {
     case "stamp":
     case "redeem":
     case "adjust": {
-      if (p.action === "adjust") { const denied = ownerOnly(); if (denied) return denied; }
+      if (p.action === "adjust" && role === "staff" && !business.staff_adjust) return fail("forbidden", 403, "Corrections are owner-only in this business");
       if (typeof p.requestId !== "string" || !UUID.test(p.requestId)) return fail("bad_request", 400, "Invalid request id");
       if (!(await allow(db, `act:${user.id}`, 60, 60))) return fail("rate_limited", 429, "Too many actions");
       const c = await db.prepare("SELECT * FROM customers WHERE id = ? AND business = ?").bind(p.customer ?? "", business.id).first<Customer>();
@@ -267,10 +274,13 @@ export async function POST(request: Request) {
       let delta: number;
       let note: string | null = null;
       if (p.action === "stamp") {
-        delta = 1;
+        // Several purchases at once (e.g. 3 coffees) are one action and one history entry.
+        const count = p.count === undefined ? 1 : p.count;
+        if (!Number.isInteger(count) || (count as number) < 1 || (count as number) > 10) return fail("bad_request", 400, "Count must be 1-10");
+        delta = count as number;
         update = db.prepare(
-          "UPDATE customers SET stamps = stamps + 1 WHERE id = ? AND business = ? AND stamps < target AND NOT EXISTS(SELECT 1 FROM events WHERE id = ?)",
-        ).bind(c.id, business.id, p.requestId);
+          "UPDATE customers SET stamps = stamps + ? WHERE id = ? AND business = ? AND stamps + ? <= target AND NOT EXISTS(SELECT 1 FROM events WHERE id = ?)",
+        ).bind(delta, c.id, business.id, delta, p.requestId);
       } else if (p.action === "redeem") {
         delta = -c.target;
         // The next round uses the business's current target.
@@ -279,13 +289,18 @@ export async function POST(request: Request) {
            WHERE id = ? AND business = ? AND stamps >= target AND NOT EXISTS(SELECT 1 FROM events WHERE id = ?)`,
         ).bind(business.id, c.id, business.id, p.requestId);
       } else {
-        if (p.delta !== 1 && p.delta !== -1) return fail("bad_request", 400, "Correction must be +1 or -1");
+        // Staff corrections are smaller; everyone must give a reason; nothing is ever deleted.
+        const max = role === "owner" ? 30 : 5;
+        if (!Number.isInteger(p.delta) || p.delta === 0 || Math.abs(p.delta as number) > max) return fail("bad_request", 400, `Correction must be between -${max} and ${max}`);
         note = str(p.note, 200);
         if (!note) return fail("note_required", 400, "A reason is required for corrections");
-        delta = p.delta;
+        delta = p.delta as number;
+        // `from` = the count the person saw. If the card changed meanwhile, nothing is applied.
+        const from = Number.isInteger(p.from) ? (p.from as number) : null;
         update = db.prepare(
-          "UPDATE customers SET stamps = stamps + ? WHERE id = ? AND business = ? AND stamps + ? BETWEEN 0 AND target AND NOT EXISTS(SELECT 1 FROM events WHERE id = ?)",
-        ).bind(delta, c.id, business.id, delta, p.requestId);
+          `UPDATE customers SET stamps = stamps + ? WHERE id = ? AND business = ? AND stamps + ? BETWEEN 0 AND target
+           AND (? IS NULL OR stamps = ?) AND NOT EXISTS(SELECT 1 FROM events WHERE id = ?)`,
+        ).bind(delta, c.id, business.id, delta, from, from, p.requestId);
       }
 
       // Balance change and history entry are written together, or not at all.
@@ -301,7 +316,10 @@ export async function POST(request: Request) {
       if (!result[0].meta.changes) {
         const previous = await db.prepare("SELECT id FROM events WHERE id = ? AND customer = ?").bind(p.requestId, c.id).first();
         if (previous) return json({ ok: true, replayed: true, card: cardState(fresh) });
-        const code = p.action === "stamp" ? "reward_ready" : p.action === "redeem" ? "not_ready" : "out_of_range";
+        const code =
+          p.action === "stamp" ? (fresh.stamps >= fresh.target ? "reward_ready" : "too_many")
+          : p.action === "redeem" ? "not_ready"
+          : Number.isInteger(p.from) && p.from !== fresh.stamps ? "card_changed" : "out_of_range";
         return json({ error: code, code, card: cardState(fresh) }, 409);
       }
       return json({ ok: true, card: cardState(fresh) });

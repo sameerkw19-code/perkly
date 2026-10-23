@@ -14,7 +14,7 @@ import { LoyaltyCard, Num } from "../components/loyalty-card";
 import { QrImage } from "../components/qr";
 
 type Role = "owner" | "staff";
-type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null };
+type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number };
 type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; phone?: string };
 type Data = {
   me: { name: string; email: string };
@@ -33,7 +33,7 @@ type Data = {
   stats?: { customers: number; new_customers: number; rewards_ready: number; stamps: number; redemptions: number };
   team?: any[];
   invites?: any[];
-  alerts?: { type: "customer" | "staff"; name: string; count: number }[];
+  alerts?: { type: "customer" | "staff" | "staffFix"; name: string; count: number }[];
   myRecent?: any[];
 };
 type Modal =
@@ -193,7 +193,7 @@ export default function Dashboard() {
         </div>
         <nav style={{ "--nav-count": nav.length } as React.CSSProperties}>
           {nav.map(([Icon, key]) => (
-            <button key={key} className={"nav-item" + (view === key ? " selected" : "")} onClick={() => { setView(key); setQuery(""); }}>
+            <button key={key} className={"nav-item" + (view === key ? " selected" : "")} onClick={() => { setView(key); setQuery(""); load(); }}>
               <Icon size={18} />{t(key)}{view === key && <span className="nav-dot" />}
             </button>
           ))}
@@ -241,7 +241,7 @@ export default function Dashboard() {
               {!!data.alerts?.length && (
                 <div className="alert-panel" role="status">
                   <strong><AlertTriangle size={16} />{t("alerts")}</strong>
-                  <ul>{data.alerts.map((a, i) => <li key={i}>{t(a.type === "customer" ? "alertCustomer" : "alertStaff", { name: a.name, n: a.count })}</li>)}</ul>
+                  <ul>{data.alerts.map((a, i) => <li key={i}>{t(a.type === "customer" ? "alertCustomer" : a.type === "staffFix" ? "alertStaffFix" : "alertStaff", { name: a.name, n: a.count })}</li>)}</ul>
                 </div>
               )}
               <section className="stats">
@@ -332,7 +332,7 @@ export default function Dashboard() {
           )}
 
           {view === "station" && (
-            <Station key={b.id} business={b} design={data.design!} branches={data.branches ?? []} myBranch={isOwner ? null : data.myBranch ?? null} t={t} lang={lang} initial={stationPick} onDone={() => load()} notify={notify}
+            <Station key={b.id} business={b} design={data.design!} branches={data.branches ?? []} myBranch={isOwner ? null : data.myBranch ?? null} canFix={isOwner || !!b.staff_adjust} t={t} lang={lang} initial={stationPick} onDone={() => load()} notify={notify}
               onRegister={() => setModal({ type: "customer" })} myRecent={data.myRecent} />
           )}
 
@@ -375,7 +375,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          <footer><span>perkly. <span className="muted">Small card. Big connection.</span></span><span>{t("pilot")} · v0.4</span></footer>
+          <footer><span>perkly. <span className="muted">Small card. Big connection.</span></span><span>{t("pilot")} · v0.5</span></footer>
         </main>
       </div>
 
@@ -417,17 +417,15 @@ export default function Dashboard() {
               <form onSubmit={async (e) => {
                 e.preventDefault();
                 const form = new FormData(e.currentTarget);
-                const delta = Number(form.get("delta"));
-                const r = await call({ action: "adjust", customer: modal.customer.id, delta, note: form.get("note"), branch: form.get("branch") || undefined, requestId: crypto.randomUUID() });
+                const delta = Number(form.get("count")) - modal.customer.stamps;
+                if (!delta) { setModal(null); return; }
+                const r = await call({ action: "adjust", customer: modal.customer.id, delta, from: modal.customer.stamps, note: form.get("note"), branch: form.get("branch") || undefined, requestId: crypto.randomUUID() });
                 if (r) { notify(t("saved")); load(); setModal(null); }
               }}>
                 <span className="modal-icon"><Activity /></span>
                 <h2>{t("correctTitle")}</h2>
                 <p><strong>{modal.customer.name}</strong> · <Num>{modal.customer.stamps}/{modal.customer.target}</Num></p>
-                <div className="choice-row">
-                  <label className="check"><input type="radio" name="delta" value="1" defaultChecked /><Plus size={14} />{t("addOne")}</label>
-                  <label className="check"><input type="radio" name="delta" value="-1" /><Minus size={14} />{t("removeOne")}</label>
-                </div>
+                <label>{t("correctCount")}<input name="count" type="number" min={0} max={modal.customer.target} required defaultValue={modal.customer.stamps} dir="ltr" /></label>
                 <label>{t("reason")}<input name="note" required maxLength={200} /></label>
                 {!!data.branches?.length && (
                   <label>{t("branch")}
@@ -515,13 +513,16 @@ function LinkBox({ url, t, notify }: { url: string; t: any; notify: (s: string, 
 
 function BusinessForm({ t, busy, initial, submitLabel, onSubmit }: {
   t: any; busy: boolean; initial?: Business; submitLabel: string;
-  onSubmit: (v: { name: string; reward: string; target: number; color: string }) => void;
+  onSubmit: (v: { name: string; reward: string; target: number; color: string; staffAdjust?: boolean }) => void;
 }) {
   return (
     <form className="stack-form" onSubmit={(e) => {
       e.preventDefault();
       const f = new FormData(e.currentTarget);
-      onSubmit({ name: String(f.get("name")), reward: String(f.get("reward")), target: Number(f.get("target")), color: String(f.get("color")) });
+      onSubmit({
+        name: String(f.get("name")), reward: String(f.get("reward")), target: Number(f.get("target")), color: String(f.get("color")),
+        ...(initial ? { staffAdjust: f.get("staffAdjust") === "on" } : {}),
+      });
     }}>
       <label>{t("businessName")}<input name="name" required maxLength={80} defaultValue={initial?.name} /></label>
       <label>{t("rewardText")}<input name="reward" required maxLength={160} defaultValue={initial?.reward ?? ""} /></label>
@@ -529,6 +530,9 @@ function BusinessForm({ t, busy, initial, submitLabel, onSubmit }: {
         <label>{t("target")}<input name="target" type="number" min={2} max={30} required defaultValue={initial?.target ?? 9} /></label>
         <label>{t("color")}<input name="color" type="color" defaultValue={initial?.color ?? "#7558E8"} /></label>
       </div>
+      {initial && (
+        <label className="check"><input type="checkbox" name="staffAdjust" defaultChecked={!!initial.staff_adjust} /><span>{t("staffAdjustSetting")}</span></label>
+      )}
       <button className="btn primary" disabled={busy}>{submitLabel}</button>
     </form>
   );
@@ -536,8 +540,8 @@ function BusinessForm({ t, busy, initial, submitLabel, onSubmit }: {
 
 // ---------- Staff station: scan or search, then confirm. The server is the source of truth. ----------
 
-function Station({ business, design, branches, myBranch, t, lang, initial, onDone, notify, onRegister, myRecent }: {
-  business: Business; design: Design; branches: { id: string; name: string }[]; myBranch: string | null; t: any; lang: any; initial: CardState | null; onDone: () => void;
+function Station({ business, design, branches, myBranch, canFix, t, lang, initial, onDone, notify, onRegister, myRecent }: {
+  business: Business; design: Design; branches: { id: string; name: string }[]; myBranch: string | null; canFix: boolean; t: any; lang: any; initial: CardState | null; onDone: () => void;
   notify: (s: string, bad?: boolean) => void; onRegister: () => void; myRecent?: any[];
 }) {
   const [selected, setSelected] = useState<CardState | null>(initial);
@@ -545,6 +549,17 @@ function Station({ business, design, branches, myBranch, t, lang, initial, onDon
   const [results, setResults] = useState<CardState[]>([]);
   const [scanning, setScanning] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [qty, setQty] = useState(1);
+  const [fixing, setFixing] = useState<{ value: number; note: string } | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  // Showing a new customer: reset the quantity and bring the card into view (phones).
+  function choose(c: CardState) {
+    setSelected(c);
+    setPending(null);
+    setQty(1);
+    setFixing(null);
+    setTimeout(() => cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }
   // The branch this device works at (remembered per business on this device).
   const [branch, setBranch] = useState<string>("");
   useEffect(() => {
@@ -610,7 +625,7 @@ function Station({ business, design, branches, myBranch, t, lang, initial, onDon
       if (code?.data) {
         stop();
         const found = await lookup({ scan: code.data });
-        if (found[0]) { setSelected(found[0]); setPending(null); }
+        if (found[0]) choose(found[0]);
       }
     }, 400);
     return () => clearInterval(timer);
@@ -620,15 +635,18 @@ function Station({ business, design, branches, myBranch, t, lang, initial, onDon
     if (!selected || busy) return;
     if (branches.length && !myBranch && !branch) { notify(t("err_branch_required"), true); return; }
     if (kind === "redeem" && !confirm(t("confirmRedeem", { name: selected.name }))) return;
-    const requestId = pending && pending.kind === kind && pending.customer === selected.id ? pending.requestId : crypto.randomUUID();
-    setPending({ kind, customer: selected.id, requestId });
+    const key = kind + ":" + (kind === "stamp" ? qty : "");
+    const requestId = pending && pending.kind === key && pending.customer === selected.id ? pending.requestId : crypto.randomUUID();
+    setPending({ kind: key, customer: selected.id, requestId });
     setBusy(true);
-    const r = await post("/api/loyalty", { action: kind, business: business.id, customer: selected.id, requestId, branch: myBranch ? undefined : branch || undefined });
+    const count = kind === "stamp" ? qty : undefined;
+    const r = await post("/api/loyalty", { action: kind, business: business.id, customer: selected.id, requestId, count, branch: myBranch ? undefined : branch || undefined });
     setBusy(false);
     if (r.ok) {
       setPending(null);
       setSelected({ ...selected, ...r.data.card });
-      notify(r.data.replayed ? t("replayed") : kind === "stamp" ? t("stampOk") : t("redeemOk"));
+      setQty(1);
+      notify(r.data.replayed ? t("replayed") : kind === "stamp" ? (count === 1 ? t("stampOk") : t("stampsOk", { n: count! })) : t("redeemOk"));
       onDone();
     } else if (r.network) {
       notify(t("err_network"), true); // outcome unknown: keep the request id for a safe retry
@@ -640,6 +658,22 @@ function Station({ business, design, branches, myBranch, t, lang, initial, onDon
   }
 
   const retrying = pending && selected && pending.customer === selected.id;
+  const remaining = selected ? Math.max(0, selected.target - selected.stamps) : 0;
+
+  async function saveFix() {
+    if (!selected || !fixing || busy) return;
+    const delta = fixing.value - selected.stamps;
+    if (!delta) { setFixing(null); return; }
+    if (branches.length && !myBranch && !branch) { notify(t("err_branch_required"), true); return; }
+    setBusy(true);
+    const r = await post("/api/loyalty", {
+      action: "adjust", business: business.id, customer: selected.id, delta, from: selected.stamps, note: fixing.note,
+      requestId: crypto.randomUUID(), branch: myBranch ? undefined : branch || undefined,
+    });
+    setBusy(false);
+    if (r.ok) { setSelected({ ...selected, ...r.data.card }); setFixing(null); setQty(1); notify(t("fixSaved")); onDone(); }
+    else { if (r.data?.card) setSelected({ ...selected, ...r.data.card }); notify(r.network ? t("err_network") : errorText(lang, r.code), true); }
+  }
   const fixedBranch = myBranch ? branches.find((x) => x.id === myBranch) : null;
 
   return (
@@ -670,7 +704,7 @@ function Station({ business, design, branches, myBranch, t, lang, initial, onDon
           <small className="form-hint">{t("searchHint")}</small>
           <div className="staff-results">
             {results.map((c) => (
-              <button key={c.id} className={"customer-result" + (selected?.id === c.id ? " active-result" : "")} onClick={() => { setSelected(c); setPending(null); }}>
+              <button key={c.id} className={"customer-result" + (selected?.id === c.id ? " active-result" : "")} onClick={() => choose(c)}>
                 <span><strong>{c.name}</strong><small dir="ltr">{c.phone}</small></span>
                 <span><Num>{c.stamps}/{c.target}</Num></span>
               </button>
@@ -679,19 +713,51 @@ function Station({ business, design, branches, myBranch, t, lang, initial, onDon
           </div>
         </div>
 
-        <div className="panel staff-card">
+        <div className="panel staff-card" ref={cardRef}>
           {!selected ? (
             <><ScanLine size={60} strokeWidth={1} /><p>{t("selectHint")}</p></>
           ) : (
             <>
+              <div className="staff-who">
+                <h2>{selected.name}</h2>
+                {selected.phone && <small dir="ltr">{selected.phone}</small>}
+              </div>
               <LoyaltyCard design={design} lang={lang} stamps={selected.stamps} target={selected.target} customerName={selected.name} t={t} />
-              {selected.phone && <p className="muted" dir="ltr">{selected.phone}</p>}
-              {selected.stamps >= selected.target ? (
+
+              {fixing ? (
+                <div className="fix-panel">
+                  <h3>{t("fixTitle")}</h3>
+                  <span className="qty-label">{t("correctCount")}</span>
+                  <Stepper value={fixing.value} min={Math.max(0, canFixMin(selected.stamps))} max={Math.min(selected.target, canFixMax(selected.stamps, selected.target))}
+                    onChange={(v) => setFixing({ ...fixing, value: v })} label={t("correctCount")} />
+                  <label className="fix-reason">{t("reason")}
+                    <input value={fixing.note} maxLength={200} onChange={(e) => setFixing({ ...fixing, note: e.target.value })} />
+                  </label>
+                  <p className="form-hint">{t("fixHint")}</p>
+                  <div className="form-actions">
+                    <button className="btn primary" disabled={busy || !fixing.note.trim() || fixing.value === selected.stamps} onClick={saveFix}>{busy ? t("sending") : t("saveFix")}</button>
+                    <button className="btn soft" onClick={() => setFixing(null)}>{t("cancel")}</button>
+                  </div>
+                </div>
+              ) : selected.stamps >= selected.target ? (
                 <button className="btn lime big" disabled={busy} onClick={() => act("redeem")}><Gift size={18} />{busy ? t("sending") : retrying ? t("retry") : t("redeem")}</button>
               ) : (
-                <button className="btn primary big" disabled={busy} onClick={() => act("stamp")}><Plus size={18} />{busy ? t("sending") : retrying ? t("retry") : t("addStamp")}</button>
+                <>
+                  <div className="qty-row">
+                    <span className="qty-label">{t("qtyLabel")}</span>
+                    <Stepper value={qty} min={1} max={Math.min(10, remaining)} onChange={setQty} label={t("qtyLabel")} />
+                    <small className="form-hint">{t("remainingHint", { k: remaining })}</small>
+                  </div>
+                  <button className="btn primary big" disabled={busy} onClick={() => act("stamp")}>
+                    <Plus size={18} />{busy ? t("sending") : retrying ? t("retry") : qty === 1 ? t("addStamp") : t("addStamps", { n: qty })}
+                  </button>
+                </>
               )}
-              <button className="text-btn" onClick={() => { setSelected(null); setPending(null); }}><X size={14} />{t("close")}</button>
+              <div className="row-actions center-row">
+                {canFix && !fixing && <button className="btn soft small" onClick={() => setFixing({ value: selected.stamps, note: "" })}><Activity size={14} />{t("fixCount")}</button>}
+                <button className="btn soft small" onClick={() => { setSelected(null); setPending(null); setFixing(null); start(); }}><ScanLine size={14} />{t("nextCustomer")}</button>
+                <button className="text-btn" onClick={() => { setSelected(null); setPending(null); setFixing(null); }}><X size={14} />{t("close")}</button>
+              </div>
             </>
           )}
         </div>
@@ -828,5 +894,19 @@ function Branches({ branches, t, busy, call, reload }: {
         <button className="btn primary small" disabled={busy}><Plus size={14} />{t("addBranch")}</button>
       </form>
     </section>
+  );
+}
+
+// Staff may correct by up to 5 at a time; the server enforces the same limit.
+function canFixMin(current: number) { return current - 5; }
+function canFixMax(current: number, target: number) { return Math.min(target, current + 5); }
+
+function Stepper({ value, min, max, onChange, label }: { value: number; min: number; max: number; onChange: (v: number) => void; label: string }) {
+  return (
+    <div className="stepper" role="group" aria-label={label}>
+      <button type="button" aria-label="−" disabled={value <= min} onClick={() => onChange(Math.max(min, value - 1))}><Minus size={18} /></button>
+      <output aria-live="polite"><Num>{value}</Num></output>
+      <button type="button" aria-label="+" disabled={value >= max} onClick={() => onChange(Math.min(max, value + 1))}><Plus size={18} /></button>
+    </div>
   );
 }

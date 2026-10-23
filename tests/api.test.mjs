@@ -172,7 +172,7 @@ test("11. staff: invited, limited permissions, then revoked", async () => {
   const s = await staff.act(bizA, "stamp", { customer: dana, requestId: id() });
   assert.equal(s.status, 200);
 
-  for (const action of ["update_business", "invite_staff", "adjust", "new_card_link", "revoke_member", "new_join_code"]) {
+  for (const action of ["update_business", "invite_staff", "new_card_link", "revoke_member", "new_join_code"]) {
     const r = await staff.act(bizA, action, { customer: dana, delta: 1, note: "x", requestId: id(), name: "Hack", reward: "x", target: 2, color: "#000000", user: "x" });
     assert.equal(r.status, 403, action);
   }
@@ -371,4 +371,54 @@ test("branches: required once they exist, staff locked to their branch, reports 
   assert.equal((await st.act(biz, "stamp", { customer: cust, requestId: id() })).status, 200);
   const hist = (await owner.get(`/api/loyalty?business=${biz}&days=all`)).body.events;
   assert.equal(hist.filter((e) => e.branch_name === "North").length, 1, "closed branch keeps its history");
+});
+
+
+// ---------------- Staff station: several stamps at once, count corrections ----------------
+test("station: several purchases in one action; staff can fix the count with a reason; owner can switch that off", async () => {
+  const owner = new Client();
+  await signup(owner, "stationOwner");
+  const biz = (await owner.post("/api/loyalty", { action: "create_business", name: "Cafe2", reward: "Free", target: 9, color: "#123456" })).body.id;
+  const cust = (await owner.act(biz, "register_customer", { name: "Omer", phone: "0549876543" })).body.id;
+  const inv = await owner.act(biz, "invite_staff", { label: "S" });
+  const st = new Client();
+  await st.post("/api/auth", { action: "accept_invite", token: new URL(inv.body.inviteUrl).pathname.split("/").pop(), name: "Station Staff", email: `station-${run}@test.perkly`, password: "station pass" });
+
+  const three = await st.act(biz, "stamp", { customer: cust, count: 3, requestId: id() });
+  assert.equal(three.status, 200);
+  assert.equal(three.body.card.stamps, 3);
+  const tooMany = await st.act(biz, "stamp", { customer: cust, count: 7, requestId: id() });
+  assert.equal(tooMany.status, 409);
+  assert.equal(tooMany.body.code, "too_many");
+  assert.equal((await st.act(biz, "stamp", { customer: cust, count: 0, requestId: id() })).status, 400);
+  assert.equal((await st.act(biz, "stamp", { customer: cust, count: 11, requestId: id() })).status, 400);
+
+  // Repeating the same multi-stamp request never doubles it.
+  const rid = id();
+  await st.act(biz, "stamp", { customer: cust, count: 2, requestId: rid });
+  const again = await st.act(biz, "stamp", { customer: cust, count: 2, requestId: rid });
+  assert.equal(again.body.replayed, true);
+  assert.equal(again.body.card.stamps, 5);
+
+  // Staff correction: reason required, limited to 5, must match the count they saw.
+  assert.equal((await st.act(biz, "adjust", { customer: cust, delta: -1, from: 5, requestId: id() })).status, 400);
+  assert.equal((await st.act(biz, "adjust", { customer: cust, delta: -6, from: 5, note: "x", requestId: id() })).status, 400);
+  const stale = await st.act(biz, "adjust", { customer: cust, delta: -1, from: 4, note: "customer bought 4", requestId: id() });
+  assert.equal(stale.status, 409);
+  assert.equal(stale.body.code, "card_changed");
+  const fix = await st.act(biz, "adjust", { customer: cust, delta: -1, from: 5, note: "customer bought 4", requestId: id() });
+  assert.equal(fix.status, 200);
+  assert.equal(fix.body.card.stamps, 4);
+
+  const view = (await owner.get(`/api/loyalty?business=${biz}&days=all`)).body;
+  const ev = view.events.find((e) => e.kind === "adjust");
+  assert.equal(ev.actor_name, "Station Staff");
+  assert.equal(ev.note, "customer bought 4");
+  assert.ok(view.alerts.some((a) => a.type === "staffFix"), "owner is told about staff corrections");
+
+  // Owner turns staff corrections off.
+  const off = await owner.act(biz, "update_business", { name: "Cafe2", reward: "Free", target: 9, color: "#123456", staffAdjust: false });
+  assert.equal(off.status, 200);
+  assert.equal((await st.act(biz, "adjust", { customer: cust, delta: 1, from: 4, note: "x", requestId: id() })).status, 403);
+  assert.equal((await owner.act(biz, "adjust", { customer: cust, delta: 1, from: 4, note: "owner fix", requestId: id() })).status, 200);
 });

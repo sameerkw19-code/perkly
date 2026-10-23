@@ -1,0 +1,1 @@
+ALTER TABLE `businesses` ADD `staff_adjust` integer DEFAULT 1 NOT NULL;
