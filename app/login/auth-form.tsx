@@ -5,9 +5,9 @@ import { errorText, useLang } from "../../lib/i18n";
 import { post } from "../../lib/api";
 import { LangSwitch } from "../../components/lang-switch";
 
-export default function AuthForm({ needsCode }: { needsCode: boolean }) {
+export default function AuthForm({ needsCode, startInSignup = false }: { needsCode: boolean; startInSignup?: boolean }) {
   const { lang, setLang, t, dir } = useLang();
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [mode, setMode] = useState<"login" | "signup">(startInSignup ? "signup" : "login");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 

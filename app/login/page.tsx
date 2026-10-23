@@ -5,7 +5,8 @@ import AuthForm from "./auth-form";
 
 export const dynamic = "force-dynamic";
 
-export default async function LoginPage() {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ signup?: string }> }) {
   if (await currentUser()) redirect("/");
-  return <AuthForm needsCode={!!env.SIGNUP_CODE} />;
+  const { signup } = await searchParams;
+  return <AuthForm needsCode={!!env.SIGNUP_CODE} startInSignup={signup === "1"} />;
 }

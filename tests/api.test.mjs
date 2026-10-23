@@ -55,9 +55,12 @@ test("forged identity headers are ignored; pages require sign-in", async () => {
   assert.equal(r.status, 401);
   const forged = await fetch(BASE + "/api/loyalty", { headers: { "oai-authenticated-user-id": "attacker", "oai-authenticated-user-email": "a@b.c" } });
   assert.equal(forged.status, 401);
-  const page = await anon.get("/");
-  assert.equal(page.status, 307);
-  assert.match(page.location, /\/login$/);
+  // Signed-out visitors get the public landing page, never the dashboard.
+  const page = await fetch(BASE + "/", { redirect: "manual" });
+  assert.equal(page.status, 200);
+  const html = await page.text();
+  assert.match(html, /הלקוחות שלכם חוזרים/);
+  assert.doesNotMatch(html, /oai-authenticated|join_code/);
 });
 
 test("mutations from another site are rejected", async () => {
