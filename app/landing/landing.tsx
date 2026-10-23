@@ -267,27 +267,79 @@ export default function Landing() {
 
 <Testimonials />
 
+<section id="kit" aria-labelledby="kit-title" style={{ maxWidth: "1200px", margin: "0 auto", padding: "clamp(64px, 8vw, 104px) clamp(16px, 4vw, 32px)", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "clamp(40px, 6vw, 72px)" }}>
+<div style={{ flex: "1 1 380px", minWidth: "0", display: "flex", flexDirection: "column", gap: "16px" }}>
+<span style={{ color: "#5B3FD6", fontWeight: "700", fontSize: "15px" }}>ערכת קופה</span>
+<h2 id="kit-title" style={{ margin: "0", fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "clamp(30px, 4vw, 46px)", lineHeight: "1.15" }}>הכל מוכן לקופה<br />מהיום הראשון.</h2>
+<p style={{ margin: "0", fontSize: "19px", color: "#4A4462", maxWidth: "500px" }}>עם ההצטרפות מקבלים ערכה מודפסת עם הלוגו שלכם וקוד ה־QR האישי של העסק. תולים, מעמידים ליד הקופה, והלקוחות מתחילים להצטרף.</p>
+<div style={{ display: "flex", flexDirection: "column", gap: "10px", fontSize: "17px", marginTop: "4px" }}>
+<span style={{ display: "flex", alignItems: "center", gap: "10px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>2 פוסטרים מעוצבים עם הלוגו שלכם</span>
+<span style={{ display: "flex", alignItems: "center", gap: "10px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>סטנד QR לדלפק</span>
+<span style={{ display: "flex", alignItems: "center", gap: "10px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>QR אישי שמוביל ישר להצטרפות לכרטיס שלכם</span>
+</div>
+<span style={{ alignSelf: "flex-start", marginTop: "6px", background: "#17132B", color: "#FFFFFF", fontWeight: "700", fontSize: "15px", padding: "10px 18px", borderRadius: "999px" }}>כלול ב־200 ₪ של החודש הראשון</span>
+</div>
+<div role="img" aria-label="ערכת הקופה: שני פוסטרים וסטנד לדלפק עם הלוגו של העסק וקוד QR" style={{ flex: "999 1 520px", minWidth: "0", background: "#F1EDFC", borderRadius: "32px", padding: "clamp(24px, 4vw, 40px) clamp(16px, 3vw, 32px) 28px", display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "flex-end", gap: "22px" }}>
+<div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
+<div style={{ width: "200px", height: "284px", background: "#6A4DE3", color: "#FFFFFF", borderRadius: "10px", padding: "18px", boxSizing: "border-box", display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", boxShadow: "0 18px 36px rgba(23,19,43,0.22)", textAlign: "center" }}>
+<div style={{ display: "flex", alignItems: "center", gap: "8px" }}><svg role="img" aria-label="הלוגו של קפה אייקון" width="34" height="34" viewBox="0 0 48 48" style={{ flex: "none" }}><rect width="48" height="48" rx="14" fill="#F3EEFF"></rect><circle cx="24" cy="25" r="17" fill="#8F72E8"></circle><path d="M15 23h16v5.5a7 7 0 0 1-7 7h-2a7 7 0 0 1-7-7z" fill="#FFFFFF"></path><path d="M31 25h1.6a3 3 0 0 1 0 6H31" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round"></path><path d="M13 38h20" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round"></path><path d="M23 21c0-3.5 2.5-5.5 2.5-11" fill="none" stroke="#3E2A8C" strokeWidth="1.6" strokeLinecap="round"></path><ellipse cx="26.6" cy="10.6" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(-30 26.6 10.6)"></ellipse><ellipse cx="24.2" cy="12.4" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(30 24.2 12.4)"></ellipse><ellipse cx="26.2" cy="14.6" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(-30 26.2 14.6)"></ellipse><ellipse cx="23.6" cy="16.6" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(30 23.6 16.6)"></ellipse></svg><span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "15px" }}>קפה אייקון</span></div>
+<span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "21px", lineHeight: "1.15" }}>אוספים חותמות.<br />מקבלים מתנה.</span>
+<div style={{ background: "#FFFFFF", borderRadius: "10px", padding: "6px", display: "flex" }}><svg aria-hidden="true" width="84" height="84" viewBox="-1 -1 23 23" shapeRendering="crispEdges"><rect x="-1" y="-1" width="23" height="23" fill="#FFFFFF"></rect><path fill="#17132B" d="M0 0h7v7H0zM14 0h7v7h-7zM0 14h7v7H0zM8 0h1v2H8zM10 1h2v1h-2zM9 3h2v2H9zM12 4h1v2h-1zM8 6h1v1H8zM10 6h1v1h-1zM0 8h2v1H0zM3 8h3v1H3zM8 8h2v2H8zM11 8h3v1h-3zM15 8h2v2h-2zM18 8h3v1h-3zM1 10h2v2H1zM5 10h2v1H5zM11 10h1v3h-1zM13 10h2v1h-2zM17 11h2v2h-2zM20 10h1v3h-1zM4 12h3v1H4zM8 12h2v2H8zM13 12h3v1h-3zM8 15h2v1H8zM11 14h2v2h-2zM14 14h2v1h-2zM17 14h1v2h-1zM19 15h2v1h-2zM9 17h3v1H9zM13 16h3v2h-3zM8 19h2v2H8zM11 19h1v2h-1zM14 19h3v1h-3zM18 18h1v3h-1zM20 19h1v2h-1z"></path><path fill="#FFFFFF" d="M1 1h5v5H1zM15 1h5v5h-5zM1 15h5v5H1z"></path><path fill="#17132B" d="M2 2h3v3H2zM16 2h3v3h-3zM2 16h3v3H2z"></path></svg></div>
+<span style={{ fontSize: "13px", fontWeight: "700", color: "#FFC24B" }}>סרקו והצטרפו בחינם</span>
+</div>
+<span style={{ fontSize: "14px", fontWeight: "700", color: "#4A4462" }}>פוסטר לחלון</span>
+</div>
+<div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
+<div style={{ width: "200px", height: "284px", background: "#FFF8EC", color: "#2A1A0A", borderRadius: "10px", padding: "18px", boxSizing: "border-box", display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", boxShadow: "0 18px 36px rgba(23,19,43,0.16)", border: "1px solid #F0E3CC", textAlign: "center" }}>
+<svg role="img" aria-label="הלוגו של קפה אייקון" width="40" height="40" viewBox="0 0 48 48" style={{ flex: "none" }}><rect width="48" height="48" rx="14" fill="#F3EEFF"></rect><circle cx="24" cy="25" r="17" fill="#8F72E8"></circle><path d="M15 23h16v5.5a7 7 0 0 1-7 7h-2a7 7 0 0 1-7-7z" fill="#FFFFFF"></path><path d="M31 25h1.6a3 3 0 0 1 0 6H31" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round"></path><path d="M13 38h20" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round"></path><path d="M23 21c0-3.5 2.5-5.5 2.5-11" fill="none" stroke="#3E2A8C" strokeWidth="1.6" strokeLinecap="round"></path><ellipse cx="26.6" cy="10.6" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(-30 26.6 10.6)"></ellipse><ellipse cx="24.2" cy="12.4" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(30 24.2 12.4)"></ellipse><ellipse cx="26.2" cy="14.6" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(-30 26.2 14.6)"></ellipse><ellipse cx="23.6" cy="16.6" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(30 23.6 16.6)"></ellipse></svg>
+<span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "20px", lineHeight: "1.15" }}>הקפה העשירי<br />עלינו</span>
+<div style={{ display: "flex", gap: "5px", direction: "rtl" }}><span style={{ width: "26px", height: "26px", borderRadius: "50%", background: "#FFC24B", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3B2A00" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"></path></svg></span><span style={{ width: "26px", height: "26px", borderRadius: "50%", background: "#FFC24B", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3B2A00" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"></path></svg></span><span style={{ width: "26px", height: "26px", borderRadius: "50%", background: "#FFC24B", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3B2A00" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"></path></svg></span><span style={{ width: "26px", height: "26px", borderRadius: "50%", border: "2px dashed #C9BFA8", boxSizing: "border-box" }}></span><span style={{ width: "26px", height: "26px", borderRadius: "50%", border: "2px dashed #C9BFA8", boxSizing: "border-box" }}></span></div>
+<div style={{ display: "flex" }}><svg aria-hidden="true" width="72" height="72" viewBox="-1 -1 23 23" shapeRendering="crispEdges"><rect x="-1" y="-1" width="23" height="23" fill="#FFFFFF"></rect><path fill="#17132B" d="M0 0h7v7H0zM14 0h7v7h-7zM0 14h7v7H0zM8 0h1v2H8zM10 1h2v1h-2zM9 3h2v2H9zM12 4h1v2h-1zM8 6h1v1H8zM10 6h1v1h-1zM0 8h2v1H0zM3 8h3v1H3zM8 8h2v2H8zM11 8h3v1h-3zM15 8h2v2h-2zM18 8h3v1h-3zM1 10h2v2H1zM5 10h2v1H5zM11 10h1v3h-1zM13 10h2v1h-2zM17 11h2v2h-2zM20 10h1v3h-1zM4 12h3v1H4zM8 12h2v2H8zM13 12h3v1h-3zM8 15h2v1H8zM11 14h2v2h-2zM14 14h2v1h-2zM17 14h1v2h-1zM19 15h2v1h-2zM9 17h3v1H9zM13 16h3v2h-3zM8 19h2v2H8zM11 19h1v2h-1zM14 19h3v1h-3zM18 18h1v3h-1zM20 19h1v2h-1z"></path><path fill="#FFFFFF" d="M1 1h5v5H1zM15 1h5v5h-5zM1 15h5v5H1z"></path><path fill="#17132B" d="M2 2h3v3H2zM16 2h3v3h-3zM2 16h3v3H2z"></path></svg></div>
+<span style={{ fontSize: "13px", fontWeight: "700", color: "#6B4E2E" }}>סרקו בקופה</span>
+</div>
+<span style={{ fontSize: "14px", fontWeight: "700", color: "#4A4462" }}>פוסטר לקיר</span>
+</div>
+<div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
+<div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+<div style={{ width: "150px", height: "196px", background: "#FFFFFF", borderRadius: "12px", padding: "14px", boxSizing: "border-box", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "10px", boxShadow: "0 14px 28px rgba(23,19,43,0.16)", border: "1px solid #E8E3F7", textAlign: "center" }}>
+<svg role="img" aria-label="הלוגו של קפה אייקון" width="34" height="34" viewBox="0 0 48 48" style={{ flex: "none" }}><rect width="48" height="48" rx="14" fill="#F3EEFF"></rect><circle cx="24" cy="25" r="17" fill="#8F72E8"></circle><path d="M15 23h16v5.5a7 7 0 0 1-7 7h-2a7 7 0 0 1-7-7z" fill="#FFFFFF"></path><path d="M31 25h1.6a3 3 0 0 1 0 6H31" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round"></path><path d="M13 38h20" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round"></path><path d="M23 21c0-3.5 2.5-5.5 2.5-11" fill="none" stroke="#3E2A8C" strokeWidth="1.6" strokeLinecap="round"></path><ellipse cx="26.6" cy="10.6" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(-30 26.6 10.6)"></ellipse><ellipse cx="24.2" cy="12.4" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(30 24.2 12.4)"></ellipse><ellipse cx="26.2" cy="14.6" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(-30 26.2 14.6)"></ellipse><ellipse cx="23.6" cy="16.6" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(30 23.6 16.6)"></ellipse></svg>
+<span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "14px", lineHeight: "1.25" }}>סרקו לכרטיס<br />הנאמנות</span>
+<div style={{ display: "flex" }}><svg aria-hidden="true" width="76" height="76" viewBox="-1 -1 23 23" shapeRendering="crispEdges"><rect x="-1" y="-1" width="23" height="23" fill="#FFFFFF"></rect><path fill="#17132B" d="M0 0h7v7H0zM14 0h7v7h-7zM0 14h7v7H0zM8 0h1v2H8zM10 1h2v1h-2zM9 3h2v2H9zM12 4h1v2h-1zM8 6h1v1H8zM10 6h1v1h-1zM0 8h2v1H0zM3 8h3v1H3zM8 8h2v2H8zM11 8h3v1h-3zM15 8h2v2h-2zM18 8h3v1h-3zM1 10h2v2H1zM5 10h2v1H5zM11 10h1v3h-1zM13 10h2v1h-2zM17 11h2v2h-2zM20 10h1v3h-1zM4 12h3v1H4zM8 12h2v2H8zM13 12h3v1h-3zM8 15h2v1H8zM11 14h2v2h-2zM14 14h2v1h-2zM17 14h1v2h-1zM19 15h2v1h-2zM9 17h3v1H9zM13 16h3v2h-3zM8 19h2v2H8zM11 19h1v2h-1zM14 19h3v1h-3zM18 18h1v3h-1zM20 19h1v2h-1z"></path><path fill="#FFFFFF" d="M1 1h5v5H1zM15 1h5v5h-5zM1 15h5v5H1z"></path><path fill="#17132B" d="M2 2h3v3H2zM16 2h3v3h-3zM2 16h3v3H2z"></path></svg></div>
+</div>
+<div style={{ width: "170px", height: "14px", background: "#17132B", clipPath: "polygon(8% 0, 92% 0, 100% 100%, 0 100%)" }}></div>
+</div>
+<span style={{ fontSize: "14px", fontWeight: "700", color: "#4A4462" }}>סטנד לדלפק</span>
+</div>
+</div>
+</section>
+
 <section id="pricing" aria-labelledby="price-title" style={{ background: "#F1EDFC" }}>
 <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "clamp(64px, 8vw, 104px) clamp(16px, 4vw, 32px)", display: "flex", flexWrap: "wrap", gap: "clamp(32px, 5vw, 64px)", alignItems: "center" }}>
 <div style={{ flex: "999 1 400px", minWidth: "0", display: "flex", flexDirection: "column", gap: "14px" }}>
 <span style={{ color: "#5B3FD6", fontWeight: "700", fontSize: "15px" }}>מחיר</span>
-<h2 id="price-title" style={{ margin: "0", fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "clamp(30px, 4vw, 46px)", lineHeight: "1.15" }}>מחיר אחד. כל היכולות.</h2>
+<h2 id="price-title" style={{ margin: "0", fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "clamp(30px, 4vw, 46px)", lineHeight: "1.15" }}>מחיר פשוט. בלי הפתעות.</h2>
 <p style={{ margin: "0", fontSize: "19px", color: "#4A4462", maxWidth: "480px" }}>בלי חבילות מסובכות ובלי תוספות. מספיק לקוח קבוע אחד שחזר בזכות המתנה, והחודש כבר שילם את עצמו.</p>
 <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "16px", color: "#3D3657", marginTop: "6px" }}>
-<span style={{ display: "flex", alignItems: "center", gap: "8px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>מתחילים בתקופת ניסיון, בלי סיכון</span>
-<span style={{ display: "flex", alignItems: "center", gap: "8px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>בלי ציוד ובלי התקנה</span>
+<span style={{ display: "flex", alignItems: "center", gap: "8px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>חודש ראשון 200 ₪: הקמה, ערכת קופה והחודש עצמו</span>
+<span style={{ display: "flex", alignItems: "center", gap: "8px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>מהחודש השני 99 ₪ לחודש, וזהו</span>
+<span style={{ display: "flex", alignItems: "center", gap: "8px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>בלי ציוד לקנות: מספיק טלפון בקופה</span>
 </div>
 </div>
 <div style={{ flex: "1 1 360px", maxWidth: "460px", background: "#FFFFFF", borderRadius: "28px", padding: "clamp(26px, 4vw, 36px)", boxShadow: "0 24px 50px rgba(23,19,43,0.12)", border: "2px solid #7558E8", display: "flex", flexDirection: "column", gap: "20px" }}>
 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
 <span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "22px" }}>Perkly לעסק</span>
-<span style={{ background: "#FFF1D1", color: "#6B4600", fontWeight: "700", fontSize: "13px", padding: "6px 12px", borderRadius: "999px" }}>14 ימי ניסיון חינם</span>
+<span style={{ background: "#FFF1D1", color: "#6B4600", fontWeight: "700", fontSize: "13px", padding: "6px 12px", borderRadius: "999px" }}>כולל ערכת קופה</span>
 </div>
 <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
 <span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "56px", lineHeight: "1" }}>99 ₪</span>
 <span style={{ color: "#5E5873", fontSize: "17px" }}>לחודש</span>
 </div>
+<div style={{ background: "#F6F3FF", borderRadius: "16px", padding: "14px 16px", display: "flex", flexDirection: "column", gap: "4px", marginTop: "-6px" }}>
+<span style={{ fontWeight: "700", fontSize: "16px" }}>בחודש הראשון: 200 ₪</span>
+<span style={{ fontSize: "14px", color: "#4A4462" }}>כולל דמי הקמה, ערכת קופה עם הלוגו שלכם והחודש הראשון. מהחודש השני 99 ₪.</span>
+</div>
 <div style={{ display: "flex", flexDirection: "column", gap: "11px", fontSize: "16px" }}>
+<span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>ערכת קופה: 2 פוסטרים וסטנד עם הלוגו שלכם</span>
 <span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>עורך עיצוב מלא לכרטיס</span>
 <span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>הצטרפות לקוחות ב־QR</span>
 <span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>עמדת עובד וצוות בהזמנה</span>
@@ -295,7 +347,7 @@ export default function Landing() {
 <span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>התראות על פעילות חריגה</span>
 <span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>עברית, ערבית ואנגלית</span>
 </div>
-<a href="/login?signup=1" style={{ background: "#7558E8", color: "#FFFFFF", textDecoration: "none", fontWeight: "700", fontSize: "18px", padding: "16px 24px", borderRadius: "14px", textAlign: "center", minHeight: "56px", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center" }}>התחילו את תקופת הניסיון</a>
+<a href="/login?signup=1" style={{ background: "#7558E8", color: "#FFFFFF", textDecoration: "none", fontWeight: "700", fontSize: "18px", padding: "16px 24px", borderRadius: "14px", textAlign: "center", minHeight: "56px", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center" }}>פתחו חשבון לעסק</a>
 </div>
 </div>
 </section>
@@ -309,7 +361,11 @@ export default function Landing() {
 </details>
 <details style={{ background: "#FFFFFF", border: "1px solid #E8E3F7", borderRadius: "18px", padding: "20px 24px" }}>
 <summary style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "19px" }}>צריך לקנות ציוד?</summary>
-<p style={{ margin: "12px 0 0", color: "#4A4462", fontSize: "16px" }}>לא. עמדת העובד רצה בדפדפן של הטלפון או הטאבלט שכבר יש לכם בקופה, ומשתמשת במצלמה שלו לסריקה. כל מה שצריך להדפיס זה שלט QR.</p>
+<p style={{ margin: "12px 0 0", color: "#4A4462", fontSize: "16px" }}>לא. עמדת העובד רצה בדפדפן של הטלפון או הטאבלט שכבר יש לכם בקופה, ומשתמשת במצלמה שלו לסריקה. את הפוסטרים והסטנד עם ה־QR אנחנו מכינים לכם, בערכת הקופה.</p>
+</details>
+<details style={{ background: "#FFFFFF", border: "1px solid #E8E3F7", borderRadius: "18px", padding: "20px 24px" }}>
+<summary style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "19px" }}>כמה זה עולה?</summary>
+<p style={{ margin: "12px 0 0", color: "#4A4462", fontSize: "16px" }}>בחודש הראשון 200 ₪. זה כולל את דמי ההקמה, ערכת קופה עם הלוגו שלכם (שני פוסטרים וסטנד לדלפק) ואת החודש הראשון עצמו. מהחודש השני המחיר הוא 99 ₪ לחודש.</p>
 </details>
 <details style={{ background: "#FFFFFF", border: "1px solid #E8E3F7", borderRadius: "18px", padding: "20px 24px" }}>
 <summary style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "19px" }}>מה מונע מעובד לחלק חותמות לחברים?</summary>
