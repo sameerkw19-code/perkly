@@ -4,7 +4,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Perkly | כרטיס קטן. קשר גדול.",
   description: "כרטיסי נאמנות דיגיטליים לעסקים",
-  icons: { icon: "/favicon.svg" },
+  icons: { icon: "/favicon.svg", apple: "/apple-touch-icon.png" },
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "Perkly", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#7558E8" };

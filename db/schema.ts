@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, uniqueIndex, index } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, uniqueIndex, index, blob } from "drizzle-orm/sqlite-core";
 
 // Businesses. `owner` is kept only for data created under the old ChatGPT Sites pilot;
 // access is decided by `memberships`, never by this column.
@@ -13,6 +13,8 @@ export const businesses = sqliteTable(
     color: text("color").notNull(),
     created: text("created").notNull(),
     joinCode: text("join_code"),
+    // Card design being edited (JSON). Customers only ever see a published version (card_designs).
+    designDraft: text("design_draft"),
   },
   (t) => [uniqueIndex("businesses_join_code").on(t.joinCode)],
 );
@@ -117,3 +119,35 @@ export const rateLimits = sqliteTable("rate_limits", {
   windowStart: integer("window_start").notNull(),
   count: integer("count").notNull(),
 });
+
+// Every published card design, kept forever (never edited). The highest version is live.
+export const cardDesigns = sqliteTable(
+  "card_designs",
+  {
+    id: text("id").primaryKey(),
+    business: text("business").notNull().references(() => businesses.id),
+    version: integer("version").notNull(),
+    data: text("data").notNull(),
+    published: text("published").notNull(),
+    publishedBy: text("published_by").notNull(),
+  },
+  (t) => [uniqueIndex("card_designs_version").on(t.business, t.version)],
+);
+
+// Uploaded images (logo, background, stamp image). Stored in D1 for the pilot; size-limited.
+export const assets = sqliteTable(
+  "assets",
+  {
+    id: text("id").primaryKey(),
+    business: text("business").notNull().references(() => businesses.id),
+    kind: text("kind").notNull(), // 'logo' | 'hero' | 'stamp'
+    mime: text("mime").notNull(),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+    bytes: integer("bytes").notNull(),
+    data: blob("data", { mode: "buffer" }).notNull(),
+    created: text("created").notNull(),
+    createdBy: text("created_by").notNull(),
+  },
+  (t) => [index("assets_business").on(t.business)],
+);

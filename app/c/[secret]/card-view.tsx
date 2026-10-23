@@ -5,7 +5,9 @@ import { LangSwitch } from "../../../components/lang-switch";
 import { LoyaltyCard } from "../../../components/loyalty-card";
 import { QrImage } from "../../../components/qr";
 
-type Card = { name: string; stamps: number; target: number; scan_code: string; business: string; reward: string; color: string };
+import type { Design } from "../../../lib/design";
+
+type Card = { name: string; stamps: number; target: number; scan_code: string; design: Design };
 
 export default function CardView({ card }: { card: Card | null }) {
   const { lang, setLang, t, dir } = useLang();
@@ -19,7 +21,7 @@ export default function CardView({ card }: { card: Card | null }) {
         <div className="auth-card panel"><h1>{t("cardNotFound")}</h1></div>
       ) : (
         <div className="card-stack">
-          <LoyaltyCard businessName={card.business} reward={card.reward} color={card.color} stamps={card.stamps} target={card.target} customerName={card.name} t={t} large />
+          <LoyaltyCard design={card.design} lang={lang} stamps={card.stamps} target={card.target} customerName={card.name} t={t} />
           {card.stamps >= card.target && <div className="ready-banner" role="status">{t("earned")}</div>}
           <div className="panel qr-panel">
             <QrImage text={"perkly:" + card.scan_code} size={210} label={t("showQr")} />

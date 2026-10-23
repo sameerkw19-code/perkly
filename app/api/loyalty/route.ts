@@ -4,6 +4,8 @@ import { randomCode, randomToken, sha256 } from "../../../lib/server/crypto";
 import { fail, json, readJson, sameOrigin, str } from "../../../lib/server/http";
 import { allow } from "../../../lib/server/rate-limit";
 import { formatPhone, maskPhone, normalizePhone } from "../../../lib/phone";
+import { assetIds, defaultDesign, designChecks, sanitizeDesign } from "../../../lib/design";
+import { assetMeta, liveDesign, ownsAssets, publishedDesign } from "../../../lib/server/designs";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +47,7 @@ export async function GET(request: Request) {
 
   const business = await loadBusiness(db, membership.business);
   const role = membership.role;
-  const base = { me, memberships, role, business };
+  const base = { me, memberships, role, business, design: await liveDesign(db, business!) };
 
   if (role === "staff") {
     const mine = await db
@@ -100,8 +102,21 @@ export async function GET(request: Request) {
     ).bind(business!.id, hourAgo),
   ]);
 
+  // Card editor data (owner only): draft, live version and uploaded images.
+  const published = await publishedDesign(db, business!.id);
+  const draftRow = await db.prepare("SELECT design_draft FROM businesses WHERE id = ?").bind(business!.id).first<{ design_draft: string | null }>();
+  const draft = (draftRow?.design_draft && sanitizeDesign(JSON.parse(draftRow.design_draft))) || published?.design || defaultDesign(business!);
+  const images = await db.prepare("SELECT id, kind, width, height FROM assets WHERE business = ? ORDER BY created DESC LIMIT 60").bind(business!.id).all();
+
   return json({
     ...base,
+    editor: {
+      draft,
+      publishedVersion: published?.version ?? 0,
+      publishedAt: published?.published ?? null,
+      hasUnpublished: !!draftRow?.design_draft && draftRow.design_draft !== JSON.stringify(published?.design ?? null),
+      images: images.results,
+    },
     range: days ?? "all",
     customers: (customers.results as any[]).map((c) => ({ ...c, phone: formatPhone(c.phone), has_link: !!c.has_link })),
     events: events.results,
@@ -296,6 +311,35 @@ export async function POST(request: Request) {
       const others = await db.prepare("SELECT COUNT(*) AS n FROM memberships WHERE user = ? AND revoked IS NULL").bind(p.user ?? "").first<{ n: number }>();
       if (!others?.n) await db.prepare("DELETE FROM sessions WHERE user = ?").bind(p.user ?? "").run();
       return json({ ok: true });
+    }
+
+    case "save_design": {
+      const denied = ownerOnly(); if (denied) return denied;
+      const design = sanitizeDesign(p.design);
+      if (!design) return fail("bad_details", 400, "Invalid design");
+      if (!(await ownsAssets(db, business.id, design))) return fail("not_found", 404, "Image not found");
+      await db.prepare("UPDATE businesses SET design_draft = ? WHERE id = ?").bind(JSON.stringify(design), business.id).run();
+      return json({ ok: true });
+    }
+
+    case "publish_design": {
+      const denied = ownerOnly(); if (denied) return denied;
+      const row = await db.prepare("SELECT design_draft FROM businesses WHERE id = ?").bind(business.id).first<{ design_draft: string | null }>();
+      const design = row?.design_draft ? sanitizeDesign(JSON.parse(row.design_draft)) : null;
+      if (!design) return fail("nothing_to_publish", 400, "Save a draft first");
+      if (!(await ownsAssets(db, business.id, design))) return fail("not_found", 404, "Image not found");
+      const checks = designChecks(design, await assetMeta(db, business.id, assetIds(design)));
+      if (checks.some((c) => c.level === "bad")) return json({ error: "design_checks", code: "design_checks", checks }, 409);
+      // New immutable version. Stamps and rewards are not touched.
+      await db
+        .prepare(
+          `INSERT INTO card_designs(id, business, version, data, published, published_by)
+           SELECT ?, ?, COALESCE(MAX(version), 0) + 1, ?, ?, ? FROM card_designs WHERE business = ?`,
+        )
+        .bind(crypto.randomUUID(), business.id, JSON.stringify(design), now, user.id, business.id)
+        .run();
+      const live = await publishedDesign(db, business.id);
+      return json({ ok: true, version: live?.version });
     }
 
     case "new_join_code": {

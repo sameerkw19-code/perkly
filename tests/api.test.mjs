@@ -246,3 +246,76 @@ test("sign out ends the session", async () => {
   const r = await ownerB.get("/api/loyalty");
   assert.equal(r.status, 401);
 });
+
+// ---------------- Card designs ----------------
+const PNG_1x1 = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+
+async function upload(client, business, kind, bytes, type = "image/png") {
+  const res = await fetch(`${BASE}/api/asset?business=${business}&kind=${kind}`, { method: "POST", headers: { ...client.headers(), "content-type": type }, body: bytes });
+  return { status: res.status, body: await res.json().catch(() => null) };
+}
+
+test("design: upload, draft, publish checks, live card uses the published design", async () => {
+  const up = await upload(ownerA, bizA, "logo", PNG_1x1);
+  assert.equal(up.status, 200, JSON.stringify(up.body));
+  assert.equal(up.body.width, 1);
+  const img = await fetch(`${BASE}/api/asset/${up.body.id}`);
+  assert.equal(img.status, 200);
+  assert.equal(img.headers.get("content-type"), "image/png");
+
+  const svg = await upload(ownerA, bizA, "logo", Buffer.from("<svg xmlns='http://www.w3.org/2000/svg'><script>alert(1)</script></svg>"), "image/svg+xml");
+  assert.equal(svg.status, 415, "SVG and unknown files are refused");
+
+  const before = (await ownerA.get(`/api/loyalty?business=${bizA}&days=all`)).body;
+  const draft = structuredClone(before.editor.draft);
+  draft.logo = up.body.id;
+  draft.stamp = { icon: "pizza", image: null };
+  draft.texts.he.title = "פיצה של רמי";
+  draft.texts.en.title = "Rami's Pizza";
+  draft.colors = { bg: "#FFFFFF", fg: "#FAFAFA", stamp: "#7558E8" }; // unreadable on purpose
+  const saved = await ownerA.act(bizA, "save_design", { design: draft });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  const blocked = await ownerA.act(bizA, "publish_design");
+  assert.equal(blocked.status, 409, "low contrast blocks publishing");
+  assert.ok(blocked.body.checks.some((c) => c.level === "bad"));
+
+  // Customers still see the old design while the draft exists.
+  const stillOld = await new Client().get(new URL(cardUrl.replace(/\/c\/.*/, "")).pathname || "/");
+  assert.ok(stillOld.status < 500);
+
+  draft.colors = { bg: "#8E1B12", fg: "#FFF4E6", stamp: "#FFC94A" };
+  await ownerA.act(bizA, "save_design", { design: draft });
+  const stampsBefore = (await stamps(ownerA, bizA, dana)).stamps;
+  const pub = await ownerA.act(bizA, "publish_design");
+  assert.equal(pub.status, 200, JSON.stringify(pub.body));
+  assert.equal(pub.body.version, 1);
+  assert.equal((await stamps(ownerA, bizA, dana)).stamps, stampsBefore, "publishing never changes balances");
+
+  const link = (await ownerA.act(bizA, "new_card_link", { customer: dana })).body.cardUrl;
+  const card = await new Client().get(new URL(link).pathname);
+  assert.match(card.text, /פיצה של רמי/);
+  assert.match(card.text, /#8E1B12/);
+  const pub2 = await ownerA.act(bizA, "publish_design");
+  assert.equal(pub2.body.version, 2, "every publish is a new kept version");
+});
+
+test("design: staff and other businesses cannot edit or borrow images", async () => {
+  const s2 = new Client();
+  const inv = await ownerA.act(bizA, "invite_staff", { label: "Cashier" });
+  await s2.post("/api/auth", { action: "accept_invite", token: new URL(inv.body.inviteUrl).pathname.split("/").pop(), name: "Cashier", email: `cash-${run}@test.perkly`, password: "cashier pass" });
+  const view = await s2.get(`/api/loyalty?business=${bizA}`);
+  assert.equal(view.body.editor, undefined, "staff get no editor data");
+  assert.ok(view.body.design, "staff still see the live design");
+  assert.equal((await s2.act(bizA, "save_design", { design: view.body.design })).status, 403);
+  assert.equal((await s2.act(bizA, "publish_design")).status, 403);
+  assert.equal((await upload(s2, bizA, "logo", PNG_1x1)).status, 403);
+
+  const ownerC = new Client();
+  await signup(ownerC, "ownerC");
+  const bizC = (await ownerC.post("/api/loyalty", { action: "create_business", name: "C", reward: "x", target: 4, color: "#222222" })).body.id;
+  const aLogo = (await ownerA.get(`/api/loyalty?business=${bizA}`)).body.editor.images[0].id;
+  const cDesign = (await ownerC.get(`/api/loyalty?business=${bizC}`)).body.editor.draft;
+  cDesign.logo = aLogo;
+  assert.equal((await ownerC.act(bizC, "save_design", { design: cDesign })).status, 404, "cannot use another business's image");
+  assert.equal((await upload(ownerC, bizA, "logo", PNG_1x1)).status, 404, "cannot upload into another business");
+});

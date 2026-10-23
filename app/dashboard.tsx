@@ -2,8 +2,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Activity, AlertTriangle, Check, Copy, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode,
-  RefreshCw, ScanLine, Search, Settings, Share2, Store, Users, Wallet, X,
+  Palette, RefreshCw, ScanLine, Search, Settings, Share2, Store, Users, Wallet, X,
 } from "lucide-react";
+import type { Design } from "../lib/design";
+import { CardEditor } from "../components/card-editor";
 import jsQR from "jsqr";
 import { errorText, useLang } from "../lib/i18n";
 import { copyText, post, whatsappLink } from "../lib/api";
@@ -19,6 +21,8 @@ type Data = {
   memberships: { business: string; role: Role; businessName: string }[];
   role: Role | null;
   business: Business | null;
+  design?: Design;
+  editor?: any;
   range?: number | "all";
   customers?: any[];
   events?: any[];
@@ -119,7 +123,7 @@ export default function Dashboard() {
   const b = data?.business;
   const isOwner = role === "owner";
   const nav: [any, string][] = isOwner
-    ? [[LayoutDashboard, "overview"], [Users, "customers"], [ScanLine, "station"], [Users, "team"], [Settings, "settings"]]
+    ? [[LayoutDashboard, "overview"], [Users, "customers"], [ScanLine, "station"], [Palette, "design"], [Users, "team"], [Settings, "settings"]]
     : [[ScanLine, "station"]];
 
   // ---------- Loading / empty states ----------
@@ -237,7 +241,7 @@ export default function Dashboard() {
               <section className="overview-grid">
                 <div className="panel card-panel">
                   <div className="section-head"><h2>{t("card")}</h2></div>
-                  <LoyaltyCard businessName={b.name} reward={b.reward} color={b.color} stamps={3} target={b.target} t={t} />
+                  <LoyaltyCard design={data.design!} lang={lang} stamps={Math.min(3, b.target)} target={b.target} t={t} />
                   <p className="wallet-note"><Wallet size={15} />{t("walletHint")}</p>
                 </div>
                 <div className="panel activity-panel">
@@ -301,8 +305,15 @@ export default function Dashboard() {
           )}
 
           {view === "station" && (
-            <Station key={b.id} business={b} t={t} lang={lang} initial={stationPick} onDone={() => load()} notify={notify}
+            <Station key={b.id} business={b} design={data.design!} t={t} lang={lang} initial={stationPick} onDone={() => load()} notify={notify}
               onRegister={() => setModal({ type: "customer" })} myRecent={data.myRecent} />
+          )}
+
+          {view === "design" && isOwner && data.editor && (
+            <>
+              <div className="page-head"><div><h1>{t("design")}</h1><p className="muted">{t("designNoBalance")}</p></div></div>
+              <CardEditor key={b.id + ":" + data.editor.publishedVersion} businessId={b.id} target={b.target} editor={data.editor} t={t} lang={lang} notify={notify} reload={load} />
+            </>
           )}
 
           {view === "team" && isOwner && (
@@ -336,7 +347,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          <footer><span>perkly. <span className="muted">Small card. Big connection.</span></span><span>{t("pilot")} · v0.2</span></footer>
+          <footer><span>perkly. <span className="muted">Small card. Big connection.</span></span><span>{t("pilot")} · v0.3</span></footer>
         </main>
       </div>
 
@@ -488,8 +499,8 @@ function BusinessForm({ t, busy, initial, submitLabel, onSubmit }: {
 
 // ---------- Staff station: scan or search, then confirm. The server is the source of truth. ----------
 
-function Station({ business, t, lang, initial, onDone, notify, onRegister, myRecent }: {
-  business: Business; t: any; lang: any; initial: CardState | null; onDone: () => void;
+function Station({ business, design, t, lang, initial, onDone, notify, onRegister, myRecent }: {
+  business: Business; design: Design; t: any; lang: any; initial: CardState | null; onDone: () => void;
   notify: (s: string, bad?: boolean) => void; onRegister: () => void; myRecent?: any[];
 }) {
   const [selected, setSelected] = useState<CardState | null>(initial);
@@ -616,7 +627,7 @@ function Station({ business, t, lang, initial, onDone, notify, onRegister, myRec
             <><ScanLine size={60} strokeWidth={1} /><p>{t("selectHint")}</p></>
           ) : (
             <>
-              <LoyaltyCard businessName={business.name} reward={business.reward} color={business.color} stamps={selected.stamps} target={selected.target} customerName={selected.name} t={t} />
+              <LoyaltyCard design={design} lang={lang} stamps={selected.stamps} target={selected.target} customerName={selected.name} t={t} />
               {selected.phone && <p className="muted" dir="ltr">{selected.phone}</p>}
               {selected.stamps >= selected.target ? (
                 <button className="btn lime big" disabled={busy} onClick={() => act("redeem")}><Gift size={18} />{busy ? t("sending") : retrying ? t("retry") : t("redeem")}</button>
