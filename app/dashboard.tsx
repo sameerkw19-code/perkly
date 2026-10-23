@@ -333,7 +333,7 @@ export default function Dashboard() {
           )}
 
           {view === "station" && (
-            <Station key={b.id} business={b} design={data.design!} branches={data.branches ?? []} myBranch={isOwner ? null : data.myBranch ?? null} canFix={isOwner || !!b.staff_adjust} t={t} lang={lang} initial={stationPick} onDone={() => load()} notify={notify}
+            <Station key={b.id} business={b} design={data.design!} branches={data.branches ?? []} myBranch={isOwner ? null : data.myBranch ?? null} canFix={isOwner || !!b.staff_adjust} owner={isOwner} t={t} lang={lang} initial={stationPick} onDone={() => load()} notify={notify}
               onRegister={() => setModal({ type: "customer" })} myRecent={data.myRecent} />
           )}
 
@@ -557,8 +557,8 @@ function BusinessForm({ t, busy, initial, submitLabel, onSubmit }: {
 
 // ---------- Staff station: scan or search, then confirm. The server is the source of truth. ----------
 
-function Station({ business, design, branches, myBranch, canFix, t, lang, initial, onDone, notify, onRegister, myRecent }: {
-  business: Business; design: Design; branches: { id: string; name: string }[]; myBranch: string | null; canFix: boolean; t: any; lang: any; initial: CardState | null; onDone: () => void;
+function Station({ business, design, branches, myBranch, canFix, owner, t, lang, initial, onDone, notify, onRegister, myRecent }: {
+  business: Business; design: Design; branches: { id: string; name: string }[]; myBranch: string | null; canFix: boolean; owner: boolean; t: any; lang: any; initial: CardState | null; onDone: () => void;
   notify: (s: string, bad?: boolean) => void; onRegister: () => void; myRecent?: any[];
 }) {
   const [selected, setSelected] = useState<CardState | null>(initial);
@@ -591,6 +591,7 @@ function Station({ business, design, branches, myBranch, canFix, t, lang, initia
   // Kept after a network failure so a retry reuses the same request id and can never count twice.
   const [pending, setPending] = useState<{ kind: string; customer: string; requestId: string } | null>(null);
   const [redeemAsk, setRedeemAsk] = useState(false);
+  const [archiveAsk, setArchiveAsk] = useState(false);
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
 
@@ -649,7 +650,23 @@ function Station({ business, design, branches, myBranch, canFix, t, lang, initia
     return () => clearInterval(timer);
   }, [scanning]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { setRedeemAsk(false); }, [selected?.id]);
+  useEffect(() => { setRedeemAsk(false); setArchiveAsk(false); }, [selected?.id]);
+
+  async function archiveCustomer() {
+    if (!selected || busy) return;
+    if (!archiveAsk) { setArchiveAsk(true); return; }
+    setArchiveAsk(false);
+    setBusy(true);
+    const r = await post("/api/loyalty", { action: "archive_customer", business: business.id, customer: selected.id });
+    setBusy(false);
+    if (r.ok) {
+      notify(t("archivedOk"));
+      setSelected(null); setPending(null); setFixing(null);
+      onDone();
+    } else {
+      notify(errorText(lang, r.code), true);
+    }
+  }
 
   async function act(kind: "stamp" | "redeem") {
     if (!selected || busy) return;
@@ -786,6 +803,7 @@ function Station({ business, design, branches, myBranch, canFix, t, lang, initia
                 {canFix && !fixing && <button className="btn soft small" onClick={() => setFixing({ value: selected.stamps, note: "" })}><Activity size={14} />{t("fixCount")}</button>}
                 <button className="btn soft small" onClick={() => { setSelected(null); setPending(null); setFixing(null); start(); }}><ScanLine size={14} />{t("nextCustomer")}</button>
                 <button className="text-btn" onClick={() => { setSelected(null); setPending(null); setFixing(null); }}><X size={14} />{t("close")}</button>
+                {owner && <button className="text-btn" style={{ color: "#b4413a" }} disabled={busy} onClick={archiveCustomer}>{archiveAsk ? t("archiveAgain") : t("archiveCustomer")}</button>}
               </div>
             </>
           )}

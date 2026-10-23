@@ -93,7 +93,7 @@ export async function GET(request: Request) {
       `SELECT c.id, c.name, c.phone, c.stamps, c.target, c.created, c.source, c.consent_marketing, c.card_hash IS NOT NULL AS has_link,
          (SELECT COUNT(*) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2))
            + (CASE WHEN ?3 = 'block' AND c.stamps >= c.target THEN 1 ELSE 0 END) AS rewards
-       FROM customers c WHERE c.business = ?1 ORDER BY c.created DESC LIMIT 5000`,
+       FROM customers c WHERE c.business = ?1 AND c.archived IS NULL ORDER BY c.created DESC LIMIT 5000`,
     ).bind(business!.id, new Date().toISOString(), business!.reward_mode),
     db.prepare(
       `SELECT e.id, e.kind, e.delta, e.created, e.actor_role, e.stamps_after, e.note, c.name AS customer, u.name AS actor_name, br.name AS branch_name,
@@ -103,8 +103,8 @@ export async function GET(request: Request) {
     ).bind(business!.id, branchFilter),
     db.prepare(
       `SELECT
-         (SELECT COUNT(*) FROM customers WHERE business = ?1) AS customers,
-         (SELECT COUNT(*) FROM customers WHERE business = ?1 AND created >= ?2) AS new_customers,
+         (SELECT COUNT(*) FROM customers WHERE business = ?1 AND archived IS NULL) AS customers,
+         (SELECT COUNT(*) FROM customers WHERE business = ?1 AND archived IS NULL AND created >= ?2) AS new_customers,
          (SELECT COUNT(*) FROM rewards WHERE business = ?1 AND redeemed IS NULL AND (expires IS NULL OR expires > ?4))
            + (CASE WHEN ?5 = 'block' THEN (SELECT COUNT(*) FROM customers WHERE business = ?1 AND stamps >= target) ELSE 0 END) AS rewards_ready,
          (SELECT COUNT(*) FROM events WHERE business = ?1 AND kind = 'stamp' AND created >= ?2 AND (?3 = '' OR branch = ?3)) AS stamps,
@@ -262,7 +262,7 @@ export async function POST(request: Request) {
       if (!(await allow(db, `lookup:${user.id}`, 90, 60))) return fail("rate_limited", 429);
       if (typeof p.scan === "string") {
         const code = p.scan.replace(/^perkly:/, "").slice(0, 100);
-        const c = await db.prepare("SELECT * FROM customers WHERE business = ? AND scan_code = ?").bind(business.id, code).first<Customer>();
+        const c = await db.prepare("SELECT * FROM customers WHERE business = ? AND scan_code = ? AND archived IS NULL").bind(business.id, code).first<Customer>();
         if (!c) return fail("unknown_card", 404, "Card not found in this business");
         return json({ results: [{ ...(await cardState(db, c, business.reward_mode)), phone: role === "owner" ? formatPhone(c.phone) : maskPhone(c.phone) }] });
       }
@@ -272,7 +272,7 @@ export async function POST(request: Request) {
       const phoneTail = digits.length >= 4 ? "%" + digits.replace(/^0/, "") + "%" : null;
       const rows = await db
         .prepare(
-          `SELECT * FROM customers WHERE business = ? AND (name LIKE ? ESCAPE '\\' ${phoneTail ? "OR phone LIKE ?" : ""})
+          `SELECT * FROM customers WHERE business = ? AND archived IS NULL AND (name LIKE ? ESCAPE '\\' ${phoneTail ? "OR phone LIKE ?" : ""})
            ORDER BY name LIMIT 8`,
         )
         .bind(business.id, "%" + q.replace(/[\\%_]/g, (m) => "\\" + m) + "%", ...(phoneTail ? [phoneTail] : []))
@@ -289,7 +289,7 @@ export async function POST(request: Request) {
       if (typeof p.requestId !== "string" || !UUID.test(p.requestId)) return fail("bad_request", 400, "Invalid request id");
       const requestId = p.requestId;
       if (!(await allow(db, `act:${user.id}`, 60, 60))) return fail("rate_limited", 429, "Too many actions");
-      let c = await db.prepare("SELECT * FROM customers WHERE id = ? AND business = ?").bind(p.customer ?? "", business.id).first<Customer>();
+      let c = await db.prepare("SELECT * FROM customers WHERE id = ? AND business = ? AND archived IS NULL").bind(p.customer ?? "", business.id).first<Customer>();
       if (!c) return fail("unknown_card", 404, "Customer not found");
 
       // Which branch this happened in. Staff tied to a branch always record their own branch.
@@ -450,6 +450,16 @@ export async function POST(request: Request) {
     case "revoke_invite": {
       const denied = ownerOnly(); if (denied) return denied;
       await db.prepare("UPDATE invites SET revoked = ? WHERE id = ? AND business = ? AND used IS NULL").bind(now, p.invite ?? "", business.id).run();
+      return json({ ok: true });
+    }
+
+    case "archive_customer": {
+      const denied = ownerOnly(); if (denied) return denied;
+      // Nothing is deleted: the history stays, but the customer disappears from lists and their card link stops working.
+      const r = await db
+        .prepare("UPDATE customers SET archived = ?, card_hash = NULL WHERE id = ? AND business = ? AND archived IS NULL")
+        .bind(now, p.customer ?? "", business.id).run();
+      if (!r.meta.changes) return fail("unknown_card", 404, "Customer not found");
       return json({ ok: true });
     }
 
