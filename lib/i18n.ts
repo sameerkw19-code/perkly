@@ -146,6 +146,7 @@ const words: Record<string, Entry> = {
   selectHint: ["בחרו לקוח כדי לראות את הכרטיס.", "اختر زبوناً لرؤية البطاقة.", "Pick a customer to see their card."],
   addStamp: ["אישור חותמת", "تأكيد ختم", "Confirm stamp"],
   redeem: ["אישור מימוש הטבה", "تأكيد استخدام المكافأة", "Confirm reward"],
+  redeemAgain: ["לחצו שוב לאישור המימוש", "اضغط مرة أخرى للتأكيد", "Tap again to confirm"],
   confirmRedeem: ["לממש את ההטבה של {name}? מתחיל סבב חדש.", "استخدام مكافأة {name}؟ تبدأ جولة جديدة.", "Redeem {name}'s reward? A new round starts."],
   stampOk: ["החותמת נשמרה בשרת", "تم حفظ الختم في الخادم", "Stamp saved on the server"],
   redeemOk: ["ההטבה מומשה. מתחיל סבב חדש.", "تم استخدام المكافأة. بدأت جولة جديدة.", "Reward redeemed. A new round has started."],

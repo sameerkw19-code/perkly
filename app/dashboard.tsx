@@ -589,6 +589,7 @@ function Station({ business, design, branches, myBranch, canFix, t, lang, initia
   }
   // Kept after a network failure so a retry reuses the same request id and can never count twice.
   const [pending, setPending] = useState<{ kind: string; customer: string; requestId: string } | null>(null);
+  const [redeemAsk, setRedeemAsk] = useState(false);
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
 
@@ -647,10 +648,14 @@ function Station({ business, design, branches, myBranch, canFix, t, lang, initia
     return () => clearInterval(timer);
   }, [scanning]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => { setRedeemAsk(false); }, [selected?.id]);
+
   async function act(kind: "stamp" | "redeem") {
     if (!selected || busy) return;
     if (branches.length && !myBranch && !branch) { notify(t("err_branch_required"), true); return; }
-    if (kind === "redeem" && !confirm(t("confirmRedeem", { name: selected.name }))) return;
+    // Two taps instead of a browser confirm() box: some phones and home-screen apps block confirm() silently.
+    if (kind === "redeem" && !redeemAsk) { setRedeemAsk(true); return; }
+    setRedeemAsk(false);
     const key = kind + ":" + (kind === "stamp" ? qty : "");
     const requestId = pending && pending.kind === key && pending.customer === selected.id ? pending.requestId : crypto.randomUUID();
     setPending({ kind: key, customer: selected.id, requestId });
@@ -760,11 +765,11 @@ function Station({ business, design, branches, myBranch, canFix, t, lang, initia
                   </div>
                 </div>
               ) : selected.stamps >= selected.target ? (
-                <button className="btn lime big" disabled={busy} onClick={() => act("redeem")}><Gift size={18} />{busy ? t("sending") : retrying ? t("retry") : t("redeem")}</button>
+                <button className="btn lime big" disabled={busy} onClick={() => act("redeem")}><Gift size={18} />{busy ? t("sending") : retrying ? t("retry") : redeemAsk ? t("redeemAgain") : t("redeem")}</button>
               ) : (
                 <>
                   {!!selected.rewards && (
-                    <button className="btn lime big" disabled={busy} onClick={() => act("redeem")}><Gift size={18} />{busy ? t("sending") : t("redeem")}</button>
+                    <button className="btn lime big" disabled={busy} onClick={() => act("redeem")}><Gift size={18} />{busy ? t("sending") : redeemAsk ? t("redeemAgain") : t("redeem")}</button>
                   )}
                   <div className="qty-row">
                     <span className="qty-label">{t("qtyLabel")}</span>
