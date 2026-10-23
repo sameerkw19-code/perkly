@@ -120,9 +120,9 @@ export default function SignupFlow() {
               <label style={field}>שם העסק<input style={input} required value={d.business} onChange={set("business")} autoComplete="organization" /></label>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
                 <label style={{ ...field, flex: "1 1 200px" }}>שם מלא<input style={input} required value={d.owner} onChange={set("owner")} autoComplete="name" /></label>
-                <label style={{ ...field, flex: "1 1 200px" }}>טלפון<input style={{ ...input, direction: "ltr", textAlign: "right" }} required type="tel" inputMode="tel" value={d.phone} onChange={set("phone")} autoComplete="tel" /></label>
+                <label style={{ ...field, flex: "1 1 200px" }}>טלפון<input dir="ltr" style={{ ...input, direction: "ltr", textAlign: "right" }} required type="tel" inputMode="tel" value={d.phone} onChange={set("phone")} autoComplete="tel" /></label>
               </div>
-              <label style={field}>אימייל<input style={{ ...input, direction: "ltr", textAlign: "right" }} required type="email" value={d.email} onChange={set("email")} autoComplete="email" /></label>
+              <label style={field}>אימייל<input dir="ltr" style={{ ...input, direction: "ltr", textAlign: "right" }} required type="email" value={d.email} onChange={set("email")} autoComplete="email" /></label>
               <fieldset style={{ border: 0, padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 14 }}>
                 <legend style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 18, marginBottom: 10 }}>לאן לשלוח את ערכת הקופה?</legend>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
@@ -148,11 +148,11 @@ export default function SignupFlow() {
                 <p style={{ margin: "6px 0 0", color: C.muted, fontSize: 16 }}>התשלום יתבצע בדף המאובטח של Tranzila. בהדגמה השדות נעולים, ואין צורך להקליד פרטי אשראי.</p>
               </div>
               <div style={{ background: C.lav, borderRadius: 18, padding: 18, display: "flex", flexDirection: "column", gap: 14 }}>
-                <label style={field}>מספר כרטיס<input style={{ ...input, direction: "ltr", textAlign: "right", background: "#F6F3FF" }} disabled value="4580 •••• •••• 1234" readOnly /></label>
+                <label style={field}>מספר כרטיס<input dir="ltr" style={{ ...input, direction: "ltr", textAlign: "right", background: "#F6F3FF" }} disabled value="4580 •••• •••• 1234" readOnly /></label>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
-                  <label style={{ ...field, flex: "1 1 120px" }}>תוקף<input style={{ ...input, direction: "ltr", textAlign: "right", background: "#F6F3FF" }} disabled value="12/29" readOnly /></label>
-                  <label style={{ ...field, flex: "1 1 120px" }}>CVV<input style={{ ...input, direction: "ltr", textAlign: "right", background: "#F6F3FF" }} disabled value="•••" readOnly /></label>
-                  <label style={{ ...field, flex: "1 1 160px" }}>תעודת זהות<input style={{ ...input, direction: "ltr", textAlign: "right", background: "#F6F3FF" }} disabled value="•••••••••" readOnly /></label>
+                  <label style={{ ...field, flex: "1 1 120px" }}>תוקף<input dir="ltr" style={{ ...input, direction: "ltr", textAlign: "right", background: "#F6F3FF" }} disabled value="12/29" readOnly /></label>
+                  <label style={{ ...field, flex: "1 1 120px" }}>CVV<input dir="ltr" style={{ ...input, direction: "ltr", textAlign: "right", background: "#F6F3FF" }} disabled value="•••" readOnly /></label>
+                  <label style={{ ...field, flex: "1 1 160px" }}>תעודת זהות<input dir="ltr" style={{ ...input, direction: "ltr", textAlign: "right", background: "#F6F3FF" }} disabled value="•••••••••" readOnly /></label>
                 </div>
               </div>
               <span style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14, color: C.muted }}>
