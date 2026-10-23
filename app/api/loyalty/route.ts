@@ -7,6 +7,7 @@ import { formatPhone, maskPhone, normalizePhone } from "../../../lib/phone";
 import { assetIds, defaultDesign, designChecks, sanitizeDesign } from "../../../lib/design";
 import { assetMeta, liveDesign, ownsAssets, publishedDesign } from "../../../lib/server/designs";
 import { releaseArchivedPhone } from "../../../lib/server/customers";
+import { isEntitled } from "../../../lib/server/billing";
 
 export const dynamic = "force-dynamic";
 
@@ -207,6 +208,11 @@ export async function POST(request: Request) {
   const role = membership.role;
   const business = (await loadBusiness(db, p.business as string))!;
   const ownerOnly = () => (role === "owner" ? null : fail("forbidden", 403, "Owner permission required"));
+  // Businesses with an inactive subscription can still view their data, but cannot change cards.
+  if (["stamp", "redeem", "adjust", "register_customer"].includes(String(p.action))) {
+    const sub = await db.prepare("SELECT status FROM subscriptions WHERE business = ?").bind(business.id).first<{ status: string }>();
+    if (sub && !isEntitled(sub.status)) return fail("subscription_required", 402, "Subscription is not active");
+  }
 
   switch (p.action) {
     case "update_business": {

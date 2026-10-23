@@ -27,6 +27,7 @@ export async function createCheckoutUrl(
     client_reference_id: businessId,
     "metadata[business]": businessId,
     "subscription_data[metadata][business]": businessId,
+    "subscription_data[trial_period_days]": "14",
   });
   if (customerEmail) body.set("customer_email", customerEmail);
   const response = await fetch(`${STRIPE_API}/checkout/sessions`, {

@@ -4,6 +4,7 @@ import { clientIp, fail, json, readJson, sameOrigin, str } from "../../../lib/se
 import { allow } from "../../../lib/server/rate-limit";
 import { normalizePhone } from "../../../lib/phone";
 import { releaseArchivedPhone } from "../../../lib/server/customers";
+import { isEntitled } from "../../../lib/server/billing";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,8 @@ export async function POST(request: Request) {
   const business = await db.prepare("SELECT id, target FROM businesses WHERE join_code = ?").bind(code).first<{ id: string; target: number }>();
   if (!code || !business) return fail("join_invalid", 404, "This join link is not active");
   if (!(await allow(db, `join-business:${business.id}`, 300, 3600))) return fail("rate_limited", 429);
+  const sub = await db.prepare("SELECT status FROM subscriptions WHERE business = ?").bind(business.id).first<{ status: string }>();
+  if (sub && !isEntitled(sub.status)) return fail("subscription_required", 402, "This business is not accepting new customers right now");
 
   const name = str(body.name, 80);
   const phone = normalizePhone(body.phone);
