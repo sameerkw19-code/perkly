@@ -6,6 +6,7 @@ import { allow } from "../../../lib/server/rate-limit";
 import { formatPhone, maskPhone, normalizePhone } from "../../../lib/phone";
 import { assetIds, defaultDesign, designChecks, sanitizeDesign } from "../../../lib/design";
 import { assetMeta, liveDesign, ownsAssets, publishedDesign } from "../../../lib/server/designs";
+import { releaseArchivedPhone } from "../../../lib/server/customers";
 
 export const dynamic = "force-dynamic";
 
@@ -247,13 +248,13 @@ export async function POST(request: Request) {
       const id = crypto.randomUUID();
       const scan = randomToken(16);
       const card = await newCardSecret();
-      const r = await db
+      const insert = db
         .prepare(
           `INSERT OR IGNORE INTO customers(id, business, name, phone, token, stamps, target, created, card_hash, scan_code, source, consent_marketing)
            VALUES(?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 0)`,
         )
-        .bind(id, business.id, name, phone, scan, business.target, now, card.hash, scan, role)
-        .run();
+        .bind(id, business.id, name, phone, scan, business.target, now, card.hash, scan, role);
+      const [, r] = await db.batch([releaseArchivedPhone(db, business.id, phone), insert]);
       if (!r.meta.changes) return fail("phone_exists", 409, "Phone already registered");
       return json({ id, cardUrl: `${origin}/c/${card.secret}` });
     }
