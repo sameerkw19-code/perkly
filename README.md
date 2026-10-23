@@ -71,20 +71,28 @@ npm run test:api
 
 כל סביבה עם מסד נפרד, כדי שנתוני בדיקה לא יתערבבו עם לקוחות אמיתיים. ההגדרות ב־`wrangler.jsonc`.
 
-## העלאה לאוויר (Cloudflare)
+## העלאה לאוויר (Cloudflare, דרך GitHub, בלי להתקין כלום)
 
-**חשבונות נדרשים:** חשבון Cloudflare (התוכנית החינמית מספיקה לפיילוט). אין צורך במפתחות אחרים בשלב הזה.
+הפריסה אוטומטית ב־GitHub Actions (`.github/workflows/deploy.yml`):
+- כל עדכון ל־`main` מריץ את כל הבדיקות, ואם עברו, מעלה לסביבת **בדיקה** (`perkly-staging`).
+- העלאה ל**ייצור** (`perkly`): בלשונית Actions לוחצים "Run workflow" ובוחרים production.
+- מסדי הנתונים נוצרים אוטומטית בפעם הראשונה, והמיגרציות רצות לפני כל העלאה.
 
-1. כניסה לחשבון: `npx wrangler login` (נפתח דפדפן לאישור).
-2. יצירת מסד לבדיקה: `npx wrangler d1 create perkly-staging`
-   מעתיקים את ה־`database_id` שמודפס לתוך `wrangler.jsonc` במקום `REPLACE_WITH_STAGING_DATABASE_ID`.
-3. הרצת המיגרציות: `npm run db:migrate:staging`
-4. (אופציונלי) קוד הרשמה לבעלי עסקים: `npx wrangler secret put SIGNUP_CODE --env staging`
-5. העלאה: `npm run deploy:staging`
-   בסוף מודפסת כתובת בסגנון `https://perkly-staging.<החשבון>.workers.dev` — זו הכתובת הציבורית.
+**הגדרה חד־פעמית (בדפדפן):**
+1. ב־Cloudflare: My Profile → API Tokens → Create Token → תבנית **Edit Cloudflare Workers**.
+   מוסיפים הרשאה: **Account → D1 → Edit**. יוצרים ומעתיקים את הטוקן.
+2. ב־GitHub, במאגר: Settings → Secrets and variables → Actions → New repository secret:
+   - `CLOUDFLARE_API_TOKEN` = הטוקן מהשלב הקודם (חובה).
+   - `CLOUDFLARE_ACCOUNT_ID` = מזהה החשבון מלוח הבקרה של Cloudflare (מומלץ).
+   - `PERKLY_SIGNUP_CODE` = קוד שרק בעלי עסקים שהזמנתם יקבלו (מומלץ, כדי שזרים לא יפתחו חשבונות).
+   - `PERKLY_ADMIN_EMAILS` = האימייל שלכם, לדף `/admin` (אופציונלי).
+3. אם זו הפעם הראשונה ב־Cloudflare Workers: נכנסים פעם אחת ל־Workers & Pages ובוחרים כתובת משנה (subdomain) ל־workers.dev.
 
-לייצור: אותם שלבים עם `perkly-production`, `REPLACE_WITH_PRODUCTION_DATABASE_ID`, `--env production`,
-`npm run db:migrate:production` ו־`npm run deploy:production`. דומיין משלכם מחברים בלוח הבקרה של Cloudflare.
+הכתובת הציבורית מופיעה בסוף שלב "Deploy" ביומן של GitHub Actions.
+**אף פעם לא להדביק טוקנים או סיסמאות בצ'אט או בקוד.**
+
+### פריסה ידנית מהמחשב (חלופה)
+`npx wrangler login`, ואז `node scripts/ci-prepare-d1.mjs staging`, `npm run db:migrate:staging`, `npm run deploy:staging`.
 
 ## מעבר מגרסת ChatGPT Sites
 

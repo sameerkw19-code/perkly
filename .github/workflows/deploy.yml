@@ -1,0 +1,80 @@
+# Tests every change, then deploys:
+#   push to main            -> staging    (https://perkly-staging.<your-subdomain>.workers.dev)
+#   "Run workflow" button   -> production (https://perkly.<your-subdomain>.workers.dev)
+# Needs GitHub secret CLOUDFLARE_API_TOKEN (and optionally CLOUDFLARE_ACCOUNT_ID,
+# PERKLY_SIGNUP_CODE, PERKLY_ADMIN_EMAILS). Never put these values in the code.
+name: Test and deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Where to deploy"
+        type: choice
+        options: [staging, production]
+        default: staging
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm run db:migrate:local
+      - name: Acceptance tests against a local server
+        run: |
+          npm run preview > preview.log 2>&1 &
+          for i in $(seq 1 60); do curl -s -o /dev/null http://127.0.0.1:8787/login && break; sleep 1; done
+          npm run test:api
+      - if: failure()
+        run: tail -100 preview.log || true
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'staging' }}
+    env:
+      TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'staging' }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Check Cloudflare token
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::Add the CLOUDFLARE_API_TOKEN secret in GitHub (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+      - run: npm ci
+      - name: Database (create if missing)
+        run: node scripts/ci-prepare-d1.mjs "$TARGET"
+      - name: Apply database migrations
+        run: npx wrangler d1 migrations apply DB --remote --env "$TARGET"
+      - name: Build
+        run: node scripts/build.mjs "$TARGET"
+      - name: Deploy
+        run: npx wrangler deploy --config dist/server/wrangler.json
+      - name: Optional settings
+        env:
+          SIGNUP_CODE: ${{ secrets.PERKLY_SIGNUP_CODE }}
+          ADMIN_EMAILS: ${{ secrets.PERKLY_ADMIN_EMAILS }}
+        run: |
+          if [ -n "$SIGNUP_CODE" ]; then printf '%s' "$SIGNUP_CODE" | npx wrangler secret put SIGNUP_CODE --env "$TARGET"; fi
+          if [ -n "$ADMIN_EMAILS" ]; then printf '%s' "$ADMIN_EMAILS" | npx wrangler secret put PLATFORM_ADMIN_EMAILS --env "$TARGET"; fi
