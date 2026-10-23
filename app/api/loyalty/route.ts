@@ -157,15 +157,15 @@ export async function GET(request: Request) {
     range: days ?? "all",
     branchFilter,
     perBranch: perBranch.results,
-    customers: (customers.results as any[]).map((c) => ({ ...c, phone: formatPhone(c.phone), has_link: !!c.has_link })),
+    customers: (customers.results as { phone: string; has_link: unknown }[]).map((c) => ({ ...c, phone: formatPhone(c.phone), has_link: !!c.has_link })),
     events: events.results,
-    stats: { ...(stats.results[0] as any), redemptions: (stats.results[0] as any).redemptions },
+    stats: stats.results[0],
     team: team.results,
     invites: invites.results,
     alerts: [
-      ...(busyCustomers.results as any[]).map((r) => ({ type: "customer", name: r.name, count: r.n })),
-      ...(busyStaff.results as any[]).map((r) => ({ type: "staff", name: r.name, count: r.n })),
-      ...(staffFixes.results as any[]).map((r) => ({ type: "staffFix", name: r.name, count: r.n })),
+      ...(busyCustomers.results as { name: string; n: number }[]).map((r) => ({ type: "customer", name: r.name, count: r.n })),
+      ...(busyStaff.results as { name: string; n: number }[]).map((r) => ({ type: "staff", name: r.name, count: r.n })),
+      ...(staffFixes.results as { name: string; n: number }[]).map((r) => ({ type: "staffFix", name: r.name, count: r.n })),
     ],
   });
 }
