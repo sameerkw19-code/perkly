@@ -3,6 +3,7 @@ import { randomToken, sha256 } from "../../../lib/server/crypto";
 import { clientIp, fail, json, readJson, sameOrigin, str } from "../../../lib/server/http";
 import { allow } from "../../../lib/server/rate-limit";
 import { normalizePhone } from "../../../lib/phone";
+import { releaseArchivedPhone } from "../../../lib/server/customers";
 
 export const dynamic = "force-dynamic";
 
@@ -30,13 +31,14 @@ export async function POST(request: Request) {
   const now = new Date().toISOString();
   const secret = randomToken(24);
   const scan = randomToken(16);
-  const r = await db
+  const insert = db
     .prepare(
       `INSERT OR IGNORE INTO customers(id, business, name, phone, token, stamps, target, created, card_hash, scan_code, consent_terms, consent_marketing, source)
        VALUES(?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, 'self')`,
     )
-    .bind(crypto.randomUUID(), business.id, name, phone, scan, business.target, now, await sha256(secret), scan, now, marketing)
-    .run();
+    .bind(crypto.randomUUID(), business.id, name, phone, scan, business.target, now, await sha256(secret), scan, now, marketing);
+  // A removed customer's phone may join again: free it first, in the same batch as the insert.
+  const [, r] = await db.batch([releaseArchivedPhone(db, business.id, phone), insert]);
   // Never hand out an existing card to someone who only knows the phone number.
   if (!r.meta.changes) return fail("phone_exists", 409, "This phone is already registered here. Ask the staff for your card link.");
   return json({ cardPath: `/c/${secret}` });

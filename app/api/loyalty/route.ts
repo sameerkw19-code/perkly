@@ -6,6 +6,7 @@ import { allow } from "../../../lib/server/rate-limit";
 import { formatPhone, maskPhone, normalizePhone } from "../../../lib/phone";
 import { assetIds, defaultDesign, designChecks, sanitizeDesign } from "../../../lib/design";
 import { assetMeta, liveDesign, ownsAssets, publishedDesign } from "../../../lib/server/designs";
+import { releaseArchivedPhone } from "../../../lib/server/customers";
 
 export const dynamic = "force-dynamic";
 
@@ -156,15 +157,15 @@ export async function GET(request: Request) {
     range: days ?? "all",
     branchFilter,
     perBranch: perBranch.results,
-    customers: (customers.results as any[]).map((c) => ({ ...c, phone: formatPhone(c.phone), has_link: !!c.has_link })),
+    customers: (customers.results as { phone: string; has_link: unknown }[]).map((c) => ({ ...c, phone: formatPhone(c.phone), has_link: !!c.has_link })),
     events: events.results,
-    stats: { ...(stats.results[0] as any), redemptions: (stats.results[0] as any).redemptions },
+    stats: stats.results[0],
     team: team.results,
     invites: invites.results,
     alerts: [
-      ...(busyCustomers.results as any[]).map((r) => ({ type: "customer", name: r.name, count: r.n })),
-      ...(busyStaff.results as any[]).map((r) => ({ type: "staff", name: r.name, count: r.n })),
-      ...(staffFixes.results as any[]).map((r) => ({ type: "staffFix", name: r.name, count: r.n })),
+      ...(busyCustomers.results as { name: string; n: number }[]).map((r) => ({ type: "customer", name: r.name, count: r.n })),
+      ...(busyStaff.results as { name: string; n: number }[]).map((r) => ({ type: "staff", name: r.name, count: r.n })),
+      ...(staffFixes.results as { name: string; n: number }[]).map((r) => ({ type: "staffFix", name: r.name, count: r.n })),
     ],
   });
 }
@@ -247,13 +248,13 @@ export async function POST(request: Request) {
       const id = crypto.randomUUID();
       const scan = randomToken(16);
       const card = await newCardSecret();
-      const r = await db
+      const insert = db
         .prepare(
           `INSERT OR IGNORE INTO customers(id, business, name, phone, token, stamps, target, created, card_hash, scan_code, source, consent_marketing)
            VALUES(?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 0)`,
         )
-        .bind(id, business.id, name, phone, scan, business.target, now, card.hash, scan, role)
-        .run();
+        .bind(id, business.id, name, phone, scan, business.target, now, card.hash, scan, role);
+      const [, r] = await db.batch([releaseArchivedPhone(db, business.id, phone), insert]);
       if (!r.meta.changes) return fail("phone_exists", 409, "Phone already registered");
       return json({ id, cardUrl: `${origin}/c/${card.secret}` });
     }
