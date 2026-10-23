@@ -1,17 +1,26 @@
 {
-  "name": "site-creator-vinext-starter",
-  "version": "0.1.0",
+  "name": "perkly",
+  "version": "0.2.0",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
   },
   "scripts": {
-    "install:ci": "bash scripts/install-pnpm.sh",
-    "dev": "node scripts/run-framework.mjs dev",
-    "build": "node scripts/run-framework.mjs build",
-    "start": "node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js dev --config dist/server/wrangler.json --local --persist-to .wrangler/state --ip 127.0.0.1 --inspector-port 0",
+    "dev": "vinext dev --port 5173",
+    "build": "vinext build",
+    "build:staging": "node scripts/build.mjs staging",
+    "build:production": "node scripts/build.mjs production",
+    "preview": "wrangler dev --config dist/server/wrangler.json --local --persist-to .wrangler/state --port 8787",
+    "deploy:staging": "npm run build:staging && wrangler deploy --config dist/server/wrangler.json",
+    "deploy:production": "npm run build:production && wrangler deploy --config dist/server/wrangler.json",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:staging": "wrangler d1 migrations apply DB --remote --env staging",
+    "db:migrate:production": "wrangler d1 migrations apply DB --remote --env production",
+    "db:generate": "drizzle-kit generate",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "drizzle-kit generate"
+    "test": "node --test tests/unit.test.mjs",
+    "test:api": "node --test tests/api.test.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -69,6 +78,5 @@
     "miniflare": {
       "sharp": "0.35.4"
     }
-  },
-  "packageManager": "pnpm@11.25.0"
+  }
 }

@@ -8,6 +8,13 @@
       "when": 1791807567261,
       "tag": "0000_large_terrax",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1792739007106,
+      "tag": "0001_auth_roles_cards",
+      "breakpoints": true
     }
   ]
 }

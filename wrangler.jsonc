@@ -1,0 +1,54 @@
+// Cloudflare configuration for Perkly.
+// The top level is the LOCAL environment. "staging" and "production" are separate
+// Workers with separate databases, so test data never mixes with real customers.
+// Replace each REPLACE_WITH_... value with the database_id printed by
+// `npx wrangler d1 create ...` (see README). These ids are not secrets.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "perkly-local",
+  "main": "./worker/index.ts",
+  "compatibility_date": "2026-05-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "perkly-local",
+      "database_id": "00000000-0000-4000-8000-000000000000",
+      "migrations_dir": "drizzle"
+    }
+  ],
+  "vars": {
+    "PLATFORM_ADMIN_EMAILS": ""
+  },
+  "env": {
+    "staging": {
+      "name": "perkly-staging",
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "perkly-staging",
+          "database_id": "REPLACE_WITH_STAGING_DATABASE_ID",
+          "migrations_dir": "drizzle"
+        }
+      ],
+      "vars": {
+        "PLATFORM_ADMIN_EMAILS": ""
+      }
+    },
+    "production": {
+      "name": "perkly",
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "perkly-production",
+          "database_id": "REPLACE_WITH_PRODUCTION_DATABASE_ID",
+          "migrations_dir": "drizzle"
+        }
+      ],
+      "vars": {
+        "PLATFORM_ADMIN_EMAILS": ""
+      }
+    }
+  }
+}

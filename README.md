@@ -1,20 +1,105 @@
-# Perkly — private loyalty pilot
+# Perkly — כרטיסי נאמנות דיגיטליים (גרסה 0.2)
 
-A mobile-friendly Hebrew, Arabic and English loyalty app, backed by D1.
+מערכת לכרטיסי ניקוב דיגיטליים לעסקים: הלקוח אוסף חותמות בכל רכישה ומקבל הטבה.
+רצה על Cloudflare Workers עם מסד נתונים Cloudflare D1. אין יותר תלות ב־ChatGPT Sites.
 
-## Working features
-- Create multiple businesses with custom name, card color, reward and stamp threshold.
-- Register customers, generate real QR codes, search by name or phone, export CSV.
-- Camera scanning using jsQR; scanning selects the customer for an explicit staff action.
-- Server-side stamp accumulation and reward redemption, event history and request idempotency.
-- Owner-scoped authorization and origin validation for mutations.
+## מה עובד בגרסה הזו
 
-## Current access and limits
-This deployment is owner-private. All views run under the owner's authenticated identity. Customer cards and the staff station are pilot views, not separately authorized production portals. Cards cannot yet be distributed to external customers. No demo records are inserted. Statistics for stamps and redemptions reflect the latest 100 events across the account.
+| תחום | מצב |
+|---|---|
+| כניסה עם אימייל וסיסמה (סיסמאות מוצפנות PBKDF2, עוגיית Session מאובטחת) | פעיל |
+| בעל עסק: לקוחות, סטטיסטיקה לפי טווח זמן, היסטוריה, CSV, הגדרות, צוות | פעיל |
+| עובד: נכנס רק בהזמנה, סורק/מחפש, מוסיף חותמת, מממש. לא רואה רשימת לקוחות ולא משנה הגדרות | פעיל |
+| ביטול גישת עובד (נחסם מיד בכל המכשירים) | פעיל |
+| לקוח: קישור סודי לכרטיס (בלי מספר טלפון), אפשר להחליף קישור | פעיל |
+| הצטרפות עצמית של לקוחות דרך QR של העסק, עם אישור תנאים והסכמה שיווקית נפרדת (לא מסומנת) | פעיל |
+| כלל טלפון אחיד: כל צורות המספר (050..., +972..., 972...) נשמרות כ־+972 ומונעות כפילות | פעיל |
+| חותמות ומימוש: אטומי, ללא ספירה כפולה, חסימת מימוש מוקדם/כפול, תיקונים מתועדים בלבד | פעיל |
+| הגבלת קצב + התראה על פעילות חריגה (4+ חותמות ללקוח או 40+ פעולות לעובד בשעה) | פעיל |
+| עברית / ערבית (RTL) / אנגלית (LTR), טלפון ומחשב | פעיל |
+| דף מנהל פלטפורמה `/admin` (צפייה בלבד) | פעיל |
+| Apple Wallet / Google Wallet | **לא מחובר** |
+| איפוס סיסמה במייל, אימות טלפון ב־SMS, סניפים, העלאת לוגו, עורך עיצוב כרטיס | **עוד לא** |
+| מנויים וחיוב | **עוד לא** |
 
-Apple Wallet and Google Wallet are not connected. This site does not issue .pkpass files or Google Wallet objects. Native-wallet configuration, pass signing and update services are future work. Separate staff identities, customer self-registration and public card access, full reporting, subscription billing, recovery, and production abuse controls are also future work.
+### כללים שחשוב לדעת
+- **שינוי מספר החותמות** חל על כרטיסים חדשים. כרטיס קיים שומר על המספר שלו עד המימוש הבא, ואז עובר למספר החדש.
+- **תיקון יתרה** (+1/−1) רק לבעלים, עם סיבה חובה. נשמר בהיסטוריה. היסטוריה לא נמחקת.
+- **סריקת QR לא מוסיפה חותמת.** העובד תמיד מאשר בלחיצה, והשרת מאשר בחזרה.
+- **בקשה חוזרת** (למשל אחרי ניתוק רשת) נשלחת עם אותו מזהה ולא נספרת פעמיים.
+- **קישור כרטיס** הוא סוד: רק ה־hash שלו נשמר במסד. "קישור חדש" מבטל את הקודם.
 
-## Validation
-`node node_modules/typescript/bin/tsc --noEmit`
-`python tests/loyalty.py`
-Build through the Sites build helper. SQL tests exercise duplicate stamp requests, the reward threshold, early and repeated redemption, tenant-scoped lookups, and duplicate customer phone constraints.
+## הפעלה מקומית (Windows CMD)
+
+דרוש Node.js 22.13 ומעלה. כל פקודה מקלידים בחלון CMD בתוך תיקיית הפרויקט.
+
+```
+cd %USERPROFILE%\Downloads\Perkly_v0.2
+npm install
+npm run db:migrate:local
+npm run build
+npm run preview
+```
+
+אחרי `npm run preview` אמורה להופיע השורה `Ready on http://localhost:8787`.
+פותחים את הכתובת הזו בדפדפן **באותו מחשב**. זו כתובת מקומית בלבד, היא לא נגישה מהאינטרנט.
+
+לבדיקות אוטומטיות: בחלון CMD שני, בזמן שהשרת רץ:
+```
+npm test
+npm run test:api
+```
+
+הגדרות מקומיות אופציונליות: מעתיקים את `.env.example` לקובץ בשם `.dev.vars`.
+
+> אם `npm install` נכשל ב־`ETIMEDOUT` — זו חסימת רשת (למשל רשת ארגונית/VPN), לא בעיה בפרויקט.
+> נסו מרשת ביתית, או בקשו ממחלקת IT גישה ל־`registry.npmjs.org`. אל תבטלו בדיקות SSL.
+
+## סביבות
+
+| סביבה | Worker | מסד נתונים |
+|---|---|---|
+| מקומית | perkly-local | קובץ מקומי בתיקיית `.wrangler` |
+| בדיקה (staging) | perkly-staging | perkly-staging |
+| ייצור (production) | perkly | perkly-production |
+
+כל סביבה עם מסד נפרד, כדי שנתוני בדיקה לא יתערבבו עם לקוחות אמיתיים. ההגדרות ב־`wrangler.jsonc`.
+
+## העלאה לאוויר (Cloudflare)
+
+**חשבונות נדרשים:** חשבון Cloudflare (התוכנית החינמית מספיקה לפיילוט). אין צורך במפתחות אחרים בשלב הזה.
+
+1. כניסה לחשבון: `npx wrangler login` (נפתח דפדפן לאישור).
+2. יצירת מסד לבדיקה: `npx wrangler d1 create perkly-staging`
+   מעתיקים את ה־`database_id` שמודפס לתוך `wrangler.jsonc` במקום `REPLACE_WITH_STAGING_DATABASE_ID`.
+3. הרצת המיגרציות: `npm run db:migrate:staging`
+4. (אופציונלי) קוד הרשמה לבעלי עסקים: `npx wrangler secret put SIGNUP_CODE --env staging`
+5. העלאה: `npm run deploy:staging`
+   בסוף מודפסת כתובת בסגנון `https://perkly-staging.<החשבון>.workers.dev` — זו הכתובת הציבורית.
+
+לייצור: אותם שלבים עם `perkly-production`, `REPLACE_WITH_PRODUCTION_DATABASE_ID`, `--env production`,
+`npm run db:migrate:production` ו־`npm run deploy:production`. דומיין משלכם מחברים בלוח הבקרה של Cloudflare.
+
+## מעבר מגרסת ChatGPT Sites
+
+- הכניסה דרך ChatGPT הוסרה לגמרי. השרת מתעלם מכותרות `oai-authenticated-*`, כך שאי אפשר להתחזות בעזרתן.
+- המיגרציה `0001` מוסיפה טבלאות ועמודות בלי למחוק נתונים, ממירה טלפונים קיימים לצורה האחידה ושומרת על קודי QR קיימים.
+- עסקים שנוצרו ב־ChatGPT Sites שייכים למזהה משתמש של ChatGPT ולכן לא יופיעו לאף משתמש חדש.
+  לא היו נתוני לקוחות אמיתיים בפיילוט. אם יש, צריך לייצא אותם מ־Sites ולשייך ידנית.
+
+## מבנה הקוד
+
+```
+app/api/auth      הרשמה, כניסה, יציאה, קבלת הזמנה
+app/api/loyalty   כל פעולות העסק, עם בדיקת הרשאה לפי תפקיד בכל בקשה
+app/api/join      הצטרפות עצמית של לקוחות (ציבורי, עם הגבלת קצב)
+app/c/[secret]    כרטיס הלקוח (ציבורי, לפי קישור סודי)
+app/join/[code]   טופס הצטרפות ללקוחות
+app/invite/[token] הצטרפות עובד
+app/admin         מנהל פלטפורמה (צפייה בלבד)
+lib/server        סיסמאות, Session, הגבלת קצב
+lib/phone.ts      כלל נרמול הטלפון
+db/schema.ts      סכמת המסד; drizzle/ מיגרציות
+worker/index.ts   נקודת הכניסה ל־Worker + כותרות אבטחה
+tests/            בדיקות יחידה ובדיקות קבלה מול שרת רץ
+```

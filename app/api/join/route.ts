@@ -1,0 +1,43 @@
+import { getD1 } from "../../../db";
+import { randomToken, sha256 } from "../../../lib/server/crypto";
+import { clientIp, fail, json, readJson, sameOrigin, str } from "../../../lib/server/http";
+import { allow } from "../../../lib/server/rate-limit";
+import { normalizePhone } from "../../../lib/phone";
+
+export const dynamic = "force-dynamic";
+
+// Public: a customer joins a business by scanning the business's join QR.
+export async function POST(request: Request) {
+  const body = await readJson(request);
+  if (!sameOrigin(request)) return fail("bad_origin", 403, "Invalid origin");
+  const db = getD1();
+  if (!body) return fail("bad_request", 400);
+
+  const ip = clientIp(request);
+  if (!(await allow(db, `join-ip:${ip}`, 10, 600))) return fail("rate_limited", 429, "Too many attempts");
+
+  const code = typeof body.code === "string" ? body.code.slice(0, 40) : "";
+  const business = await db.prepare("SELECT id, target FROM businesses WHERE join_code = ?").bind(code).first<{ id: string; target: number }>();
+  if (!code || !business) return fail("join_invalid", 404, "This join link is not active");
+  if (!(await allow(db, `join-business:${business.id}`, 300, 3600))) return fail("rate_limited", 429);
+
+  const name = str(body.name, 80);
+  const phone = normalizePhone(body.phone);
+  if (!name || !phone) return fail("bad_details", 400, "Invalid name or phone");
+  if (body.terms !== true) return fail("terms_required", 400, "Terms must be accepted");
+  const marketing = body.marketing === true ? 1 : 0;
+
+  const now = new Date().toISOString();
+  const secret = randomToken(24);
+  const scan = randomToken(16);
+  const r = await db
+    .prepare(
+      `INSERT OR IGNORE INTO customers(id, business, name, phone, token, stamps, target, created, card_hash, scan_code, consent_terms, consent_marketing, source)
+       VALUES(?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, 'self')`,
+    )
+    .bind(crypto.randomUUID(), business.id, name, phone, scan, business.target, now, await sha256(secret), scan, now, marketing)
+    .run();
+  // Never hand out an existing card to someone who only knows the phone number.
+  if (!r.meta.changes) return fail("phone_exists", 409, "This phone is already registered here. Ask the staff for your card link.");
+  return json({ cardPath: `/c/${secret}` });
+}
