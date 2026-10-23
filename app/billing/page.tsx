@@ -2,12 +2,14 @@ import { redirect } from "next/navigation";
 import { getD1 } from "../../db";
 import { currentUser } from "../../lib/server/page-session";
 import { getMemberships } from "../../lib/server/auth";
+import { env } from "cloudflare:workers";
+import { polarConfigured } from "../../lib/server/polar";
 import BillingView, { type BillingBusiness } from "./billing-view";
 
 export const dynamic = "force-dynamic";
 
 // Owner's subscription page. Shows each business the owner runs and its subscription status.
-// Payment is not connected yet.
+// Owners can subscribe through Polar once POLAR_* secrets are set.
 export default async function BillingPage() {
   const user = await currentUser();
   if (!user) redirect("/login");
@@ -27,5 +29,5 @@ export default async function BillingPage() {
     status: b.status ?? "none",
     periodEnd: b.periodEnd,
   }));
-  return <BillingView businesses={businesses} />;
+  return <BillingView businesses={businesses} configured={polarConfigured(env)} />;
 }
