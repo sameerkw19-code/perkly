@@ -14,13 +14,13 @@ const LABEL: Record<string, string> = {
 
 /** Google Wallet class status, and the button that submits it for Google's review. */
 export function WalletPanel() {
-  const [state, setState] = useState<{ configured?: boolean; status?: string; error?: string } | null>(null);
+  const [state, setState] = useState<{ configured?: boolean; status?: string; error?: string; classes?: string[] } | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
   async function load() {
     const r = await fetch("/api/admin/wallet", { credentials: "same-origin" });
-    setState((await r.json().catch(() => ({ status: "error" }))) as { configured?: boolean; status?: string; error?: string });
+    setState((await r.json().catch(() => ({ status: "error" }))) as { configured?: boolean; status?: string; error?: string; classes?: string[] });
   }
   useEffect(() => { load(); }, []);
 
@@ -51,6 +51,7 @@ export function WalletPanel() {
           )}
         </div>
       )}
+      {state?.classes && <p className="form-hint" dir="ltr">Classes at Google: {state.classes.length ? state.classes.join(", ") : "none"}</p>}
       {msg && <p className="form-hint">{msg}</p>}
     </section>
   );

@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { getD1 } from "../../../../db";
 import { getUser, isPlatformAdmin } from "../../../../lib/server/auth";
 import { fail, json, readJson, sameOrigin } from "../../../../lib/server/http";
-import { getClassStatus, submitClassForReview, walletConfig } from "../../../../lib/server/google-wallet";
+import { getClassStatus, listClassIds, submitClassForReview, walletConfig } from "../../../../lib/server/google-wallet";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +18,10 @@ export async function GET(request: Request) {
   const config = walletConfig(env);
   if (!config) return json({ configured: false });
   try {
-    return json({ configured: true, ...(await getClassStatus(config)) });
+    const status = await getClassStatus(config);
+    // When our class id is not found, list what Google has, to spot an id mismatch.
+    const classes = status.status === "missing" ? await listClassIds(config).catch((e) => [`(${(e as Error).message})`]) : undefined;
+    return json({ configured: true, ...status, classes });
   } catch (e) {
     return json({ configured: true, status: "error", error: (e as Error).message }, 502);
   }

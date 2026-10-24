@@ -209,3 +209,12 @@ export async function submitClassForReview(config: WalletConfig): Promise<ClassS
   const data = (await r.json()) as { reviewStatus?: string };
   return { status: normalizeReview(data.reviewStatus), raw: data.reviewStatus };
 }
+
+/** All loyalty class ids this issuer has at Google (admin diagnostics). */
+export async function listClassIds(config: WalletConfig): Promise<string[]> {
+  const token = await accessToken(config);
+  const r = await fetch(`${API}/loyaltyClass?issuerId=${encodeURIComponent(config.issuerId)}`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!r.ok) throw new Error(`google_list_${r.status}`);
+  const data = (await r.json()) as { resources?: { id?: string; reviewStatus?: string }[] };
+  return (data.resources ?? []).map((c) => `${c.id} (${c.reviewStatus ?? "?"})`);
+}
