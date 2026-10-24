@@ -370,3 +370,4 @@ fieldset.birthday{border:0;padding:0;margin:0 0 14px}fieldset.birthday legend{fo
   .lp-top .brand{font-size:24px}
   .lp-top-actions{gap:6px}.lp-top-actions .lang-select{max-width:84px}
 }
+.admin-reset-link{display:grid;gap:4px;min-width:240px}.admin-reset-link input{font-size:11px;padding:6px 8px}

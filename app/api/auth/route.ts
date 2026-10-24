@@ -71,6 +71,35 @@ export async function POST(request: Request) {
       return json({ ok: true }, 200, { "Set-Cookie": sessionCookie(token, request) });
     }
 
+    case "reset_password": {
+      if (!(await allow(db, `reset:${ip}`, 10, 600))) return fail("rate_limited", 429, "Too many attempts");
+      const tokenText = typeof body.token === "string" && body.token.length <= 100 ? body.token : "";
+      if (!validPassword(body.password)) return fail("weak_password", 400, "Password must be 8+ characters");
+      const now = new Date().toISOString();
+      const reset = tokenText
+        ? await db
+            .prepare(
+              `SELECT r.id, r.user FROM password_resets r JOIN users u ON u.id = r.user
+               WHERE r.id = ? AND r.used IS NULL AND r.expires > ? AND u.blocked IS NULL`,
+            )
+            .bind(await sha256(tokenText), now)
+            .first<{ id: string; user: string }>()
+        : null;
+      if (!reset) return fail("reset_invalid", 404, "This reset link expired or was already used");
+      const [used] = await db.batch([
+        // Marks the link used first, so the same link cannot be used twice at the same time.
+        db.prepare("UPDATE password_resets SET used = ? WHERE id = ? AND used IS NULL").bind(now, reset.id),
+      ]);
+      if (!used.meta.changes) return fail("reset_invalid", 404, "This reset link expired or was already used");
+      await db.batch([
+        db.prepare("UPDATE users SET pass_hash = ? WHERE id = ?").bind(await hashPassword(body.password), reset.user),
+        // Signs out every device that used the old password.
+        db.prepare("DELETE FROM sessions WHERE user = ?").bind(reset.user),
+      ]);
+      const token = await createSession(db, reset.user);
+      return json({ ok: true }, 200, { "Set-Cookie": sessionCookie(token, request) });
+    }
+
     case "logout": {
       await endSession(db, request.headers.get("cookie"));
       return json({ ok: true }, 200, { "Set-Cookie": clearSessionCookie(request) });

@@ -2,10 +2,12 @@ import { env } from "cloudflare:workers";
 import { fail, json, str } from "../../../../lib/server/http";
 import { adminLog, adminRequest } from "../../../../lib/server/admin-api";
 import { isPlatformAdmin } from "../../../../lib/server/auth";
+import { randomToken, sha256 } from "../../../../lib/server/crypto";
 
 export const dynamic = "force-dynamic";
 
-// Platform admin actions on one user: block (with reason), unblock, signout (end all sessions).
+// Platform admin actions on one user: block (with reason), unblock, signout (end all sessions),
+// reset_link (a one-time password reset link, valid 24 hours, shown to the admin once).
 export async function POST(request: Request) {
   const a = await adminRequest(request, { mutate: true });
   if ("error" in a) return a.error;
@@ -42,6 +44,19 @@ export async function POST(request: Request) {
         adminLog(db, me.email, null, "user_signout", target.email),
       ]);
       return json({ ok: true, ended: r[0].meta.changes });
+    }
+    case "reset_link": {
+      if (target.blocked) return fail("user_blocked", 409, "Unblock the user first");
+      const token = randomToken(24);
+      const expires = new Date(Date.now() + 24 * 3_600_000).toISOString();
+      await db.batch([
+        // Older unused links for this user stop working.
+        db.prepare("UPDATE password_resets SET used = ? WHERE user = ? AND used IS NULL").bind(now, id),
+        db.prepare("INSERT INTO password_resets(id, user, created, created_by, expires) VALUES(?, ?, ?, ?, ?)")
+          .bind(await sha256(token), id, now, me.email, expires),
+        adminLog(db, me.email, null, "user_reset_link", target.email),
+      ]);
+      return json({ ok: true, url: `${new URL(request.url).origin}/reset/${token}`, expires });
     }
     default:
       return fail("bad_request", 400, "Unknown action");

@@ -66,6 +66,15 @@ test("forged identity headers are ignored; pages require sign-in", async () => {
   for (const path of ["/terms", "/privacy"]) assert.equal((await anon.get(path)).status, 200, path);
 });
 
+test("password reset links: unknown or reused tokens are refused", async () => {
+  const r = await new Client().post("/api/auth", { action: "reset_password", token: "not-a-real-token", password: "new password 1" });
+  assert.equal(r.status, 404);
+  assert.equal(r.body.code, "reset_invalid");
+  const weak = await new Client().post("/api/auth", { action: "reset_password", token: "x", password: "short" });
+  assert.equal(weak.status, 400);
+  assert.equal((await new Client().get("/reset/whatever")).status, 200);
+});
+
 test("mutations from another site are rejected", async () => {
   const r = await new Client().post("/api/auth", { action: "login", email: "x@y.z", password: "whatever1" }, { origin: "https://evil.example" });
   assert.equal(r.status, 403);

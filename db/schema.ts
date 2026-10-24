@@ -245,3 +245,13 @@ export const settings = sqliteTable("settings", {
   updated: text("updated").notNull(),
   updatedBy: text("updated_by"),
 });
+
+/** One-time password reset links, created by a platform admin. Only the SHA-256 of the token is stored. */
+export const passwordResets = sqliteTable("password_resets", {
+  id: text("id").primaryKey(),
+  user: text("user").notNull().references(() => users.id),
+  created: text("created").notNull(),
+  createdBy: text("created_by").notNull(),
+  expires: text("expires").notNull(),
+  used: text("used"),
+});

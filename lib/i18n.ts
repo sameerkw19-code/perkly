@@ -47,7 +47,11 @@ const words: Record<string, Entry> = {
   haveAccount: ["כבר יש לך חשבון? כניסה", "لديك حساب؟ تسجيل الدخول", "Already have an account? Sign in"],
   noAccount: ["בעל עסק חדש? פתיחת חשבון", "صاحب مشروع جديد؟ إنشاء حساب", "New business owner? Create an account"],
   staffNoAccount: ["עובדים מצטרפים רק דרך קישור הזמנה מבעל העסק.", "ينضم الموظفون فقط عبر رابط دعوة من صاحب المشروع.", "Staff join only through an invite link from the owner."],
-  noPasswordReset: ["שכחתם סיסמה? איפוס עדיין לא זמין. בעל העסק יכול לשלוח לעובד הזמנה חדשה.", "نسيت كلمة المرور؟ الاستعادة غير متاحة بعد. يمكن لصاحب المشروع إرسال دعوة جديدة للموظف.", "Forgot your password? Reset is not available yet. Owners can send staff a new invite."],
+  noPasswordReset: ["שכחתם סיסמה? כתבו ל-support@perkly.shop ונשלח לכם קישור לאיפוס. עובדים יכולים גם לבקש מבעל העסק הזמנה חדשה.", "نسيت كلمة المرور؟ اكتب إلى support@perkly.shop وسنرسل لك رابط إعادة تعيين. يمكن للموظفين أيضاً طلب دعوة جديدة من صاحب المشروع.", "Forgot your password? Email support@perkly.shop and we'll send a reset link. Staff can also ask the owner for a new invite."],
+  resetTitle: ["בחירת סיסמה חדשה", "اختيار كلمة مرور جديدة", "Choose a new password"],
+  resetNew: ["סיסמה חדשה", "كلمة مرور جديدة", "New password"],
+  resetSave: ["שמירה וכניסה", "حفظ ودخول", "Save and sign in"],
+  err_reset_invalid: ["הקישור פג תוקף או שכבר השתמשו בו. בקשו קישור חדש מ-support@perkly.shop.", "الرابط منتهي أو استُخدم. اطلب رابطاً جديداً من support@perkly.shop.", "This link expired or was already used. Ask support@perkly.shop for a new one."],
 
   // Errors (keys match API error codes)
   err_bad_login: ["אימייל או סיסמה שגויים.", "البريد أو كلمة المرور غير صحيحة.", "Wrong email or password."],

@@ -6,6 +6,17 @@ import { post } from "../../../lib/api";
 export function UserActions({ user, name, blocked, protectedUser, sessions }: { user: string; name: string; blocked: boolean; protectedUser: boolean; sessions: number }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [link, setLink] = useState("");
+
+  async function resetLink() {
+    if (!confirm(`ליצור קישור איפוס סיסמה ל-${name}? הקישור תקף ל-24 שעות ומבטל קישורים קודמים.`)) return;
+    setBusy(true);
+    setErr("");
+    const r = await post<{ url: string }>("/api/admin/users", { action: "reset_link", user });
+    setBusy(false);
+    if (!r.ok) { setErr(r.code === "user_blocked" ? "המשתמש חסום" : "נכשל"); return; }
+    setLink(r.data.url);
+  }
 
   async function run(action: string, extra: Record<string, unknown> = {}) {
     setBusy(true);
@@ -28,6 +39,14 @@ export function UserActions({ user, name, blocked, protectedUser, sessions }: { 
       ) : null}
       {sessions > 0 && !blocked && (
         <button className="btn soft small" disabled={busy} onClick={() => confirm(`לנתק את ${name} מכל המכשירים?`) && run("signout")}>ניתוק</button>
+      )}
+      {!blocked && <button className="btn soft small" disabled={busy} onClick={resetLink}>קישור איפוס</button>}
+      {link && (
+        <span className="admin-reset-link">
+          <input readOnly value={link} dir="ltr" onFocus={(e) => e.currentTarget.select()} aria-label="קישור איפוס" />
+          <button className="btn primary small" onClick={() => navigator.clipboard?.writeText(link)}>העתקה</button>
+          <small className="form-hint">שלח למשתמש בוואטסאפ או במייל. מוצג פעם אחת.</small>
+        </span>
       )}
       {err && <small className="form-error">{err}</small>}
     </div>

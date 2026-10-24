@@ -44,6 +44,11 @@
       "name": "perkly",
       "keep_vars": true,
       "observability": { "enabled": true },
+      // Same Google Wallet issuer and class as staging (one issuer account). Not secret.
+      "vars": {
+        "GOOGLE_WALLET_ISSUER_ID": "3388000000023227862",
+        "GOOGLE_WALLET_CLASS_ID": "3388000000023227862.3388000000023227862.perkly_loyalty"
+      },
       // Your own domain. Works once perkly.shop is active in the same Cloudflare account.
       "routes": [
         { "pattern": "perkly.shop", "custom_domain": true },
