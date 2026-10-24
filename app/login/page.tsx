@@ -12,7 +12,8 @@ function safeNext(value: unknown): string {
 }
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const next = safeNext((await searchParams).next);
+  const params = await searchParams;
+  const next = safeNext(params.next);
   if (await currentUser()) redirect(next);
-  return <AuthForm needsCode={!!env.SIGNUP_CODE} next={next} />;
+  return <AuthForm needsCode={!!env.SIGNUP_CODE} next={next} initialMode={params.mode === "signup" ? "signup" : "login"} />;
 }

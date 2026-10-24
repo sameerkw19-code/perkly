@@ -51,6 +51,7 @@ export default function CardView({ card, secret, googleWallet, isIOS }: { card: 
             <p className="wallet-note"><Wallet size={15} />{isIOS ? t("walletHintIOS") : t("walletHint")}</p>
           )}
           <p className="form-hint center">{t("saveLinkHint")}</p>
+          <p className="form-hint center legal-links"><a href="/privacy">{t("privacyLink")}</a></p>
         </div>
       )}
     </div>

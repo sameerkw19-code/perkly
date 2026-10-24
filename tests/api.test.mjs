@@ -55,9 +55,15 @@ test("forged identity headers are ignored; pages require sign-in", async () => {
   assert.equal(r.status, 401);
   const forged = await fetch(BASE + "/api/loyalty", { headers: { "oai-authenticated-user-id": "attacker", "oai-authenticated-user-email": "a@b.c" } });
   assert.equal(forged.status, 401);
+  // Visitors get the public landing page; the dashboard data itself needs a session (401 above).
   const page = await anon.get("/");
-  assert.equal(page.status, 307);
-  assert.match(page.location, /\/login$/);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /perkly/i);
+  // The admin control center sends visitors to sign in and back.
+  const admin = await anon.get("/admin");
+  assert.ok([302, 303, 307, 308].includes(admin.status), `admin status ${admin.status}`);
+  assert.match(admin.location, /\/login\?next=\/admin$/);
+  for (const path of ["/terms", "/privacy"]) assert.equal((await anon.get(path)).status, 200, path);
 });
 
 test("mutations from another site are rejected", async () => {
