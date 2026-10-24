@@ -1,3 +1,4 @@
+import { env } from "cloudflare:workers";
 import { getD1 } from "../../../../../db";
 import { sha256 } from "../../../../../lib/server/crypto";
 import { fail } from "../../../../../lib/server/http";
@@ -8,10 +9,7 @@ export const dynamic = "force-dynamic";
 // GET /api/wallet/google/<card secret> → redirects to Google's "Add to Google Wallet" page.
 // Returns 404 until the Google Wallet key and issuer id are configured.
 export async function GET(request: Request, { params }: { params: Promise<{ secret: string }> }) {
-  const config = walletConfig({
-    GOOGLE_WALLET_SA_KEY: process.env.GOOGLE_WALLET_SA_KEY,
-    GOOGLE_WALLET_ISSUER_ID: process.env.GOOGLE_WALLET_ISSUER_ID,
-  });
+  const config = walletConfig(env);
   if (!config) return fail("not_found", 404, "Google Wallet is not configured");
 
   const { secret } = await params;

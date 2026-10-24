@@ -10,5 +10,8 @@ declare namespace Cloudflare {
     POLAR_PRODUCT_ID?: string;
     POLAR_WEBHOOK_SECRET?: string;
     POLAR_SANDBOX?: string;
+    /** Google Wallet. Issuer id is a Variable; the service-account JSON key is a Secret. */
+    GOOGLE_WALLET_ISSUER_ID?: string;
+    GOOGLE_WALLET_SA_KEY?: string;
   }
 }
