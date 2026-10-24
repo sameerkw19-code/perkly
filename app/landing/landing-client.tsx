@@ -49,6 +49,7 @@ export function SiteNav({ lang }: { lang: Lang }) {
     <span className="lp-langs" role="group" aria-label={c.lang}>
       <Link href="/" lang="he" hrefLang="he" aria-current={lang === "he" ? "true" : undefined} onClick={() => rememberLang("he")}>עברית</Link>
       <Link href="/ar" lang="ar" hrefLang="ar" aria-current={lang === "ar" ? "true" : undefined} onClick={() => rememberLang("ar")}>العربية</Link>
+      <Link href="/en" lang="en" hrefLang="en" aria-current={lang === "en" ? "true" : undefined} onClick={() => rememberLang("en")}>English</Link>
     </span>
   );
 
@@ -289,6 +290,7 @@ export function DemoPanel({ lang }: { lang: Lang }) {
 export function ExamplesPicker({ lang }: { lang: Lang }) {
   const c = COPY[lang].examples;
   const d = COPY[lang].demo;
+  const rtl = COPY[lang].dir === "rtl";
   const list = c.list;
   const [i, setI] = useState(0);
   const start = useRef<number | null>(null);
@@ -316,8 +318,8 @@ export function ExamplesPicker({ lang }: { lang: Lang }) {
           const dx = e.clientX - start.current;
           start.current = null;
           if (Math.abs(dx) < 40) return;
-          // Right-to-left page: swiping left moves forward.
-          go(dx < 0 ? i + 1 : i - 1);
+          // Swipe toward the reading direction's end to move forward.
+          go((rtl ? dx > 0 : dx < 0) ? i + 1 : i - 1);
         }}
       >
         <div className="lp-example-card" key={ex.key}>
@@ -334,9 +336,9 @@ export function ExamplesPicker({ lang }: { lang: Lang }) {
         </div>
       </div>
       <div className="lp-example-controls">
-        <button type="button" className="lp-round-btn" onClick={() => go(i - 1)} aria-label={c.prev}><Icon name="chevronRight" size={20} /></button>
+        <button type="button" className="lp-round-btn" onClick={() => go(i - 1)} aria-label={c.prev}><Icon name={rtl ? "chevronRight" : "chevronLeft"} size={20} /></button>
         <span className="lp-example-pos" aria-live="polite">{ex.kind} · {c.position(i + 1, list.length)}</span>
-        <button type="button" className="lp-round-btn" onClick={() => go(i + 1)} aria-label={c.next}><Icon name="chevronLeft" size={20} /></button>
+        <button type="button" className="lp-round-btn" onClick={() => go(i + 1)} aria-label={c.next}><Icon name={rtl ? "chevronLeft" : "chevronRight"} size={20} /></button>
       </div>
     </div>
   );

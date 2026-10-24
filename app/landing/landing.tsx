@@ -126,7 +126,7 @@ export default function Landing({ lang }: { lang: Lang }) {
   const c = COPY[lang];
   const h = hrefs(lang);
   return (
-    <div className="lp" lang={lang} dir="rtl">
+    <div className="lp" lang={lang} dir={c.dir}>
       <a href="#main" className="lp-skip">{c.nav.skip}</a>
       <SiteNav lang={lang} />
 
@@ -139,7 +139,7 @@ export default function Landing({ lang }: { lang: Lang }) {
               <h1 id="hero-title" className="lp-h1">{c.hero.title}</h1>
               <p className="lp-lead">{c.hero.text}</p>
               <div className="lp-hero-ctas">
-                <a href={h.signup} className="lp-btn lp-btn-primary lp-btn-lg">{c.hero.cta}<Icon name="arrowLeft" size={20} stroke={2.4} /></a>
+                <a href={h.signup} className="lp-btn lp-btn-primary lp-btn-lg">{c.hero.cta}<Icon name={c.dir === "rtl" ? "arrowLeft" : "arrowRight"} size={20} stroke={2.4} /></a>
                 <a href="#demo" className="lp-btn lp-btn-ghost lp-btn-lg">{c.hero.demo}</a>
               </div>
               <p className="lp-hero-price"><strong>{c.hero.price}</strong><span aria-hidden="true">·</span><span>{c.hero.priceNote}</span></p>

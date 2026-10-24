@@ -6,7 +6,7 @@
 // - Prices: 99 ILS a month, no setup fee. Counter kit: optional, 99 ILS one-time, also without a subscription.
 // - No testimonials, customer counts or results until real, approved ones exist.
 
-export type Lang = "he" | "ar";
+export type Lang = "he" | "ar" | "en";
 
 export const WHATSAPP_INTL = "972526028291";
 export const WHATSAPP_DISPLAY = "052-602-8291";
@@ -15,7 +15,7 @@ export type ExampleKey = "cafe" | "barber" | "pizza" | "icecream" | "studio" | "
 export type Example = { key: ExampleKey; kind: string; name: string; reward: string; target: number; filled: number };
 
 const he = {
-  dir: "rtl" as const,
+  dir: "rtl" as "rtl" | "ltr",
   meta: {
     title: "Perkly — כרטיס נאמנות דיגיטלי לעסקים",
     description: "כרטיס חותמות דיגיטלי בעיצוב העסק שלכם. הצטרפות ב־QR, ניהול חותמות והטבות ולוח בקרה לבעלי עסקים.",
@@ -364,7 +364,181 @@ const ar: Copy = {
   },
 };
 
-export const COPY: Record<Lang, Copy> = { he, ar };
+const en: Copy = {
+  dir: "ltr",
+  meta: {
+    title: "Perkly — Digital loyalty cards for small businesses",
+    description: "A digital stamp card in your business's own design. QR sign-up, stamps and rewards, and a dashboard for owners.",
+    ogAlt: "Perkly: a digital loyalty card on a customer's phone",
+  },
+  nav: { skip: "Skip to content", how: "How it works", examples: "Examples", pricing: "Pricing", faq: "FAQ", login: "Sign in", cta: "Join the pilot", menu: "Menu", close: "Close menu", lang: "Language", home: "Perkly, home page" },
+  hero: {
+    badge: "Digital stamp card · in pilot",
+    title: "The card that brings customers back.",
+    text: "A digital loyalty card in your business's own design. Customers collect stamps on their phone, staff handle them in a tap, and you see who comes back.",
+    cta: "Join the pilot",
+    demo: "Try the demo",
+    price: "₪99 a month",
+    priceNote: "No setup fee",
+    points: ["No app for customers to download", "Any phone or tablet at the counter", "Hebrew, Arabic and English"],
+    sceneLabel: "Illustration: a café loyalty card on a phone, with a barbershop card and an ice cream shop card behind it",
+    myCard: "My card",
+    qrCaption: "Show this code at the counter",
+  },
+  how: {
+    eyebrow: "How it works",
+    title: "Four steps and you're live.",
+    steps: [
+      { title: "Design your card", text: "Logo, colours, stamp icon and reward. Preview it before you publish." },
+      { title: "Put up the QR code", text: "Customers scan it at the counter, enter a name and phone number, and get a personal card on their phone." },
+      { title: "Add stamps", text: "Staff scan the customer's code or search by name, and confirm with one tap." },
+      { title: "Redeem and keep collecting", text: "When the card is full, the reward is ready. After redeeming, a new card starts." },
+    ],
+    ruleTitle: "How stamps are counted",
+    rule: "The business decides how many stamps fill a card, for example 10. Staff add a stamp on each qualifying visit. When the card is full the reward is ready, and redeeming the reward does not count as a stamp.",
+    tabs: { label: "Product demo", try: "Try it yourself", video: "Short video" },
+  },
+  demo: {
+    badge: "Demo · nothing is saved",
+    intro: "This is what staff see when they add a stamp:",
+    add: "Add a stamp",
+    added: "Stamp added",
+    readyTitle: "The reward is ready!",
+    readyText: "At this point staff confirm the redemption, and the customer starts a new card.",
+    reset: "Reset and try again",
+    of: "of",
+    left: (k: number, reward: string) => (k === 1 ? `1 more for a ${reward}` : `${k} more for a ${reward}`),
+    ready: "Reward ready",
+    live: (n: number, t: number) => `Stamp added. ${n} of ${t}.`,
+    liveReady: "The card is full. The reward is ready.",
+    liveReset: "The demo was reset.",
+    stampsOf: (n: number, t: number) => `${n} of ${t} stamps`,
+  },
+  video: {
+    play: "Play the video: Perkly in 20 seconds",
+    caption: "Silent video, in Hebrew.",
+    error: "The video didn't load. You can try the demo in the other tab.",
+  },
+  examples: {
+    eyebrow: "Examples",
+    title: "Every business gets its own card.",
+    text: "Pick a type of business to see how its card could look. Each business chooses its logo, colours, stamp icon, texts and background image.",
+    pick: "Choose a type of business",
+    prev: "Previous example",
+    next: "Next example",
+    position: (i: number, n: number) => `${i} of ${n}`,
+    rewardLine: (t: number, reward: string) => `${t} stamps = ${reward}`,
+    note: "The business names in these examples are made up.",
+    list: [
+      { key: "cafe", kind: "Café", name: "Café Icon", reward: "free coffee", target: 10, filled: 7 },
+      { key: "barber", kind: "Barbershop", name: "Alon Barbers", reward: "free haircut", target: 10, filled: 9 },
+      { key: "pizza", kind: "Pizzeria", name: "Nona Pizza", reward: "free pizza", target: 6, filled: 4 },
+      { key: "icecream", kind: "Ice cream", name: "Mika's Ice Cream", reward: "free scoop", target: 8, filled: 5 },
+      { key: "studio", kind: "Studio", name: "Maya Studio", reward: "free class", target: 8, filled: 3 },
+      { key: "bakery", kind: "Bakery", name: "Rachel's Bakery", reward: "free pastry", target: 10, filled: 6 },
+    ] as Example[],
+  },
+  manage: {
+    eyebrow: "For business owners",
+    title: "See who comes back, and who stopped coming.",
+    text: "One dashboard for the whole business: customers, stamps, rewards and staff activity.",
+    points: [
+      "Stats for any time range",
+      "History of every stamp and redemption, with the staff member's name",
+      "Alerts on unusual activity by a customer or a staff member",
+      "Export your customer list to CSV",
+    ],
+    controlsTitle: "Stamp controls",
+    controls: [
+      "Each staff member has a personal login, and removing access takes effect immediately",
+      "A request sent again after a dropped connection is not counted twice",
+      "Staff can't see the customer list or change settings",
+    ],
+    demoLabel: "Demo data",
+    range: ["Today", "30 days", "All"],
+    stats: [
+      { label: "Customers", value: "312" },
+      { label: "Joined this month", value: "47" },
+      { label: "Stamps", value: "1,186" },
+      { label: "Rewards waiting", value: "23" },
+    ],
+    alert: "Unusual activity: 4 stamps for one customer in the last hour",
+    staffTitle: "Staff activity today",
+    staff: [
+      { name: "Dana", detail: "18 stamps · 3 redemptions" },
+      { name: "Yossi", detail: "11 stamps · 1 redemption" },
+    ],
+    recentTitle: "Recent activity",
+    recent: [
+      { text: "Noa K. got a stamp", time: "2 min ago" },
+      { text: "New customer joined via QR", time: "31 min ago" },
+    ],
+  },
+  trust: {
+    title: "We're in a pilot, looking for our first businesses.",
+    text: "We don't have testimonials to show yet, so we won't make any up. Want to see how it would look for your business? We'll walk through it together in a short call.",
+    cta: "Talk to us on WhatsApp",
+    waText: "Hi, I'd like to hear about Perkly",
+  },
+  pricing: {
+    eyebrow: "Pricing",
+    title: "One price, no surprises.",
+    sub: {
+      name: "Perkly subscription",
+      price: "₪99",
+      per: "a month",
+      note: "No setup fee",
+      features: ["A card in your business's design", "Customer sign-up by QR", "Staff station and staff invites", "Dashboard, history and alerts", "Hebrew, Arabic and English"],
+      cta: "Join the pilot",
+    },
+    kit: {
+      tag: "Optional add-on",
+      name: "Counter kit",
+      price: "₪99",
+      per: "one-time",
+      items: ["2 posters with your logo and QR code", "A QR stand for the counter"],
+      noSub: "You can order it without a subscription.",
+      cta: "Order a kit on WhatsApp",
+      waText: "Hi, I'd like to order a Perkly counter kit (₪99)",
+      sceneLabel: "Illustration of the counter kit: two posters and a QR stand on a counter",
+      poster1: "Collect stamps. Get a reward.",
+      poster2: "10 stamps = free coffee",
+      stand: "Scan for your card",
+      scan: "Scan to join",
+    },
+  },
+  faq: {
+    eyebrow: "FAQ",
+    title: "Questions business owners ask",
+    items: [
+      { q: "Do customers need to download an app?", a: "No. Customers scan a QR code, sign up with a name and phone number, and get a personal link to their card. They can add it to their home screen." },
+      { q: "Do I need to buy equipment?", a: "No. The staff station runs in the browser of any phone or tablet with a camera. You can print the QR code yourself or order a counter kit." },
+      { q: "How do you prevent unearned stamps?", a: "Each staff member has a personal login, and every action is logged with their name. The system flags unusual activity, and the owner can remove a staff member's access immediately." },
+      { q: "What happens when the card is full?", a: "The reward is ready. You choose whether it's redeemed right away, or saved while the customer keeps collecting on a new card. You can also set an expiry for rewards." },
+      { q: "How much does it cost?", a: "₪99 a month, no setup fee. The counter kit is an optional one-time add-on for ₪99." },
+      { q: "Does it work with Apple Wallet and Google Wallet?", a: "Not yet. Google Wallet is awaiting approval, and Apple Wallet is in development. For now the card opens from its personal link or a home screen shortcut." },
+      { q: "How do I join now?", a: "Leave your details in the pilot form. We'll get back to you and send a code to open your account." },
+    ],
+  },
+  final: {
+    title: "Ready for customers to come back?",
+    text: "Leave your details and we'll get back to you with a code to open your account.",
+    cta: "Join the pilot",
+    support: "Questions? Message us on WhatsApp",
+  },
+  footer: {
+    tagline: "Digital loyalty cards for businesses",
+    support: "WhatsApp support",
+    nav: "Links",
+    terms: "Terms of use (Hebrew)",
+    privacy: "Privacy policy (Hebrew)",
+    accessibility: "Accessibility statement (Hebrew)",
+    login: "Business sign-in",
+    rights: "© 2026 Perkly",
+  },
+};
+
+export const COPY: Record<Lang, Copy> = { he, ar, en };
 export type { Copy };
 
 export function waLink(text: string) {
@@ -372,10 +546,12 @@ export function waLink(text: string) {
 }
 
 /** Links that keep the chosen language. */
+export const HOME: Record<Lang, string> = { he: "/", ar: "/ar", en: "/en" };
+
 export function hrefs(lang: Lang) {
-  const q = lang === "ar" ? "?lang=ar" : "";
+  const q = lang === "he" ? "" : `?lang=${lang}`;
   return {
-    home: lang === "ar" ? "/ar" : "/",
+    home: HOME[lang],
     signup: `/signup${q}`,
     login: `/login${q}`,
     terms: "/terms",

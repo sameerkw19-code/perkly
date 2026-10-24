@@ -4,9 +4,9 @@ import type { Lang } from "./content";
 
 type Quote = { text: string; name: string; business: string; city: string };
 
-const QUOTES: Record<Lang, Quote[]> = { he: [], ar: [] };
+const QUOTES: Record<Lang, Quote[]> = { he: [], ar: [], en: [] };
 
-const TITLE: Record<Lang, string> = { he: "מה אומרים בעלי העסקים", ar: "ماذا يقول أصحاب المشاريع" };
+const TITLE: Record<Lang, string> = { he: "מה אומרים בעלי העסקים", ar: "ماذا يقول أصحاب المشاريع", en: "What business owners say" };
 
 export function Testimonials({ lang }: { lang: Lang }) {
   const quotes = QUOTES[lang];

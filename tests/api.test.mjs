@@ -67,6 +67,9 @@ test("forged identity headers are ignored; pages require sign-in", async () => {
   const arabic = await fetch(BASE + "/ar", { redirect: "manual" });
   assert.equal(arabic.status, 200);
   assert.match(await arabic.text(), /البطاقة التي تجعل الزبائن يعودون/);
+  const english = await fetch(BASE + "/en", { redirect: "manual" });
+  assert.equal(english.status, 200);
+  assert.match(await english.text(), /The card that brings customers back/);
 });
 
 test("mutations from another site are rejected", async () => {

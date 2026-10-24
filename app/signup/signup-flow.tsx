@@ -66,6 +66,34 @@ const T = {
     support: "أسئلة؟ واتساب",
     login: "لدي حساب",
   },
+  en: {
+    title: "Join the pilot",
+    intro: "Leave your details and we'll get back to you with a code to open your account. Online payment isn't connected yet, and nothing is charged at this stage.",
+    business: "Business name", contact: "Contact name", phone: "Phone", email: "Email", optional: "(optional)",
+    kind: "Type of business", kindPick: "Choose…", city: "City", note: "Anything we should know?",
+    kinds: { cafe: "Café", barber: "Barbershop", food: "Restaurant or pizzeria", icecream: "Ice cream shop", studio: "Studio or gym", bar: "Bar", other: "Other" },
+    kit: "I'm also interested in a counter kit (₪99 one-time): 2 posters and a QR stand",
+    privacyBefore: "I've read the ",
+    privacyLink: "privacy policy",
+    privacyAfter: " (in Hebrew) and agree that Perkly may contact me about the pilot",
+    marketing: "Send me updates and offers from Perkly (optional)",
+    submit: "Send request", sending: "Sending…",
+    errSummary: "Please fix these fields:",
+    err: { required: "Required", phone: "Invalid phone number", email: "Invalid email address", privacy: "Please agree so we can get back to you" },
+    errRate: "Too many requests. Try again later or message us on WhatsApp.",
+    errNet: "Sending failed. Check your connection and try again.",
+    doneTitle: "We got your request!",
+    doneText: "We'll get back to you on WhatsApp or by phone, and send a code to open your account.",
+    doneWa: "In a hurry? Send us a message",
+    doneWaText: (b: string) => `Hi, I sent a request to join the Perkly pilot (${b})`,
+    askWaText: "Hi, I have a question about the Perkly pilot",
+    home: "Back to home",
+    nextTitle: "What happens next",
+    next: ["We get back to you and send a code to open your account", "You open your account and design your card", "You put up the QR code and start stamping"],
+    price: "₪99 a month", priceNote: "No setup fee",
+    support: "Questions? WhatsApp",
+    login: "I have an account",
+  },
 };
 
 type FieldName = "business" | "contact" | "phone" | "email" | "privacy";
@@ -76,8 +104,9 @@ const noSubscribe = () => () => {};
 function readLang(): Lang {
   try {
     const q = new URLSearchParams(window.location.search).get("lang");
-    if (q === "ar" || q === "he") return q;
-    if (localStorage.getItem("perkly-language") === "ar") return "ar";
+    if (q === "ar" || q === "he" || q === "en") return q;
+    const saved = localStorage.getItem("perkly-language");
+    if (saved === "ar" || saved === "en") return saved;
   } catch {}
   return "he";
 }
@@ -166,7 +195,7 @@ export default function SignupFlow() {
   const labels: Record<FieldName, string> = { business: t.business, contact: t.contact, phone: t.phone, email: t.email, privacy: t.privacyLink };
 
   return (
-    <div className="lp su" lang={lang} dir="rtl">
+    <div className="lp su" lang={lang} dir={lang === "en" ? "ltr" : "rtl"}>
       <header className="lp-header">
         <div className="lp-wrap lp-header-row">
           <Link href={h.home} className="lp-home-link"><Logo label="Perkly" /></Link>

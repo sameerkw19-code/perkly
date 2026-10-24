@@ -47,6 +47,8 @@
   -webkit-font-smoothing: antialiased;
   overflow-x: clip;
 }
+.lp { --rot: 16deg; --card-rot: -8deg; --dash-rot: -6deg; }
+.lp[dir="ltr"] { --rot: -16deg; --card-rot: 8deg; --dash-rot: 6deg; }
 .lp[lang="ar"] { --font-body: "Plex Arabic", "Rubik", system-ui, sans-serif; --font-display: "Rubik", "Plex Arabic", system-ui, sans-serif; }
 .lp *, .lp *::before, .lp *::after { box-sizing: border-box; }
 .lp a { color: var(--p-strong); text-decoration: none; }
@@ -147,7 +149,7 @@
 /* 3D scene */
 .lp-hero-visual { position: relative; min-height: 560px; display: flex; align-items: center; justify-content: center; }
 .lp-scene { --tilt-x: 0deg; --tilt-y: 0deg; perspective: 1400px; width: 100%; height: 560px; display: flex; align-items: center; justify-content: center; }
-.lp-stage { position: relative; width: 300px; height: 560px; transform-style: preserve-3d; transform: rotateX(calc(4deg + var(--tilt-x))) rotateY(calc(16deg + var(--tilt-y))); transition: transform .5s cubic-bezier(.2, .7, .2, 1); }
+.lp-stage { position: relative; width: 300px; height: 560px; transform-style: preserve-3d; transform: rotateX(calc(4deg + var(--tilt-x))) rotateY(calc(var(--rot) + var(--tilt-y))); transition: transform .5s cubic-bezier(.2, .7, .2, 1); }
 .lp-glow { position: absolute; inset: -40px -120px; background: radial-gradient(closest-side, rgba(117, 88, 232, 0.22), rgba(117, 88, 232, 0) 70%); transform: translateZ(-160px); }
 .lp-phone { position: absolute; inset: 0; border-radius: 46px; padding: 11px; background: linear-gradient(150deg, #2D2650, #120F24 55%); transform: translateZ(40px); box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.14), -26px 40px 60px rgba(23, 19, 41, 0.28), -6px 10px 20px rgba(23, 19, 41, 0.18); }
 .lp-phone::after { content: ""; position: absolute; top: 18px; left: 50%; width: 76px; height: 22px; margin-left: -38px; border-radius: 12px; background: #0B0918; }
@@ -238,18 +240,19 @@
 /* ---- Examples ---- */
 .lp-examples { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 .lp-example-chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 4px 2px 8px; mask-image: linear-gradient(to left, #000 85%, transparent); -webkit-mask-image: linear-gradient(to left, #000 85%, transparent); }
+.lp[dir="ltr"] .lp-example-chips { mask-image: linear-gradient(to right, #000 85%, transparent); -webkit-mask-image: linear-gradient(to right, #000 85%, transparent); }
 .lp-example-chips::-webkit-scrollbar { display: none; }
 .lp-example-chips button { flex: none; min-height: 44px; padding: 8px 16px; border-radius: 999px; border: 1.5px solid var(--line); background: #fff; color: var(--ink); font: inherit; font-weight: 700; font-size: 15px; display: inline-flex; align-items: center; gap: 7px; cursor: pointer; }
 .lp-example-chips button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
 .lp-example-stage { perspective: 1200px; touch-action: pan-y; padding: 10px 0; }
-.lp-example-card { transform: rotateX(6deg) rotateY(-8deg); transform-style: preserve-3d; animation: lp-card-in .45s cubic-bezier(.2, .8, .3, 1) both; max-width: 520px; }
-@keyframes lp-card-in { from { opacity: 0; transform: rotateX(6deg) rotateY(-24deg) translateX(-30px); } to { opacity: 1; transform: rotateX(6deg) rotateY(-8deg); } }
+.lp-example-card { transform: rotateX(6deg) rotateY(var(--card-rot)); transform-style: preserve-3d; animation: lp-card-in .45s cubic-bezier(.2, .8, .3, 1) both; max-width: 520px; }
+@keyframes lp-card-in { from { opacity: 0; transform: rotateX(6deg) rotateY(calc(var(--card-rot) * 3)); } to { opacity: 1; transform: rotateX(6deg) rotateY(var(--card-rot)); } }
 .lp-example-card .lp-card { box-shadow: -18px 30px 50px rgba(23, 19, 41, 0.22), -4px 8px 16px rgba(23, 19, 41, 0.12); }
 .lp-example-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; max-width: 520px; }
 .lp-example-pos { font-weight: 700; font-size: 15px; color: var(--muted); }
 
 /* ---- Dashboard mock ---- */
-.lp-dash { background: #fff; color: var(--ink); border-radius: 26px; padding: clamp(16px, 3vw, 24px); box-shadow: 0 40px 80px rgba(0, 0, 0, 0.35); transform: perspective(1400px) rotateY(-6deg) rotateX(3deg); }
+.lp-dash { background: #fff; color: var(--ink); border-radius: 26px; padding: clamp(16px, 3vw, 24px); box-shadow: 0 40px 80px rgba(0, 0, 0, 0.35); transform: perspective(1400px) rotateY(var(--dash-rot)) rotateX(3deg); }
 .lp-dash > div { display: flex; flex-direction: column; gap: 14px; }
 .lp-dash-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
 .lp-dash-name { display: inline-flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 700; font-size: 18px; }
@@ -358,7 +361,7 @@
   .lp-hero-ctas .lp-btn { flex: 1 1 100%; }
   /* Lighter scene on phones: one card behind the phone, no floating, softer shadows */
   .lp-scene { height: 470px; perspective: 1100px; }
-  .lp-stage { width: 250px; height: 470px; transform: rotateX(3deg) rotateY(10deg); }
+  .lp-stage { width: 250px; height: 470px; transform: rotateX(3deg) rotateY(calc(var(--rot) * 0.6)); }
   .lp-phone { border-radius: 40px; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.14), -14px 24px 36px rgba(23, 19, 41, 0.25); }
   .lp-phone-screen { border-radius: 31px; padding: 46px 11px 12px; gap: 10px; }
   .lp-phone-qr { padding: 8px; }
@@ -383,7 +386,7 @@
 /* ---- Reduced motion: no floating, tilt, or stamp animation ---- */
 @media (prefers-reduced-motion: reduce) {
   .lp *, .lp *::before, .lp *::after { animation: none !important; transition: none !important; }
-  .lp-stage { transform: rotateX(3deg) rotateY(12deg) !important; }
+  .lp-stage { transform: rotateX(3deg) rotateY(calc(var(--rot) * 0.75)) !important; }
 }
 
 /* ---- Pilot sign-up form ---- */
