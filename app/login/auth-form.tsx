@@ -5,7 +5,7 @@ import { errorText, useLang } from "../../lib/i18n";
 import { post } from "../../lib/api";
 import { LangSwitch } from "../../components/lang-switch";
 
-export default function AuthForm({ needsCode }: { needsCode: boolean }) {
+export default function AuthForm({ needsCode, next = "/" }: { needsCode: boolean; next?: string }) {
   const { lang, setLang, t, dir } = useLang();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [busy, setBusy] = useState(false);
@@ -25,7 +25,7 @@ export default function AuthForm({ needsCode }: { needsCode: boolean }) {
       signupCode: form.get("signupCode") || undefined,
     });
     if (result.ok) {
-      window.location.href = "/";
+      window.location.href = next;
       return;
     }
     setError(errorText(lang, result.code));
