@@ -2,7 +2,7 @@ import {
   Beer, Cake, Coffee, Croissant, CupSoda, Gift, GlassWater, Hamburger, Heart, IceCreamCone, Martini,
   Pizza, Sandwich, Scissors, ShoppingBag, Sparkles, Star, Utensils,
 } from "lucide-react";
-import { assetUrl, onColor, textsFor, type Design, type PresetIcon } from "../lib/design";
+import { FONTS, assetUrl, fontHref, onColor, textsFor, type Design, type PresetIcon } from "../lib/design";
 import type { Lang } from "../lib/i18n-types";
 
 export const ICONS: Record<PresetIcon, any> = {
@@ -77,6 +77,33 @@ export function cardStyle(design: Design): React.CSSProperties {
   } as React.CSSProperties;
 }
 
+const TEXT_SCALE = { s: 0.9, m: 1, l: 1.14 } as const;
+const STAMP_SIZE = { s: "44px", m: "56px", l: "68px" } as const;
+const GRADIENT_ANGLE = { down: "180deg", diag: "150deg", side: "90deg" } as const;
+
+/** Extra variables for the wallet-style card: gradient, photo overlay, font and sizes. */
+function lookStyle(design: Design): React.CSSProperties {
+  const look = design.look;
+  const fill = look.dir === "radial"
+    ? `radial-gradient(120% 120% at 50% 0%, ${design.colors.bg} 0%, ${look.bg2} 100%)`
+    : `linear-gradient(${GRADIENT_ANGLE[look.dir]}, ${design.colors.bg} 0%, ${look.bg2} 100%)`;
+  return {
+    ...cardStyle(design),
+    "--c-bg2": look.bg2,
+    "--c-fill": fill,
+    "--c-ov": `${look.overlay}%`,
+    "--c-font": FONTS[look.font]?.family ?? FONTS.system.family,
+    "--c-ts": TEXT_SCALE[look.text],
+    "--c-ss": STAMP_SIZE[look.stamps],
+  } as React.CSSProperties;
+}
+
+/** Loads the card font once. Browsers accept a stylesheet link anywhere in the page. */
+function FontLink({ design }: { design: Design }) {
+  const href = fontHref(design.look.font);
+  return href ? <link rel="stylesheet" href={href} /> : null;
+}
+
 /** One stamp slot. Empty slots show the same mark, dimmed. */
 function PassStamp({ design, filled }: { design: Design; filled: boolean }) {
   const kind = design.stamp.icon === "image" && design.stamp.image ? "photo" : "mark";
@@ -100,7 +127,8 @@ export function LoyaltyCard({ design, lang, stamps, target, customerName, reward
   const columns = total <= 6 ? total : Math.ceil(total / 2);
   const showName = design.showCustomerName && !!customerName;
   return (
-    <div className={`pcard layout-${design.layout}${ready ? " is-ready" : ""}`} style={cardStyle(design)}>
+    <div className={`pcard layout-${design.layout} stamps-${design.look.stamps}${ready ? " is-ready" : ""}`} style={lookStyle(design)}>
+      <FontLink design={design} />
       <div className="pcard-head">
         <div className="pcard-brand">
           {design.logo ? (

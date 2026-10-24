@@ -1,8 +1,9 @@
 "use client";
 import { useMemo, useState } from "react";
-import { ImagePlus, Trash2, UploadCloud } from "lucide-react";
+import { ImagePlus, Shuffle, Trash2, UploadCloud } from "lucide-react";
 import {
-  IMAGE_MIN, LIMITS, PALETTES, STAMP_ICONS, designChecks, type AssetMeta, type Design, type Layout, type StampIcon, type Texts,
+  FONTS, GRADIENTS, GRADIENT_DIRS, IMAGE_MIN, LIMITS, PALETTES, STAMP_ICONS, darken, designChecks,
+  type AssetMeta, type CardLook, type Design, type FontId, type Layout, type Size, type StampIcon, type Texts,
 } from "../lib/design";
 import type { Lang } from "../lib/i18n-types";
 import { LANGS, errorText } from "../lib/i18n";
@@ -14,6 +15,13 @@ type Editor = { draft: Design; publishedVersion: number; publishedAt: string | n
 type T = (key: string, vars?: Record<string, string | number>) => string;
 
 const MAX_SIDE = { logo: 800, hero: 1200, stamp: 400 } as const;
+const SIZES: Size[] = ["s", "m", "l"];
+/** All selectable Google Fonts in one request, so the font buttons preview in their own face. */
+const ALL_FONTS_HREF =
+  "https://fonts.googleapis.com/css2?" +
+  Object.values(FONTS).flatMap((f) => (f.google ? [`family=${f.google}`] : [])).join("&") +
+  "&display=swap";
+const pick = <T,>(list: readonly T[]): T => list[Math.floor(Math.random() * list.length)];
 
 /** Shrinks an image in the browser before upload (keeps transparency). */
 async function shrink(file: File, maxSide: number): Promise<Blob> {
@@ -54,6 +62,18 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
   const blocked = checks.some((c) => c.level === "bad");
 
   const set = (patch: Partial<Design>) => setDesign((d) => ({ ...d, ...patch }));
+  const setLook = (patch: Partial<CardLook>) => setDesign((d) => ({ ...d, look: { ...d.look, ...patch } }));
+
+  /** Random gradient, direction and font. Logo, images, texts and stamps stay as they are. */
+  function surprise() {
+    const g = GRADIENTS[pick(Object.keys(GRADIENTS))];
+    setDesign((d) => ({
+      ...d,
+      layout: d.layout === "photo" && d.hero ? "photo" : "gradient",
+      colors: { bg: g.bg, fg: g.fg, stamp: g.stamp },
+      look: { ...d.look, bg2: g.bg2, dir: pick(GRADIENT_DIRS), font: pick(Object.keys(FONTS) as FontId[]) },
+    }));
+  }
   const setText = (k: keyof Texts, v: string) =>
     setDesign((d) => ({ ...d, texts: { ...d.texts, [textLang]: { ...d.texts[textLang], [k]: v.slice(0, LIMITS[k]) } } }));
 
@@ -175,7 +195,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
             {Object.entries(PALETTES).map(([k, p]) => (
               <button key={k} type="button" className="palette" title={k} aria-label={k}
                 aria-pressed={design.colors.bg === p.bg && design.colors.fg === p.fg && design.colors.stamp === p.stamp}
-                style={{ background: p.bg }} onClick={() => set({ colors: { ...p } })}>
+                style={{ background: p.bg }} onClick={() => set({ colors: { ...p }, look: { ...design.look, bg2: darken(p.bg) } })}>
                 <i style={{ background: p.fg }} /><i style={{ background: p.stamp }} />
               </button>
             ))}
@@ -189,6 +209,68 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
                 </span>
               </label>
             ))}
+          </div>
+
+          {design.layout === "gradient" && (
+            <>
+              <h3 className="sub-head">{t("edGradients")}</h3>
+              <div className="palettes">
+                {Object.entries(GRADIENTS).map(([k, g]) => (
+                  <button key={k} type="button" className="palette" title={k} aria-label={k}
+                    aria-pressed={design.colors.bg === g.bg && design.look.bg2 === g.bg2}
+                    style={{ background: `linear-gradient(150deg, ${g.bg}, ${g.bg2})` }}
+                    onClick={() => set({ colors: { bg: g.bg, fg: g.fg, stamp: g.stamp }, look: { ...design.look, bg2: g.bg2 } })}>
+                    <i style={{ background: g.fg }} /><i style={{ background: g.stamp }} />
+                  </button>
+                ))}
+              </div>
+              <div className="color-row">
+                <label>{t("edBg2")}
+                  <span className="color-box">
+                    <input type="color" value={design.look.bg2.toLowerCase()} onChange={(e) => setLook({ bg2: e.target.value.toUpperCase() })} />
+                    <code dir="ltr">{design.look.bg2}</code>
+                  </span>
+                </label>
+              </div>
+              <h3 className="sub-head">{t("edGradDir")}</h3>
+              <div className="seg">
+                {GRADIENT_DIRS.map((d) => (
+                  <button key={d} type="button" aria-pressed={design.look.dir === d} onClick={() => setLook({ dir: d })}>{t("dir_" + d)}</button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {design.layout === "photo" && (
+            <label className="demo-row">
+              <span>{t("edOverlay")} <Num>{design.look.overlay}%</Num></span>
+              <input type="range" min={0} max={90} step={5} value={design.look.overlay} onChange={(e) => setLook({ overlay: Number(e.target.value) })} />
+            </label>
+          )}
+        </section>
+
+        <section className="panel">
+          <link rel="stylesheet" href={ALL_FONTS_HREF} />
+          <div className="section-head" style={{ marginBottom: 12 }}>
+            <h2>{t("edType")}</h2>
+            <button type="button" className="btn soft small" onClick={surprise}><Shuffle size={14} />{t("edSurprise")}</button>
+          </div>
+          <div className="icon-grid font-grid">
+            {(Object.keys(FONTS) as FontId[]).map((k) => (
+              <button key={k} type="button" className="icon-choice font-choice" aria-pressed={design.look.font === k}
+                style={{ fontFamily: FONTS[k].family }} onClick={() => setLook({ font: k })}>
+                <b>אבג Abc</b><span>{FONTS[k].label}</span>
+              </button>
+            ))}
+          </div>
+          <p className="form-hint">{t("edFontHint")}</p>
+          <h3 className="sub-head">{t("edTextSize")}</h3>
+          <div className="seg">
+            {SIZES.map((z) => <button key={z} type="button" aria-pressed={design.look.text === z} onClick={() => setLook({ text: z })}>{t("size_" + z)}</button>)}
+          </div>
+          <h3 className="sub-head">{t("edStampSize")}</h3>
+          <div className="seg">
+            {SIZES.map((z) => <button key={z} type="button" aria-pressed={design.look.stamps === z} onClick={() => setLook({ stamps: z })}>{t("size_" + z)}</button>)}
           </div>
         </section>
 

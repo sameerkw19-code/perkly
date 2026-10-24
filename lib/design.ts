@@ -12,6 +12,40 @@ export type StampIcon = PresetIcon | "logo" | "image";
 export type Layout = "gradient" | "solid" | "photo";
 export type Texts = { title: string; subtitle: string; reward: string; gift: string };
 
+/** Fonts a business can pick. All are free Google Fonts; "system" needs no download. */
+export const FONTS = {
+  system: { family: "Arial, 'Helvetica Neue', sans-serif", google: null, label: "Arial" },
+  rubik: { family: "'Rubik', Arial, sans-serif", google: "Rubik:wght@400;500;700", label: "Rubik" },
+  heebo: { family: "'Heebo', Arial, sans-serif", google: "Heebo:wght@400;500;700", label: "Heebo" },
+  assistant: { family: "'Assistant', Arial, sans-serif", google: "Assistant:wght@400;600;800", label: "Assistant" },
+  varela: { family: "'Varela Round', Arial, sans-serif", google: "Varela+Round", label: "Varela Round" },
+  secular: { family: "'Secular One', Arial, sans-serif", google: "Secular+One", label: "Secular One" },
+  frank: { family: "'Frank Ruhl Libre', Georgia, serif", google: "Frank+Ruhl+Libre:wght@400;500;700", label: "Frank Ruhl" },
+  amatic: { family: "'Amatic SC', Arial, sans-serif", google: "Amatic+SC:wght@400;700", label: "Amatic" },
+  cairo: { family: "'Cairo', Arial, sans-serif", google: "Cairo:wght@400;600;700", label: "Cairo" },
+} as const;
+export type FontId = keyof typeof FONTS;
+export const GRADIENT_DIRS = ["down", "diag", "side", "radial"] as const;
+export type GradientDir = (typeof GRADIENT_DIRS)[number];
+export type Size = "s" | "m" | "l";
+
+/** Free-form look settings. Changing them never affects stamps or rewards. */
+export type CardLook = {
+  /** Second gradient color. */
+  bg2: string;
+  dir: GradientDir;
+  /** How strongly the background color covers a photo background, 0–90 (%). */
+  overlay: number;
+  font: FontId;
+  text: Size;
+  stamps: Size;
+};
+
+export function fontHref(font: FontId): string | null {
+  const g = FONTS[font]?.google;
+  return g ? `https://fonts.googleapis.com/css2?family=${g}&display=swap` : null;
+}
+
 export type Design = {
   v: 1;
   layout: Layout;
@@ -21,6 +55,7 @@ export type Design = {
   hero: string | null;
   texts: Record<Lang, Texts>;
   showCustomerName: boolean;
+  look: CardLook;
 };
 
 export const LIMITS = { title: 40, subtitle: 40, reward: 80, gift: 14 };
@@ -38,7 +73,30 @@ export const PALETTES: Record<string, { bg: string; fg: string; stamp: string }>
   paper: { bg: "#FFFFFF", fg: "#1C1A29", stamp: "#7558E8" },
 };
 
+/** Ready-made gradients: background, second color, text, stamp. */
+export const GRADIENTS: Record<string, { bg: string; bg2: string; fg: string; stamp: string }> = {
+  forest: { bg: "#0E8A4F", bg2: "#043F2B", fg: "#FFFFFF", stamp: "#F4BF34" },
+  ocean: { bg: "#1E5BD8", bg2: "#0B1F4D", fg: "#FFFFFF", stamp: "#7FE3FF" },
+  sunset: { bg: "#FF7A59", bg2: "#B3264B", fg: "#FFFFFF", stamp: "#FFE08A" },
+  berry: { bg: "#8E2DE2", bg2: "#3A0CA3", fg: "#FFFFFF", stamp: "#F9C6FF" },
+  coffee: { bg: "#8A5A3C", bg2: "#2B1A12", fg: "#FFF4E8", stamp: "#E8B66B" },
+  gold: { bg: "#2A2A2A", bg2: "#0D0D0D", fg: "#F5E6C4", stamp: "#D4A84B" },
+  mint: { bg: "#D4FC79", bg2: "#96E6A1", fg: "#16351F", stamp: "#1F6B3A" },
+  peach: { bg: "#FFE3D1", bg2: "#FFB6A3", fg: "#4A1E12", stamp: "#C2410C" },
+};
+
 const HEX = /^#[0-9a-fA-F]{6}$/;
+
+/** Mixes a color toward black (amount 0..1). Used for a default second gradient color. */
+export function darken(hex: string, amount = 0.35): string {
+  const h = hex.replace("#", "");
+  const c = [0, 2, 4].map((i) => Math.round(parseInt(h.slice(i, i + 2), 16) * (1 - amount)));
+  return "#" + c.map((v) => v.toString(16).padStart(2, "0")).join("").toUpperCase();
+}
+
+export function defaultLook(bg: string): CardLook {
+  return { bg2: darken(HEX.test(bg) ? bg : "#1E1B2E"), dir: "diag", overlay: 55, font: "system", text: "m", stamps: "m" };
+}
 const ASSET_ID = /^[0-9a-f-]{36}$/;
 
 export function defaultDesign(b: { name: string; reward: string; color: string }): Design {
@@ -54,6 +112,7 @@ export function defaultDesign(b: { name: string; reward: string; color: string }
     hero: null,
     texts: { he: t("he"), ar: t("ar"), en: t("en") },
     showCustomerName: true,
+    look: defaultLook(HEX.test(b.color) ? b.color : "#1E1B2E"),
   };
 }
 
@@ -89,6 +148,24 @@ export function sanitizeDesign(input: unknown): Design | null {
     hero: asset(d.hero),
     texts,
     showCustomerName: d.showCustomerName !== false,
+    look: sanitizeLook(d.look, colors.bg.toUpperCase()),
+  };
+}
+
+/** Older designs have no look: fill defaults. Unknown values fall back, never fail. */
+function sanitizeLook(input: unknown, bg: string): CardLook {
+  const base = defaultLook(bg);
+  if (!input || typeof input !== "object") return base;
+  const l = input as any;
+  const size = (v: unknown, fb: Size): Size => (v === "s" || v === "m" || v === "l" ? v : fb);
+  const overlay = Number(l.overlay);
+  return {
+    bg2: typeof l.bg2 === "string" && HEX.test(l.bg2) ? l.bg2.toUpperCase() : base.bg2,
+    dir: (GRADIENT_DIRS as readonly string[]).includes(l.dir) ? l.dir : base.dir,
+    overlay: Number.isFinite(overlay) ? Math.max(0, Math.min(90, Math.round(overlay / 5) * 5)) : base.overlay,
+    font: typeof l.font === "string" && Object.prototype.hasOwnProperty.call(FONTS, l.font) ? (l.font as FontId) : base.font,
+    text: size(l.text, base.text),
+    stamps: size(l.stamps, base.stamps),
   };
 }
 
@@ -123,9 +200,11 @@ export type AssetMeta = { id: string; width: number; height: number };
 /** Checks shown in the editor. The server refuses to publish while any check is "bad". */
 export function designChecks(d: Design, assets: AssetMeta[]): Check[] {
   const out: Check[] = [];
-  const text = contrast(d.colors.fg, d.colors.bg);
+  // With a gradient the text sits on both colors, so the weaker one counts.
+  const backs = d.layout === "gradient" ? [d.colors.bg, d.look.bg2] : [d.colors.bg];
+  const text = Math.min(...backs.map((b) => contrast(d.colors.fg, b)));
   out.push({ level: text >= 4.5 ? "ok" : text >= 3 ? "warn" : "bad", key: text >= 4.5 ? "chkTextOk" : text >= 3 ? "chkTextWarn" : "chkTextBad", vars: { r: text.toFixed(1) } });
-  const stamp = contrast(d.colors.stamp, d.colors.bg);
+  const stamp = Math.min(...backs.map((b) => contrast(d.colors.stamp, b)));
   out.push({ level: stamp >= 3 ? "ok" : stamp >= 1.6 ? "warn" : "bad", key: stamp >= 3 ? "chkStampOk" : "chkStampWarn", vars: { r: stamp.toFixed(1) } });
 
   const meta = (id: string | null) => (id ? assets.find((a) => a.id === id) : undefined);
