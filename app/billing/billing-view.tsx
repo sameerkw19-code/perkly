@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export type BillingBusiness = { id: string; name: string; status: string; periodEnd: string | null };
 
@@ -19,6 +19,24 @@ const PRICE_TEXT = "99 ₪ לחודש, בלי דמי הקמה";
 export default function BillingView({ businesses, configured }: { businesses: BillingBusiness[]; configured: boolean }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [returned, setReturned] = useState(false);
+  const [waiting, setWaiting] = useState(false);
+
+  // Returning from Polar with ?ok=1: the webhook may land a few seconds later, so retry the page a few times.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("ok") !== "1") return;
+    setReturned(true);
+    const active = businesses.some((b) => ["active", "trialing"].includes(b.status));
+    if (active) return;
+    const attempt = Number(sessionStorage.getItem("billing-attempts") ?? "0");
+    if (attempt >= 5) return;
+    setWaiting(true);
+    sessionStorage.setItem("billing-attempts", String(attempt + 1));
+    const timer = setTimeout(() => window.location.reload(), 3000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function subscribe(businessId: string) {
     setError("");
@@ -45,7 +63,8 @@ export default function BillingView({ businesses, configured }: { businesses: Bi
     <main className="card" style={{ maxWidth: 560, margin: "32px auto", padding: 24 }}>
       <h1 style={{ fontSize: 22, marginBottom: 8 }}>מנוי ותשלום</h1>
       <p style={{ marginBottom: 16 }}>{PRICE_TEXT}</p>
-      {!configured && <p style={{ marginBottom: 16 }}>התשלום עדיין בהכנה.</p>}
+      {returned && <p role="status" style={{ marginBottom: 16 }}>{waiting ? "התשלום התקבל. מעדכנים את סטטוס המנוי..." : "התשלום התקבל. אם הסטטוס עדיין לא עודכן, רענן את העמוד או פנה לתמיכה."}</p>}
+      {!configured && <p style={{ marginBottom: 16 }}>התשלומים עדיין לא מופעלים. נסה שוב מאוחר יותר, או פנה אלינו ב-support@perkly.shop.</p>}
       {businesses.length === 0 && <p>אין לך עסקים שאתה בעלים שלהם.</p>}
       {businesses.map((b) => {
         const canSubscribe = configured && !["active", "trialing"].includes(b.status);
@@ -56,7 +75,7 @@ export default function BillingView({ businesses, configured }: { businesses: Bi
             {b.periodEnd && <div style={{ fontSize: 14, marginBottom: 6 }}>החיוב הבא: {new Date(b.periodEnd).toLocaleDateString("he-IL")}</div>}
             {canSubscribe && (
               <button className="btn soft" disabled={busy === b.id} onClick={() => subscribe(b.id)}>
-                {busy === b.id ? "פותח דף תשלום..." : "הירשם"}
+                {busy === b.id ? "פותח דף תשלום..." : "הפעל מנוי"}
               </button>
             )}
           </section>
