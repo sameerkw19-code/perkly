@@ -1,5 +1,6 @@
+import { env } from "cloudflare:workers";
 import { getD1 } from "../../../db";
-import { getMembership, getMemberships, getUser } from "../../../lib/server/auth";
+import { getMembership, getMemberships, getUser, isPlatformAdmin } from "../../../lib/server/auth";
 import { randomCode, randomToken, sha256 } from "../../../lib/server/crypto";
 import { fail, json, readJson, sameOrigin, str } from "../../../lib/server/http";
 import { allow } from "../../../lib/server/rate-limit";
@@ -60,13 +61,15 @@ export async function GET(request: Request) {
   const memberships = await getMemberships(db, user.id);
   const wanted = url.searchParams.get("business");
   const membership = memberships.find((m) => m.business === wanted) ?? memberships[0];
-  const me = { name: user.name, email: user.email };
+  const me = { name: user.name, email: user.email, platformAdmin: isPlatformAdmin(user, env.PLATFORM_ADMIN_EMAILS) };
   if (!membership) return json({ me, memberships, business: null, role: null });
 
   const business = await loadBusiness(db, membership.business);
   const role = membership.role;
   const branches = await activeBranches(db, business!.id);
-  const base = { me, memberships, role, business, branches, myBranch: membership.branch, design: await liveDesign(db, business!) };
+  // Whether stamping and new customers are allowed now (subscription, admin suspension or free access).
+  const access = await businessAccess(db, business!.id);
+  const base = { me, memberships, role, business, branches, myBranch: membership.branch, design: await liveDesign(db, business!), access };
 
   if (role === "staff") {
     const mine = await db

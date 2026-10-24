@@ -85,7 +85,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
         )}
 
         <section className="stats admin-stats">
-          <div className="stat"><span className="stat-label">לקוחות</span><strong>{c.customers}</strong><small>{c.customers30} חדשים ב־30 יום · {c.selfJoined} הצטרפו לבד</small></div>
+          <div className="stat"><span className="stat-label">לקוחות פעילים</span><strong>{c.customers}</strong><small>{c.customers30} הצטרפו ב־30 יום (כולל שהוסרו) · {c.selfJoined} הצטרפו לבד</small></div>
           <div className="stat"><span className="stat-label">חותמות ב־30 יום</span><strong>{c.stamps30}</strong><small>{c.redeems30} הטבות מומשו</small></div>
           <div className="stat"><span className="stat-label">צוות</span><strong>{team.results.filter((m) => !m.revoked).length}</strong><small>חברים פעילים</small></div>
           <div className="stat"><span className="stat-label">עיצוב</span><strong>{c.published ? `v${c.published}` : "—"}</strong><small>{c.published ? "גרסה מפורסמת" : "עיצוב ברירת מחדל"}</small></div>

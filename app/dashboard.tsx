@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Activity, AlertTriangle, Check, Copy, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode,
+  Activity, AlertTriangle, Check, Copy, CreditCard, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode, Shield,
   Palette, RefreshCw, ScanLine, Search, Settings, Share2, Store, Users, Wallet, X,
 } from "lucide-react";
 import type { Design } from "../lib/design";
@@ -17,7 +17,8 @@ type Role = "owner" | "staff";
 type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number };
 type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; rewards?: number; nextExpiry?: string | null; phone?: string };
 type Data = {
-  me: { name: string; email: string };
+  me: { name: string; email: string; platformAdmin?: boolean };
+  access?: { ok: true } | { ok: false; code: "business_suspended" | "subscription_required" };
   memberships: { business: string; role: Role; businessName: string; branch: string | null }[];
   branches?: { id: string; name: string }[];
   myBranch?: string | null;
@@ -200,6 +201,8 @@ export default function Dashboard() {
         </nav>
         <div className="side-bottom">
           <div className="profile"><span>{data.me.name.charAt(0)}</span><div><strong>{data.me.name}</strong><small dir="ltr">{data.me.email}</small></div></div>
+          {isOwner && <a className="text-btn" href="/billing"><CreditCard size={15} />{t("billingLink")}</a>}
+          {data.me.platformAdmin && <a className="text-btn" href="/admin"><Shield size={15} />{t("adminLink")}</a>}
           <button className="text-btn" onClick={signOut}><LogOut size={15} />{t("signOut")}</button>
         </div>
       </aside>
@@ -214,10 +217,19 @@ export default function Dashboard() {
               </select>
             )}
             <LangSwitch lang={lang} setLang={setLang} />
+            {isOwner && <a className="icon-btn mobile-only" href="/billing" aria-label={t("billingLink")} title={t("billingLink")}><CreditCard size={16} /></a>}
+            {data.me.platformAdmin && <a className="icon-btn mobile-only" href="/admin" aria-label={t("adminLink")} title={t("adminLink")}><Shield size={16} /></a>}
             <button className="icon-btn mobile-only" aria-label={t("signOut")} title={t("signOut")} onClick={signOut}><LogOut size={16} /></button>
           </div>
         </header>
         {!online && <div className="offline-bar" role="alert">{t("offline")}</div>}
+        {data.access && !data.access.ok && (
+          <div className="access-bar" role="alert">
+            <AlertTriangle size={16} />
+            <span>{t(data.access.code === "business_suspended" ? "accessSuspended" : "accessNoSub")}</span>
+            {isOwner && data.access.code === "subscription_required" && <a className="btn primary small" href="/billing">{t("billingLink")}</a>}
+          </div>
+        )}
 
         <main>
           {view === "overview" && isOwner && (
