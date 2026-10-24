@@ -1,4 +1,7 @@
 // Small pieces of the landing page that hold business details.
+import { PERKLY_SOCIAL, PERKLY_WHATSAPP_TEXT } from "../../lib/perkly-social";
+import { socialLinks } from "../../lib/social";
+import { SocialIcon } from "../../lib/social-icon";
 
 /** WhatsApp for visitors who need a sign-up code. */
 const WHATSAPP_INTL = "972526028291";
@@ -47,5 +50,21 @@ export function Testimonials() {
         ))}
       </div>
     </section>
+  );
+}
+
+/** Perkly's social accounts as round icon links (footer). Hidden accounts are skipped. */
+export function SocialRow() {
+  const links = socialLinks(PERKLY_SOCIAL, PERKLY_WHATSAPP_TEXT);
+  if (links.length === 0) return null;
+  return (
+    <nav aria-label="Perkly ברשתות" style={{ display: "flex", flexDirection: "row", flexWrap: "wrap", gap: 10, alignItems: "center", height: "auto" }}>
+      {links.map((l) => (
+        <a key={l.key} href={l.url} target="_blank" rel="noopener noreferrer" aria-label={l.label} title={l.label}
+          style={{ width: 44, height: 44, borderRadius: "50%", background: "#FFFFFF", border: "1px solid #E8E3F7", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#17132B" }}>
+          <SocialIcon name={l.key} size={20} />
+        </a>
+      ))}
+    </nav>
   );
 }

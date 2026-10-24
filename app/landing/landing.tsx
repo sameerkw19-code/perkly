@@ -1,6 +1,6 @@
 // Generated from the landing-page design (Perkly canvas). Edit freely.
 import { AutoVideo, DemoPhone } from "./landing-client";
-import { Testimonials, WhatsAppLine } from "./landing-parts";
+import { SocialRow, Testimonials, WhatsAppLine } from "./landing-parts";
 
 export default function Landing() {
   return (
@@ -413,7 +413,8 @@ export default function Landing() {
 <footer style={{ borderTop: "1px solid #E8E3F7", display: "block", margin: 0, fontSize: "inherit", color: "inherit" }}>
 <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "28px clamp(16px, 4vw, 32px)", display: "flex", flexWrap: "wrap", gap: "14px", alignItems: "center", justifyContent: "space-between", fontSize: "14px", color: "#5E5873" }}>
 <span style={{ display: "flex", alignItems: "center", gap: "10px" }}><span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "18px", color: "#17132B" }}>Perkly</span>כרטיס קטן. קשר גדול.</span>
-<span style={{ display: "flex", gap: "18px", flexWrap: "wrap" }}><a href="#top">perkly.shop</a><span>© 2026 Perkly</span></span>
+<SocialRow />
+<span style={{ display: "flex", gap: "18px", flexWrap: "wrap", alignItems: "center" }}><a href="/links">כל הקישורים</a><a href="#top">perkly.shop</a><span>© 2026 Perkly</span></span>
 </div>
 </footer>
 

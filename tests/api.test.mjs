@@ -236,6 +236,27 @@ test("new card link replaces the old one", async () => {
   assert.match(newPage.text, /Dana/);
 });
 
+test("social links: owner saves them, they show on the customer card, bad ones are rejected", async () => {
+  const base = { name: "Corner Cafe", reward: "Free coffee", target: 5, color: "#7558E8" };
+  const bad = await ownerA.act(bizA, "update_business", { ...base, social: { instagram: "https://evil.example/x" } });
+  assert.equal(bad.status, 400);
+  assert.equal(bad.body.code, "bad_social");
+  const ok = await ownerA.act(bizA, "update_business", { ...base, social: { instagram: "@corner.cafe", whatsapp: "050-111-2233", website: "" } });
+  assert.equal(ok.status, 200);
+  const biz = (await ownerA.get(`/api/loyalty?business=${bizA}`)).body.business;
+  assert.deepEqual(biz.social, { instagram: "corner.cafe", whatsapp: "+972501112233" });
+  // Saving other settings without `social` keeps the links.
+  await ownerA.act(bizA, "update_business", base);
+  assert.deepEqual((await ownerA.get(`/api/loyalty?business=${bizA}`)).body.business.social, { instagram: "corner.cafe", whatsapp: "+972501112233" });
+  const r = await ownerA.act(bizA, "new_card_link", { customer: dana });
+  const page = await new Client().get(new URL(r.body.cardUrl).pathname);
+  assert.match(page.text, /instagram\.com\/corner\.cafe/);
+  assert.match(page.text, /wa\.me\/972501112233/);
+  // Clearing every field removes them.
+  await ownerA.act(bizA, "update_business", { ...base, social: {} });
+  assert.deepEqual((await ownerA.get(`/api/loyalty?business=${bizA}`)).body.business.social, {});
+});
+
 test("login: wrong password rejected, then rate limited", async () => {
   const c = new Client();
   const email = `ownerA-${run}@test.perkly`;
