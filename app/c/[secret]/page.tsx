@@ -1,6 +1,7 @@
 import { getD1 } from "../../../db";
 import { sha256 } from "../../../lib/server/crypto";
 import { liveDesign } from "../../../lib/server/designs";
+import { walletConfig } from "../../../lib/server/google-wallet";
 import CardView from "./card-view";
 
 export const dynamic = "force-dynamic";
@@ -32,8 +33,18 @@ export default async function CardPage({ params }: { params: Promise<{ secret: s
           .bind(await sha256(secret), new Date().toISOString())
           .first<{ name: string; stamps: number; target: number; scan_code: string; business_id: string; business: string; reward: string; color: string; reward_mode: string; saved: number; next_expiry: string | null }>()
       : null;
-  if (!row) return <CardView card={null} />;
+  if (!row) return <CardView card={null} secret={secret} googleWallet={false} />;
   const design = await liveDesign(db, { id: row.business_id, name: row.business, reward: row.reward, color: row.color });
   const rewards = row.saved + (row.reward_mode === "block" && row.stamps >= row.target ? 1 : 0);
-  return <CardView card={{ name: row.name, stamps: row.stamps, target: row.target, scan_code: row.scan_code, design, rewards, nextExpiry: row.next_expiry }} />;
+  const googleWallet = walletConfig({
+    GOOGLE_WALLET_SA_KEY: process.env.GOOGLE_WALLET_SA_KEY,
+    GOOGLE_WALLET_ISSUER_ID: process.env.GOOGLE_WALLET_ISSUER_ID,
+  }) !== null;
+  return (
+    <CardView
+      card={{ name: row.name, stamps: row.stamps, target: row.target, scan_code: row.scan_code, design, rewards, nextExpiry: row.next_expiry }}
+      secret={secret}
+      googleWallet={googleWallet}
+    />
+  );
 }

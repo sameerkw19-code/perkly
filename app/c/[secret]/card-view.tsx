@@ -9,7 +9,7 @@ import type { Design } from "../../../lib/design";
 
 type Card = { name: string; stamps: number; target: number; scan_code: string; design: Design; rewards: number; nextExpiry: string | null };
 
-export default function CardView({ card }: { card: Card | null }) {
+export default function CardView({ card, secret, googleWallet }: { card: Card | null; secret: string; googleWallet: boolean }) {
   const { lang, setLang, t, dir } = useLang();
   return (
     <div className="card-page" dir={dir}>
@@ -35,7 +35,13 @@ export default function CardView({ card }: { card: Card | null }) {
             <small className="form-hint">{t("qrNote")}</small>
           </div>
           <button className="btn soft wide" onClick={() => window.location.reload()}><RefreshCw size={16} />{t("refresh")}</button>
-          <p className="wallet-note"><Wallet size={15} />{t("walletHint")}</p>
+          {googleWallet ? (
+            <a className="btn primary wide" href={`/api/wallet/google/${encodeURIComponent(secret)}`} target="_blank" rel="noreferrer">
+              <Wallet size={16} />{t("walletAddGoogle")}
+            </a>
+          ) : (
+            <p className="wallet-note"><Wallet size={15} />{t("walletHint")}</p>
+          )}
           <p className="form-hint center">{t("saveLinkHint")}</p>
         </div>
       )}
