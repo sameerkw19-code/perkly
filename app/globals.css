@@ -201,3 +201,16 @@ select.needs-choice{border-color:#f0a050;box-shadow:0 0 0 3px #f0a05022}
 .mode-set legend{font-size:13px;font-weight:bold;padding:0 6px}
 .stack-form select{width:100%}
 .ready-expiry{display:block;font-weight:normal;font-size:12px;margin-top:4px}
+
+/* ---- Social links: card page and business settings ---- */
+.social-panel{display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;padding:18px}
+.social-panel p{margin:0;font-size:13px;color:var(--muted)}
+.social-panel p strong{color:var(--ink)}
+.social-row{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.social-row a{width:44px;height:44px;border-radius:50%;background:#f6f4fb;border:1px solid var(--line);display:grid;place-items:center;transition:transform .15s,background .15s}
+.social-row a:hover{transform:translateY(-2px);background:#efebfa}
+.social-set{gap:12px}
+.social-field{display:grid;gap:6px;font-size:12px}
+.social-field-name{display:flex;align-items:center;gap:7px;font-weight:bold}
+.social-field input{width:100%;text-align:left}
+@media(prefers-reduced-motion:reduce){.social-row a{transition:none}.social-row a:hover{transform:none}}

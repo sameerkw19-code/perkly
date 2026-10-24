@@ -335,6 +335,9 @@
 .lp .lp-footer-links a, .lp .lp-footer-brand a { color: var(--ink); min-height: 32px; display: inline-flex; align-items: center; }
 .lp .lp-footer-links a:hover { color: var(--p-strong); }
 .lp-footer-rights { font-size: 14px; }
+.lp .lp-social { display: flex; flex-direction: row; flex-wrap: wrap; gap: 10px; height: auto; margin-top: 4px; }
+.lp .lp-social a { width: 44px; height: 44px; border-radius: 50%; background: #fff; border: 1px solid var(--line); display: inline-flex; align-items: center; justify-content: center; color: var(--ink); }
+.lp .lp-social a:hover { border-color: var(--p); color: var(--p-strong); }
 
 /* ---- Responsive ---- */
 @media (max-width: 1020px) {

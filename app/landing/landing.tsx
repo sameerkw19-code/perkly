@@ -2,7 +2,7 @@
 import "./landing.css";
 import { COPY, hrefs, waLink, WHATSAPP_DISPLAY, type Lang } from "./content";
 import { DemoPanel, ExamplesPicker, Logo, SiteNav, TiltStage } from "./landing-client";
-import { Testimonials } from "./landing-parts";
+import { SocialRow, Testimonials } from "./landing-parts";
 import { CafeLogo, CardVisual, Icon, QrArt } from "./visuals";
 
 const STEP_ICONS = ["palette", "qr", "stamp", "repeat"];
@@ -311,12 +311,14 @@ export default function Landing({ lang }: { lang: Lang }) {
             <Logo label="Perkly" />
             <span>{c.footer.tagline}</span>
             <a href={waLink(c.trust.waText)} target="_blank" rel="noopener noreferrer">{c.footer.support}&nbsp;<bdi className="lp-num">{WHATSAPP_DISPLAY}</bdi></a>
+            <SocialRow lang={lang} />
           </div>
           <nav aria-label={c.footer.nav} className="lp-footer-links">
             <a href={h.terms}>{c.footer.terms}</a>
             <a href={h.privacy}>{c.footer.privacy}</a>
             <a href={h.accessibility}>{c.footer.accessibility}</a>
             <a href={h.login}>{c.footer.login}</a>
+            <a href="/links">{c.footer.links}</a>
           </nav>
           <span className="lp-footer-rights">{c.footer.rights}</span>
         </div>

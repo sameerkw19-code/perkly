@@ -7,10 +7,11 @@ import { formatPhone, maskPhone, normalizePhone } from "../../../lib/phone";
 import { assetIds, defaultDesign, designChecks, sanitizeDesign } from "../../../lib/design";
 import { assetMeta, liveDesign, ownsAssets, publishedDesign } from "../../../lib/server/designs";
 import { releaseArchivedPhone } from "../../../lib/server/customers";
+import { normalizeSocial, parseSocial, type Social } from "../../../lib/social";
 
 export const dynamic = "force-dynamic";
 
-type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust: number; reward_mode: "bank" | "block"; reward_expiry_days: number };
+type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust: number; reward_mode: "bank" | "block"; reward_expiry_days: number; social: Social };
 type Customer = { id: string; business: string; name: string; phone: string; stamps: number; target: number; scan_code: string };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -21,7 +22,11 @@ function validTarget(v: unknown): v is number {
 }
 
 async function loadBusiness(db: D1Database, id: string) {
-  return db.prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days FROM businesses WHERE id = ?").bind(id).first<Business>();
+  const row = await db
+    .prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, social FROM businesses WHERE id = ?")
+    .bind(id)
+    .first<Omit<Business, "social"> & { social: string | null }>();
+  return row ? { ...row, social: parseSocial(row.social) } : null;
 }
 
 /** Saved rewards that can be used now, and the nearest expiry. */
@@ -223,9 +228,17 @@ export async function POST(request: Request) {
       const mode = p.rewardMode === "bank" || p.rewardMode === "block" ? p.rewardMode : business.reward_mode;
       const expiry = p.rewardExpiryDays === undefined ? business.reward_expiry_days : p.rewardExpiryDays;
       if (![0, 30, 60, 90, 180, 365].includes(expiry as number)) return fail("bad_details", 400, "Invalid expiry");
+      // Social links are optional; when sent, the whole set is replaced (an empty field removes that link).
+      let social = business.social;
+      if (p.social !== undefined) {
+        const checked = normalizeSocial(p.social);
+        if (!checked.ok) return fail("bad_social", 400, checked.field);
+        social = checked.value;
+      }
+      const socialJson = Object.keys(social).length ? JSON.stringify(social) : null;
       const statements = [
-        db.prepare("UPDATE businesses SET name = ?, reward = ?, target = ?, color = ?, staff_adjust = ?, reward_mode = ?, reward_expiry_days = ? WHERE id = ?")
-          .bind(name, reward, p.target, p.color, staffAdjust, mode, expiry, business.id),
+        db.prepare("UPDATE businesses SET name = ?, reward = ?, target = ?, color = ?, staff_adjust = ?, reward_mode = ?, reward_expiry_days = ?, social = ? WHERE id = ?")
+          .bind(name, reward, p.target, p.color, staffAdjust, mode, expiry, socialJson, business.id),
       ];
       if (business.reward_mode === "block" && mode === "bank") {
         // Switching to collect mode: cards that are full now become a saved reward and start a new round.

@@ -21,6 +21,8 @@ export const businesses = sqliteTable(
     rewardMode: text("reward_mode").notNull().default("block"),
     // Days a saved reward stays valid (0 = no expiry). Applies to rewards earned after the change.
     rewardExpiryDays: integer("reward_expiry_days").notNull().default(0),
+    // Social links shown on customer cards (JSON). See lib/social.tsx.
+    social: text("social"),
   },
   (t) => [uniqueIndex("businesses_join_code").on(t.joinCode)],
 );

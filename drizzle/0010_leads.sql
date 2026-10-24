@@ -1,4 +1,4 @@
-CREATE TABLE `leads` (
+CREATE TABLE IF NOT EXISTS `leads` (
 	`id` text PRIMARY KEY NOT NULL,
 	`created` text NOT NULL,
 	`business` text NOT NULL,
@@ -14,4 +14,4 @@ CREATE TABLE `leads` (
 	`status` text DEFAULT 'new' NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `leads_created` ON `leads` (`created`);
+CREATE INDEX IF NOT EXISTS `leads_created` ON `leads` (`created`);

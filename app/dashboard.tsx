@@ -1,5 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { SOCIAL_KEYS, SOCIAL_LABEL, normalizeSocial, socialDisplay, type Social } from "../lib/social";
+import { SocialIcon } from "../lib/social-icon";
 import {
   Activity, AlertTriangle, Check, Copy, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode,
   Palette, RefreshCw, ScanLine, Search, Settings, Share2, Store, Users, Wallet, X,
@@ -14,7 +16,7 @@ import { LoyaltyCard, Num } from "../components/loyalty-card";
 import { QrImage } from "../components/qr";
 
 type Role = "owner" | "staff";
-type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number };
+type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; social?: Social };
 type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; rewards?: number; nextExpiry?: string | null; phone?: string };
 type Data = {
   me: { name: string; email: string };
@@ -353,7 +355,7 @@ export default function Dashboard() {
             <div className="settings-grid">
               <section className="panel">
                 <div className="section-head"><h2>{t("settings")}</h2></div>
-                <BusinessForm key={b.id} t={t} busy={busy} initial={b} submitLabel={t("save")} onSubmit={async (values) => {
+                <BusinessForm key={b.id} t={t} busy={busy} initial={b} submitLabel={t("save")} onInvalid={(m) => notify(m, true)} onSubmit={async (values) => {
                   const r = await call({ action: "update_business", ...values });
                   if (r) { notify(t("saved")); load(); }
                 }} />
@@ -513,17 +515,35 @@ function LinkBox({ url, t, notify }: { url: string; t: any; notify: (s: string, 
   );
 }
 
-function BusinessForm({ t, busy, initial, submitLabel, onSubmit }: {
+const SOCIAL_PLACEHOLDER: Record<string, string> = {
+  instagram: "@your.business", tiktok: "@your.business", facebook: "facebook.com/yourbusiness",
+  whatsapp: "050-123-4567", website: "yourbusiness.co.il", waze: "https://waze.com/ul/...",
+};
+
+function BusinessForm({ t, busy, initial, submitLabel, onSubmit, onInvalid }: {
   t: any; busy: boolean; initial?: Business; submitLabel: string;
-  onSubmit: (v: { name: string; reward: string; target: number; color: string; staffAdjust?: boolean; rewardMode?: string; rewardExpiryDays?: number }) => void;
+  onSubmit: (v: { name: string; reward: string; target: number; color: string; staffAdjust?: boolean; rewardMode?: string; rewardExpiryDays?: number; social?: Social }) => void;
+  onInvalid?: (message: string) => void;
 }) {
   return (
     <form className="stack-form" onSubmit={(e) => {
       e.preventDefault();
-      const f = new FormData(e.currentTarget);
+      const form = e.currentTarget;
+      const f = new FormData(form);
+      let social: Social | undefined;
+      if (initial) {
+        // Same check as the server, so the owner sees which field to fix before saving.
+        const checked = normalizeSocial(Object.fromEntries(SOCIAL_KEYS.map((k) => [k, String(f.get("social_" + k) ?? "")])));
+        if (!checked.ok) {
+          (form.elements.namedItem("social_" + checked.field) as HTMLInputElement | null)?.focus();
+          onInvalid?.(t("socialBadField", { field: SOCIAL_LABEL[checked.field] }));
+          return;
+        }
+        social = checked.value;
+      }
       onSubmit({
         name: String(f.get("name")), reward: String(f.get("reward")), target: Number(f.get("target")), color: String(f.get("color")),
-        ...(initial ? { staffAdjust: f.get("staffAdjust") === "on", rewardMode: String(f.get("rewardMode")), rewardExpiryDays: Number(f.get("rewardExpiryDays")) } : {}),
+        ...(initial ? { staffAdjust: f.get("staffAdjust") === "on", rewardMode: String(f.get("rewardMode")), rewardExpiryDays: Number(f.get("rewardExpiryDays")), social } : {}),
       });
     }}>
       <label>{t("businessName")}<input name="name" required maxLength={80} defaultValue={initial?.name} /></label>
@@ -548,6 +568,18 @@ function BusinessForm({ t, busy, initial, submitLabel, onSubmit }: {
             <small className="form-hint">{t("expiryNote")}</small>
           </label>
           <label className="check"><input type="checkbox" name="staffAdjust" defaultChecked={!!initial.staff_adjust} /><span>{t("staffAdjustSetting")}</span></label>
+          <fieldset className="mode-set social-set">
+            <legend>{t("socialTitle")}</legend>
+            <small className="form-hint">{t("socialHint")}</small>
+            {SOCIAL_KEYS.map((k) => (
+              <label key={k} className="social-field">
+                <span className="social-field-name"><SocialIcon name={k} size={16} />{k === "website" ? t("socialWebsite") : SOCIAL_LABEL[k]}</span>
+                <input name={"social_" + k} dir="ltr" maxLength={300} autoComplete="off" spellCheck={false}
+                  inputMode={k === "whatsapp" ? "tel" : "url"} placeholder={SOCIAL_PLACEHOLDER[k]}
+                  defaultValue={initial.social?.[k] ? socialDisplay(k, initial.social[k]!) : ""} />
+              </label>
+            ))}
+          </fieldset>
         </>
       )}
       <button className="btn primary" disabled={busy}>{submitLabel}</button>

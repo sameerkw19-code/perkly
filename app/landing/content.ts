@@ -184,6 +184,7 @@ const he = {
     privacy: "מדיניות פרטיות",
     accessibility: "הצהרת נגישות",
     login: "כניסה לבעלי עסקים",
+    links: "כל הקישורים",
     rights: "© 2026 Perkly",
   },
 };
@@ -360,6 +361,7 @@ const ar: Copy = {
     privacy: "سياسة الخصوصية (بالعبرية)",
     accessibility: "بيان الإتاحة (بالعبرية)",
     login: "دخول أصحاب المشاريع",
+    links: "كل الروابط",
     rights: "© 2026 Perkly",
   },
 };
@@ -534,6 +536,7 @@ const en: Copy = {
     privacy: "Privacy policy (Hebrew)",
     accessibility: "Accessibility statement (Hebrew)",
     login: "Business sign-in",
+    links: "All links",
     rights: "© 2026 Perkly",
   },
 };
