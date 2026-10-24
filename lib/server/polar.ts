@@ -114,3 +114,46 @@ export function subscriptionRow(event: PolarEvent): SubscriptionRow | null {
     currentPeriodEnd: typeof periodEnd === "string" ? periodEnd : null,
   };
 }
+
+export type PolarOrder = {
+  id: string;
+  created: string;
+  amount: number; // in major units (e.g. shekels)
+  currency: string;
+  status: string;
+  reason: string;
+  customerEmail: string | null;
+  business: string | null;
+};
+
+/**
+ * Recent orders (payments) from Polar, newest first, for the admin billing page.
+ * Reads up to `pages` pages of 100. Field names are read defensively, since the API evolves.
+ * Throws "polar_orders_<status>" on an API error (e.g. 401/403 when the token lacks orders:read).
+ */
+export async function listOrders(env: PolarEnv, pages = 3): Promise<PolarOrder[]> {
+  if (!env.POLAR_ACCESS_TOKEN) throw new Error("polar_not_configured");
+  const out: PolarOrder[] = [];
+  for (let page = 1; page <= pages; page++) {
+    const r = await fetch(`${apiBase(env)}/orders/?limit=100&page=${page}&sorting=-created_at`, {
+      headers: { Authorization: `Bearer ${env.POLAR_ACCESS_TOKEN}`, Accept: "application/json" },
+    });
+    if (!r.ok) throw new Error(`polar_orders_${r.status}`);
+    const data = (await r.json()) as { items?: Record<string, any>[]; pagination?: { max_page?: number } };
+    for (const o of data.items ?? []) {
+      const cents = Number(o.total_amount ?? o.amount ?? o.net_amount ?? 0);
+      out.push({
+        id: String(o.id ?? ""),
+        created: String(o.created_at ?? ""),
+        amount: Number.isFinite(cents) ? cents / 100 : 0,
+        currency: String(o.currency ?? "").toUpperCase(),
+        status: String(o.status ?? (o.paid ? "paid" : "")),
+        reason: String(o.billing_reason ?? ""),
+        customerEmail: typeof o.customer?.email === "string" ? o.customer.email : null,
+        business: typeof o.metadata?.business === "string" ? o.metadata.business : typeof o.subscription?.metadata?.business === "string" ? o.subscription.metadata.business : null,
+      });
+    }
+    if (!data.pagination?.max_page || page >= data.pagination.max_page) break;
+  }
+  return out;
+}

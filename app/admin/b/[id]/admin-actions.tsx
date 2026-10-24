@@ -6,7 +6,9 @@ import { useLang } from "../../../../lib/i18n";
 import type { Design } from "../../../../lib/design";
 
 /** Suspend / unsuspend and free-access controls for one business. Reloads the page after each change. */
-export function AdminActions({ business, suspended, compUntil }: { business: string; suspended: boolean; compUntil: string | null }) {
+type Biz = { id: string; name: string; reward: string; target: number; archived: string | null; ownerEmail: string | null };
+
+export function AdminActions({ business, suspended, compUntil, biz }: { business: string; suspended: boolean; compUntil: string | null; biz: Biz }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [reason, setReason] = useState("");
@@ -20,7 +22,14 @@ export function AdminActions({ business, suspended, compUntil }: { business: str
     const r = await post("/api/admin", { action, business, ...extra });
     setBusy(false);
     if (!r.ok) {
-      setError(r.code === "reason_required" ? "צריך לכתוב סיבה להשהיה." : "הפעולה נכשלה. נסה שוב.");
+      setError(
+        r.code === "reason_required" ? "צריך לכתוב סיבה."
+        : r.code === "user_not_found" ? "אין משתמש עם המייל הזה. הוא צריך להירשם קודם."
+        : r.code === "user_blocked" ? "המשתמש הזה חסום."
+        : r.code === "already_owner" ? "הוא כבר הבעלים."
+        : r.code === "bad_details" ? "פרטים לא תקינים (מספר חותמות 2–30)."
+        : "הפעולה נכשלה. נסה שוב.",
+      );
       return;
     }
     window.location.reload();
@@ -58,6 +67,49 @@ export function AdminActions({ business, suspended, compUntil }: { business: str
           <button className="btn primary small" disabled={busy} onClick={() => run("grant_comp", { days })}>{compActive ? "הארכה" : "מתן גישה"}</button>
           {compActive && <button className="btn soft small" disabled={busy} onClick={() => run("clear_comp", {}, "לבטל את הגישה החינמית?")}>ביטול</button>}
         </div>
+      </div>
+      <div className="admin-action">
+        <h3>פרטי העסק</h3>
+        <form className="admin-edit" onSubmit={(e) => {
+          e.preventDefault();
+          const f = new FormData(e.currentTarget);
+          run("update_business", { name: f.get("name"), reward: f.get("reward"), target: Number(f.get("target")) }, "לשמור את השינויים בפרטי העסק?");
+        }}>
+          <label>שם<input name="name" defaultValue={biz.name} maxLength={80} required /></label>
+          <label>הטבה<input name="reward" defaultValue={biz.reward} maxLength={160} required /></label>
+          <label>חותמות להטבה<input name="target" type="number" min={2} max={30} defaultValue={biz.target} required /></label>
+          <button className="btn soft small" disabled={busy}>שמירה</button>
+        </form>
+        <small className="form-hint">מספר חותמות חדש חל על כרטיסים חדשים, ועל קיימים מהסבב הבא.</small>
+      </div>
+
+      <div className="admin-action">
+        <h3>העברת בעלות</h3>
+        <p className="muted">בעלים נוכחי: <span dir="ltr">{biz.ownerEmail ?? "—"}</span>. הבעלים הקודם יישאר בצוות כעובד.</p>
+        <form className="admin-row" onSubmit={(e) => {
+          e.preventDefault();
+          const email = String(new FormData(e.currentTarget).get("email") ?? "").trim();
+          if (email) run("transfer_owner", { email }, `להעביר את הבעלות על העסק ל-${email}?`);
+        }}>
+          <input name="email" type="email" dir="ltr" placeholder="מייל של משתמש קיים" required />
+          <button className="btn soft small" disabled={busy}>העברה</button>
+        </form>
+      </div>
+
+      <div className="admin-action">
+        <h3>ייצוא וארכוב</h3>
+        <div className="admin-row">
+          <a className="btn soft small" href={`/api/admin/export?business=${encodeURIComponent(business)}`}>ייצוא נתונים (JSON)</a>
+          {biz.archived ? (
+            <button className="btn primary small" disabled={busy} onClick={() => run("restore", {}, "לשחזר את העסק? הבעלים והצוות יראו אותו שוב.")}>שחזור מהארכיון</button>
+          ) : (
+            <button className="btn soft small danger" disabled={busy} onClick={() => {
+              const reason = prompt("סיבת הארכוב (נשמרת ביומן):")?.trim();
+              if (reason && confirm("לארכב את העסק? הבעלים והצוות לא יראו אותו, וההצטרפות תיסגר. הנתונים נשמרים ואפשר לשחזר.")) run("archive", { reason });
+            }}>ארכוב עסק</button>
+          )}
+        </div>
+        <small className="form-hint">בייצוא, מספרי הטלפון של הלקוחות מוסתרים חוץ מ-4 הספרות האחרונות. כל ייצוא נרשם ביומן.</small>
       </div>
       {error && <p className="form-error" role="alert">{error}</p>}
     </div>

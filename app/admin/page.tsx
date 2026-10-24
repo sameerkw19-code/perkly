@@ -22,7 +22,7 @@ const WEEKS = 8;
 
 type Row = {
   id: string; name: string; created: string; owner_email: string | null;
-  suspended: string | null; comp_until: string | null; status: string | null;
+  suspended: string | null; comp_until: string | null; archived: string | null; status: string | null;
   customers: number; stamps30: number; published: number | null; last_activity: string | null;
 };
 
@@ -51,7 +51,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   const [list, totals, weeklyBiz, weeklyCust, statusRows] = await Promise.all([
     db.prepare(
-      `SELECT b.id, b.name, b.created, b.suspended, b.comp_until, s.status, u.email AS owner_email,
+      `SELECT b.id, b.name, b.created, b.suspended, b.comp_until, b.archived, s.status, u.email AS owner_email,
          (SELECT COUNT(*) FROM customers c WHERE c.business = b.id AND c.archived IS NULL) AS customers,
          (SELECT COUNT(*) FROM events e WHERE e.business = b.id AND e.kind = 'stamp' AND e.created >= ?1) AS stamps30,
          (SELECT MAX(version) FROM card_designs d WHERE d.business = b.id) AS published,
@@ -182,7 +182,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id}>
-                    <td><a href={`/admin/b/${r.id}`}><strong>{r.name}</strong></a></td>
+                    <td><a href={`/admin/b/${r.id}`}><strong>{r.name}</strong></a>{r.archived && <span className="admin-chip small st-none" style={{ marginInlineStart: 6 }}>בארכיון</span>}</td>
                     <td dir="ltr" className="admin-email">{r.owner_email ?? "—"}</td>
                     <td><span className={"admin-chip small st-" + r.st}>{STATUS_LABEL[r.st]}</span></td>
                     <td>{r.customers}</td>
