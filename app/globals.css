@@ -211,3 +211,10 @@ select.needs-choice{border-color:#f0a050;box-shadow:0 0 0 3px #f0a05022}
 .loyalty-card .card-progress-next{font-size:12px;font-weight:500;opacity:.8;text-align:end}
 .loyalty-card .stamp-grid{gap:10px}
 .loyalty-card .rewards-badge{margin-top:16px}
+
+/* Premium membership look: subtle translucent waves, thin keyline, soft depth. No logo required. */
+.loyalty-card{background-image:radial-gradient(120% 70% at 100% 0%,#ffffff1f 0%,transparent 60%),radial-gradient(90% 60% at 0% 100%,#ffffff14 0%,transparent 55%),linear-gradient(160deg,var(--c-bg),color-mix(in srgb,var(--c-bg) 72%,#000));background-color:var(--c-bg)}
+.loyalty-card.layout-solid{background-image:radial-gradient(120% 70% at 100% 0%,#ffffff14 0%,transparent 60%)}
+.loyalty-card .stamp.filled{box-shadow:inset 0 1px 0 #ffffff66,0 2px 6px #0003}
+.loyalty-card .stamp.gift.filled{box-shadow:0 0 0 3px color-mix(in srgb,var(--c-st) 22%,transparent)}
+@media (prefers-reduced-motion: reduce){.loyalty-card .stamp{transition:none}}
