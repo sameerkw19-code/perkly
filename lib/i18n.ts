@@ -43,7 +43,7 @@ const words: Record<string, Entry> = {
   passwordHint: ["לפחות 8 תווים", "8 أحرف على الأقل", "At least 8 characters"],
   yourName: ["השם שלך", "اسمك", "Your name"],
   signupCode: ["קוד הרשמה", "رمز التسجيل", "Signup code"],
-  signupCodeHint: ["נדרש רק אם קיבלתם קוד מ־Perkly", "مطلوب فقط إذا حصلت على رمز من Perkly", "Only needed if Perkly gave you a code"],
+  signupCodeHint: ["את הקוד מקבלים מ־Perkly אחרי הצטרפות לפיילוט", "تحصل على الرمز من Perkly بعد الانضمام للتجربة", "Perkly sends you the code after you join the pilot"],
   haveAccount: ["כבר יש לך חשבון? כניסה", "لديك حساب؟ تسجيل الدخول", "Already have an account? Sign in"],
   noAccount: ["בעל עסק חדש? פתיחת חשבון", "صاحب مشروع جديد؟ إنشاء حساب", "New business owner? Create an account"],
   staffNoAccount: ["עובדים מצטרפים רק דרך קישור הזמנה מבעל העסק.", "ينضم الموظفون فقط عبر رابط دعوة من صاحب المشروع.", "Staff join only through an invite link from the owner."],
@@ -195,6 +195,8 @@ const words: Record<string, Entry> = {
   joinIntro: ["ממלאים שם וטלפון ומקבלים כרטיס אישי בטלפון.", "أدخل اسمك وهاتفك واحصل على بطاقة شخصية على هاتفك.", "Enter your name and phone and get a personal card on your phone."],
   terms: ["אני מאשר/ת לעסק לשמור את השם והטלפון שלי לצורך כרטיס הנאמנות.", "أوافق على حفظ اسمي وهاتفي لدى المشروع لغرض بطاقة الولاء.", "I agree that the business may keep my name and phone for the loyalty card."],
   marketing: ["אשמח לקבל עדכונים ומבצעים מהעסק (לא חובה).", "أرغب بتلقي تحديثات وعروض من المشروع (اختياري).", "I'd like to receive updates and offers from the business (optional)."],
+  legalLinks: ["מדיניות פרטיות", "سياسة الخصوصية", "Privacy policy"],
+  termsLink: ["תנאי שימוש", "شروط الاستخدام", "Terms of use"],
   getCard: ["קבלת הכרטיס", "احصل على البطاقة", "Get my card"],
   phoneNotVerified: ["מספר הטלפון לא מאומת ב־SMS.", "رقم الهاتف غير مُتحقق منه برسالة SMS.", "The phone number isn't verified by SMS."],
 };
@@ -363,7 +365,9 @@ export function useLang() {
   const [lang, setLang] = useState<Lang>("he");
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("perkly-language");
+      // A ?lang= link (for example from the Arabic marketing page) wins over the saved choice.
+      const fromUrl = new URLSearchParams(window.location.search).get("lang");
+      const saved = fromUrl && LANGS.includes(fromUrl as Lang) ? fromUrl : localStorage.getItem("perkly-language");
       if (saved && LANGS.includes(saved as Lang)) setLang(saved as Lang);
     } catch {}
   }, []);

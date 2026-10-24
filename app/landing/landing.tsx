@@ -1,423 +1,326 @@
-// Generated from the landing-page design (Perkly canvas). Edit freely.
-import { AutoVideo, DemoPhone } from "./landing-client";
-import { Testimonials, WhatsAppLine } from "./landing-parts";
+// Public marketing page (Hebrew at "/", Arabic at "/ar"). Copy lives in content.ts.
+import "./landing.css";
+import { COPY, hrefs, waLink, WHATSAPP_DISPLAY, type Lang } from "./content";
+import { DemoPanel, ExamplesPicker, Logo, SiteNav, TiltStage } from "./landing-client";
+import { Testimonials } from "./landing-parts";
+import { CafeLogo, CardVisual, Icon, QrArt } from "./visuals";
 
-export default function Landing() {
+const STEP_ICONS = ["palette", "qr", "stamp", "repeat"];
+
+function Check() {
+  return <Icon name="check" size={18} stroke={2.6} className="lp-check" />;
+}
+
+function HeroScene({ lang }: { lang: Lang }) {
+  const c = COPY[lang];
+  const [cafe, barber, , icecream] = c.examples.list;
+  const d = c.demo;
   return (
-    <>
-      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800&family=Heebo:wght@400;500;700&display=swap" precedence="default" />
-      <style href="perkly-landing" precedence="default">{"@media (max-width: 760px) { .lp-hide-sm { display: none !important; } }"}</style>
-<div dir="rtl" style={{ fontFamily: "'Heebo', system-ui, sans-serif", color: "#17132B", background: "#FAF8FF", lineHeight: "1.6" }}>
+    <div className="lp-hero-visual" role="img" aria-label={c.hero.sceneLabel}>
+      <TiltStage className="lp-scene">
+        <div className="lp-stage" aria-hidden="true">
+          <div className="lp-glow" />
+          <div className="lp-float lp-back lp-back-1">
+            <CardVisual k="barber" name={barber.name} rewardLine={c.examples.rewardLine(barber.target, barber.reward)} target={barber.target} filled={barber.filled} footStart={`${barber.filled} ${d.of} ${barber.target}`} footEnd={d.left(barber.target - barber.filled, barber.reward)} size="sm" />
+          </div>
+          <div className="lp-float lp-back lp-back-2">
+            <CardVisual k="icecream" name={icecream.name} rewardLine={c.examples.rewardLine(icecream.target, icecream.reward)} target={icecream.target} filled={icecream.filled} footStart={`${icecream.filled} ${d.of} ${icecream.target}`} footEnd={d.left(icecream.target - icecream.filled, icecream.reward)} size="sm" />
+          </div>
+          <div className="lp-phone">
+            <div className="lp-phone-screen">
+              <div className="lp-phone-bar">
+                <span>{c.hero.myCard}</span>
+                <span dir="ltr">perkly.shop</span>
+              </div>
+              <CardVisual k="cafe" name={cafe.name} rewardLine={c.examples.rewardLine(cafe.target, cafe.reward)} target={cafe.target} filled={cafe.filled} footStart={`${cafe.filled} ${d.of} ${cafe.target}`} footEnd={d.left(cafe.target - cafe.filled, cafe.reward)} size="sm" />
+              <div className="lp-phone-qr">
+                <QrArt size={92} />
+                <span>{c.hero.qrCaption}</span>
+              </div>
+            </div>
+          </div>
+          <div className="lp-floor-shadow" />
+        </div>
+      </TiltStage>
+    </div>
+  );
+}
 
-<header style={{ position: "sticky", top: "0", zIndex: "10", background: "rgba(250,248,255,0.92)", backdropFilter: "blur(10px)", borderBottom: "1px solid #E8E3F7" }}>
-<div style={{ maxWidth: "1200px", margin: "0 auto", padding: "12px clamp(16px, 4vw, 32px)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px", flexWrap: "wrap" }}>
-<a href="#top" style={{ display: "flex", alignItems: "center", gap: "10px", textDecoration: "none", color: "#17132B" }}>
-<span style={{ width: "38px", height: "38px", borderRadius: "12px", background: "#7558E8", display: "flex", alignItems: "center", justifyContent: "center" }}>
-<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"></rect><path d="M12 8v13"></path><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"></path><path d="M7.5 8a2.5 2.5 0 0 1 0-5C10 3 12 8 12 8s2-5 4.5-5a2.5 2.5 0 0 1 0 5"></path></svg>
-</span>
-<span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "24px", letterSpacing: "-0.5px" }}>Perkly</span>
-</a>
-<nav aria-label="ניווט ראשי" style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "clamp(12px, 2.5vw, 26px)", flexWrap: "wrap", fontSize: "15px", fontWeight: "500" }}>
-<a href="#how" className="lp-hide-sm" style={{ color: "#3D3657", textDecoration: "none" }}>איך זה עובד</a>
-<a href="#cards" className="lp-hide-sm" style={{ color: "#3D3657", textDecoration: "none" }}>דוגמאות</a>
-<a href="#features" className="lp-hide-sm" style={{ color: "#3D3657", textDecoration: "none" }}>יכולות</a>
-<a href="#pricing" className="lp-hide-sm" style={{ color: "#3D3657", textDecoration: "none" }}>מחיר</a>
-<a href="#faq" className="lp-hide-sm" style={{ color: "#3D3657", textDecoration: "none" }}>שאלות</a>
-<a href="/login" style={{ color: "#17132B", textDecoration: "none", fontWeight: "700", minHeight: "44px", display: "inline-flex", alignItems: "center" }}>כניסה</a>
-<a href="/signup" style={{ background: "#17132B", color: "#FFFFFF", textDecoration: "none", padding: "11px 20px", borderRadius: "999px", fontWeight: "700", minHeight: "44px", boxSizing: "border-box", display: "inline-flex", alignItems: "center" }}>פתחו כרטיס</a>
-</nav>
-</div>
-</header>
+function KitScene({ lang }: { lang: Lang }) {
+  const k = COPY[lang].pricing.kit;
+  const name = COPY[lang].examples.list[0].name;
+  return (
+    <div className="lp-kit-scene" role="img" aria-label={k.sceneLabel}>
+      <div className="lp-kit-room" aria-hidden="true">
+        <div className="lp-kit-wall" />
+        <div className="lp-kit-counter" />
+        <div className="lp-kit-item lp-poster lp-poster-a">
+          <span className="lp-poster-brand"><CafeLogo size={26} />{name}</span>
+          <strong>{k.poster1}</strong>
+          <span className="lp-poster-qr"><QrArt size={58} /></span>
+          <span className="lp-poster-cta">{k.scan}</span>
+        </div>
+        <div className="lp-kit-item lp-poster lp-poster-b">
+          <CafeLogo size={30} />
+          <strong>{k.poster2}</strong>
+          <span className="lp-poster-dots"><i /><i /><i /><i className="off" /><i className="off" /></span>
+          <QrArt size={50} />
+        </div>
+        <div className="lp-kit-item lp-stand">
+          <div className="lp-stand-face">
+            <CafeLogo size={24} />
+            <span>{k.stand}</span>
+            <QrArt size={52} />
+          </div>
+          <div className="lp-stand-base" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
-<section id="top" style={{ maxWidth: "1200px", margin: "0 auto", padding: "clamp(44px, 6vw, 84px) clamp(16px, 4vw, 32px) clamp(56px, 7vw, 92px)", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "clamp(40px, 6vw, 80px)" }}>
-<div style={{ flex: "999 1 460px", minWidth: "0", display: "flex", flexDirection: "column", gap: "24px" }}>
-<span style={{ alignSelf: "flex-start", background: "#EEE9FF", color: "#4A2FC4", fontWeight: "700", fontSize: "14px", padding: "7px 14px", borderRadius: "999px" }}>כרטיס ניקוב דיגיטלי לעסקים קטנים</span>
-<h1 style={{ margin: "0", fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "clamp(40px, 6vw, 72px)", lineHeight: "1.05", letterSpacing: "-1.5px" }}>הלקוחות שלכם חוזרים.<br /><span style={{ color: "#6A4DE3" }}>כל פעם מחדש.</span></h1>
-<p style={{ margin: "0", fontSize: "clamp(18px, 2vw, 21px)", color: "#4A4462", maxWidth: "560px" }}>כרטיס החותמות של העסק שלכם עובר לטלפון של הלקוח. אין אפליקציה להוריד, אין כרטיס נייר לאבד ואין חותמות מזויפות. הלקוח סורק QR בקופה, אוסף חותמות, וחוזר לקחת את המתנה.</p>
-<div style={{ display: "flex", flexWrap: "wrap", gap: "12px", marginTop: "4px" }}>
-<a href="/signup" style={{ background: "#7558E8", color: "#FFFFFF", textDecoration: "none", fontWeight: "700", fontSize: "18px", padding: "16px 28px", borderRadius: "14px", display: "inline-flex", alignItems: "center", gap: "10px", minHeight: "56px", boxSizing: "border-box", boxShadow: "0 10px 24px rgba(117,88,232,0.32)" }}>צרו את הכרטיס שלכם
-<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
-</a>
-<a href="#how" style={{ background: "#FFFFFF", color: "#17132B", textDecoration: "none", fontWeight: "700", fontSize: "18px", padding: "16px 26px", borderRadius: "14px", border: "1.5px solid #DCD5F2", display: "inline-flex", alignItems: "center", minHeight: "56px", boxSizing: "border-box" }}>איך זה עובד?</a>
-</div>
-<div style={{ display: "flex", flexWrap: "wrap", gap: "10px 22px", fontSize: "15px", color: "#4A4462", fontWeight: "500" }}>
-<span style={{ display: "flex", alignItems: "center", gap: "7px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>מוכן בכמה דקות</span>
-<span style={{ display: "flex", alignItems: "center", gap: "7px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>בלי ציוד: מספיק טלפון בקופה</span>
-<span style={{ display: "flex", alignItems: "center", gap: "7px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>עברית, ערבית ואנגלית</span>
-<span style={{ display: "flex", alignItems: "center", gap: "7px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>Apple Wallet ו־Google Wallet</span>
-</div>
-</div>
+function DashboardMock({ lang }: { lang: Lang }) {
+  const m = COPY[lang].manage;
+  const name = COPY[lang].examples.list[0].name;
+  return (
+    <div className="lp-dash" role="img" aria-label={`${m.demoLabel}: ${m.stats.map((s) => `${s.label} ${s.value}`).join(", ")}`}>
+      <div aria-hidden="true">
+        <div className="lp-dash-top">
+          <span className="lp-dash-name"><CafeLogo size={28} />{name}</span>
+          <span className="lp-chip lp-chip-yellow">{m.demoLabel}</span>
+        </div>
+        <div className="lp-dash-range">
+          {m.range.map((r, i) => (
+            <span key={r} className={i === 1 ? "is-on" : ""}>{r}</span>
+          ))}
+        </div>
+        <div className="lp-dash-stats">
+          {m.stats.map((s) => (
+            <div key={s.label}>
+              <span>{s.label}</span>
+              <strong>{s.value}</strong>
+            </div>
+          ))}
+        </div>
+        <div className="lp-dash-alert"><Icon name="alert" size={18} />{m.alert}</div>
+        <div className="lp-dash-cols">
+          <div>
+            <span className="lp-dash-sub">{m.staffTitle}</span>
+            {m.staff.map((s) => (
+              <div key={s.name} className="lp-dash-row"><span className="lp-avatar">{s.name.slice(0, 1)}</span><span><strong>{s.name}</strong> · {s.detail}</span></div>
+            ))}
+          </div>
+          <div>
+            <span className="lp-dash-sub">{m.recentTitle}</span>
+            {m.recent.map((r) => (
+              <div key={r.text} className="lp-dash-row lp-dash-row-split"><span>{r.text}</span><span className="lp-muted">{r.time}</span></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-<DemoPhone />
-</section>
+export default function Landing({ lang }: { lang: Lang }) {
+  const c = COPY[lang];
+  const h = hrefs(lang);
+  return (
+    <div className="lp" lang={lang} dir="rtl">
+      <a href="#main" className="lp-skip">{c.nav.skip}</a>
+      <SiteNav lang={lang} />
 
-<section aria-labelledby="pain-title" style={{ background: "#17132B", color: "#FFFFFF" }}>
-<div style={{ maxWidth: "1200px", margin: "0 auto", padding: "clamp(56px, 7vw, 88px) clamp(16px, 4vw, 32px)", display: "flex", flexDirection: "column", gap: "40px" }}>
-<div style={{ display: "flex", flexDirection: "column", gap: "12px", maxWidth: "720px" }}>
-<h2 id="pain-title" style={{ margin: "0", fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "clamp(30px, 4vw, 46px)", lineHeight: "1.15" }}>כרטיס הנייר עולה לכם לקוחות.</h2>
-<p style={{ margin: "0", fontSize: "19px", color: "#C9C3DE" }}>הוא נשאר בבית, נקרע בארנק, ואף אחד לא יודע כמה חותמות באמת חולקו.</p>
-</div>
-<div style={{ display: "flex", flexWrap: "wrap", gap: "20px" }}>
-<div style={{ flex: "1 1 280px", background: "#241E40", borderRadius: "22px", padding: "28px", display: "flex", flexDirection: "column", gap: "12px" }}>
-<span style={{ width: "48px", height: "48px", borderRadius: "14px", background: "#3A2F66", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFC24B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg></span>
-<h3 style={{ margin: "0", fontFamily: "'Rubik', sans-serif", fontSize: "21px", fontWeight: "700" }}>הולך לאיבוד</h3>
-<p style={{ margin: "0", color: "#C9C3DE", fontSize: "16px" }}>לקוח ששכח את הכרטיס מתחיל מאפס, ולקוח שמתחיל מאפס מפסיק לספור.</p>
-</div>
-<div style={{ flex: "1 1 280px", background: "#241E40", borderRadius: "22px", padding: "28px", display: "flex", flexDirection: "column", gap: "12px" }}>
-<span style={{ width: "48px", height: "48px", borderRadius: "14px", background: "#3A2F66", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFC24B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"></path><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"></path><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"></path><path d="m2 2 20 20"></path></svg></span>
-<h3 style={{ margin: "0", fontFamily: "'Rubik', sans-serif", fontSize: "21px", fontWeight: "700" }}>אתם עובדים בעיוורון</h3>
-<p style={{ margin: "0", color: "#C9C3DE", fontSize: "16px" }}>אין לכם מושג מי הלקוחות הקבועים, מתי הם באים ומי הפסיק להגיע.</p>
-</div>
-<div style={{ flex: "1 1 280px", background: "#241E40", borderRadius: "22px", padding: "28px", display: "flex", flexDirection: "column", gap: "12px" }}>
-<span style={{ width: "48px", height: "48px", borderRadius: "14px", background: "#3A2F66", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFC24B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg></span>
-<h3 style={{ margin: "0", fontFamily: "'Rubik', sans-serif", fontSize: "21px", fontWeight: "700" }}>קל לזייף</h3>
-<p style={{ margin: "0", color: "#C9C3DE", fontSize: "16px" }}>חותמת נוספת לחבר, ניקוב כפול בטעות. המתנות יוצאות, והכסף איתן.</p>
-</div>
-</div>
-</div>
-</section>
+      <main id="main" className="lp-main">
+        {/* Hero */}
+        <section className="lp-hero" aria-labelledby="hero-title">
+          <div className="lp-wrap lp-hero-grid">
+            <div className="lp-hero-text">
+              <span className="lp-chip">{c.hero.badge}</span>
+              <h1 id="hero-title" className="lp-h1">{c.hero.title}</h1>
+              <p className="lp-lead">{c.hero.text}</p>
+              <div className="lp-hero-ctas">
+                <a href={h.signup} className="lp-btn lp-btn-primary lp-btn-lg">{c.hero.cta}<Icon name="arrowLeft" size={20} stroke={2.4} /></a>
+                <a href="#demo" className="lp-btn lp-btn-ghost lp-btn-lg">{c.hero.demo}</a>
+              </div>
+              <p className="lp-hero-price"><strong>{c.hero.price}</strong><span aria-hidden="true">·</span><span>{c.hero.priceNote}</span></p>
+              <ul className="lp-hero-points">
+                {c.hero.points.map((p) => (
+                  <li key={p}><Check />{p}</li>
+                ))}
+              </ul>
+            </div>
+            <HeroScene lang={lang} />
+          </div>
+        </section>
 
-<section id="demo" aria-labelledby="demo-title" style={{ maxWidth: "1200px", margin: "0 auto", padding: "clamp(64px, 8vw, 104px) clamp(16px, 4vw, 32px) 0", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "clamp(40px, 6vw, 88px)" }}>
-<div style={{ flex: "999 1 420px", minWidth: "0", display: "flex", flexDirection: "column", gap: "18px" }}>
-<span style={{ color: "#5B3FD6", fontWeight: "700", fontSize: "15px" }}>Perkly בפעולה</span>
-<h2 id="demo-title" style={{ margin: "0", fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "clamp(30px, 4vw, 46px)", lineHeight: "1.15" }}>20 שניות, וכבר הבנתם<br />איך זה עובד.</h2>
-<p style={{ margin: "0", fontSize: "19px", color: "#4A4462", maxWidth: "520px" }}>מהעיצוב הראשון של הכרטיס ועד הלקוח שחוזר לקחת את המתנה. ככה זה נראה אצלכם בקופה ואצל הלקוח בטלפון.</p>
-<div style={{ display: "flex", flexDirection: "column", gap: "12px", fontSize: "17px", marginTop: "4px" }}>
-<span style={{ display: "flex", alignItems: "center", gap: "12px" }}><span style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#17132B", color: "#FFFFFF", fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "15px", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>1</span>מעצבים כרטיס בצבעים שלכם</span>
-<span style={{ display: "flex", alignItems: "center", gap: "12px" }}><span style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#17132B", color: "#FFFFFF", fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "15px", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>2</span>הלקוח סורק QR ומצטרף בשניות</span>
-<span style={{ display: "flex", alignItems: "center", gap: "12px" }}><span style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#17132B", color: "#FFFFFF", fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "15px", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>3</span>העובד מוסיף חותמת בלחיצה</span>
-<span style={{ display: "flex", alignItems: "center", gap: "12px" }}><span style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#FFC24B", color: "#2B1F00", fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "15px", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>4</span>הכרטיס מתמלא, והלקוח חוזר</span>
-</div>
-<a href="/signup" style={{ alignSelf: "flex-start", marginTop: "8px", background: "#7558E8", color: "#FFFFFF", textDecoration: "none", fontWeight: "700", fontSize: "18px", padding: "16px 28px", borderRadius: "14px", display: "inline-flex", alignItems: "center", gap: "10px", minHeight: "56px", boxSizing: "border-box" }}>רוצים כזה לעסק שלכם?
-<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
-</a>
-</div>
-<div style={{ flex: "1 1 300px", minWidth: "0", display: "flex", justifyContent: "center", position: "relative" }}>
-<div aria-hidden="true" style={{ position: "absolute", width: "340px", height: "340px", borderRadius: "50%", background: "#EEE9FF", top: "50%", left: "50%", transform: "translate(-50%, -50%)" }}></div>
-<div style={{ position: "relative", width: "300px", maxWidth: "100%", aspectRatio: "9 / 16", borderRadius: "40px", background: "#17132B", padding: "10px", boxSizing: "border-box", boxShadow: "0 30px 60px rgba(23,19,43,0.28)" }}>
-<AutoVideo src="/videos/perkly-promo.mp4" autoPlay muted loop playsInline preload="auto" aria-label="סרטון: ארבעת השלבים של Perkly, מעיצוב הכרטיס ועד המתנה" style={{ width: "100%", height: "100%", display: "block", objectFit: "cover", borderRadius: "31px", background: "#EEE9FF" }} />
-</div>
-</div>
-</section>
+        {/* How it works + live demo */}
+        <section id="how" className="lp-section lp-tint" aria-labelledby="how-title">
+          <div className="lp-wrap">
+            <span className="lp-eyebrow">{c.how.eyebrow}</span>
+            <h2 id="how-title" className="lp-h2">{c.how.title}</h2>
+            <div className="lp-how-grid">
+              <div className="lp-how-steps">
+                <ol className="lp-steps">
+                  {c.how.steps.map((s, i) => (
+                    <li key={s.title}>
+                      <span className="lp-step-icon" aria-hidden="true"><Icon name={STEP_ICONS[i]} size={22} /></span>
+                      <span className="lp-step-text">
+                        <strong><span className="lp-step-num">{i + 1}.</span> {s.title}</strong>
+                        <span>{s.text}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+                <div className="lp-rule">
+                  <strong>{c.how.ruleTitle}</strong>
+                  <p>{c.how.rule}</p>
+                </div>
+              </div>
+              <DemoPanel lang={lang} />
+            </div>
+          </div>
+        </section>
 
-<section id="cards" aria-labelledby="cards-title" style={{ padding: "clamp(64px, 8vw, 104px) 0", display: "flex", flexDirection: "column", gap: "40px" }}>
-<div style={{ maxWidth: "1200px", width: "100%", margin: "0 auto", padding: "0 clamp(16px, 4vw, 32px)", boxSizing: "border-box", display: "flex", flexWrap: "wrap", gap: "16px", alignItems: "flex-end", justifyContent: "space-between" }}>
-<div style={{ display: "flex", flexDirection: "column", gap: "12px", maxWidth: "640px" }}>
-<span style={{ color: "#5B3FD6", fontWeight: "700", fontSize: "15px" }}>לכל עסק, הכרטיס שלו</span>
-<h2 id="cards-title" style={{ margin: "0", fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "clamp(30px, 4vw, 46px)", lineHeight: "1.15" }}>כרטיס שהלקוחות שלכם ירצו לשמור.</h2>
-<p style={{ margin: "0", fontSize: "18px", color: "#4A4462" }}>לוגו, צבעים, 17 סמלי חותמת ושלושה סגנונות. ואם רוצים, הלוגו שלכם הוא החותמת.</p>
-</div>
-<a href="/signup" style={{ fontWeight: "700", fontSize: "16px", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "6px", minHeight: "44px" }}>עצבו את שלכם
-<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
-</a>
-</div>
-<div style={{ display: "flex", gap: "20px", overflowX: "auto", scrollSnapType: "x mandatory", padding: "8px clamp(16px, 4vw, 32px) 24px", maxWidth: "1264px", width: "100%", margin: "0 auto", boxSizing: "border-box" }}>
+        {/* Examples */}
+        <section id="examples" className="lp-section" aria-labelledby="examples-title">
+          <div className="lp-wrap lp-split">
+            <div className="lp-split-text">
+              <span className="lp-eyebrow">{c.examples.eyebrow}</span>
+              <h2 id="examples-title" className="lp-h2">{c.examples.title}</h2>
+              <p className="lp-body">{c.examples.text}</p>
+              <p className="lp-small lp-muted">{c.examples.note}</p>
+            </div>
+            <ExamplesPicker lang={lang} />
+          </div>
+        </section>
 
-<div role="img" aria-label="דוגמה: כרטיס בית קפה, 6 מתוך 8" style={{ flex: "0 0 280px", scrollSnapAlign: "start", background: "#1F1B3A", color: "#FFFFFF", borderRadius: "26px", padding: "24px", display: "flex", flexDirection: "column", gap: "20px", boxShadow: "0 16px 34px rgba(23,19,43,0.16)" }}>
-<div style={{ display: "flex", alignItems: "center", gap: "12px" }}><svg role="img" aria-label="הלוגו של קפה אייקון" width="44" height="44" viewBox="0 0 48 48" style={{ flex: "none" }}><rect width="48" height="48" rx="14" fill="#F3EEFF"></rect><circle cx="24" cy="25" r="17" fill="#8F72E8"></circle><path d="M15 23h16v5.5a7 7 0 0 1-7 7h-2a7 7 0 0 1-7-7z" fill="#FFFFFF"></path><path d="M31 25h1.6a3 3 0 0 1 0 6H31" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round"></path><path d="M13 38h20" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round"></path><path d="M23 21c0-3.5 2.5-5.5 2.5-11" fill="none" stroke="#3E2A8C" strokeWidth="1.6" strokeLinecap="round"></path><ellipse cx="26.6" cy="10.6" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(-30 26.6 10.6)"></ellipse><ellipse cx="24.2" cy="12.4" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(30 24.2 12.4)"></ellipse><ellipse cx="26.2" cy="14.6" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(-30 26.2 14.6)"></ellipse><ellipse cx="23.6" cy="16.6" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(30 23.6 16.6)"></ellipse></svg><div style={{ display: "flex", flexDirection: "column", lineHeight: "1.3" }}><span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "18px" }}>קפה אייקון</span><span style={{ fontSize: "14px", color: "#C9C3DE" }}>הקפה התשיעי עלינו</span></div></div>
-<div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "10px" }}><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#FFC24B", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#2B1F00" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M10 2v2"></path><path d="M14 2v2"></path><path d="M6 2v2"></path><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#FFC24B", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#2B1F00" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M10 2v2"></path><path d="M14 2v2"></path><path d="M6 2v2"></path><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#FFC24B", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#2B1F00" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M10 2v2"></path><path d="M14 2v2"></path><path d="M6 2v2"></path><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#FFC24B", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#2B1F00" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M10 2v2"></path><path d="M14 2v2"></path><path d="M6 2v2"></path><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#FFC24B", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#2B1F00" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M10 2v2"></path><path d="M14 2v2"></path><path d="M6 2v2"></path><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#FFC24B", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#2B1F00" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M10 2v2"></path><path d="M14 2v2"></path><path d="M6 2v2"></path><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", border: "2px dashed #6B6488", boxSizing: "border-box" }}></span><span style={{ aspectRatio: "1", borderRadius: "50%", border: "2px dashed #6B6488", boxSizing: "border-box" }}></span></div>
-<span style={{ fontSize: "14px", fontWeight: "700", color: "#FFC24B" }}>עוד 2 לקפה חינם</span>
-</div>
+        {/* Owner dashboard */}
+        <section className="lp-section lp-dark" aria-labelledby="manage-title">
+          <div className="lp-wrap lp-split lp-split-wide">
+            <div className="lp-split-text">
+              <span className="lp-eyebrow lp-eyebrow-yellow">{c.manage.eyebrow}</span>
+              <h2 id="manage-title" className="lp-h2">{c.manage.title}</h2>
+              <p className="lp-body">{c.manage.text}</p>
+              <ul className="lp-list">
+                {c.manage.points.map((p) => (
+                  <li key={p}><Check />{p}</li>
+                ))}
+              </ul>
+              <h3 className="lp-h3"><Icon name="shield" size={20} />{c.manage.controlsTitle}</h3>
+              <ul className="lp-list">
+                {c.manage.controls.map((p) => (
+                  <li key={p}><Check />{p}</li>
+                ))}
+              </ul>
+            </div>
+            <DashboardMock lang={lang} />
+          </div>
+        </section>
 
-<div role="img" aria-label="דוגמה: כרטיס מספרה, 9 מתוך 10" style={{ flex: "0 0 280px", scrollSnapAlign: "start", background: "#FFF4E6", color: "#2A1A0A", borderRadius: "26px", padding: "24px", display: "flex", flexDirection: "column", gap: "20px", border: "1px solid #F3DFC6", boxShadow: "0 16px 34px rgba(23,19,43,0.08)" }}>
-<div style={{ display: "flex", alignItems: "center", gap: "12px" }}><span style={{ width: "44px", height: "44px", borderRadius: "14px", background: "#2A1A0A", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFF4E6" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"></circle><path d="M8.12 8.12 12 12"></path><path d="M20 4 8.12 15.88"></path><circle cx="6" cy="18" r="3"></circle><path d="M14.8 14.8 20 20"></path></svg></span><div style={{ display: "flex", flexDirection: "column", lineHeight: "1.3" }}><span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "18px" }}>מספרת אלון</span><span style={{ fontSize: "14px", color: "#6B4E2E" }}>התספורת העשירית חינם</span></div></div>
-<div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: "9px" }}><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#D9622B", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#FFF4E6" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"></circle><path d="M8.12 8.12 12 12"></path><path d="M20 4 8.12 15.88"></path><circle cx="6" cy="18" r="3"></circle><path d="M14.8 14.8 20 20"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#D9622B", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#FFF4E6" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"></circle><path d="M8.12 8.12 12 12"></path><path d="M20 4 8.12 15.88"></path><circle cx="6" cy="18" r="3"></circle><path d="M14.8 14.8 20 20"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#D9622B", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#FFF4E6" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"></circle><path d="M8.12 8.12 12 12"></path><path d="M20 4 8.12 15.88"></path><circle cx="6" cy="18" r="3"></circle><path d="M14.8 14.8 20 20"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#D9622B", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#FFF4E6" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"></circle><path d="M8.12 8.12 12 12"></path><path d="M20 4 8.12 15.88"></path><circle cx="6" cy="18" r="3"></circle><path d="M14.8 14.8 20 20"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#D9622B", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#FFF4E6" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"></circle><path d="M8.12 8.12 12 12"></path><path d="M20 4 8.12 15.88"></path><circle cx="6" cy="18" r="3"></circle><path d="M14.8 14.8 20 20"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#D9622B", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#FFF4E6" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"></circle><path d="M8.12 8.12 12 12"></path><path d="M20 4 8.12 15.88"></path><circle cx="6" cy="18" r="3"></circle><path d="M14.8 14.8 20 20"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#D9622B", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#FFF4E6" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"></circle><path d="M8.12 8.12 12 12"></path><path d="M20 4 8.12 15.88"></path><circle cx="6" cy="18" r="3"></circle><path d="M14.8 14.8 20 20"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#D9622B", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#FFF4E6" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"></circle><path d="M8.12 8.12 12 12"></path><path d="M20 4 8.12 15.88"></path><circle cx="6" cy="18" r="3"></circle><path d="M14.8 14.8 20 20"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#D9622B", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#FFF4E6" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"></circle><path d="M8.12 8.12 12 12"></path><path d="M20 4 8.12 15.88"></path><circle cx="6" cy="18" r="3"></circle><path d="M14.8 14.8 20 20"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", border: "2px dashed #C9A27A", boxSizing: "border-box" }}></span></div>
-<span style={{ fontSize: "14px", fontWeight: "700", color: "#A3441A" }}>עוד אחת לתספורת חינם</span>
-</div>
+        <Testimonials lang={lang} />
 
-<div role="img" aria-label="דוגמה: כרטיס פיצרייה, 4 מתוך 6" style={{ flex: "0 0 280px", scrollSnapAlign: "start", background: "#C8102E", color: "#FFFFFF", borderRadius: "26px", padding: "24px", display: "flex", flexDirection: "column", gap: "20px", boxShadow: "0 16px 34px rgba(200,16,46,0.22)" }}>
-<div style={{ display: "flex", alignItems: "center", gap: "12px" }}><span style={{ width: "44px", height: "44px", borderRadius: "14px", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C8102E" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 11h.01"></path><path d="M11 15h.01"></path><path d="M16 16h.01"></path><path d="m2 16 20 6-6-20A20 20 0 0 0 2 16"></path><path d="M5.71 17.11a17.04 17.04 0 0 1 11.4-11.4"></path></svg></span><div style={{ display: "flex", flexDirection: "column", lineHeight: "1.3" }}><span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "18px" }}>פיצה נונה</span><span style={{ fontSize: "14px", color: "#FFE3E8" }}>המגש השישי עלינו</span></div></div>
-<div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "12px" }}><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#C8102E" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M15 11h.01"></path><path d="M11 15h.01"></path><path d="M16 16h.01"></path><path d="m2 16 20 6-6-20A20 20 0 0 0 2 16"></path><path d="M5.71 17.11a17.04 17.04 0 0 1 11.4-11.4"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#C8102E" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M15 11h.01"></path><path d="M11 15h.01"></path><path d="M16 16h.01"></path><path d="m2 16 20 6-6-20A20 20 0 0 0 2 16"></path><path d="M5.71 17.11a17.04 17.04 0 0 1 11.4-11.4"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#C8102E" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M15 11h.01"></path><path d="M11 15h.01"></path><path d="M16 16h.01"></path><path d="m2 16 20 6-6-20A20 20 0 0 0 2 16"></path><path d="M5.71 17.11a17.04 17.04 0 0 1 11.4-11.4"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#C8102E" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M15 11h.01"></path><path d="M11 15h.01"></path><path d="M16 16h.01"></path><path d="m2 16 20 6-6-20A20 20 0 0 0 2 16"></path><path d="M5.71 17.11a17.04 17.04 0 0 1 11.4-11.4"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", border: "2px dashed rgba(255,255,255,0.6)", boxSizing: "border-box" }}></span><span style={{ aspectRatio: "1", borderRadius: "50%", border: "2px dashed rgba(255,255,255,0.6)", boxSizing: "border-box" }}></span></div>
-<span style={{ fontSize: "14px", fontWeight: "700" }}>עוד 2 למגש חינם</span>
-</div>
+        {/* Trust: honest pilot status and a personal call */}
+        <section className="lp-section lp-section-tight" aria-labelledby="trust-title">
+          <div className="lp-wrap">
+            <div className="lp-trust">
+              <div>
+                <h2 id="trust-title" className="lp-h3 lp-trust-title">{c.trust.title}</h2>
+                <p className="lp-body">{c.trust.text}</p>
+              </div>
+              <a href={waLink(c.trust.waText)} className="lp-btn lp-btn-dark" target="_blank" rel="noopener noreferrer">
+                <Icon name="message" size={18} />{c.trust.cta}
+              </a>
+            </div>
+          </div>
+        </section>
 
-<div role="img" aria-label="דוגמה: כרטיס גלידרייה, 7 מתוך 8" style={{ flex: "0 0 280px", scrollSnapAlign: "start", background: "#DDF4EC", color: "#0E3B2E", borderRadius: "26px", padding: "24px", display: "flex", flexDirection: "column", gap: "20px", border: "1px solid #BDE6D7", boxShadow: "0 16px 34px rgba(23,19,43,0.08)" }}>
-<div style={{ display: "flex", alignItems: "center", gap: "12px" }}><span style={{ width: "44px", height: "44px", borderRadius: "14px", background: "#F07FA6", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m7 11 4.08 10.35a1 1 0 0 0 1.84 0L17 11"></path><path d="M17 7A5 5 0 0 0 7 7"></path><path d="M17 7a2 2 0 0 1 0 4H7a2 2 0 0 1 0-4"></path></svg></span><div style={{ display: "flex", flexDirection: "column", lineHeight: "1.3" }}><span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "18px" }}>גלידה של מיקה</span><span style={{ fontSize: "14px", color: "#2D5E4F" }}>כדור שמיני מתנה</span></div></div>
-<div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "10px" }}><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#F07FA6", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m7 11 4.08 10.35a1 1 0 0 0 1.84 0L17 11"></path><path d="M17 7A5 5 0 0 0 7 7"></path><path d="M17 7a2 2 0 0 1 0 4H7a2 2 0 0 1 0-4"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#F07FA6", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m7 11 4.08 10.35a1 1 0 0 0 1.84 0L17 11"></path><path d="M17 7A5 5 0 0 0 7 7"></path><path d="M17 7a2 2 0 0 1 0 4H7a2 2 0 0 1 0-4"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#F07FA6", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m7 11 4.08 10.35a1 1 0 0 0 1.84 0L17 11"></path><path d="M17 7A5 5 0 0 0 7 7"></path><path d="M17 7a2 2 0 0 1 0 4H7a2 2 0 0 1 0-4"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#F07FA6", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m7 11 4.08 10.35a1 1 0 0 0 1.84 0L17 11"></path><path d="M17 7A5 5 0 0 0 7 7"></path><path d="M17 7a2 2 0 0 1 0 4H7a2 2 0 0 1 0-4"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#F07FA6", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m7 11 4.08 10.35a1 1 0 0 0 1.84 0L17 11"></path><path d="M17 7A5 5 0 0 0 7 7"></path><path d="M17 7a2 2 0 0 1 0 4H7a2 2 0 0 1 0-4"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#F07FA6", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m7 11 4.08 10.35a1 1 0 0 0 1.84 0L17 11"></path><path d="M17 7A5 5 0 0 0 7 7"></path><path d="M17 7a2 2 0 0 1 0 4H7a2 2 0 0 1 0-4"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#F07FA6", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m7 11 4.08 10.35a1 1 0 0 0 1.84 0L17 11"></path><path d="M17 7A5 5 0 0 0 7 7"></path><path d="M17 7a2 2 0 0 1 0 4H7a2 2 0 0 1 0-4"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", border: "2px dashed #7FBFA8", boxSizing: "border-box" }}></span></div>
-<span style={{ fontSize: "14px", fontWeight: "700", color: "#0E3B2E" }}>עוד אחד לכדור חינם</span>
-</div>
+        {/* Pricing */}
+        <section id="pricing" className="lp-section lp-tint" aria-labelledby="pricing-title">
+          <div className="lp-wrap">
+            <span className="lp-eyebrow">{c.pricing.eyebrow}</span>
+            <h2 id="pricing-title" className="lp-h2">{c.pricing.title}</h2>
+            <div className="lp-pricing">
+              <article className="lp-price-card lp-price-main" aria-labelledby="plan-sub">
+                <h3 id="plan-sub" className="lp-price-name">{c.pricing.sub.name}</h3>
+                <p className="lp-price"><strong>{c.pricing.sub.price}</strong><span>{c.pricing.sub.per}</span></p>
+                <p className="lp-price-note">{c.pricing.sub.note}</p>
+                <ul className="lp-list">
+                  {c.pricing.sub.features.map((f) => (
+                    <li key={f}><Check />{f}</li>
+                  ))}
+                </ul>
+                <a href={h.signup} className="lp-btn lp-btn-primary lp-btn-wide">{c.pricing.sub.cta}</a>
+              </article>
+              <article className="lp-price-card lp-price-kit" aria-labelledby="plan-kit">
+                <KitScene lang={lang} />
+                <div className="lp-kit-body">
+                  <span className="lp-chip lp-chip-yellow">{c.pricing.kit.tag}</span>
+                  <h3 id="plan-kit" className="lp-price-name">{c.pricing.kit.name}</h3>
+                  <p className="lp-price"><strong>{c.pricing.kit.price}</strong><span>{c.pricing.kit.per}</span></p>
+                  <ul className="lp-list">
+                    {c.pricing.kit.items.map((f) => (
+                      <li key={f}><Check />{f}</li>
+                    ))}
+                  </ul>
+                  <p className="lp-price-note">{c.pricing.kit.noSub}</p>
+                  <a href={waLink(c.pricing.kit.waText)} className="lp-btn lp-btn-dark lp-btn-wide" target="_blank" rel="noopener noreferrer">
+                    <Icon name="message" size={18} />{c.pricing.kit.cta}
+                  </a>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
 
-<div role="img" aria-label="דוגמה: כרטיס סטודיו, 3 מתוך 8" style={{ flex: "0 0 280px", scrollSnapAlign: "start", background: "#6A4DE3", color: "#FFFFFF", borderRadius: "26px", padding: "24px", display: "flex", flexDirection: "column", gap: "20px", boxShadow: "0 16px 34px rgba(106,77,227,0.26)" }}>
-<div style={{ display: "flex", alignItems: "center", gap: "12px" }}><span style={{ width: "44px", height: "44px", borderRadius: "14px", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6A4DE3" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></span><div style={{ display: "flex", flexDirection: "column", lineHeight: "1.3" }}><span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "18px" }}>סטודיו מאיה</span><span style={{ fontSize: "14px", color: "#F1EDFF" }}>שיעור שמיני מתנה</span></div></div>
-<div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "10px" }}><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#6A4DE3" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#6A4DE3" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#6A4DE3" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", border: "2px dashed rgba(255,255,255,0.55)", boxSizing: "border-box" }}></span><span style={{ aspectRatio: "1", borderRadius: "50%", border: "2px dashed rgba(255,255,255,0.55)", boxSizing: "border-box" }}></span><span style={{ aspectRatio: "1", borderRadius: "50%", border: "2px dashed rgba(255,255,255,0.55)", boxSizing: "border-box" }}></span><span style={{ aspectRatio: "1", borderRadius: "50%", border: "2px dashed rgba(255,255,255,0.55)", boxSizing: "border-box" }}></span><span style={{ aspectRatio: "1", borderRadius: "50%", border: "2px dashed rgba(255,255,255,0.55)", boxSizing: "border-box" }}></span></div>
-<span style={{ fontSize: "14px", fontWeight: "700" }}>עוד 5 לשיעור מתנה</span>
-</div>
+        {/* FAQ */}
+        <section id="faq" className="lp-section" aria-labelledby="faq-title">
+          <div className="lp-wrap lp-faq-wrap">
+            <span className="lp-eyebrow">{c.faq.eyebrow}</span>
+            <h2 id="faq-title" className="lp-h2">{c.faq.title}</h2>
+            <div className="lp-faq">
+              {c.faq.items.map((f) => (
+                <details key={f.q}>
+                  <summary>{f.q}<Icon name="plus" size={18} className="lp-faq-icon" /></summary>
+                  <p>{f.a}</p>
+                </details>
+              ))}
+            </div>
+          </div>
+        </section>
 
-<div role="img" aria-label="דוגמה: כרטיס בר, 5 מתוך 10" style={{ flex: "0 0 280px", scrollSnapAlign: "start", background: "#0F2A2E", color: "#FFFFFF", borderRadius: "26px", padding: "24px", display: "flex", flexDirection: "column", gap: "20px", boxShadow: "0 16px 34px rgba(15,42,46,0.24)" }}>
-<div style={{ display: "flex", alignItems: "center", gap: "12px" }}><span style={{ width: "44px", height: "44px", borderRadius: "14px", background: "#7FE0C2", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F2A2E" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 22h8"></path><path d="M7 10h10"></path><path d="M12 15v7"></path><path d="M12 15a5 5 0 0 0 5-5c0-2-.5-4-2-8H9c-1.5 4-2 6-2 8a5 5 0 0 0 5 5Z"></path></svg></span><div style={{ display: "flex", flexDirection: "column", lineHeight: "1.3" }}><span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "18px" }}>בר הנמל</span><span style={{ fontSize: "14px", color: "#B9D8D4" }}>הקוקטייל העשירי עלינו</span></div></div>
-<div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: "9px" }}><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#7FE0C2", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#0F2A2E" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M8 22h8"></path><path d="M7 10h10"></path><path d="M12 15v7"></path><path d="M12 15a5 5 0 0 0 5-5c0-2-.5-4-2-8H9c-1.5 4-2 6-2 8a5 5 0 0 0 5 5Z"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#7FE0C2", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#0F2A2E" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M8 22h8"></path><path d="M7 10h10"></path><path d="M12 15v7"></path><path d="M12 15a5 5 0 0 0 5-5c0-2-.5-4-2-8H9c-1.5 4-2 6-2 8a5 5 0 0 0 5 5Z"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#7FE0C2", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#0F2A2E" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M8 22h8"></path><path d="M7 10h10"></path><path d="M12 15v7"></path><path d="M12 15a5 5 0 0 0 5-5c0-2-.5-4-2-8H9c-1.5 4-2 6-2 8a5 5 0 0 0 5 5Z"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#7FE0C2", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#0F2A2E" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M8 22h8"></path><path d="M7 10h10"></path><path d="M12 15v7"></path><path d="M12 15a5 5 0 0 0 5-5c0-2-.5-4-2-8H9c-1.5 4-2 6-2 8a5 5 0 0 0 5 5Z"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", background: "#7FE0C2", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="58%" height="58%" viewBox="0 0 24 24" fill="none" stroke="#0F2A2E" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M8 22h8"></path><path d="M7 10h10"></path><path d="M12 15v7"></path><path d="M12 15a5 5 0 0 0 5-5c0-2-.5-4-2-8H9c-1.5 4-2 6-2 8a5 5 0 0 0 5 5Z"></path></svg></span><span style={{ aspectRatio: "1", borderRadius: "50%", border: "2px dashed #4E7C7A", boxSizing: "border-box" }}></span><span style={{ aspectRatio: "1", borderRadius: "50%", border: "2px dashed #4E7C7A", boxSizing: "border-box" }}></span><span style={{ aspectRatio: "1", borderRadius: "50%", border: "2px dashed #4E7C7A", boxSizing: "border-box" }}></span><span style={{ aspectRatio: "1", borderRadius: "50%", border: "2px dashed #4E7C7A", boxSizing: "border-box" }}></span><span style={{ aspectRatio: "1", borderRadius: "50%", border: "2px dashed #4E7C7A", boxSizing: "border-box" }}></span></div>
-<span style={{ fontSize: "14px", fontWeight: "700", color: "#7FE0C2" }}>עוד 5 לקוקטייל חינם</span>
-</div>
+        {/* Final call to action */}
+        <section className="lp-section lp-section-tight" aria-labelledby="final-title">
+          <div className="lp-wrap">
+            <div className="lp-final">
+              <h2 id="final-title" className="lp-h2">{c.final.title}</h2>
+              <p className="lp-lead">{c.final.text}</p>
+              <div className="lp-final-ctas">
+                <a href={h.signup} className="lp-btn lp-btn-light lp-btn-lg">{c.final.cta}</a>
+                <a href={waLink(c.trust.waText)} className="lp-final-support" target="_blank" rel="noopener noreferrer">
+                  <Icon name="message" size={18} />{c.final.support} <bdi className="lp-num">{WHATSAPP_DISPLAY}</bdi>
+                </a>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
 
-</div>
-</section>
-
-<section id="how" aria-labelledby="how-title" style={{ background: "#F1EDFC" }}>
-<div style={{ maxWidth: "1200px", margin: "0 auto", padding: "clamp(64px, 8vw, 104px) clamp(16px, 4vw, 32px)", display: "flex", flexDirection: "column", gap: "44px" }}>
-<div style={{ display: "flex", flexDirection: "column", gap: "12px", textAlign: "center", alignItems: "center" }}>
-<span style={{ color: "#5B3FD6", fontWeight: "700", fontSize: "15px" }}>איך זה עובד</span>
-<h2 id="how-title" style={{ margin: "0", fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "clamp(30px, 4vw, 46px)", lineHeight: "1.15" }}>מוכן עוד היום. בארבעה צעדים.</h2>
-<p style={{ margin: "0", fontSize: "18px", color: "#4A4462" }}>ללקוח אין אפליקציה להוריד, ולכם אין מסופון לקנות.</p>
-</div>
-<div style={{ display: "flex", flexWrap: "wrap", gap: "18px" }}>
-<div style={{ flex: "1 1 240px", background: "#FFFFFF", borderRadius: "24px", padding: "14px 14px 22px", display: "flex", flexDirection: "column", gap: "10px" }}>
-<div style={{ position: "relative", aspectRatio: "1", borderRadius: "18px", overflow: "hidden", background: "#EEE9FF" }}><AutoVideo src="/videos/step1-design.mp4" autoPlay muted loop playsInline preload="auto" aria-label="אנימציה: בעל העסק משנה צבע וסמל חותמת בכרטיס" style={{ width: "100%", height: "100%", display: "block", objectFit: "cover" }} /><span style={{ position: "absolute", top: "12px", right: "12px", width: "40px", height: "40px", borderRadius: "50%", background: "#17132B", color: "#FFFFFF", fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "20px", display: "flex", alignItems: "center", justifyContent: "center" }}>1</span></div>
-<h3 style={{ margin: "4px 10px 0", fontFamily: "'Rubik', sans-serif", fontSize: "21px", fontWeight: "700" }}>מעצבים כרטיס</h3>
-<p style={{ margin: "0 10px", color: "#4A4462", fontSize: "16px" }}>בוחרים צבעים, סמל חותמת, כמה חותמות ומה המתנה. רואים איך זה ייראה לפני שמפרסמים.</p>
-</div>
-<div style={{ flex: "1 1 240px", background: "#FFFFFF", borderRadius: "24px", padding: "14px 14px 22px", display: "flex", flexDirection: "column", gap: "10px" }}>
-<div style={{ position: "relative", aspectRatio: "1", borderRadius: "18px", overflow: "hidden", background: "#EEE9FF" }}><AutoVideo src="/videos/step2-join.mp4" autoPlay muted loop playsInline preload="auto" aria-label="אנימציה: לקוח סורק QR, ממלא שם וטלפון ומקבל כרטיס" style={{ width: "100%", height: "100%", display: "block", objectFit: "cover" }} /><span style={{ position: "absolute", top: "12px", right: "12px", width: "40px", height: "40px", borderRadius: "50%", background: "#17132B", color: "#FFFFFF", fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "20px", display: "flex", alignItems: "center", justifyContent: "center" }}>2</span></div>
-<h3 style={{ margin: "4px 10px 0", fontFamily: "'Rubik', sans-serif", fontSize: "21px", fontWeight: "700" }}>תולים QR בקופה</h3>
-<p style={{ margin: "0 10px", color: "#4A4462", fontSize: "16px" }}>הלקוח סורק, ממלא שם וטלפון, ומקבל כרטיס אישי בטלפון תוך שניות. אפשר לשלוח את הקישור גם בוואטסאפ.</p>
-</div>
-<div style={{ flex: "1 1 240px", background: "#FFFFFF", borderRadius: "24px", padding: "14px 14px 22px", display: "flex", flexDirection: "column", gap: "10px" }}>
-<div style={{ position: "relative", aspectRatio: "1", borderRadius: "18px", overflow: "hidden", background: "#EEE9FF" }}><AutoVideo src="/videos/step3-stamp.mp4" autoPlay muted loop playsInline preload="auto" aria-label="אנימציה: העובד לוחץ על חותמת והכרטיס של הלקוח מתמלא" style={{ width: "100%", height: "100%", display: "block", objectFit: "cover" }} /><span style={{ position: "absolute", top: "12px", right: "12px", width: "40px", height: "40px", borderRadius: "50%", background: "#17132B", color: "#FFFFFF", fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "20px", display: "flex", alignItems: "center", justifyContent: "center" }}>3</span></div>
-<h3 style={{ margin: "4px 10px 0", fontFamily: "'Rubik', sans-serif", fontSize: "21px", fontWeight: "700" }}>סורקים ומחתימים</h3>
-<p style={{ margin: "0 10px", color: "#4A4462", fontSize: "16px" }}>העובד סורק את הקוד של הלקוח במצלמת הטלפון, או מחפש לפי שם, ומאשר בלחיצה אחת.</p>
-</div>
-<div style={{ flex: "1 1 240px", background: "#6A4DE3", color: "#FFFFFF", borderRadius: "24px", padding: "14px 14px 22px", display: "flex", flexDirection: "column", gap: "10px" }}>
-<div style={{ position: "relative", aspectRatio: "1", borderRadius: "18px", overflow: "hidden", background: "#6A4DE3" }}><AutoVideo src="/videos/step4-reward.mp4" autoPlay muted loop playsInline preload="auto" aria-label="אנימציה: הכרטיס מתמלא, המתנה ממומשת וסבב חדש מתחיל" style={{ width: "100%", height: "100%", display: "block", objectFit: "cover" }} /><span style={{ position: "absolute", top: "12px", right: "12px", width: "40px", height: "40px", borderRadius: "50%", background: "#FFC24B", color: "#2B1F00", fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "20px", display: "flex", alignItems: "center", justifyContent: "center" }}>4</span></div>
-<h3 style={{ margin: "4px 10px 0", fontFamily: "'Rubik', sans-serif", fontSize: "21px", fontWeight: "700" }}>הלקוח חוזר</h3>
-<p style={{ margin: "0 10px", color: "#F1EDFF", fontSize: "16px" }}>הוא רואה כמה חסר לו למתנה, וזו בדיוק הסיבה שהקפה הבא שלו יהיה אצלכם.</p>
-</div>
-</div>
-</div>
-</section>
-
-<section aria-labelledby="dash-title" style={{ maxWidth: "1200px", margin: "0 auto", padding: "clamp(64px, 8vw, 104px) clamp(16px, 4vw, 32px)", display: "flex", flexWrap: "wrap", gap: "clamp(36px, 5vw, 64px)", alignItems: "center" }}>
-<div style={{ flex: "1 1 380px", minWidth: "0", display: "flex", flexDirection: "column", gap: "16px" }}>
-<span style={{ color: "#5B3FD6", fontWeight: "700", fontSize: "15px" }}>לבעלי העסק</span>
-<h2 id="dash-title" style={{ margin: "0", fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "clamp(30px, 4vw, 44px)", lineHeight: "1.15" }}>סוף סוף רואים מי חוזר. ומי לא.</h2>
-<p style={{ margin: "0", fontSize: "18px", color: "#4A4462" }}>לוח בקרה אחד שמראה מה קורה בעסק: כמה לקוחות הצטרפו, כמה חותמות יצאו, ואילו מתנות עוד מחכות.</p>
-<div style={{ display: "flex", flexDirection: "column", gap: "10px", fontSize: "16px", marginTop: "4px" }}>
-<span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>סטטיסטיקה לפי כל טווח זמן</span>
-<span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>היסטוריה מלאה של כל חותמת וכל מימוש, עם שם העובד</span>
-<span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>התראה על פעילות חריגה של לקוח או עובד</span>
-<span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>רשימת הלקוחות שלכם, עם ייצוא ל־CSV</span>
-</div>
-</div>
-<div role="img" aria-label="הדמיה של לוח הבקרה עם נתוני דוגמה" style={{ flex: "1 1 440px", minWidth: "0", background: "#FFFFFF", border: "1px solid #E8E3F7", borderRadius: "26px", padding: "clamp(18px, 3vw, 26px)", boxShadow: "0 24px 50px rgba(23,19,43,0.10)", display: "flex", flexDirection: "column", gap: "16px" }}>
-<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", flexWrap: "wrap" }}>
-<span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "18px" }}>קפה אייקון</span>
-<div style={{ display: "flex", gap: "6px", fontSize: "13px", fontWeight: "500" }}>
-<span style={{ padding: "5px 11px", borderRadius: "999px", background: "#F1EDFC", color: "#4A4462" }}>היום</span>
-<span style={{ padding: "5px 11px", borderRadius: "999px", background: "#17132B", color: "#FFFFFF" }}>30 יום</span>
-<span style={{ padding: "5px 11px", borderRadius: "999px", background: "#F1EDFC", color: "#4A4462" }}>הכל</span>
-</div>
-</div>
-<div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px" }}>
-<div style={{ background: "#FAF8FF", borderRadius: "16px", padding: "14px", display: "flex", flexDirection: "column" }}><span style={{ fontSize: "13px", color: "#5E5873" }}>לקוחות</span><span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "28px" }}>312</span></div>
-<div style={{ background: "#FAF8FF", borderRadius: "16px", padding: "14px", display: "flex", flexDirection: "column" }}><span style={{ fontSize: "13px", color: "#5E5873" }}>הצטרפו החודש</span><span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "28px" }}>47</span></div>
-<div style={{ background: "#FAF8FF", borderRadius: "16px", padding: "14px", display: "flex", flexDirection: "column" }}><span style={{ fontSize: "13px", color: "#5E5873" }}>חותמות</span><span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "28px" }}>1,186</span></div>
-<div style={{ background: "#FAF8FF", borderRadius: "16px", padding: "14px", display: "flex", flexDirection: "column" }}><span style={{ fontSize: "13px", color: "#5E5873" }}>מתנות מחכות</span><span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "28px", color: "#5B3FD6" }}>23</span></div>
-</div>
-<div style={{ background: "#FFF4E0", borderRadius: "14px", padding: "12px 14px", display: "flex", alignItems: "center", gap: "10px", fontSize: "14px", color: "#5C3D00" }}>
-<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#B26B00" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none" }}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>
-<span>פעילות חריגה: 4 חותמות ללקוח אחד בשעה האחרונה</span>
-</div>
-<div style={{ display: "flex", flexDirection: "column", fontSize: "14px" }}>
-<div style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid #F1EDFC" }}><span>נועה כ. קיבלה חותמת</span><span style={{ color: "#5E5873" }}>לפני 2 דק׳</span></div>
-<div style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid #F1EDFC" }}><span>יוסי ל. מימש קפה חינם</span><span style={{ color: "#5E5873" }}>לפני 14 דק׳</span></div>
-<div style={{ display: "flex", justifyContent: "space-between", padding: "10px 0" }}><span>לקוח חדש הצטרף דרך QR</span><span style={{ color: "#5E5873" }}>לפני 31 דק׳</span></div>
-</div>
-<span style={{ fontSize: "12px", color: "#5E5873", textAlign: "center" }}>נתוני דוגמה להמחשה</span>
-</div>
-</section>
-
-<section id="features" aria-labelledby="features-title" style={{ background: "#17132B", color: "#FFFFFF" }}>
-<div style={{ maxWidth: "1200px", margin: "0 auto", padding: "clamp(64px, 8vw, 104px) clamp(16px, 4vw, 32px)", display: "flex", flexDirection: "column", gap: "40px" }}>
-<div style={{ display: "flex", flexDirection: "column", gap: "12px", maxWidth: "720px" }}>
-<span style={{ color: "#FFC24B", fontWeight: "700", fontSize: "15px" }}>יכולות</span>
-<h2 id="features-title" style={{ margin: "0", fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "clamp(30px, 4vw, 46px)", lineHeight: "1.15" }}>כל מה שכרטיס נייר לא יכול.</h2>
-</div>
-<div style={{ display: "flex", flexWrap: "wrap", gap: "16px" }}>
-<div style={{ flex: "1 1 320px", background: "#241E40", borderRadius: "22px", padding: "26px", display: "flex", flexDirection: "column", gap: "10px" }}>
-<svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FFC24B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="20" x="5" y="2" rx="2"></rect><path d="M12 18h.01"></path></svg>
-<h3 style={{ margin: "0", fontFamily: "'Rubik', sans-serif", fontSize: "20px", fontWeight: "700" }}>בלי אפליקציה, בלי חסמים</h3>
-<p style={{ margin: "0", color: "#C9C3DE", fontSize: "16px" }}>הלקוח שומר את הכרטיס ב־Apple Wallet או ב־Google Wallet, או פותח אותו מקישור אישי. גם מי שלא מוריד אפליקציות בשביל קפה מצטרף בלי לחשוב פעמיים.</p>
-</div>
-<div style={{ flex: "1 1 320px", background: "#241E40", borderRadius: "22px", padding: "26px", display: "flex", flexDirection: "column", gap: "10px" }}>
-<svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FFC24B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path></svg>
-<h3 style={{ margin: "0", fontFamily: "'Rubik', sans-serif", fontSize: "20px", fontWeight: "700" }}>מוגן מרמאויות</h3>
-<p style={{ margin: "0", color: "#C9C3DE", fontSize: "16px" }}>אין ספירה כפולה ואין מימוש כפול. גם אחרי ניתוק רשת החותמת לא נספרת פעמיים, וגישה של עובד שעזב נחסמת מיד.</p>
-</div>
-<div style={{ flex: "1 1 320px", background: "#241E40", borderRadius: "22px", padding: "26px", display: "flex", flexDirection: "column", gap: "10px" }}>
-<svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FFC24B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-<h3 style={{ margin: "0", fontFamily: "'Rubik', sans-serif", fontSize: "20px", fontWeight: "700" }}>צוות בלי כאב ראש</h3>
-<p style={{ margin: "0", color: "#C9C3DE", fontSize: "16px" }}>מזמינים עובדים בקישור. הם מוסיפים חותמות ומממשים מתנות, אבל לא רואים את רשימת הלקוחות ולא נוגעים בהגדרות.</p>
-</div>
-<div style={{ flex: "1 1 320px", background: "#241E40", borderRadius: "22px", padding: "26px", display: "flex", flexDirection: "column", gap: "10px" }}>
-<svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FFC24B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"></rect><path d="M12 8v13"></path><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"></path></svg>
-<h3 style={{ margin: "0", fontFamily: "'Rubik', sans-serif", fontSize: "20px", fontWeight: "700" }}>מימוש מיד או צבירה</h3>
-<p style={{ margin: "0", color: "#C9C3DE", fontSize: "16px" }}>כרטיס מלא נפדה בקופה, או שהמתנה נשמרת והלקוח ממשיך לכרטיס חדש. אפשר לקבוע תוקף למתנה, מ־30 ועד 365 יום.</p>
-</div>
-<div style={{ flex: "1 1 320px", background: "#241E40", borderRadius: "22px", padding: "26px", display: "flex", flexDirection: "column", gap: "10px" }}>
-<svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FFC24B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path></svg>
-<h3 style={{ margin: "0", fontFamily: "'Rubik', sans-serif", fontSize: "20px", fontWeight: "700" }}>עברית, ערבית ואנגלית</h3>
-<p style={{ margin: "0", color: "#C9C3DE", fontSize: "16px" }}>כל לקוח רואה את הכרטיס בשפה שלו, מימין לשמאל או משמאל לימין.</p>
-</div>
-<div style={{ flex: "1 1 320px", background: "#241E40", borderRadius: "22px", padding: "26px", display: "flex", flexDirection: "column", gap: "10px" }}>
-<svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FFC24B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-<h3 style={{ margin: "0", fontFamily: "'Rubik', sans-serif", fontSize: "20px", fontWeight: "700" }}>פרטיות כמו שצריך</h3>
-<p style={{ margin: "0", color: "#C9C3DE", fontSize: "16px" }}>הלקוח מאשר תנאים בהצטרפות, וההסכמה לדיוור שיווקי נפרדת ולא מסומנת מראש. הקישור לכרטיס סודי ואפשר להחליף אותו.</p>
-</div>
-</div>
-</div>
-</section>
-
-<Testimonials />
-
-<section id="kit" aria-labelledby="kit-title" style={{ maxWidth: "1200px", margin: "0 auto", padding: "clamp(64px, 8vw, 104px) clamp(16px, 4vw, 32px)", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "clamp(40px, 6vw, 72px)" }}>
-<div style={{ flex: "1 1 380px", minWidth: "0", display: "flex", flexDirection: "column", gap: "16px" }}>
-<span style={{ color: "#5B3FD6", fontWeight: "700", fontSize: "15px" }}>ערכת קופה</span>
-<h2 id="kit-title" style={{ margin: "0", fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "clamp(30px, 4vw, 46px)", lineHeight: "1.15" }}>הכל מוכן לקופה<br />מהיום הראשון.</h2>
-<p style={{ margin: "0", fontSize: "19px", color: "#4A4462", maxWidth: "500px" }}>רוצים להתחיל מוכנים? מזמינים ערכה מודפסת עם הלוגו שלכם וקוד ה־QR האישי של העסק. תולים, מעמידים ליד הקופה, והלקוחות מתחילים להצטרף. הערכה לא חובה, ואפשר להזמין אותה גם בלי מנוי.</p>
-<div style={{ display: "flex", flexDirection: "column", gap: "10px", fontSize: "17px", marginTop: "4px" }}>
-<span style={{ display: "flex", alignItems: "center", gap: "10px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>2 פוסטרים מעוצבים עם הלוגו שלכם</span>
-<span style={{ display: "flex", alignItems: "center", gap: "10px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>סטנד QR לדלפק</span>
-<span style={{ display: "flex", alignItems: "center", gap: "10px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>QR אישי שמוביל ישר להצטרפות לכרטיס שלכם</span>
-</div>
-<div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "14px", marginTop: "6px" }}>
-<span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "34px", lineHeight: "1" }}>99 ₪</span>
-<span style={{ fontSize: "15px", color: "#4A4462" }}>תשלום חד־פעמי</span>
-</div>
-<a href="https://wa.me/972526028291?text=%D7%94%D7%99%D7%99%2C%20%D7%90%D7%A9%D7%9E%D7%97%20%D7%9C%D7%94%D7%96%D7%9E%D7%99%D7%9F%20%D7%A2%D7%A8%D7%9B%D7%AA%20%D7%A7%D7%95%D7%A4%D7%94%20%D7%A9%D7%9C%20Perkly%20%2899%20%E2%82%AA%29" style={{ alignSelf: "flex-start", background: "#17132B", color: "#FFFFFF", textDecoration: "none", fontWeight: "700", fontSize: "17px", padding: "14px 24px", borderRadius: "14px", minHeight: "52px", boxSizing: "border-box", display: "inline-flex", alignItems: "center", gap: "10px" }}>הזמינו ערכה בוואטסאפ</a>
-</div>
-<div role="img" aria-label="ערכת הקופה: שני פוסטרים וסטנד לדלפק עם הלוגו של העסק וקוד QR" style={{ flex: "999 1 520px", minWidth: "0", background: "#F1EDFC", borderRadius: "32px", padding: "clamp(24px, 4vw, 40px) clamp(16px, 3vw, 32px) 28px", display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "flex-end", gap: "22px" }}>
-<div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
-<div style={{ width: "200px", height: "284px", background: "#6A4DE3", color: "#FFFFFF", borderRadius: "10px", padding: "18px", boxSizing: "border-box", display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", boxShadow: "0 18px 36px rgba(23,19,43,0.22)", textAlign: "center" }}>
-<div style={{ display: "flex", alignItems: "center", gap: "8px" }}><svg role="img" aria-label="הלוגו של קפה אייקון" width="34" height="34" viewBox="0 0 48 48" style={{ flex: "none" }}><rect width="48" height="48" rx="14" fill="#F3EEFF"></rect><circle cx="24" cy="25" r="17" fill="#8F72E8"></circle><path d="M15 23h16v5.5a7 7 0 0 1-7 7h-2a7 7 0 0 1-7-7z" fill="#FFFFFF"></path><path d="M31 25h1.6a3 3 0 0 1 0 6H31" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round"></path><path d="M13 38h20" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round"></path><path d="M23 21c0-3.5 2.5-5.5 2.5-11" fill="none" stroke="#3E2A8C" strokeWidth="1.6" strokeLinecap="round"></path><ellipse cx="26.6" cy="10.6" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(-30 26.6 10.6)"></ellipse><ellipse cx="24.2" cy="12.4" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(30 24.2 12.4)"></ellipse><ellipse cx="26.2" cy="14.6" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(-30 26.2 14.6)"></ellipse><ellipse cx="23.6" cy="16.6" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(30 23.6 16.6)"></ellipse></svg><span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "15px" }}>קפה אייקון</span></div>
-<span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "21px", lineHeight: "1.15" }}>אוספים חותמות.<br />מקבלים מתנה.</span>
-<div style={{ background: "#FFFFFF", borderRadius: "10px", padding: "6px", display: "flex" }}><svg aria-hidden="true" width="84" height="84" viewBox="-1 -1 23 23" shapeRendering="crispEdges"><rect x="-1" y="-1" width="23" height="23" fill="#FFFFFF"></rect><path fill="#17132B" d="M0 0h7v7H0zM14 0h7v7h-7zM0 14h7v7H0zM8 0h1v2H8zM10 1h2v1h-2zM9 3h2v2H9zM12 4h1v2h-1zM8 6h1v1H8zM10 6h1v1h-1zM0 8h2v1H0zM3 8h3v1H3zM8 8h2v2H8zM11 8h3v1h-3zM15 8h2v2h-2zM18 8h3v1h-3zM1 10h2v2H1zM5 10h2v1H5zM11 10h1v3h-1zM13 10h2v1h-2zM17 11h2v2h-2zM20 10h1v3h-1zM4 12h3v1H4zM8 12h2v2H8zM13 12h3v1h-3zM8 15h2v1H8zM11 14h2v2h-2zM14 14h2v1h-2zM17 14h1v2h-1zM19 15h2v1h-2zM9 17h3v1H9zM13 16h3v2h-3zM8 19h2v2H8zM11 19h1v2h-1zM14 19h3v1h-3zM18 18h1v3h-1zM20 19h1v2h-1z"></path><path fill="#FFFFFF" d="M1 1h5v5H1zM15 1h5v5h-5zM1 15h5v5H1z"></path><path fill="#17132B" d="M2 2h3v3H2zM16 2h3v3h-3zM2 16h3v3H2z"></path></svg></div>
-<span style={{ fontSize: "13px", fontWeight: "700", color: "#FFC24B" }}>סרקו והצטרפו בחינם</span>
-</div>
-<span style={{ fontSize: "14px", fontWeight: "700", color: "#4A4462" }}>פוסטר לחלון</span>
-</div>
-<div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
-<div style={{ width: "200px", height: "284px", background: "#FFF8EC", color: "#2A1A0A", borderRadius: "10px", padding: "18px", boxSizing: "border-box", display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", boxShadow: "0 18px 36px rgba(23,19,43,0.16)", border: "1px solid #F0E3CC", textAlign: "center" }}>
-<svg role="img" aria-label="הלוגו של קפה אייקון" width="40" height="40" viewBox="0 0 48 48" style={{ flex: "none" }}><rect width="48" height="48" rx="14" fill="#F3EEFF"></rect><circle cx="24" cy="25" r="17" fill="#8F72E8"></circle><path d="M15 23h16v5.5a7 7 0 0 1-7 7h-2a7 7 0 0 1-7-7z" fill="#FFFFFF"></path><path d="M31 25h1.6a3 3 0 0 1 0 6H31" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round"></path><path d="M13 38h20" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round"></path><path d="M23 21c0-3.5 2.5-5.5 2.5-11" fill="none" stroke="#3E2A8C" strokeWidth="1.6" strokeLinecap="round"></path><ellipse cx="26.6" cy="10.6" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(-30 26.6 10.6)"></ellipse><ellipse cx="24.2" cy="12.4" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(30 24.2 12.4)"></ellipse><ellipse cx="26.2" cy="14.6" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(-30 26.2 14.6)"></ellipse><ellipse cx="23.6" cy="16.6" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(30 23.6 16.6)"></ellipse></svg>
-<span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "20px", lineHeight: "1.15" }}>הקפה העשירי<br />עלינו</span>
-<div style={{ display: "flex", gap: "5px", direction: "rtl" }}><span style={{ width: "26px", height: "26px", borderRadius: "50%", background: "#FFC24B", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3B2A00" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"></path></svg></span><span style={{ width: "26px", height: "26px", borderRadius: "50%", background: "#FFC24B", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3B2A00" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"></path></svg></span><span style={{ width: "26px", height: "26px", borderRadius: "50%", background: "#FFC24B", display: "flex", alignItems: "center", justifyContent: "center" }}><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3B2A00" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"></path></svg></span><span style={{ width: "26px", height: "26px", borderRadius: "50%", border: "2px dashed #C9BFA8", boxSizing: "border-box" }}></span><span style={{ width: "26px", height: "26px", borderRadius: "50%", border: "2px dashed #C9BFA8", boxSizing: "border-box" }}></span></div>
-<div style={{ display: "flex" }}><svg aria-hidden="true" width="72" height="72" viewBox="-1 -1 23 23" shapeRendering="crispEdges"><rect x="-1" y="-1" width="23" height="23" fill="#FFFFFF"></rect><path fill="#17132B" d="M0 0h7v7H0zM14 0h7v7h-7zM0 14h7v7H0zM8 0h1v2H8zM10 1h2v1h-2zM9 3h2v2H9zM12 4h1v2h-1zM8 6h1v1H8zM10 6h1v1h-1zM0 8h2v1H0zM3 8h3v1H3zM8 8h2v2H8zM11 8h3v1h-3zM15 8h2v2h-2zM18 8h3v1h-3zM1 10h2v2H1zM5 10h2v1H5zM11 10h1v3h-1zM13 10h2v1h-2zM17 11h2v2h-2zM20 10h1v3h-1zM4 12h3v1H4zM8 12h2v2H8zM13 12h3v1h-3zM8 15h2v1H8zM11 14h2v2h-2zM14 14h2v1h-2zM17 14h1v2h-1zM19 15h2v1h-2zM9 17h3v1H9zM13 16h3v2h-3zM8 19h2v2H8zM11 19h1v2h-1zM14 19h3v1h-3zM18 18h1v3h-1zM20 19h1v2h-1z"></path><path fill="#FFFFFF" d="M1 1h5v5H1zM15 1h5v5h-5zM1 15h5v5H1z"></path><path fill="#17132B" d="M2 2h3v3H2zM16 2h3v3h-3zM2 16h3v3H2z"></path></svg></div>
-<span style={{ fontSize: "13px", fontWeight: "700", color: "#6B4E2E" }}>סרקו בקופה</span>
-</div>
-<span style={{ fontSize: "14px", fontWeight: "700", color: "#4A4462" }}>פוסטר לקיר</span>
-</div>
-<div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
-<div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-<div style={{ width: "150px", height: "196px", background: "#FFFFFF", borderRadius: "12px", padding: "14px", boxSizing: "border-box", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "10px", boxShadow: "0 14px 28px rgba(23,19,43,0.16)", border: "1px solid #E8E3F7", textAlign: "center" }}>
-<svg role="img" aria-label="הלוגו של קפה אייקון" width="34" height="34" viewBox="0 0 48 48" style={{ flex: "none" }}><rect width="48" height="48" rx="14" fill="#F3EEFF"></rect><circle cx="24" cy="25" r="17" fill="#8F72E8"></circle><path d="M15 23h16v5.5a7 7 0 0 1-7 7h-2a7 7 0 0 1-7-7z" fill="#FFFFFF"></path><path d="M31 25h1.6a3 3 0 0 1 0 6H31" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round"></path><path d="M13 38h20" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round"></path><path d="M23 21c0-3.5 2.5-5.5 2.5-11" fill="none" stroke="#3E2A8C" strokeWidth="1.6" strokeLinecap="round"></path><ellipse cx="26.6" cy="10.6" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(-30 26.6 10.6)"></ellipse><ellipse cx="24.2" cy="12.4" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(30 24.2 12.4)"></ellipse><ellipse cx="26.2" cy="14.6" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(-30 26.2 14.6)"></ellipse><ellipse cx="23.6" cy="16.6" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(30 23.6 16.6)"></ellipse></svg>
-<span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "14px", lineHeight: "1.25" }}>סרקו לכרטיס<br />הנאמנות</span>
-<div style={{ display: "flex" }}><svg aria-hidden="true" width="76" height="76" viewBox="-1 -1 23 23" shapeRendering="crispEdges"><rect x="-1" y="-1" width="23" height="23" fill="#FFFFFF"></rect><path fill="#17132B" d="M0 0h7v7H0zM14 0h7v7h-7zM0 14h7v7H0zM8 0h1v2H8zM10 1h2v1h-2zM9 3h2v2H9zM12 4h1v2h-1zM8 6h1v1H8zM10 6h1v1h-1zM0 8h2v1H0zM3 8h3v1H3zM8 8h2v2H8zM11 8h3v1h-3zM15 8h2v2h-2zM18 8h3v1h-3zM1 10h2v2H1zM5 10h2v1H5zM11 10h1v3h-1zM13 10h2v1h-2zM17 11h2v2h-2zM20 10h1v3h-1zM4 12h3v1H4zM8 12h2v2H8zM13 12h3v1h-3zM8 15h2v1H8zM11 14h2v2h-2zM14 14h2v1h-2zM17 14h1v2h-1zM19 15h2v1h-2zM9 17h3v1H9zM13 16h3v2h-3zM8 19h2v2H8zM11 19h1v2h-1zM14 19h3v1h-3zM18 18h1v3h-1zM20 19h1v2h-1z"></path><path fill="#FFFFFF" d="M1 1h5v5H1zM15 1h5v5h-5zM1 15h5v5H1z"></path><path fill="#17132B" d="M2 2h3v3H2zM16 2h3v3h-3zM2 16h3v3H2z"></path></svg></div>
-</div>
-<div style={{ width: "170px", height: "14px", background: "#17132B", clipPath: "polygon(8% 0, 92% 0, 100% 100%, 0 100%)" }}></div>
-</div>
-<span style={{ fontSize: "14px", fontWeight: "700", color: "#4A4462" }}>סטנד לדלפק</span>
-</div>
-</div>
-</section>
-
-<section id="pricing" aria-labelledby="price-title" style={{ background: "#F1EDFC" }}>
-<div style={{ maxWidth: "1200px", margin: "0 auto", padding: "clamp(64px, 8vw, 104px) clamp(16px, 4vw, 32px)", display: "flex", flexWrap: "wrap", gap: "clamp(32px, 5vw, 64px)", alignItems: "center" }}>
-<div style={{ flex: "999 1 400px", minWidth: "0", display: "flex", flexDirection: "column", gap: "14px" }}>
-<span style={{ color: "#5B3FD6", fontWeight: "700", fontSize: "15px" }}>מחיר</span>
-<h2 id="price-title" style={{ margin: "0", fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "clamp(30px, 4vw, 46px)", lineHeight: "1.15" }}>מחיר פשוט. בלי הפתעות.</h2>
-<p style={{ margin: "0", fontSize: "19px", color: "#4A4462", maxWidth: "480px" }}>בלי חבילות מסובכות ובלי תוספות. מספיק לקוח קבוע אחד שחזר בזכות המתנה, והחודש כבר שילם את עצמו.</p>
-<div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "16px", color: "#3D3657", marginTop: "6px" }}>
-<span style={{ display: "flex", alignItems: "center", gap: "8px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>99 ₪ לחודש, בלי דמי הקמה</span>
-<span style={{ display: "flex", alignItems: "center", gap: "8px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>ערכת קופה מודפסת לבחירה: 99 ₪ חד־פעמי</span>
-<span style={{ display: "flex", alignItems: "center", gap: "8px" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>בלי ציוד לקנות: מספיק טלפון בקופה</span>
-</div>
-</div>
-<div style={{ flex: "1 1 360px", maxWidth: "460px", background: "#FFFFFF", borderRadius: "28px", padding: "clamp(26px, 4vw, 36px)", boxShadow: "0 24px 50px rgba(23,19,43,0.12)", border: "2px solid #7558E8", display: "flex", flexDirection: "column", gap: "20px" }}>
-<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
-<span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "22px" }}>Perkly לעסק</span>
-<span style={{ background: "#FFF1D1", color: "#6B4600", fontWeight: "700", fontSize: "13px", padding: "6px 12px", borderRadius: "999px" }}>בלי דמי הקמה</span>
-</div>
-<div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
-<span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "56px", lineHeight: "1" }}>99 ₪</span>
-<span style={{ color: "#5E5873", fontSize: "17px" }}>לחודש</span>
-</div>
-<div style={{ background: "#F6F3FF", borderRadius: "16px", padding: "14px 16px", display: "flex", flexDirection: "column", gap: "4px", marginTop: "-6px" }}>
-<span style={{ fontWeight: "700", fontSize: "16px" }}>תוספת לבחירה: ערכת קופה, 99 ₪</span>
-<span style={{ fontSize: "14px", color: "#4A4462" }}>2 פוסטרים וסטנד לדלפק עם הלוגו שלכם. תשלום חד־פעמי, לא חובה.</span>
-</div>
-<div style={{ display: "flex", flexDirection: "column", gap: "11px", fontSize: "16px" }}>
-<span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>עורך עיצוב מלא לכרטיס</span>
-<span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>כרטיס ב־Apple Wallet וב־Google Wallet</span>
-<span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>הצטרפות לקוחות ב־QR</span>
-<span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>עמדת עובד וצוות בהזמנה</span>
-<span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>לוח בקרה, היסטוריה וייצוא ל־CSV</span>
-<span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>התראות על פעילות חריגה</span>
-<span style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B3FD6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: "3px" }}><path d="M20 6 9 17l-5-5"></path></svg>עברית, ערבית ואנגלית</span>
-</div>
-<a href="/signup" style={{ background: "#7558E8", color: "#FFFFFF", textDecoration: "none", fontWeight: "700", fontSize: "18px", padding: "16px 24px", borderRadius: "14px", textAlign: "center", minHeight: "56px", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center" }}>פתחו חשבון לעסק</a>
-</div>
-</div>
-</section>
-
-<section id="faq" aria-labelledby="faq-title" style={{ maxWidth: "860px", margin: "0 auto", padding: "clamp(64px, 8vw, 104px) clamp(16px, 4vw, 32px)", display: "flex", flexDirection: "column", gap: "32px" }}>
-<h2 id="faq-title" style={{ margin: "0", fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "clamp(30px, 4vw, 46px)", lineHeight: "1.15", textAlign: "center" }}>שאלות שבעלי עסקים שואלים</h2>
-<div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-<details style={{ background: "#FFFFFF", border: "1px solid #E8E3F7", borderRadius: "18px", padding: "20px 24px" }}>
-<summary style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "19px" }}>הלקוחות צריכים להוריד אפליקציה?</summary>
-<p style={{ margin: "12px 0 0", color: "#4A4462", fontSize: "16px" }}>לא. הלקוח סורק את ה־QR בקופה, נרשם בכמה שניות ומקבל קישור אישי לכרטיס. אפשר לשמור אותו ב־Apple Wallet או ב־Google Wallet, או להוסיף אותו למסך הבית. זה עובד בכל טלפון.</p>
-</details>
-<details style={{ background: "#FFFFFF", border: "1px solid #E8E3F7", borderRadius: "18px", padding: "20px 24px" }}>
-<summary style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "19px" }}>צריך לקנות ציוד?</summary>
-<p style={{ margin: "12px 0 0", color: "#4A4462", fontSize: "16px" }}>לא. עמדת העובד רצה בדפדפן של הטלפון או הטאבלט שכבר יש לכם בקופה, ומשתמשת במצלמה שלו לסריקה. את שלט ה־QR אפשר להדפיס בעצמכם, או להזמין מאיתנו ערכת קופה מעוצבת ב־99 ₪.</p>
-</details>
-<details style={{ background: "#FFFFFF", border: "1px solid #E8E3F7", borderRadius: "18px", padding: "20px 24px" }}>
-<summary style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "19px" }}>כמה זה עולה?</summary>
-<p style={{ margin: "12px 0 0", color: "#4A4462", fontSize: "16px" }}>99 ₪ לחודש, בלי דמי הקמה. ערכת קופה מודפסת, עם שני פוסטרים וסטנד לדלפק עם הלוגו שלכם, אפשר להזמין בנפרד ב־99 ₪ חד־פעמי. היא לא חובה, ואפשר להזמין אותה גם בלי מנוי.</p>
-</details>
-<details style={{ background: "#FFFFFF", border: "1px solid #E8E3F7", borderRadius: "18px", padding: "20px 24px" }}>
-<summary style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "19px" }}>מה מונע מעובד לחלק חותמות לחברים?</summary>
-<p style={{ margin: "12px 0 0", color: "#4A4462", fontSize: "16px" }}>לכל עובד כניסה אישית, וכל פעולה נרשמת בהיסטוריה עם השם שלו. המערכת מתריעה כשלקוח מקבל יותר מדי חותמות בשעה או כשעובד מבצע הרבה פעולות. ביטול גישה חל מיד.</p>
-</details>
-<details style={{ background: "#FFFFFF", border: "1px solid #E8E3F7", borderRadius: "18px", padding: "20px 24px" }}>
-<summary style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "19px" }}>מה קורה כשהכרטיס מתמלא?</summary>
-<p style={{ margin: "12px 0 0", color: "#4A4462", fontSize: "16px" }}>אתם בוחרים. במצב מימוש מיד, הלקוח מקבל את המתנה בקופה. במצב צבירה, המתנה נשמרת לו והוא מתחיל כרטיס חדש. אפשר לקבוע תוקף למתנה או להשאיר בלי הגבלה.</p>
-</details>
-<details style={{ background: "#FFFFFF", border: "1px solid #E8E3F7", borderRadius: "18px", padding: "20px 24px" }}>
-<summary style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "19px" }}>אפשר לשנות את העיצוב אחרי שהתחלנו?</summary>
-<p style={{ margin: "12px 0 0", color: "#4A4462", fontSize: "16px" }}>כן, מתי שתרצו. שומרים טיוטה, בודקים בתצוגה מקדימה ומפרסמים. שינוי עיצוב לא נוגע בחותמות שהלקוחות כבר צברו.</p>
-</details>
-<details style={{ background: "#FFFFFF", border: "1px solid #E8E3F7", borderRadius: "18px", padding: "20px 24px" }}>
-<summary style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "19px" }}>זה מתאים לעסק שלי?</summary>
-<p style={{ margin: "12px 0 0", color: "#4A4462", fontSize: "16px" }}>אם הלקוחות שלכם חוזרים, או שהייתם רוצים שיחזרו, זה מתאים. בתי קפה, מספרות, מסעדות, גלידריות, ברים, סטודיו ועסקי שירות משתמשים בכרטיס ניקוב כבר שנים. Perkly פשוט עושה אותו חכם יותר.</p>
-</details>
-<details style={{ background: "#FFFFFF", border: "1px solid #E8E3F7", borderRadius: "18px", padding: "20px 24px" }}>
-<summary style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "700", fontSize: "19px" }}>יש חיבור ל־Apple Wallet ול־Google Wallet?</summary>
-<p style={{ margin: "12px 0 0", color: "#4A4462", fontSize: "16px" }}>כן. הלקוח שומר את הכרטיס ב־Apple Wallet או ב־Google Wallet בלחיצה, והחותמות מתעדכנות בו. מי שמעדיף יכול לפתוח את הכרטיס מהקישור האישי או מקיצור במסך הבית.</p>
-</details>
-</div>
-</section>
-
-<section aria-labelledby="cta-title" style={{ padding: "0 clamp(16px, 4vw, 32px) clamp(64px, 8vw, 104px)" }}>
-<div style={{ maxWidth: "1200px", margin: "0 auto", background: "#6A4DE3", color: "#FFFFFF", borderRadius: "32px", padding: "clamp(40px, 6vw, 72px) clamp(24px, 5vw, 64px)", display: "flex", flexWrap: "wrap", gap: "32px", alignItems: "center", justifyContent: "space-between", position: "relative", overflow: "hidden" }}>
-<div aria-hidden="true" style={{ position: "absolute", width: "280px", height: "280px", borderRadius: "50%", border: "36px solid #7E63EE", left: "-80px", bottom: "-120px" }}></div>
-<div aria-hidden="true" style={{ position: "absolute", width: "90px", height: "90px", borderRadius: "50%", background: "#FFC24B", left: "140px", top: "-30px" }}></div>
-<div style={{ flex: "999 1 420px", minWidth: "0", display: "flex", flexDirection: "column", gap: "12px", position: "relative" }}>
-<h2 id="cta-title" style={{ margin: "0", fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "clamp(30px, 4.2vw, 50px)", lineHeight: "1.1" }}>מביקור אחד<br />ללקוח קבוע.</h2>
-<p style={{ margin: "0", fontSize: "19px", color: "#F1EDFF" }}>פותחים חשבון, מעצבים כרטיס, תולים QR ליד הקופה. עוד היום.</p>
-</div>
-<div style={{ flex: "1 1 260px", display: "flex", flexDirection: "column", gap: "12px", alignItems: "stretch", position: "relative" }}>
-<a href="/signup" style={{ background: "#FFFFFF", color: "#17132B", textDecoration: "none", fontWeight: "800", fontSize: "19px", padding: "18px 28px", borderRadius: "16px", textAlign: "center", minHeight: "60px", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center" }}>צרו את הכרטיס הראשון שלכם</a>
-<WhatsAppLine style={{ fontSize: "14px", color: "#F1EDFF", textAlign: "center" }} />
-</div>
-</div>
-</section>
-
-<footer style={{ borderTop: "1px solid #E8E3F7", display: "block", margin: 0, fontSize: "inherit", color: "inherit" }}>
-<div style={{ maxWidth: "1200px", margin: "0 auto", padding: "28px clamp(16px, 4vw, 32px)", display: "flex", flexWrap: "wrap", gap: "14px", alignItems: "center", justifyContent: "space-between", fontSize: "14px", color: "#5E5873" }}>
-<span style={{ display: "flex", alignItems: "center", gap: "10px" }}><span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: "800", fontSize: "18px", color: "#17132B" }}>Perkly</span>כרטיס קטן. קשר גדול.</span>
-<span style={{ display: "flex", gap: "18px", flexWrap: "wrap" }}><a href="#top">perkly.shop</a><span>© 2026 Perkly</span></span>
-</div>
-</footer>
-
-</div>
-    </>
+      <footer className="lp-footer">
+        <div className="lp-wrap lp-footer-grid">
+          <div className="lp-footer-brand">
+            <Logo label="Perkly" />
+            <span>{c.footer.tagline}</span>
+            <a href={waLink(c.trust.waText)} target="_blank" rel="noopener noreferrer">{c.footer.support}&nbsp;<bdi className="lp-num">{WHATSAPP_DISPLAY}</bdi></a>
+          </div>
+          <nav aria-label={c.footer.nav} className="lp-footer-links">
+            <a href={h.terms}>{c.footer.terms}</a>
+            <a href={h.privacy}>{c.footer.privacy}</a>
+            <a href={h.accessibility}>{c.footer.accessibility}</a>
+            <a href={h.login}>{c.footer.login}</a>
+          </nav>
+          <span className="lp-footer-rights">{c.footer.rights}</span>
+        </div>
+      </footer>
+    </div>
   );
 }

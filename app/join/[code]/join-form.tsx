@@ -53,6 +53,7 @@ export default function JoinForm({ code, business }: { code: string; business: B
           <label>{t("phone")}<input name="phone" type="tel" required maxLength={20} autoComplete="tel" dir="ltr" placeholder={t("phoneHint")} /></label>
           <label className="check"><input type="checkbox" name="terms" required /> <span>{t("terms")}</span></label>
           <label className="check"><input type="checkbox" name="marketing" /> <span>{t("marketing")}</span></label>
+          <p className="form-hint"><a href="/privacy" target="_blank" rel="noopener" style={{ textDecoration: "underline" }}>{t("legalLinks")}</a> · <a href="/terms" target="_blank" rel="noopener" style={{ textDecoration: "underline" }}>{t("termsLink")}</a></p>
           {error && <p className="form-error" role="alert">{error}</p>}
           <button className="btn primary wide" disabled={busy}>{busy ? t("loading") : t("getCard")}</button>
           <p className="form-hint">{t("phoneNotVerified")}</p>

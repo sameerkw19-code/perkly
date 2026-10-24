@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin
+Disallow: /c/
+Disallow: /join/
+Disallow: /invite/
+
+Sitemap: https://perkly.shop/sitemap.xml

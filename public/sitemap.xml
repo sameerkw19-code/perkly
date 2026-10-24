@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://perkly.shop/</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://perkly.shop/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://perkly.shop/ar"/>
+  </url>
+  <url>
+    <loc>https://perkly.shop/ar</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://perkly.shop/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://perkly.shop/ar"/>
+  </url>
+  <url>
+    <loc>https://perkly.shop/signup</loc>
+  </url>
+</urlset>

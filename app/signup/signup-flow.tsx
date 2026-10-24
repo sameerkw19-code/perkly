@@ -1,200 +1,245 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import "../landing/landing.css";
+import { hrefs, waLink, WHATSAPP_DISPLAY, type Lang } from "../landing/content";
+import { Logo } from "../landing/landing-client";
+import { Icon } from "../landing/visuals";
 
-// DEMO payment flow. No card details can be typed (the fields are locked), nothing is
-// charged and nothing is sent to the server. Replace step 2 with the Tranzila hosted page
-// once the terminal is set up.
+// Pilot request form. Real: the request is saved (POST /api/lead) and shown on /admin.
+// Online payment is not connected yet, so nothing is charged here.
 
-const MONTHLY = 99;
-const KIT = 99;
+const T = {
+  he: {
+    title: "הצטרפות לפיילוט",
+    intro: "השאירו פרטים ונחזור אליכם עם קוד לפתיחת חשבון. התשלום באתר עדיין לא מחובר, ולא נגבה תשלום בשלב הזה.",
+    business: "שם העסק", contact: "שם איש הקשר", phone: "טלפון", email: "אימייל", optional: "(לא חובה)",
+    kind: "סוג העסק", kindPick: "בחרו…", city: "עיר", note: "משהו שחשוב שנדע?",
+    kinds: { cafe: "בית קפה", barber: "מספרה", food: "מסעדה או פיצרייה", icecream: "גלידרייה", studio: "סטודיו או חדר כושר", bar: "בר", other: "אחר" },
+    kit: "מעוניינים גם בערכת קופה (99 ₪ חד־פעמי): 2 פוסטרים וסטנד QR",
+    privacyBefore: "קראתי את ",
+    privacyLink: "מדיניות הפרטיות",
+    privacyAfter: " ואני מסכים/ה ש־Perkly תיצור איתי קשר בנוגע לפיילוט",
+    marketing: "אשמח לקבל מ־Perkly עדכונים והצעות (לא חובה)",
+    submit: "שליחת הבקשה", sending: "שולח…",
+    errSummary: "יש שדות שצריך לתקן:",
+    err: { required: "שדה חובה", phone: "מספר טלפון לא תקין", email: "כתובת אימייל לא תקינה", privacy: "צריך לאשר כדי שנוכל לחזור אליכם" },
+    errRate: "נשלחו יותר מדי בקשות. נסו שוב מאוחר יותר או כתבו לנו בוואטסאפ.",
+    errNet: "השליחה נכשלה. בדקו את החיבור ונסו שוב.",
+    doneTitle: "קיבלנו את הבקשה!",
+    doneText: "נחזור אליכם בוואטסאפ או בטלפון, ונשלח קוד לפתיחת החשבון.",
+    doneWa: "רוצים לזרז? שלחו לנו הודעה",
+    doneWaText: (b: string) => `היי, השארתי בקשה להצטרף לפיילוט של Perkly (${b})`,
+    askWaText: "היי, יש לי שאלה על הפיילוט של Perkly",
+    home: "חזרה לדף הבית",
+    nextTitle: "מה קורה אחרי השליחה",
+    next: ["אנחנו חוזרים אליכם ושולחים קוד לפתיחת חשבון", "פותחים חשבון ומעצבים את הכרטיס", "מציבים QR בקופה ומתחילים להחתים"],
+    price: "99 ₪ לחודש", priceNote: "בלי דמי הקמה",
+    support: "שאלות? וואטסאפ",
+    login: "כבר יש לי חשבון",
+  },
+  ar: {
+    title: "الانضمام للتجربة",
+    intro: "اتركوا تفاصيلكم وسنعود إليكم برمز لفتح الحساب. الدفع في الموقع غير مربوط بعد، ولا يتم تحصيل أي مبلغ في هذه المرحلة.",
+    business: "اسم المشروع", contact: "اسم الشخص المسؤول", phone: "الهاتف", email: "البريد الإلكتروني", optional: "(اختياري)",
+    kind: "نوع المشروع", kindPick: "اختاروا…", city: "المدينة", note: "شيء مهم نعرفه؟",
+    kinds: { cafe: "مقهى", barber: "صالون حلاقة", food: "مطعم أو بيتزا", icecream: "بوظة", studio: "ستوديو أو نادٍ رياضي", bar: "بار", other: "آخر" },
+    kit: "مهتمون أيضاً بطقم الصندوق (99 ₪ لمرة واحدة): ملصقان وحامل QR",
+    privacyBefore: "قرأت ",
+    privacyLink: "سياسة الخصوصية",
+    privacyAfter: " وأوافق على أن تتواصل معي Perkly بخصوص التجربة",
+    marketing: "يسعدني تلقي تحديثات وعروض من Perkly (اختياري)",
+    submit: "إرسال الطلب", sending: "جارٍ الإرسال…",
+    errSummary: "هناك حقول يجب تصحيحها:",
+    err: { required: "حقل إلزامي", phone: "رقم هاتف غير صحيح", email: "بريد إلكتروني غير صحيح", privacy: "يجب الموافقة لكي نعود إليكم" },
+    errRate: "تم إرسال طلبات كثيرة. حاولوا لاحقاً أو راسلونا عبر واتساب.",
+    errNet: "فشل الإرسال. تحققوا من الاتصال وحاولوا مجدداً.",
+    doneTitle: "استلمنا طلبكم!",
+    doneText: "سنعود إليكم عبر واتساب أو الهاتف، ونرسل رمزاً لفتح الحساب.",
+    doneWa: "تريدون التسريع؟ أرسلوا لنا رسالة",
+    doneWaText: (b: string) => `مرحباً، تركت طلباً للانضمام لتجربة Perkly (${b})`,
+    askWaText: "مرحباً، لدي سؤال عن تجربة Perkly",
+    home: "العودة للصفحة الرئيسية",
+    nextTitle: "ماذا يحدث بعد الإرسال",
+    next: ["نعود إليكم ونرسل رمزاً لفتح الحساب", "تفتحون الحساب وتصممون البطاقة", "تضعون رمز QR عند الصندوق وتبدؤون بالأختام"],
+    price: "99 ₪ شهرياً", priceNote: "بدون رسوم تأسيس",
+    support: "أسئلة؟ واتساب",
+    login: "لدي حساب",
+  },
+};
 
-const C = { ink: "#17132B", purple: "#7558E8", purpleDeep: "#5B3FD6", lav: "#F1EDFC", muted: "#4A4462", line: "#E1DAF5", yellow: "#FFC24B" };
-const DISPLAY = "'Rubik', sans-serif";
+type FieldName = "business" | "contact" | "phone" | "email" | "privacy";
+const ORDER: FieldName[] = ["business", "contact", "phone", "email", "privacy"];
 
-type Details = { business: string; owner: string; phone: string; email: string; street: string; city: string };
-const EMPTY: Details = { business: "", owner: "", phone: "", email: "", street: "", city: "" };
+const noSubscribe = () => () => {};
 
-const field: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 7, fontSize: 14, fontWeight: 700, color: C.ink };
-const input: React.CSSProperties = { height: 50, borderRadius: 12, border: `1.5px solid ${C.line}`, padding: "0 14px", fontSize: 16, fontFamily: "inherit", background: "#FFFFFF", color: C.ink, fontWeight: 400, width: "100%", boxSizing: "border-box" };
-const primary: React.CSSProperties = { minHeight: 56, border: 0, borderRadius: 14, background: C.purple, color: "#FFFFFF", fontFamily: "inherit", fontWeight: 700, fontSize: 18, cursor: "pointer", width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, boxShadow: "0 10px 24px rgba(117,88,232,0.3)" };
-
-function Check({ color = "#1F9D6B" }: { color?: string }) {
-  return (
-    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none" }}>
-      <path d="M20 6 9 17l-5-5" />
-    </svg>
-  );
-}
-
-function Steps({ step }: { step: 1 | 2 | 3 }) {
-  const items = ["פרטי העסק", "תשלום", "סיום"];
-  return (
-    <ol aria-label="שלבי ההצטרפות" style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", gap: 10, flexWrap: "wrap" }}>
-      {items.map((label, i) => {
-        const n = i + 1;
-        const state = n < step ? "done" : n === step ? "current" : "next";
-        return (
-          <li key={label} aria-current={state === "current" ? "step" : undefined} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 15, fontWeight: 700, color: state === "next" ? "#6B6488" : C.ink }}>
-            <span style={{ width: 30, height: 30, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, background: state === "done" ? "#1F9D6B" : state === "current" ? C.ink : "#E8E3F7", color: state === "next" ? C.muted : "#FFFFFF" }}>
-              {state === "done" ? <Check color="#FFFFFF" /> : n}
-            </span>
-            {label}
-            {n < 3 ? <span aria-hidden="true" style={{ width: 24, height: 2, background: "#DCD5F2", borderRadius: 2 }} /> : null}
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
-
-function Summary({ kit }: { kit: boolean }) {
-  const total = MONTHLY + (kit ? KIT : 0);
-  return (
-    <aside aria-label="סיכום הזמנה" style={{ flex: "1 1 300px", minWidth: 0, background: "#FFFFFF", border: `1px solid ${C.line}`, borderRadius: 24, padding: 26, display: "flex", flexDirection: "column", gap: 16, alignSelf: "flex-start" }}>
-      <span style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 20 }}>Perkly לעסק</span>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 15, color: C.muted }}>
-        <span style={{ display: "flex", gap: 8, alignItems: "center" }}><Check />חשבון לעסק ועיצוב הכרטיס, בלי דמי הקמה</span>
-        <span style={{ display: "flex", gap: 8, alignItems: "center" }}><Check />כרטיס ב־Apple Wallet וב־Google Wallet</span>
-        <span style={{ display: "flex", gap: 8, alignItems: "center" }}><Check />החודש הראשון של השירות</span>
-      </div>
-      <div style={{ borderTop: `1px solid ${C.line}`, paddingTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 15 }}><span>מנוי חודשי</span><span>{MONTHLY} ₪</span></div>
-        {kit ? <div style={{ display: "flex", justifyContent: "space-between", fontSize: 15 }}><span>ערכת קופה (חד־פעמי)</span><span>{KIT} ₪</span></div> : null}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <span style={{ fontWeight: 700 }}>לתשלום היום</span>
-          <span style={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: 34 }}>{total} ₪</span>
-        </div>
-        <span style={{ fontSize: 14, color: C.muted }}>מהחודש הבא: {MONTHLY} ₪ לחודש</span>
-      </div>
-    </aside>
-  );
+function readLang(): Lang {
+  try {
+    const q = new URLSearchParams(window.location.search).get("lang");
+    if (q === "ar" || q === "he") return q;
+    if (localStorage.getItem("perkly-language") === "ar") return "ar";
+  } catch {}
+  return "he";
 }
 
 export default function SignupFlow() {
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [d, setD] = useState<Details>(EMPTY);
-  const [paying, setPaying] = useState(false);
-  const [kit, setKit] = useState(false);
-  const total = MONTHLY + (kit ? KIT : 0);
-  const set = (k: keyof Details) => (e: React.ChangeEvent<HTMLInputElement>) => setD({ ...d, [k]: e.target.value });
+  // Hebrew on the server; the browser picks ?lang= or the saved choice.
+  const lang = useSyncExternalStore(noSubscribe, readLang, () => "he" as Lang);
+  const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({});
+  const [formError, setFormError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState<string | null>(null);
+  const requestId = useRef<string>("");
+  const sending = useRef(false);
+  const summaryRef = useRef<HTMLDivElement>(null);
+  const doneRef = useRef<HTMLHeadingElement>(null);
 
-  function next(e: React.FormEvent) {
+  useEffect(() => {
+    try { localStorage.setItem("perkly-language", lang); } catch {}
+  }, [lang]);
+  useEffect(() => { if (done) doneRef.current?.focus(); }, [done]);
+
+  const t = T[lang];
+  const h = hrefs(lang);
+
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setStep(2);
-    window.scrollTo({ top: 0 });
+    if (busy || sending.current) return;
+    const f = new FormData(e.currentTarget);
+    const data = {
+      business: String(f.get("business") ?? "").trim(),
+      contact: String(f.get("contact") ?? "").trim(),
+      phone: String(f.get("phone") ?? "").trim(),
+      email: String(f.get("email") ?? "").trim(),
+      kind: String(f.get("kind") ?? ""),
+      city: String(f.get("city") ?? "").trim(),
+      note: String(f.get("note") ?? "").trim(),
+      kit: f.get("kit") === "on",
+      privacy: f.get("privacy") === "on",
+      marketing: f.get("marketing") === "on",
+    };
+    // Quick checks in the browser; the server checks again.
+    const errs: Partial<Record<FieldName, string>> = {};
+    if (!data.business) errs.business = t.err.required;
+    if (!data.contact) errs.contact = t.err.required;
+    if (!/^[+\d][\d\s().-]{7,}$/.test(data.phone)) errs.phone = data.phone ? t.err.phone : t.err.required;
+    if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) errs.email = t.err.email;
+    if (!data.privacy) errs.privacy = t.err.privacy;
+    setErrors(errs);
+    setFormError("");
+    if (Object.keys(errs).length) {
+      requestAnimationFrame(() => summaryRef.current?.focus());
+      return;
+    }
+    // The same id on a retry or a double click: the server stores the request once.
+    if (!requestId.current) requestId.current = crypto.randomUUID();
+    sending.current = true;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/lead", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...data, lang, requestId: requestId.current }) });
+      const body = (await res.json().catch(() => ({}))) as { ok?: boolean; code?: string; fields?: Record<string, string> };
+      if (res.ok && body.ok) {
+        setDone(data.business);
+        return;
+      }
+      if (body.fields) {
+        const map: Partial<Record<FieldName, string>> = {};
+        for (const [k, v] of Object.entries(body.fields)) {
+          if (!ORDER.includes(k as FieldName)) continue;
+          map[k as FieldName] = v === "phone" ? t.err.phone : v === "email" ? t.err.email : k === "privacy" ? t.err.privacy : t.err.required;
+        }
+        setErrors(map);
+        requestAnimationFrame(() => summaryRef.current?.focus());
+      } else {
+        setFormError(res.status === 429 ? t.errRate : t.errNet);
+      }
+    } catch {
+      setFormError(t.errNet);
+    } finally {
+      sending.current = false;
+      setBusy(false);
+    }
   }
 
-  function pay() {
-    setPaying(true);
-    window.setTimeout(() => {
-      setPaying(false);
-      setStep(3);
-      window.scrollTo({ top: 0 });
-    }, 1200);
-  }
+  const err = (name: FieldName) => (errors[name] ? <span id={`${name}-err`} className="su-err">{errors[name]}</span> : null);
+  const aria = (name: FieldName) => ({ "aria-invalid": errors[name] ? true : undefined, "aria-describedby": errors[name] ? `${name}-err` : undefined });
+  const labels: Record<FieldName, string> = { business: t.business, contact: t.contact, phone: t.phone, email: t.email, privacy: t.privacyLink };
 
   return (
-    <div dir="rtl" style={{ minHeight: "100vh", background: "#FAF8FF", color: C.ink, fontFamily: "'Heebo', system-ui, sans-serif", lineHeight: 1.6 }}>
-      <div role="note" style={{ background: C.yellow, color: "#2B1F00", textAlign: "center", padding: "10px 16px", fontWeight: 700, fontSize: 14 }}>
-        מצב הדגמה: לא מתבצע חיוב ולא נשמרים פרטים
-      </div>
-      <header style={{ borderBottom: "1px solid #E8E3F7", background: "#FFFFFF" }}>
-        <div style={{ maxWidth: 1000, margin: "0 auto", padding: "14px clamp(16px, 4vw, 32px)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-          <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, color: C.ink, textDecoration: "none" }}>
-            <span style={{ width: 36, height: 36, borderRadius: 11, background: C.purple, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="8" width="18" height="4" rx="1" /><path d="M12 8v13" /><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" /><path d="M7.5 8a2.5 2.5 0 0 1 0-5C10 3 12 8 12 8s2-5 4.5-5a2.5 2.5 0 0 1 0 5" /></svg>
-            </span>
-            <span style={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: 22 }}>Perkly</span>
-          </Link>
-          <a href="/login" style={{ fontWeight: 700, color: C.ink, minHeight: 44, display: "flex", alignItems: "center" }}>כבר יש לי חשבון</a>
+    <div className="lp su" lang={lang} dir="rtl">
+      <header className="lp-header">
+        <div className="lp-wrap lp-header-row">
+          <Link href={h.home} className="lp-home-link"><Logo label="Perkly" /></Link>
+          <a href={h.login} className="lp-login">{t.login}</a>
         </div>
       </header>
-
-      <div style={{ maxWidth: 1000, margin: "0 auto", padding: "clamp(28px, 5vw, 56px) clamp(16px, 4vw, 32px) 64px", display: "flex", flexDirection: "column", gap: 28 }}>
-        <Steps step={step} />
-
-        {step === 1 ? (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 28 }}>
-            <form onSubmit={next} style={{ flex: "999 1 420px", minWidth: 0, background: "#FFFFFF", border: `1px solid ${C.line}`, borderRadius: 24, padding: "clamp(20px, 4vw, 32px)", display: "flex", flexDirection: "column", gap: 18 }}>
-              <div>
-                <h1 style={{ margin: 0, fontFamily: DISPLAY, fontWeight: 800, fontSize: "clamp(26px, 3.4vw, 34px)", lineHeight: 1.2 }}>פותחים כרטיס לעסק</h1>
-                <p style={{ margin: "6px 0 0", color: C.muted, fontSize: 16 }}>הפרטים משמשים להקמת החשבון לעסק.</p>
-              </div>
-              <label style={field}>שם העסק<input style={input} required value={d.business} onChange={set("business")} autoComplete="organization" /></label>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
-                <label style={{ ...field, flex: "1 1 200px" }}>שם מלא<input style={input} required value={d.owner} onChange={set("owner")} autoComplete="name" /></label>
-                <label style={{ ...field, flex: "1 1 200px" }}>טלפון<input dir="ltr" style={{ ...input, direction: "ltr", textAlign: "right" }} required type="tel" inputMode="tel" value={d.phone} onChange={set("phone")} autoComplete="tel" /></label>
-              </div>
-              <label style={field}>אימייל<input dir="ltr" style={{ ...input, direction: "ltr", textAlign: "right" }} required type="email" value={d.email} onChange={set("email")} autoComplete="email" /></label>
-              <label style={{ display: "flex", gap: 12, alignItems: "flex-start", background: C.lav, borderRadius: 16, padding: 16, cursor: "pointer" }}>
-                <input type="checkbox" checked={kit} onChange={(e) => setKit(e.target.checked)} style={{ width: 22, height: 22, marginTop: 2, accentColor: C.purple, flex: "none" }} />
-                <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  <span style={{ fontWeight: 700, fontSize: 16 }}>הוסיפו ערכת קופה: {KIT} ₪ חד־פעמי</span>
-                  <span style={{ fontSize: 14, color: C.muted }}>2 פוסטרים וסטנד לדלפק עם הלוגו שלכם וקוד ה־QR של העסק. לא חובה.</span>
-                </span>
-              </label>
-              {kit ? (
-                <fieldset style={{ border: 0, padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 14 }}>
-                <legend style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 18, marginBottom: 10 }}>לאן לשלוח את הערכה?</legend>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
-                  <label style={{ ...field, flex: "2 1 220px" }}>רחוב ומספר<input style={input} required value={d.street} onChange={set("street")} autoComplete="street-address" /></label>
-                  <label style={{ ...field, flex: "1 1 140px" }}>עיר<input style={input} required value={d.city} onChange={set("city")} autoComplete="address-level2" /></label>
-                </div>
-              </fieldset>
-              ) : null}
-              <label style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 15, color: C.muted }}>
-                <input type="checkbox" required style={{ width: 20, height: 20, marginTop: 3, accentColor: C.purple, flex: "none" }} />
-                קראתי ואני מאשר/ת את תנאי השימוש
-              </label>
-              <button type="submit" style={primary}>המשך לתשלום</button>
-            </form>
-            <Summary kit={kit} />
-          </div>
-        ) : null}
-
-        {step === 2 ? (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 28 }}>
-            <div style={{ flex: "999 1 420px", minWidth: 0, background: "#FFFFFF", border: `1px solid ${C.line}`, borderRadius: 24, padding: "clamp(20px, 4vw, 32px)", display: "flex", flexDirection: "column", gap: 18 }}>
-              <div>
-                <h1 style={{ margin: 0, fontFamily: DISPLAY, fontWeight: 800, fontSize: "clamp(26px, 3.4vw, 34px)", lineHeight: 1.2 }}>תשלום מאובטח</h1>
-                <p style={{ margin: "6px 0 0", color: C.muted, fontSize: 16 }}>התשלום יתבצע בדף המאובטח של Tranzila. בהדגמה השדות נעולים, ואין צורך להקליד פרטי אשראי.</p>
-              </div>
-              <div style={{ background: C.lav, borderRadius: 18, padding: 18, display: "flex", flexDirection: "column", gap: 14 }}>
-                <label style={field}>מספר כרטיס<input dir="ltr" style={{ ...input, direction: "ltr", textAlign: "right", background: "#F6F3FF" }} disabled value="4580 •••• •••• 1234" readOnly /></label>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
-                  <label style={{ ...field, flex: "1 1 120px" }}>תוקף<input dir="ltr" style={{ ...input, direction: "ltr", textAlign: "right", background: "#F6F3FF" }} disabled value="12/29" readOnly /></label>
-                  <label style={{ ...field, flex: "1 1 120px" }}>CVV<input dir="ltr" style={{ ...input, direction: "ltr", textAlign: "right", background: "#F6F3FF" }} disabled value="•••" readOnly /></label>
-                  <label style={{ ...field, flex: "1 1 160px" }}>תעודת זהות<input dir="ltr" style={{ ...input, direction: "ltr", textAlign: "right", background: "#F6F3FF" }} disabled value="•••••••••" readOnly /></label>
-                </div>
-              </div>
-              <span style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14, color: C.muted }}>
-                <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-                פרטי האשראי לא נשמרים אצלנו. מהחודש הבא החיוב של {MONTHLY} ₪ מתבצע אוטומטית.
-              </span>
-              <button type="button" onClick={pay} disabled={paying} style={{ ...primary, opacity: paying ? 0.7 : 1 }}>
-                {paying ? "מעבד תשלום…" : `תשלום ${total} ₪ (הדגמה)`}
-              </button>
-              <button type="button" onClick={() => setStep(1)} style={{ background: "none", border: 0, color: C.purpleDeep, fontWeight: 700, fontSize: 15, cursor: "pointer", minHeight: 44, fontFamily: "inherit" }}>חזרה לפרטי העסק</button>
+      <main className="lp-main lp-wrap su-main">
+        {done ? (
+          <section className="su-card su-done" aria-labelledby="done-title">
+            <span className="su-done-icon" aria-hidden="true"><Icon name="check" size={40} stroke={2.8} /></span>
+            <h1 id="done-title" ref={doneRef} tabIndex={-1} className="lp-h2">{t.doneTitle}</h1>
+            <p className="lp-lead">{t.doneText}</p>
+            <div className="su-done-actions">
+              <a className="lp-btn lp-btn-primary" href={waLink(t.doneWaText(done))} target="_blank" rel="noopener noreferrer"><Icon name="message" size={18} />{t.doneWa}</a>
+              <Link className="lp-btn lp-btn-ghost" href={h.home}>{t.home}</Link>
             </div>
-            <Summary kit={kit} />
+          </section>
+        ) : (
+          <div className="su-grid">
+            <form className="su-card" onSubmit={submit} noValidate aria-labelledby="su-title">
+              <h1 id="su-title" className="lp-h2">{t.title}</h1>
+              <p className="lp-body">{t.intro}</p>
+              {Object.keys(errors).length ? (
+                <div ref={summaryRef} tabIndex={-1} className="su-summary" role="alert">
+                  <strong>{t.errSummary}</strong>
+                  <ul>
+                    {ORDER.filter((n) => errors[n]).map((n) => (
+                      <li key={n}><a href={`#su-${n}`}>{labels[n]}: {errors[n]}</a></li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              <div className="su-row">
+                <label className="su-field">{t.business}<input id="su-business" name="business" autoComplete="organization" maxLength={80} required {...aria("business")} />{err("business")}</label>
+                <label className="su-field">{t.contact}<input id="su-contact" name="contact" autoComplete="name" maxLength={80} required {...aria("contact")} />{err("contact")}</label>
+              </div>
+              <div className="su-row">
+                <label className="su-field">{t.phone}<input id="su-phone" name="phone" type="tel" inputMode="tel" autoComplete="tel" dir="ltr" maxLength={20} required {...aria("phone")} />{err("phone")}</label>
+                <label className="su-field"><span>{t.email} <span className="su-opt">{t.optional}</span></span><input id="su-email" name="email" type="email" inputMode="email" autoComplete="email" dir="ltr" maxLength={200} {...aria("email")} />{err("email")}</label>
+              </div>
+              <div className="su-row">
+                <label className="su-field"><span>{t.kind} <span className="su-opt">{t.optional}</span></span>
+                  <select name="kind" defaultValue="">
+                    <option value="">{t.kindPick}</option>
+                    {Object.entries(t.kinds).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  </select>
+                </label>
+                <label className="su-field"><span>{t.city} <span className="su-opt">{t.optional}</span></span><input name="city" autoComplete="address-level2" maxLength={60} /></label>
+              </div>
+              <label className="su-field"><span>{t.note} <span className="su-opt">{t.optional}</span></span><textarea name="note" rows={3} maxLength={500} /></label>
+              <label className="su-check su-kit"><input type="checkbox" name="kit" /><span>{t.kit}</span></label>
+              <div className="su-checks">
+                <label className="su-check">
+                  <input id="su-privacy" type="checkbox" name="privacy" required {...aria("privacy")} />
+                  <span>{t.privacyBefore}<a href="/privacy" target="_blank" rel="noopener">{t.privacyLink}</a>{t.privacyAfter}</span>
+                </label>
+                {err("privacy")}
+                <label className="su-check"><input type="checkbox" name="marketing" /><span>{t.marketing}</span></label>
+              </div>
+              {formError ? <p className="su-summary" role="alert">{formError}</p> : null}
+              <button type="submit" className="lp-btn lp-btn-primary lp-btn-lg lp-btn-wide" disabled={busy} aria-busy={busy}>{busy ? t.sending : t.submit}</button>
+            </form>
+            <aside className="su-side" aria-labelledby="su-next">
+              <h2 id="su-next" className="lp-h3">{t.nextTitle}</h2>
+              <ol className="su-steps">
+                {t.next.map((s, i) => <li key={s}><span>{i + 1}</span>{s}</li>)}
+              </ol>
+              <p className="su-price"><strong>{t.price}</strong> · {t.priceNote}</p>
+              <a href={waLink(t.askWaText)} target="_blank" rel="noopener noreferrer" className="su-support"><Icon name="message" size={18} />{t.support}&nbsp;<bdi className="lp-num">{WHATSAPP_DISPLAY}</bdi></a>
+            </aside>
           </div>
-        ) : null}
-
-        {step === 3 ? (
-          <div role="status" style={{ background: "#FFFFFF", border: `1px solid ${C.line}`, borderRadius: 28, padding: "clamp(24px, 5vw, 44px)", display: "flex", flexDirection: "column", alignItems: "center", gap: 16, textAlign: "center", maxWidth: 620, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
-            <span style={{ width: 76, height: 76, borderRadius: "50%", background: "#E3F7EE", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <svg aria-hidden="true" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-            </span>
-            <h1 style={{ margin: 0, fontFamily: DISPLAY, fontWeight: 800, fontSize: "clamp(26px, 3.6vw, 36px)", lineHeight: 1.2 }}>התשלום התקבל. ברוכים הבאים ל־Perkly!</h1>
-            <p style={{ margin: 0, color: C.muted, fontSize: 17 }}>
-              {d.business ? `${d.business}, ` : ""}{kit ? `ערכת הקופה תישלח אל ${d.street}, ${d.city}. ` : ""}עכשיו נשאר רק לפתוח חשבון ולעצב את הכרטיס.
-            </p>
-            <a href="/login?signup=1" style={{ ...primary, textDecoration: "none", maxWidth: 360 }}>ממשיכים ליצירת החשבון</a>
-            <span style={{ fontSize: 13, color: "#6B6488" }}>זו הדגמה: לא בוצע חיוב ולא נשמרו פרטים.</span>
-          </div>
-        ) : null}
-      </div>
+        )}
+      </main>
     </div>
   );
 }

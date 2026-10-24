@@ -195,3 +195,25 @@ export const rewards = sqliteTable(
   },
   (t) => [index("rewards_customer").on(t.customer, t.redeemed), index("rewards_business").on(t.business, t.redeemed)],
 );
+
+// Pilot requests from the public site (/signup). Read only by platform admins (/admin).
+export const leads = sqliteTable(
+  "leads",
+  {
+    id: text("id").primaryKey(),
+    created: text("created").notNull(),
+    business: text("business").notNull(),
+    contact: text("contact").notNull(),
+    phone: text("phone").notNull(),
+    email: text("email"),
+    kind: text("kind"),
+    city: text("city"),
+    kit: integer("kit").notNull().default(0),
+    note: text("note"),
+    lang: text("lang").notNull(),
+    // Separate, opt-in consent to receive marketing messages (never pre-ticked).
+    consentMarketing: integer("consent_marketing").notNull().default(0),
+    status: text("status").notNull().default("new"),
+  },
+  (t) => [index("leads_created").on(t.created)],
+);

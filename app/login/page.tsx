@@ -4,6 +4,7 @@ import { currentUser } from "../../lib/server/page-session";
 import AuthForm from "./auth-form";
 
 export const dynamic = "force-dynamic";
+export const metadata = { title: "Perkly | כניסה", robots: { index: false } };
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ signup?: string }> }) {
   if (await currentUser()) redirect("/");

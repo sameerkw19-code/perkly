@@ -59,11 +59,14 @@ test("forged identity headers are ignored; pages require sign-in", async () => {
   const page = await fetch(BASE + "/", { redirect: "manual" });
   assert.equal(page.status, 200);
   const html = await page.text();
-  assert.match(html, /הלקוחות שלכם חוזרים/);
+  assert.match(html, /הכרטיס שגורם ללקוחות לחזור/);
   assert.doesNotMatch(html, /oai-authenticated|join_code/);
   const signup = await fetch(BASE + "/signup", { redirect: "manual" });
   assert.equal(signup.status, 200);
-  assert.match(await signup.text(), /מצב הדגמה/);
+  assert.match(await signup.text(), /הצטרפות לפיילוט/);
+  const arabic = await fetch(BASE + "/ar", { redirect: "manual" });
+  assert.equal(arabic.status, 200);
+  assert.match(await arabic.text(), /البطاقة التي تجعل الزبائن يعودون/);
 });
 
 test("mutations from another site are rejected", async () => {
@@ -502,3 +505,19 @@ test("collect mode: expiry applies to new rewards only; switching modes converts
   assert.equal(used.status, 200);
   assert.equal(used.body.card.rewards, 1);
 });
+
+test("pilot request: validated per field, stored once, rate limited", async () => {
+  const c = new Client();
+  const bad = await c.post("/api/lead", { business: "", contact: "x", phone: "12", privacy: false });
+  assert.equal(bad.status, 400);
+  assert.deepEqual(Object.keys(bad.body.fields).sort(), ["business", "phone", "privacy"]);
+  const requestId = `lead-${run}`;
+  const lead = { business: "Test Cafe", contact: "Tester", phone: "050-123-4567", email: "", privacy: true, marketing: false, kit: true, lang: "he", requestId };
+  const ok = await c.post("/api/lead", lead);
+  assert.equal(ok.status, 200);
+  const again = await c.post("/api/lead", lead);
+  assert.equal(again.status, 200);
+  const evil = await c.post("/api/lead", lead, { origin: "https://evil.example" });
+  assert.equal(evil.status, 403);
+});
+

@@ -1,119 +1,343 @@
 "use client";
-import { useCallback, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { COPY, hrefs, type Lang } from "./content";
+import { CardVisual, Icon } from "./visuals";
 
-/** Muted, looping video that starts playing on its own (sets `muted` as a property, which autoplay needs). */
-export function AutoVideo(props: React.VideoHTMLAttributes<HTMLVideoElement>) {
-  const ref = useCallback((el: HTMLVideoElement | null) => {
-    if (!el) return;
-    el.muted = true;
-    el.playsInline = true;
-    el.play().catch(() => {});
-  }, []);
-  return <video {...props} ref={ref} muted autoPlay loop playsInline />;
+/** Remember the language for the app pages (login, sign-up), which read this key. */
+function rememberLang(lang: Lang) {
+  try {
+    localStorage.setItem("perkly-language", lang);
+  } catch {}
 }
 
-const CUP = "M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1";
-const TARGET = 10;
-
-function CafeLogo({ size }: { size: number }) {
+export function Logo({ label }: { label: string }) {
   return (
-    <svg role="img" aria-label="הלוגו של קפה אייקון" width={size} height={size} viewBox="0 0 48 48" style={{ flex: "none" }}>
-      <rect width="48" height="48" rx="14" fill="#F3EEFF" />
-      <circle cx="24" cy="25" r="17" fill="#8F72E8" />
-      <path d="M15 23h16v5.5a7 7 0 0 1-7 7h-2a7 7 0 0 1-7-7z" fill="#FFFFFF" />
-      <path d="M31 25h1.6a3 3 0 0 1 0 6H31" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" />
-      <path d="M13 38h20" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" />
-      <path d="M23 21c0-3.5 2.5-5.5 2.5-11" fill="none" stroke="#3E2A8C" strokeWidth="1.6" strokeLinecap="round" />
-      <ellipse cx="26.6" cy="10.6" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(-30 26.6 10.6)" />
-      <ellipse cx="24.2" cy="12.4" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(30 24.2 12.4)" />
-      <ellipse cx="26.2" cy="14.6" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(-30 26.2 14.6)" />
-      <ellipse cx="23.6" cy="16.6" rx="1.7" ry="1.2" fill="#FFD6F3" transform="rotate(30 23.6 16.6)" />
-    </svg>
+    <span className="lp-logo" aria-label={label}>
+      <span className="lp-logo-mark" aria-hidden="true"><Icon name="gift" size={21} stroke={2.2} /></span>
+      <span className="lp-logo-word" aria-hidden="true">Perkly</span>
+    </span>
   );
 }
 
-const btn: React.CSSProperties = {
-  width: "100%",
-  minHeight: 48,
-  border: 0,
-  borderRadius: 14,
-  background: "#17132B",
-  color: "#FFFFFF",
-  fontFamily: "'Heebo', sans-serif",
-  fontWeight: 700,
-  fontSize: 16,
-  cursor: "pointer",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 8,
-};
+export function SiteNav({ lang }: { lang: Lang }) {
+  const c = COPY[lang].nav;
+  const h = hrefs(lang);
+  const [open, setOpen] = useState(false);
+  const menuId = useId();
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
-/** Hero phone with a tappable stamp demo. */
-export function DemoPhone() {
-  const [count, setCount] = useState(7);
-  const [toast, setToast] = useState(false);
-  const full = count >= TARGET;
-  const remaining = TARGET - count;
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        buttonRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  const links = [
+    { href: "#how", label: c.how },
+    { href: "#examples", label: c.examples },
+    { href: "#pricing", label: c.pricing },
+    { href: "#faq", label: c.faq },
+  ];
+  const langLinks = (
+    <span className="lp-langs" role="group" aria-label={c.lang}>
+      <Link href="/" lang="he" hrefLang="he" aria-current={lang === "he" ? "true" : undefined} onClick={() => rememberLang("he")}>עברית</Link>
+      <Link href="/ar" lang="ar" hrefLang="ar" aria-current={lang === "ar" ? "true" : undefined} onClick={() => rememberLang("ar")}>العربية</Link>
+    </span>
+  );
 
   return (
-    <div style={{ flex: "1 1 320px", minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 14, position: "relative", padding: "10px 0" }}>
-      <div aria-hidden="true" style={{ position: "absolute", width: 360, height: 360, maxWidth: "100%", borderRadius: "50%", background: "#EEE9FF", top: "46%", left: "50%", transform: "translate(-50%, -50%)" }} />
-      <div style={{ position: "relative", width: 300, height: 600, borderRadius: 46, background: "#17132B", padding: 12, boxSizing: "border-box", boxShadow: "0 30px 60px rgba(23,19,43,0.28)" }}>
-        <div style={{ width: "100%", height: "100%", borderRadius: 36, background: "#F6F3FF", overflow: "hidden", display: "flex", flexDirection: "column", padding: "34px 16px 18px", boxSizing: "border-box", gap: 14 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, fontSize: 15 }}>הכרטיס שלי</span>
-            <span style={{ fontSize: 12, color: "#5E5873" }}>perkly.shop</span>
-          </div>
-          <div style={{ background: "#6A4DE3", borderRadius: 22, padding: "18px 16px", color: "#FFFFFF", display: "flex", flexDirection: "column", gap: 14 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <CafeLogo size={40} />
-              <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.25 }}>
-                <span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 700, fontSize: 17 }}>קפה אייקון</span>
-                <span style={{ fontSize: 13, color: "#F1EDFF" }}>הקפה העשירי עלינו</span>
-              </div>
-            </div>
-            <div role="img" aria-label={`כרטיס נאמנות לדוגמה: ${count} מתוך ${TARGET} חותמות`} style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 8 }}>
-              {Array.from({ length: TARGET }, (_, i) =>
-                i < count ? (
-                  <span key={i} style={{ aspectRatio: "1", borderRadius: "50%", background: "#FFC24B", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3B2A00" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d={CUP} /></svg>
-                  </span>
-                ) : (
-                  <span key={i} style={{ aspectRatio: "1", borderRadius: "50%", border: "2px dashed rgba(255,255,255,0.6)", boxSizing: "border-box" }} />
-                ),
-              )}
-            </div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13 }}>
-              <span style={{ fontWeight: 700 }}>{count} מתוך {TARGET}</span>
-              <span style={{ color: "#F1EDFF" }}>{full ? "המתנה מוכנה!" : remaining === 1 ? "עוד חותמת אחת למתנה" : `עוד ${remaining} למתנה`}</span>
-            </div>
-          </div>
-          {full ? (
-            <div role="status" style={{ background: "#FFC24B", borderRadius: 20, padding: 16, display: "flex", flexDirection: "column", alignItems: "center", gap: 12, color: "#2B1F00" }}>
-              <span style={{ fontFamily: "'Rubik', sans-serif", fontWeight: 800, fontSize: 18 }}>המתנה מוכנה!</span>
-              <span style={{ fontSize: 13, textAlign: "center" }}>ככה לקוח מרגיש כשהוא חוזר אליכם.</span>
-              <button type="button" style={btn} onClick={() => { setCount(0); setToast(false); }}>מימוש והתחלה מחדש</button>
-            </div>
-          ) : (
-            <div style={{ background: "#FFFFFF", borderRadius: 20, padding: 16, display: "flex", flexDirection: "column", alignItems: "center", gap: 12, border: "1px solid #E8E3F7" }}>
-              <span style={{ fontSize: 13, color: "#4A4462", fontWeight: 500, textAlign: "center" }}>כך העובד מוסיף חותמת. נסו בעצמכם:</span>
-              <button type="button" style={btn} onClick={() => { setCount((c) => Math.min(TARGET, c + 1)); setToast(true); }}>
-                <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFC24B" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
-                הוסיפו חותמת
-              </button>
-            </div>
-          )}
+    <header className="lp-header">
+      <div className="lp-wrap lp-header-row">
+        <Link href={h.home} className="lp-home-link"><Logo label={c.home} /></Link>
+        <nav aria-label="Perkly" className="lp-nav-desktop">
+          {links.map((l) => (
+            <a key={l.href} href={l.href}>{l.label}</a>
+          ))}
+        </nav>
+        <div className="lp-header-actions">
+          <span className="lp-only-desktop">{langLinks}</span>
+          <a href={h.login} className="lp-login lp-only-desktop">{c.login}</a>
+          <a href={h.signup} className="lp-btn lp-btn-dark lp-btn-sm">{c.cta}</a>
+          <button
+            ref={buttonRef}
+            type="button"
+            className="lp-menu-btn"
+            aria-expanded={open}
+            aria-controls={menuId}
+            aria-label={open ? c.close : c.menu}
+            onClick={() => setOpen((v) => !v)}
+          >
+            <Icon name={open ? "x" : "menu"} size={22} />
+          </button>
         </div>
       </div>
-      {toast && !full ? (
-        <div role="status" style={{ position: "absolute", top: 92, right: "calc(50% + 104px)", background: "#FFFFFF", borderRadius: 14, padding: "10px 14px", boxShadow: "0 12px 28px rgba(23,19,43,0.14)", display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: 14, whiteSpace: "nowrap" }}>
-          <span style={{ width: 26, height: 26, borderRadius: "50%", background: "#E3F7EE", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-          </span>
-          חותמת נוספה
+      <div id={menuId} className="lp-mobile-menu" hidden={!open}>
+        <nav aria-label="Perkly" className="lp-wrap">
+          {links.map((l) => (
+            <a key={l.href} href={l.href} onClick={() => setOpen(false)}>{l.label}</a>
+          ))}
+          <a href={h.login} onClick={() => setOpen(false)}>{c.login}</a>
+          {langLinks}
+        </nav>
+      </div>
+    </header>
+  );
+}
+
+/** Gentle tilt toward the mouse on desktop. Off on touch screens and with reduced motion. */
+export function TiltStage({ children, className }: { children: React.ReactNode; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const fine = window.matchMedia("(pointer: fine) and (min-width: 960px)");
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let frame = 0;
+    let target = { x: 0, y: 0 };
+    const apply = () => {
+      frame = 0;
+      el.style.setProperty("--tilt-x", `${target.y * -5}deg`);
+      el.style.setProperty("--tilt-y", `${target.x * 7}deg`);
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!fine.matches || reduced.matches) return;
+      const r = el.getBoundingClientRect();
+      if (e.clientY < r.top - 200 || e.clientY > r.bottom + 200) return;
+      target = {
+        x: Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width / 2)) / (r.width / 2 + 200))),
+        y: Math.max(-1, Math.min(1, (e.clientY - (r.top + r.height / 2)) / (r.height / 2 + 200))),
+      };
+      if (!frame) frame = requestAnimationFrame(apply);
+    };
+    const onLeave = () => {
+      target = { x: 0, y: 0 };
+      if (!frame) frame = requestAnimationFrame(apply);
+    };
+    window.addEventListener("pointermove", onMove, { passive: true });
+    document.addEventListener("pointerleave", onLeave);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerleave", onLeave);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, []);
+  return (
+    <div ref={ref} className={className}>
+      {children}
+    </div>
+  );
+}
+
+const START = 7;
+const TARGET = 10;
+
+function StampDemo({ lang }: { lang: Lang }) {
+  const c = COPY[lang];
+  const d = c.demo;
+  const ex = c.examples.list[0];
+  const [count, setCount] = useState(START);
+  const [press, setPress] = useState(0);
+  const [toast, setToast] = useState(false);
+  const [live, setLive] = useState("");
+  const full = count >= TARGET;
+  const toastTimer = useRef<number | undefined>(undefined);
+
+  useEffect(() => () => window.clearTimeout(toastTimer.current), []);
+
+  function add() {
+    if (full) return;
+    const next = count + 1;
+    setCount(next);
+    setPress((p) => p + 1);
+    setToast(true);
+    setLive(next >= TARGET ? d.liveReady : d.live(next, TARGET));
+    window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToast(false), 1400);
+  }
+  function reset() {
+    setCount(START);
+    setToast(false);
+    setLive(d.liveReset);
+  }
+
+  return (
+    <div className="lp-demo">
+      <div className="lp-demo-top">
+        <span className="lp-chip lp-chip-yellow">{d.badge}</span>
+      </div>
+      <div className="lp-demo-card">
+        <CardVisual
+          k="cafe"
+          name={ex.name}
+          rewardLine={c.examples.rewardLine(TARGET, ex.reward)}
+          target={TARGET}
+          filled={count}
+          pressed={press ? count - 1 : undefined}
+          pressKey={press}
+          footStart={`${count} ${d.of} ${TARGET}`}
+          footEnd={full ? d.ready : d.left(TARGET - count, ex.reward)}
+          size="lg"
+          ready={full}
+        />
+        <span className={`lp-toast${toast ? " is-on" : ""}`} aria-hidden="true">
+          <Icon name="check" size={16} stroke={3} /> {d.added}
+        </span>
+      </div>
+      {full ? (
+        <div className="lp-demo-ready">
+          <strong>{d.readyTitle}</strong>
+          <span>{d.readyText}</span>
+          <button type="button" className="lp-btn lp-btn-dark" onClick={reset}>{d.reset}</button>
         </div>
-      ) : null}
+      ) : (
+        <div className="lp-demo-actions">
+          <span className="lp-demo-intro">{d.intro}</span>
+          <button type="button" className="lp-btn lp-btn-dark lp-btn-wide" onClick={add}>
+            <Icon name="plus" size={18} stroke={3} className="lp-yellow-icon" /> {d.add}
+          </button>
+        </div>
+      )}
+      <p className="lp-sr-only" role="status" aria-live="polite">{live}</p>
+    </div>
+  );
+}
+
+function VideoDemo({ lang }: { lang: Lang }) {
+  const v = COPY[lang].video;
+  const [playing, setPlaying] = useState(false);
+  const [failed, setFailed] = useState(false);
+  return (
+    <figure className="lp-video">
+      <div className="lp-video-frame">
+        {playing && !failed ? (
+          <video
+            src="/videos/perkly-promo.mp4"
+            poster="/videos/perkly-promo-poster.jpg"
+            width={540}
+            height={960}
+            controls
+            autoPlay
+            muted
+            playsInline
+            onError={() => setFailed(true)}
+          />
+        ) : (
+          <button type="button" className="lp-video-poster" onClick={() => setPlaying(true)} aria-label={v.play} disabled={failed}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/videos/perkly-promo-poster.jpg" alt="" width={540} height={960} />
+            {!failed ? <span className="lp-play" aria-hidden="true"><Icon name="play" size={28} stroke={0} style={{ fill: "currentColor" }} /></span> : null}
+          </button>
+        )}
+      </div>
+      <figcaption>{failed ? v.error : v.caption}</figcaption>
+    </figure>
+  );
+}
+
+/** "Try it" stamp demo and the 20-second video, as tabs. */
+export function DemoPanel({ lang }: { lang: Lang }) {
+  const t = COPY[lang].how.tabs;
+  const [tab, setTab] = useState<"try" | "video">("try");
+  const base = useId();
+  const tabs = [
+    { id: "try" as const, label: t.try },
+    { id: "video" as const, label: t.video },
+  ];
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    const next = tab === "try" ? "video" : "try";
+    setTab(next);
+    document.getElementById(`${base}-${next}-tab`)?.focus();
+  };
+  return (
+    <div className="lp-demo-panel" id="demo">
+      <div className="lp-tabs" role="tablist" aria-label={t.label} onKeyDown={onKey}>
+        {tabs.map((x) => (
+          <button
+            key={x.id}
+            id={`${base}-${x.id}-tab`}
+            type="button"
+            role="tab"
+            aria-selected={tab === x.id}
+            aria-controls={`${base}-${x.id}-panel`}
+            tabIndex={tab === x.id ? 0 : -1}
+            onClick={() => setTab(x.id)}
+          >
+            <Icon name={x.id === "try" ? "stamp" : "play"} size={16} /> {x.label}
+          </button>
+        ))}
+      </div>
+      <div id={`${base}-try-panel`} role="tabpanel" aria-labelledby={`${base}-try-tab`} hidden={tab !== "try"}>
+        <StampDemo lang={lang} />
+      </div>
+      <div id={`${base}-video-panel`} role="tabpanel" aria-labelledby={`${base}-video-tab`} hidden={tab !== "video"}>
+        {tab === "video" ? <VideoDemo lang={lang} /> : null}
+      </div>
+    </div>
+  );
+}
+
+/** Pick a business type and see a large example card. Swipe on phones. */
+export function ExamplesPicker({ lang }: { lang: Lang }) {
+  const c = COPY[lang].examples;
+  const d = COPY[lang].demo;
+  const list = c.list;
+  const [i, setI] = useState(0);
+  const start = useRef<number | null>(null);
+  const go = useCallback((n: number) => setI((n + list.length) % list.length), [list.length]);
+  const ex = list[i];
+  const left = ex.target - ex.filled;
+
+  return (
+    <div className="lp-examples">
+      <div className="lp-example-chips" role="group" aria-label={c.pick}>
+        {list.map((x, n) => (
+          <button key={x.key} type="button" aria-pressed={n === i} onClick={() => setI(n)}>
+            <Icon name={x.key === "cafe" ? "coffee" : x.key === "barber" ? "scissors" : x.key === "pizza" ? "pizza" : x.key === "icecream" ? "icecream" : x.key === "studio" ? "star" : "cake"} size={17} />
+            {x.kind}
+          </button>
+        ))}
+      </div>
+      <div
+        className="lp-example-stage"
+        onPointerDown={(e) => {
+          if (e.pointerType !== "mouse") start.current = e.clientX;
+        }}
+        onPointerUp={(e) => {
+          if (start.current === null) return;
+          const dx = e.clientX - start.current;
+          start.current = null;
+          if (Math.abs(dx) < 40) return;
+          // Right-to-left page: swiping left moves forward.
+          go(dx < 0 ? i + 1 : i - 1);
+        }}
+      >
+        <div className="lp-example-card" key={ex.key}>
+          <CardVisual
+            k={ex.key}
+            name={ex.name}
+            rewardLine={c.rewardLine(ex.target, ex.reward)}
+            target={ex.target}
+            filled={ex.filled}
+            footStart={`${ex.filled} ${d.of} ${ex.target}`}
+            footEnd={d.left(left, ex.reward)}
+            size="lg"
+          />
+        </div>
+      </div>
+      <div className="lp-example-controls">
+        <button type="button" className="lp-round-btn" onClick={() => go(i - 1)} aria-label={c.prev}><Icon name="chevronRight" size={20} /></button>
+        <span className="lp-example-pos" aria-live="polite">{ex.kind} · {c.position(i + 1, list.length)}</span>
+        <button type="button" className="lp-round-btn" onClick={() => go(i + 1)} aria-label={c.next}><Icon name="chevronLeft" size={20} /></button>
+      </div>
     </div>
   );
 }
