@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+/* eslint-disable @next/next/no-html-link-for-pages -- plain links on purpose: client-side navigation breaks on this server */
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import "../landing/landing.css";
 import { hrefs, waLink, WHATSAPP_DISPLAY, type Lang } from "../landing/content";
@@ -198,7 +198,7 @@ export default function SignupFlow() {
     <div className="lp su" lang={lang} dir={lang === "en" ? "ltr" : "rtl"}>
       <header className="lp-header">
         <div className="lp-wrap lp-header-row">
-          <Link href={h.home} className="lp-home-link"><Logo label="Perkly" /></Link>
+          <a href={h.home} className="lp-home-link"><Logo label="Perkly" /></a>
           <a href={h.login} className="lp-login">{t.login}</a>
         </div>
       </header>
@@ -210,7 +210,7 @@ export default function SignupFlow() {
             <p className="lp-lead">{t.doneText}</p>
             <div className="su-done-actions">
               <a className="lp-btn lp-btn-primary" href={waLink(t.doneWaText(done))} target="_blank" rel="noopener noreferrer"><Icon name="message" size={18} />{t.doneWa}</a>
-              <Link className="lp-btn lp-btn-ghost" href={h.home}>{t.home}</Link>
+              <a className="lp-btn lp-btn-ghost" href={h.home}>{t.home}</a>
             </div>
           </section>
         ) : (

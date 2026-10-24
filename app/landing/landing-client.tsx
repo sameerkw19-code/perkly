@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+/* eslint-disable @next/next/no-html-link-for-pages -- plain links on purpose: client-side navigation breaks on this server */
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { COPY, hrefs, type Lang } from "./content";
 import { CardVisual, Icon } from "./visuals";
@@ -47,16 +47,16 @@ export function SiteNav({ lang }: { lang: Lang }) {
   ];
   const langLinks = (
     <span className="lp-langs" role="group" aria-label={c.lang}>
-      <Link href="/" lang="he" hrefLang="he" aria-current={lang === "he" ? "true" : undefined} onClick={() => rememberLang("he")}>עברית</Link>
-      <Link href="/ar" lang="ar" hrefLang="ar" aria-current={lang === "ar" ? "true" : undefined} onClick={() => rememberLang("ar")}>العربية</Link>
-      <Link href="/en" lang="en" hrefLang="en" aria-current={lang === "en" ? "true" : undefined} onClick={() => rememberLang("en")}>English</Link>
+      <a href="/" lang="he" hrefLang="he" aria-current={lang === "he" ? "true" : undefined} onClick={() => rememberLang("he")}>עברית</a>
+      <a href="/ar" lang="ar" hrefLang="ar" aria-current={lang === "ar" ? "true" : undefined} onClick={() => rememberLang("ar")}>العربية</a>
+      <a href="/en" lang="en" hrefLang="en" aria-current={lang === "en" ? "true" : undefined} onClick={() => rememberLang("en")}>English</a>
     </span>
   );
 
   return (
     <header className="lp-header">
       <div className="lp-wrap lp-header-row">
-        <Link href={h.home} className="lp-home-link"><Logo label={c.home} /></Link>
+        <a href={h.home} className="lp-home-link"><Logo label={c.home} /></a>
         <nav aria-label="Perkly" className="lp-nav-desktop">
           {links.map((l) => (
             <a key={l.href} href={l.href}>{l.label}</a>
