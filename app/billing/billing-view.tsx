@@ -61,6 +61,7 @@ export default function BillingView({ businesses, configured }: { businesses: Bi
 
   return (
     <main className="card" style={{ maxWidth: 560, margin: "32px auto", padding: 24 }}>
+      <a href="/" style={{ fontSize: 14, display: "inline-block", marginBottom: 12 }}>← חזרה ללוח הבקרה</a>
       <h1 style={{ fontSize: 22, marginBottom: 8 }}>מנוי ותשלום</h1>
       <p style={{ marginBottom: 16 }}>{PRICE_TEXT}</p>
       {returned && <p role="status" style={{ marginBottom: 16 }}>{waiting ? "התשלום התקבל. מעדכנים את סטטוס המנוי..." : "התשלום התקבל. אם הסטטוס עדיין לא עודכן, רענן את העמוד או פנה לתמיכה."}</p>}
