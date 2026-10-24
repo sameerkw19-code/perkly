@@ -9,7 +9,7 @@ import type { Design } from "../../../lib/design";
 
 type Card = { name: string; stamps: number; target: number; scan_code: string; design: Design; rewards: number; nextExpiry: string | null };
 
-export default function CardView({ card, secret, googleWallet }: { card: Card | null; secret: string; googleWallet: boolean }) {
+export default function CardView({ card, secret, googleWallet, isIOS }: { card: Card | null; secret: string; googleWallet: boolean; isIOS: boolean }) {
   const { lang, setLang, t, dir } = useLang();
   return (
     <div className="card-page" dir={dir}>
@@ -40,7 +40,7 @@ export default function CardView({ card, secret, googleWallet }: { card: Card | 
               <Wallet size={16} />{t("walletAddGoogle")}
             </a>
           ) : (
-            <p className="wallet-note"><Wallet size={15} />{t("walletHint")}</p>
+            <p className="wallet-note"><Wallet size={15} />{isIOS ? t("walletHintIOS") : t("walletHint")}</p>
           )}
           <p className="form-hint center">{t("saveLinkHint")}</p>
         </div>

@@ -35,7 +35,7 @@ export default async function CardPage({ params }: { params: Promise<{ secret: s
           .bind(await sha256(secret), new Date().toISOString())
           .first<{ name: string; stamps: number; target: number; scan_code: string; business_id: string; business: string; reward: string; color: string; reward_mode: string; saved: number; next_expiry: string | null }>()
       : null;
-  if (!row) return <CardView card={null} secret={secret} googleWallet={false} />;
+  if (!row) return <CardView card={null} secret={secret} googleWallet={false} isIOS={false} />;
   const design = await liveDesign(db, { id: row.business_id, name: row.business, reward: row.reward, color: row.color });
   const rewards = row.saved + (row.reward_mode === "block" && row.stamps >= row.target ? 1 : 0);
   // Google Wallet does not run on iPhone, so the Google button is shown only to non-iOS devices.
@@ -47,6 +47,7 @@ export default async function CardPage({ params }: { params: Promise<{ secret: s
       card={{ name: row.name, stamps: row.stamps, target: row.target, scan_code: row.scan_code, design, rewards, nextExpiry: row.next_expiry }}
       secret={secret}
       googleWallet={googleWallet}
+      isIOS={isIOS}
     />
   );
 }
