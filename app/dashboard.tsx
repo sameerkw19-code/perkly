@@ -507,7 +507,7 @@ function LinkBox({ url, t, notify }: { url: string; t: any; notify: (s: string, 
       <input readOnly value={url} dir="ltr" onFocus={(e) => e.currentTarget.select()} aria-label="Link" />
       <div className="row-actions">
         <button type="button" className="btn soft small" onClick={async () => notify((await copyText(url)) ? t("copied") : t("err_generic"))}><Copy size={14} />{t("copy")}</button>
-        <a className="btn lime small" href={whatsappLink(url)} target="_blank" rel="noreferrer"><Share2 size={14} />{t("whatsapp")}</a>
+        <a className="btn soft small" href={whatsappLink(url)} target="_blank" rel="noreferrer" title={t("whatsapp")}><Share2 size={14} />{t("whatsapp")}</a>
       </div>
     </div>
   );
