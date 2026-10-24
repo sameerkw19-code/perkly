@@ -92,7 +92,7 @@ export async function POST(request: Request) {
       if (next.id === business.owner) return fail("already_owner", 409, "Already the owner");
       await db.batch([
         // The previous owner stays on the team as staff; the new owner can remove them.
-        db.prepare("UPDATE memberships SET role = 'staff' WHERE business = ? AND user = ? AND role = 'owner'").bind(businessId, business.owner),
+        db.prepare("UPDATE memberships SET role = 'staff' WHERE business = ? AND role = 'owner' AND user != ?").bind(businessId, next.id),
         db.prepare("INSERT OR IGNORE INTO memberships(id, business, user, role, created) VALUES(?, ?, ?, 'owner', ?)")
           .bind(crypto.randomUUID(), businessId, next.id, nowIso),
         db.prepare("UPDATE memberships SET role = 'owner', revoked = NULL, branch = NULL WHERE business = ? AND user = ?").bind(businessId, next.id),

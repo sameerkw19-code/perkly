@@ -41,9 +41,11 @@ export async function POST(request: Request) {
       if (!(await allow(db, `signup:${ip}`, 5, 3600))) return fail("rate_limited", 429, "Too many attempts");
       if (env.SIGNUP_CODE && body.signupCode !== env.SIGNUP_CODE) return fail("signup_code", 403, "Signup code required");
       const sys = await getSettings(db);
-      if (!sys.signupsOpen || sys.maintenance) return fail(sys.maintenance ? "maintenance" : "signups_closed", 403, "Sign-ups are closed");
       const name = str(body.name, 80);
       const email = normalizeEmail(body.email);
+      // Closed sign-ups never lock out a configured platform admin email.
+      const adminEmail = !!email && (env.PLATFORM_ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).includes(email);
+      if ((!sys.signupsOpen || sys.maintenance) && !adminEmail) return fail(sys.maintenance ? "maintenance" : "signups_closed", 403, "Sign-ups are closed");
       if (!name || !email) return fail("bad_details", 400, "Invalid name or email");
       if (!validPassword(body.password)) return fail("weak_password", 400, "Password must be 8+ characters");
       const userId = await newUser(db, name, email, body.password);
@@ -79,8 +81,13 @@ export async function POST(request: Request) {
       const tokenText = typeof body.token === "string" && body.token.length <= 100 ? body.token : "";
       const inviteId = await sha256(tokenText);
       const now = new Date().toISOString();
+      if ((await getSettings(db)).maintenance) return fail("maintenance", 503, "Maintenance");
+      // Invites to archived businesses do not work.
       const invite = await db
-        .prepare("SELECT business, role, branch FROM invites WHERE id = ? AND used IS NULL AND revoked IS NULL AND expires > ?")
+        .prepare(
+          `SELECT i.business, i.role, i.branch FROM invites i JOIN businesses b ON b.id = i.business
+           WHERE i.id = ? AND i.used IS NULL AND i.revoked IS NULL AND i.expires > ? AND b.archived IS NULL`,
+        )
         .bind(inviteId, now)
         .first<{ business: string; role: string; branch: string | null }>();
       if (!tokenText || !invite) return fail("invite_invalid", 404, "Invite expired or already used");

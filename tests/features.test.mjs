@@ -115,3 +115,25 @@ test("access: subscription status, and pilot businesses without one", async () =
   assert.deepEqual(await businessAccess(fakeDb({ suspended: null, comp_until: null, status: null }), "b", NOW), { ok: true });
   assert.deepEqual(await businessAccess(fakeDb(null), "missing", NOW), { ok: false, code: "subscription_required" });
 });
+
+// ---- Platform settings ----
+import { cleanSetting, saveSettings, DEFAULT_SETTINGS } from "../lib/server/settings.ts";
+
+test("settings: values are validated by type", () => {
+  assert.equal(cleanSetting("trialDays", 14), 14);
+  for (const bad of [null, "", false, true, "14", -1, 366, 1.5]) assert.equal(cleanSetting("trialDays", bad), undefined, String(bad));
+  assert.equal(cleanSetting("signupsOpen", false), false);
+  assert.equal(cleanSetting("signupsOpen", "false"), undefined);
+  assert.equal(cleanSetting("announcement", "  hi\u0007there  "), "hi there");
+  assert.equal(cleanSetting("announcement", "x".repeat(500)).length, 300);
+  assert.equal(DEFAULT_SETTINGS.signupsOpen, true);
+});
+
+test("settings: saving is all or nothing", async () => {
+  const writes = [];
+  const db = { prepare: () => ({ bind: (...a) => ({ a }) }), batch: async (s) => writes.push(...s) };
+  assert.deepEqual(await saveSettings(db, { announcement: "ok", trialDays: null }, "a@b.c"), ["trialDays"]);
+  assert.equal(writes.length, 0);
+  assert.deepEqual(await saveSettings(db, { announcement: "ok", trialDays: 7 }, "a@b.c"), []);
+  assert.equal(writes.length, 4); // two settings, each with a log entry
+});

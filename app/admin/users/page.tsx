@@ -30,7 +30,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
     .prepare(
       `SELECT u.id, u.email, u.name, u.created, u.blocked,
          (SELECT GROUP_CONCAT(b.name || ' · ' || CASE m.role WHEN 'owner' THEN 'בעלים' ELSE 'עובד' END, ' | ')
-            FROM memberships m JOIN businesses b ON b.id = m.business WHERE m.user = u.id AND m.revoked IS NULL) AS businesses,
+            FROM memberships m JOIN businesses b ON b.id = m.business WHERE m.user = u.id AND m.revoked IS NULL AND b.archived IS NULL) AS businesses,
          (SELECT MAX(created) FROM sessions s WHERE s.user = u.id) AS last_login,
          (SELECT COUNT(*) FROM sessions s WHERE s.user = u.id AND s.expires > ?1) AS active_sessions
        FROM users u

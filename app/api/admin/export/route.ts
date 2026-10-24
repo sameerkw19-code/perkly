@@ -46,7 +46,7 @@ export async function GET(request: Request) {
     subscription: sub ?? null,
     design,
     team: team.results,
-    customers: customers.results.map(({ phone, ...c }) => ({ ...c, phone: maskPhone(phone) })),
+    customers: customers.results.map(({ phone, ...c }) => ({ ...c, phone: maskPhone(phone.replace(/ \(archived [^)]*\)$/, "")) })),
     activity: events.results,
   };
   const safeName = b.name.replace(/[^\p{L}\p{N}_-]+/gu, "-").slice(0, 40) || "business";

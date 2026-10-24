@@ -95,7 +95,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
         <div className="admin-grid">
           <section className="panel">
             <h2>פעולות</h2>
-            <AdminActions business={b.id} suspended={!!b.suspended} compUntil={b.comp_until} biz={{ id: b.id, name: b.name, reward: b.reward, target: b.target, archived: b.archived, ownerEmail: b.owner_email }} />
+            <AdminActions business={b.id} suspended={!!b.suspended} compUntil={b.comp_until} biz={{ id: b.id, name: b.name, reward: b.reward, target: b.target, archived: b.archived, ownerEmail: b.owner_email, paying: b.status === "active" || b.status === "trialing" }} />
           </section>
 
           <section className="panel">

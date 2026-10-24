@@ -6,7 +6,7 @@ import { useLang } from "../../../../lib/i18n";
 import type { Design } from "../../../../lib/design";
 
 /** Suspend / unsuspend and free-access controls for one business. Reloads the page after each change. */
-type Biz = { id: string; name: string; reward: string; target: number; archived: string | null; ownerEmail: string | null };
+type Biz = { id: string; name: string; reward: string; target: number; archived: string | null; ownerEmail: string | null; paying: boolean };
 
 export function AdminActions({ business, suspended, compUntil, biz }: { business: string; suspended: boolean; compUntil: string | null; biz: Biz }) {
   const [busy, setBusy] = useState(false);
@@ -105,7 +105,8 @@ export function AdminActions({ business, suspended, compUntil, biz }: { business
           ) : (
             <button className="btn soft small danger" disabled={busy} onClick={() => {
               const reason = prompt("סיבת הארכוב (נשמרת ביומן):")?.trim();
-              if (reason && confirm("לארכב את העסק? הבעלים והצוות לא יראו אותו, וההצטרפות תיסגר. הנתונים נשמרים ואפשר לשחזר.")) run("archive", { reason });
+              const warn = biz.paying ? "\n\nשים לב: לעסק יש מנוי פעיל ב-Polar, והוא ימשיך להיות מחויב. בטל את המנוי ב-Polar בנפרד." : "";
+              if (reason && confirm("לארכב את העסק? הבעלים והצוות לא יראו אותו, וההצטרפות תיסגר. הנתונים נשמרים ואפשר לשחזר." + warn)) run("archive", { reason });
             }}>ארכוב עסק</button>
           )}
         </div>

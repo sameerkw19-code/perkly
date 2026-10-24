@@ -29,8 +29,7 @@ export function cleanSetting<K extends keyof Settings>(key: K, value: unknown): 
   const d = DEFAULT_SETTINGS[key];
   if (typeof d === "boolean") return (typeof value === "boolean" ? value : undefined) as Settings[K] | undefined;
   if (typeof d === "number") {
-    const n = Number(value);
-    return (Number.isInteger(n) && n >= 0 && n <= 365 ? n : undefined) as Settings[K] | undefined;
+    return (typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 365 ? value : undefined) as Settings[K] | undefined;
   }
   if (typeof value !== "string") return undefined;
   return value.replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 300) as Settings[K];
@@ -54,12 +53,14 @@ export async function getSettings(db: D1Database): Promise<Settings> {
 /** Saves the given settings and logs each change. Returns the keys that were rejected. */
 export async function saveSettings(db: D1Database, patch: Record<string, unknown>, adminEmail: string): Promise<string[]> {
   const now = new Date().toISOString();
-  const rejected: string[] = [];
+  // All or nothing: if any key is unknown or invalid, nothing is saved.
+  const rejected = Object.entries(patch)
+    .filter(([k, raw]) => !(KEYS as string[]).includes(k) || cleanSetting(k as keyof Settings, raw) === undefined)
+    .map(([k]) => k);
+  if (rejected.length) return rejected;
   const statements: D1PreparedStatement[] = [];
   for (const [k, raw] of Object.entries(patch)) {
-    if (!(KEYS as string[]).includes(k)) { rejected.push(k); continue; }
-    const v = cleanSetting(k as keyof Settings, raw);
-    if (v === undefined) { rejected.push(k); continue; }
+    const v = cleanSetting(k as keyof Settings, raw)!;
     statements.push(
       db.prepare(
         `INSERT INTO settings(key, value, updated, updated_by) VALUES(?, ?, ?, ?)
@@ -70,5 +71,5 @@ export async function saveSettings(db: D1Database, patch: Record<string, unknown
     );
   }
   if (statements.length) await db.batch(statements);
-  return rejected;
+  return [];
 }

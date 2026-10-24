@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import { getD1 } from "../../../../../db";
 import { sha256 } from "../../../../../lib/server/crypto";
 import { fail } from "../../../../../lib/server/http";
+import { getSettings } from "../../../../../lib/server/settings";
 import { saveUrl, walletConfig } from "../../../../../lib/server/google-wallet";
 
 export const dynamic = "force-dynamic";
@@ -21,13 +22,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ secr
       `SELECT c.id AS customer_id, c.business AS business_id, c.stamps, c.target, c.scan_code,
          (SELECT COUNT(*) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2))
            + (CASE WHEN b.reward_mode = 'block' AND c.stamps >= c.target THEN 1 ELSE 0 END) AS rewards
-       FROM customers c JOIN businesses b ON b.id = c.business WHERE c.card_hash = ?1 AND c.archived IS NULL`,
+       FROM customers c JOIN businesses b ON b.id = c.business WHERE c.card_hash = ?1 AND c.archived IS NULL AND b.archived IS NULL`,
     )
     .bind(await sha256(secret), new Date().toISOString())
     .first<{ customer_id: string; business_id: string; stamps: number; target: number; scan_code: string; rewards: number }>();
   if (!row) return fail("unknown_card", 404, "Card not found");
   // From now on, stamps for this customer are pushed to Google (see lib/server/wallet-sync.ts).
-  await db.prepare("UPDATE customers SET google_wallet = ? WHERE id = ?").bind(new Date().toISOString(), row.customer_id).run();
+  if (!(await getSettings(db)).maintenance) {
+    await db.prepare("UPDATE customers SET google_wallet = ? WHERE id = ?").bind(new Date().toISOString(), row.customer_id).run();
+  }
 
   // One shared class for now (GOOGLE_WALLET_CLASS_ID). Per-business classes can come later.
   const url = await saveUrl(
