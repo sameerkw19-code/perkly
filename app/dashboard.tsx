@@ -16,7 +16,7 @@ import { BirthdayFields } from "../components/birthday-fields";
 import { birthdayFromParts, formatBirthday } from "../lib/birthday";
 
 type Role = "owner" | "staff";
-type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number };
+type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number };
 type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; rewards?: number; nextExpiry?: string | null; phone?: string };
 type Data = {
   me: { name: string; email: string; platformAdmin?: boolean };
@@ -176,8 +176,9 @@ export default function Dashboard() {
 
   function exportCSV() {
     const safe = (s: unknown) => '"' + String(s ?? "").replace(/^[=+@\-\t\r]/, "'$&").replaceAll('"', '""') + '"';
-    const rows = [["Name", "Phone", "Stamps", "Target", "Birthday (DD/MM)", "Marketing consent", "Joined", "Source"],
-      ...customers.map((c) => [c.name, c.phone, c.stamps, c.target, formatBirthday(c.birthday), c.consent_marketing ? "yes" : "no", c.created, c.source])];
+    const withBirthday = b?.birthdays !== 0;
+    const rows = [["Name", "Phone", "Stamps", "Target", ...(withBirthday ? ["Birthday (DD/MM)"] : []), "Marketing consent", "Joined", "Source"],
+      ...customers.map((c) => [c.name, c.phone, c.stamps, c.target, ...(withBirthday ? [formatBirthday(c.birthday)] : []), c.consent_marketing ? "yes" : "no", c.created, c.source])];
     const csv = "﻿" + rows.map((r) => r.map(safe).join(",")).join("\r\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
@@ -321,7 +322,7 @@ export default function Dashboard() {
               ) : (
                 <div className="table-wrap">
                   <table>
-                    <thead><tr><th>{t("name")}</th><th>{t("phone")}</th><th>{t("balance")}</th><th>{t("birthdayCol")}</th><th>{t("marketingCol")}</th><th>{t("actions")}</th></tr></thead>
+                    <thead><tr><th>{t("name")}</th><th>{t("phone")}</th><th>{t("balance")}</th>{b.birthdays !== 0 && <th>{t("birthdayCol")}</th>}<th>{t("marketingCol")}</th><th>{t("actions")}</th></tr></thead>
                     <tbody>
                       {filtered.map((c) => (
                         <tr key={c.id}>
@@ -334,7 +335,7 @@ export default function Dashboard() {
                               {c.rewards > 0 && <span className="pill ready-pill"><Gift size={11} /> <Num>{c.rewards}</Num></span>}
                             </div>
                           </td>
-                          <td><Num>{formatBirthday(c.birthday) || "—"}</Num></td>
+                          {b.birthdays !== 0 && <td><Num>{formatBirthday(c.birthday) || "—"}</Num></td>}
                           <td>{c.consent_marketing ? t("yes") : t("no")}</td>
                           <td>
                             <div className="row-actions">
@@ -423,7 +424,7 @@ export default function Dashboard() {
                 <h2>{t("newCustomer")}</h2>
                 <label>{t("name")}<input name="name" required maxLength={80} autoFocus /></label>
                 <label>{t("phone")}<input name="phone" type="tel" required maxLength={20} dir="ltr" placeholder={t("phoneHint")} /></label>
-                <BirthdayFields t={t} hint={false} />
+                {b.birthdays !== 0 && <BirthdayFields t={t} hint={false} />}
                 <p className="form-hint">{t("privacy")} {t("phoneNotVerified")}</p>
                 <div className="form-actions">
                   <button className="btn primary" disabled={busy}>{t("save")}</button>
@@ -543,7 +544,7 @@ function LinkBox({ url, t, notify }: { url: string; t: any; notify: (s: string, 
 
 function BusinessForm({ t, busy, initial, submitLabel, onSubmit }: {
   t: any; busy: boolean; initial?: Business; submitLabel: string;
-  onSubmit: (v: { name: string; reward: string; target: number; color: string; staffAdjust?: boolean; rewardMode?: string; rewardExpiryDays?: number }) => void;
+  onSubmit: (v: { name: string; reward: string; target: number; color: string; staffAdjust?: boolean; birthdays?: boolean; rewardMode?: string; rewardExpiryDays?: number }) => void;
 }) {
   return (
     <form className="stack-form" onSubmit={(e) => {
@@ -551,7 +552,7 @@ function BusinessForm({ t, busy, initial, submitLabel, onSubmit }: {
       const f = new FormData(e.currentTarget);
       onSubmit({
         name: String(f.get("name")), reward: String(f.get("reward")), target: Number(f.get("target")), color: String(f.get("color")),
-        ...(initial ? { staffAdjust: f.get("staffAdjust") === "on", rewardMode: String(f.get("rewardMode")), rewardExpiryDays: Number(f.get("rewardExpiryDays")) } : {}),
+        ...(initial ? { staffAdjust: f.get("staffAdjust") === "on", birthdays: f.get("birthdays") === "on", rewardMode: String(f.get("rewardMode")), rewardExpiryDays: Number(f.get("rewardExpiryDays")) } : {}),
       });
     }}>
       <label>{t("businessName")}<input name="name" required maxLength={80} defaultValue={initial?.name} /></label>
@@ -576,6 +577,8 @@ function BusinessForm({ t, busy, initial, submitLabel, onSubmit }: {
             <small className="form-hint">{t("expiryNote")}</small>
           </label>
           <label className="check"><input type="checkbox" name="staffAdjust" defaultChecked={!!initial.staff_adjust} /><span>{t("staffAdjustSetting")}</span></label>
+          <label className="check"><input type="checkbox" name="birthdays" defaultChecked={initial.birthdays !== 0} /><span>{t("birthdaysSetting")}</span></label>
+          <small className="form-hint">{t("birthdaysSettingHint")}</small>
         </>
       )}
       <button className="btn primary" disabled={busy}>{submitLabel}</button>

@@ -10,7 +10,7 @@ import { birthdayFromParts } from "../../../lib/birthday";
 import type { Design } from "../../../lib/design";
 import { textsFor } from "../../../lib/design";
 
-type Business = { name: string; target: number; design: Design };
+type Business = { name: string; target: number; design: Design; birthdays: boolean };
 
 export default function JoinForm({ code, business }: { code: string; business: Business | null }) {
   const { lang, setLang, t, dir } = useLang();
@@ -29,7 +29,7 @@ export default function JoinForm({ code, business }: { code: string; business: B
       phone: form.get("phone"),
       terms: form.get("terms") === "on",
       marketing: form.get("marketing") === "on",
-      birthday: birthdayFromParts(form.get("bday"), form.get("bmonth")),
+      birthday: business?.birthdays ? birthdayFromParts(form.get("bday"), form.get("bmonth")) : "",
     });
     if (result.ok) {
       window.location.replace(result.data.cardPath);
@@ -54,7 +54,7 @@ export default function JoinForm({ code, business }: { code: string; business: B
           <LoyaltyCard design={business.design} lang={lang} stamps={0} target={business.target} t={t} />
           <label>{t("name")}<input name="name" required maxLength={80} autoComplete="name" /></label>
           <label>{t("phone")}<input name="phone" type="tel" required maxLength={20} autoComplete="tel" dir="ltr" placeholder={t("phoneHint")} /></label>
-          <BirthdayFields t={t} />
+          {business.birthdays && <BirthdayFields t={t} />}
           <label className="check"><input type="checkbox" name="terms" required /> <span>{t("terms")}</span></label>
           <label className="check"><input type="checkbox" name="marketing" /> <span>{t("marketing")}</span></label>
           {error && <p className="form-error" role="alert">{error}</p>}

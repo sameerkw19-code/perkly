@@ -21,6 +21,8 @@ export const businesses = sqliteTable(
     rewardMode: text("reward_mode").notNull().default("block"),
     // Days a saved reward stays valid (0 = no expiry). Applies to rewards earned after the change.
     rewardExpiryDays: integer("reward_expiry_days").notNull().default(0),
+    // 1 = ask customers for a birthday (day and month) and show upcoming birthdays. Owner setting.
+    birthdays: integer("birthdays").notNull().default(1),
     // Set by a platform admin. A suspended business cannot stamp or accept new customers.
     suspended: text("suspended"),
     suspendReason: text("suspend_reason"),

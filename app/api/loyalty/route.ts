@@ -13,7 +13,7 @@ import { formatBirthday, parseBirthday, upcomingKeys } from "../../../lib/birthd
 
 export const dynamic = "force-dynamic";
 
-type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust: number; reward_mode: "bank" | "block"; reward_expiry_days: number };
+type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust: number; reward_mode: "bank" | "block"; reward_expiry_days: number; birthdays: number };
 type Customer = { id: string; business: string; name: string; phone: string; stamps: number; target: number; scan_code: string };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -24,7 +24,7 @@ function validTarget(v: unknown): v is number {
 }
 
 async function loadBusiness(db: D1Database, id: string) {
-  return db.prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days FROM businesses WHERE id = ?").bind(id).first<Business>();
+  return db.prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays FROM businesses WHERE id = ?").bind(id).first<Business>();
 }
 
 /** Saved rewards that can be used now, and the nearest expiry. */
@@ -71,12 +71,15 @@ export async function GET(request: Request) {
   // Whether stamping and new customers are allowed now (subscription, admin suspension or free access).
   const access = await businessAccess(db, business!.id);
   // Birthdays today and in the next 6 days (Israel time). Names only, for owner and staff.
+  // Only when the business has birthdays turned on.
   const upcoming = upcomingKeys(new Date());
   const keys = [...upcoming.keys()];
-  const bdays = await db
-    .prepare(`SELECT id, name, birthday FROM customers WHERE business = ? AND archived IS NULL AND birthday IN (${keys.map(() => "?").join(",")})`)
-    .bind(business!.id, ...keys)
-    .all<{ id: string; name: string; birthday: string }>();
+  const bdays = business!.birthdays
+    ? await db
+        .prepare(`SELECT id, name, birthday FROM customers WHERE business = ? AND archived IS NULL AND birthday IN (${keys.map(() => "?").join(",")})`)
+        .bind(business!.id, ...keys)
+        .all<{ id: string; name: string; birthday: string }>()
+    : { results: [] as { id: string; name: string; birthday: string }[] };
   const birthdays = bdays.results
     .map((c) => ({ id: c.id, name: c.name, date: formatBirthday(c.birthday), inDays: upcoming.get(c.birthday) ?? 0 }))
     .sort((a, b) => a.inDays - b.inDays);
@@ -248,12 +251,13 @@ export async function POST(request: Request) {
       }
       // A new target applies to new cards and to existing cards from their next round (after redemption).
       const staffAdjust = typeof p.staffAdjust === "boolean" ? (p.staffAdjust ? 1 : 0) : business.staff_adjust;
+      const birthdaysOn = typeof p.birthdays === "boolean" ? (p.birthdays ? 1 : 0) : business.birthdays;
       const mode = p.rewardMode === "bank" || p.rewardMode === "block" ? p.rewardMode : business.reward_mode;
       const expiry = p.rewardExpiryDays === undefined ? business.reward_expiry_days : p.rewardExpiryDays;
       if (![0, 30, 60, 90, 180, 365].includes(expiry as number)) return fail("bad_details", 400, "Invalid expiry");
       const statements = [
-        db.prepare("UPDATE businesses SET name = ?, reward = ?, target = ?, color = ?, staff_adjust = ?, reward_mode = ?, reward_expiry_days = ? WHERE id = ?")
-          .bind(name, reward, p.target, p.color, staffAdjust, mode, expiry, business.id),
+        db.prepare("UPDATE businesses SET name = ?, reward = ?, target = ?, color = ?, staff_adjust = ?, reward_mode = ?, reward_expiry_days = ?, birthdays = ? WHERE id = ?")
+          .bind(name, reward, p.target, p.color, staffAdjust, mode, expiry, birthdaysOn, business.id),
       ];
       if (business.reward_mode === "block" && mode === "bank") {
         // Switching to collect mode: cards that are full now become a saved reward and start a new round.
@@ -275,7 +279,8 @@ export async function POST(request: Request) {
       const name = str(p.name, 80);
       const phone = normalizePhone(p.phone);
       if (!name || !phone) return fail("bad_details", 400, "Invalid name or phone");
-      const birthday = parseBirthday(p.birthday);
+      // Ignored when the business has birthdays turned off.
+      const birthday = business.birthdays ? parseBirthday(p.birthday) : null;
       if (birthday === "invalid") return fail("bad_details", 400, "Invalid birthday");
       const id = crypto.randomUUID();
       const scan = randomToken(16);

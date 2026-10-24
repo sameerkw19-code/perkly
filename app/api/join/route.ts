@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   if (!(await allow(db, `join-ip:${ip}`, 10, 600))) return fail("rate_limited", 429, "Too many attempts");
 
   const code = typeof body.code === "string" ? body.code.slice(0, 40) : "";
-  const business = await db.prepare("SELECT id, target FROM businesses WHERE join_code = ?").bind(code).first<{ id: string; target: number }>();
+  const business = await db.prepare("SELECT id, target, birthdays FROM businesses WHERE join_code = ?").bind(code).first<{ id: string; target: number; birthdays: number }>();
   if (!code || !business) return fail("join_invalid", 404, "This join link is not active");
   if (!(await allow(db, `join-business:${business.id}`, 300, 3600))) return fail("rate_limited", 429);
   const access = await businessAccess(db, business.id);
@@ -32,7 +32,8 @@ export async function POST(request: Request) {
   if (body.terms !== true) return fail("terms_required", 400, "Terms must be accepted");
   const marketing = body.marketing === true ? 1 : 0;
   // Optional day and month only ("MM-DD"). The year is never collected.
-  const birthday = parseBirthday(body.birthday);
+  // Ignored when the business has birthdays turned off.
+  const birthday = business.birthdays ? parseBirthday(body.birthday) : null;
   if (birthday === "invalid") return fail("bad_details", 400, "Invalid birthday");
 
   const now = new Date().toISOString();

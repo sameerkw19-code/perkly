@@ -213,6 +213,8 @@ Object.assign(words, {
   stampsWord: ["חותמות", "أختام", "Stamps"],
   billingLink: ["מנוי ותשלום", "الاشتراك والدفع", "Subscription"],
   birthdayCol: ["יום הולדת", "عيد الميلاد", "Birthday"],
+  birthdaysSetting: ["לבקש מלקוחות יום הולדת (יום וחודש)", "طلب تاريخ ميلاد الزبائن (اليوم والشهر)", "Ask customers for their birthday (day and month)"],
+  birthdaysSettingHint: ["כשכבוי: השדה לא מופיע בהרשמה ואצל הצוות, ורשימת ימי ההולדת מוסתרת. תאריכים שכבר נשמרו נשארים.", "عند الإيقاف: لا يظهر الحقل في التسجيل ولدى الطاقم، وتُخفى قائمة أعياد الميلاد. التواريخ المحفوظة تبقى.", "When off: the field is hidden at sign-up and for staff, and the birthday list is hidden. Dates already saved are kept."],
   birthdaysTitle: ["ימי הולדת השבוע:", "أعياد ميلاد هذا الأسبوع:", "Birthdays this week:"],
   bdayToday: ["היום!", "اليوم!", "today!"],
   bdayTomorrow: ["מחר", "غداً", "tomorrow"],
