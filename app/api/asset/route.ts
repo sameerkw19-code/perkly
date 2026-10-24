@@ -1,5 +1,6 @@
 import { getD1 } from "../../../db";
 import { getRole, getUser } from "../../../lib/server/auth";
+import { businessAccess } from "../../../lib/server/billing";
 import { fail, json, sameOrigin } from "../../../lib/server/http";
 import { imageInfo } from "../../../lib/server/image";
 import { allow } from "../../../lib/server/rate-limit";
@@ -22,6 +23,8 @@ export async function POST(request: Request) {
   const role = await getRole(db, user.id, business);
   if (!role) return fail("not_found", 404);
   if (role !== "owner") return fail("forbidden", 403);
+  const access = await businessAccess(db, business!);
+  if (!access.ok && access.code === "business_suspended") return fail(access.code, 402, "Business is suspended");
   if (!KINDS.has(kind)) return fail("bad_request", 400);
   if (!bytes.length || bytes.length > MAX_BYTES) return fail("image_too_big", 413);
   if (!(await allow(db, `upload:${user.id}`, 60, 3600))) return fail("rate_limited", 429);

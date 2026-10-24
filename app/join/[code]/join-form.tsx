@@ -4,17 +4,13 @@ import { errorText, useLang } from "../../../lib/i18n";
 import { post } from "../../../lib/api";
 import { LangSwitch } from "../../../components/lang-switch";
 import { LoyaltyCard } from "../../../components/loyalty-card";
+import { BirthdayFields } from "../../../components/birthday-fields";
+import { birthdayFromParts } from "../../../lib/birthday";
 
 import type { Design } from "../../../lib/design";
 import { textsFor } from "../../../lib/design";
 
 type Business = { name: string; target: number; design: Design };
-
-/** Returns "MM-DD", or "" when the customer left the birthday empty. */
-function birthdayValue(day: string, month: string): string {
-  if (!day || !month) return "";
-  return `${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
-}
 
 export default function JoinForm({ code, business }: { code: string; business: Business | null }) {
   const { lang, setLang, t, dir } = useLang();
@@ -33,7 +29,7 @@ export default function JoinForm({ code, business }: { code: string; business: B
       phone: form.get("phone"),
       terms: form.get("terms") === "on",
       marketing: form.get("marketing") === "on",
-      birthday: birthdayValue(form.get("bday") as string, form.get("bmonth") as string),
+      birthday: birthdayFromParts(form.get("bday"), form.get("bmonth")),
     });
     if (result.ok) {
       window.location.replace(result.data.cardPath);
@@ -58,24 +54,7 @@ export default function JoinForm({ code, business }: { code: string; business: B
           <LoyaltyCard design={business.design} lang={lang} stamps={0} target={business.target} t={t} />
           <label>{t("name")}<input name="name" required maxLength={80} autoComplete="name" /></label>
           <label>{t("phone")}<input name="phone" type="tel" required maxLength={20} autoComplete="tel" dir="ltr" placeholder={t("phoneHint")} /></label>
-          <fieldset className="birthday">
-            <legend>{t("birthday")}</legend>
-            <div className="form-row">
-              <label>{t("bday")}
-                <select name="bday" defaultValue="">
-                  <option value="">—</option>
-                  {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => <option key={d} value={d}>{d}</option>)}
-                </select>
-              </label>
-              <label>{t("bmonth")}
-                <select name="bmonth" defaultValue="">
-                  <option value="">—</option>
-                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => <option key={m} value={m}>{m}</option>)}
-                </select>
-              </label>
-            </div>
-            <small className="form-hint">{t("birthdayHint")}</small>
-          </fieldset>
+          <BirthdayFields t={t} />
           <label className="check"><input type="checkbox" name="terms" required /> <span>{t("terms")}</span></label>
           <label className="check"><input type="checkbox" name="marketing" /> <span>{t("marketing")}</span></label>
           {error && <p className="form-error" role="alert">{error}</p>}

@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { env } from "cloudflare:workers";
 import { isPlatformAdmin } from "./auth";
 import { currentUser } from "./page-session";
@@ -6,8 +6,8 @@ import { currentUser } from "./page-session";
 /** For admin pages: the signed-in platform admin, or a 404 for everyone else (the page stays hidden). */
 export async function requireAdminPage() {
   const user = await currentUser();
-  if (!user) redirect("/login");
-  if (!isPlatformAdmin(user, env.PLATFORM_ADMIN_EMAILS)) notFound();
+  // Same 404 for signed-out visitors and non-admins, so the page does not reveal itself.
+  if (!user || !isPlatformAdmin(user, env)) notFound();
   return user;
 }
 

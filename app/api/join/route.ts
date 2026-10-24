@@ -5,18 +5,9 @@ import { allow } from "../../../lib/server/rate-limit";
 import { normalizePhone } from "../../../lib/phone";
 import { releaseArchivedPhone } from "../../../lib/server/customers";
 import { businessAccess } from "../../../lib/server/billing";
+import { parseBirthday } from "../../../lib/birthday";
 
 export const dynamic = "force-dynamic";
-
-/** "MM-DD" with a real calendar day. 02-29 is allowed because the year is unknown. */
-function validMonthDay(value: string): boolean {
-  const m = /^(\d{2})-(\d{2})$/.exec(value);
-  if (!m) return false;
-  const month = Number(m[1]);
-  const day = Number(m[2]);
-  const days = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
-  return days !== undefined && day >= 1 && day <= days;
-}
 
 // Public: a customer joins a business by scanning the business's join QR.
 export async function POST(request: Request) {
@@ -41,8 +32,8 @@ export async function POST(request: Request) {
   if (body.terms !== true) return fail("terms_required", 400, "Terms must be accepted");
   const marketing = body.marketing === true ? 1 : 0;
   // Optional day and month only ("MM-DD"). The year is never collected.
-  const birthday = body.birthday == null || body.birthday === "" ? null : String(body.birthday);
-  if (birthday !== null && !validMonthDay(birthday)) return fail("bad_details", 400, "Invalid birthday");
+  const birthday = parseBirthday(body.birthday);
+  if (birthday === "invalid") return fail("bad_details", 400, "Invalid birthday");
 
   const now = new Date().toISOString();
   const secret = randomToken(24);

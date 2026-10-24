@@ -94,13 +94,15 @@ export async function getRole(db: D1Database, userId: string, businessId: unknow
   return row?.role ?? null;
 }
 
-export function isPlatformAdmin(user: User, adminEmails: string | undefined): boolean {
-  if (!adminEmails) return false;
-  return adminEmails
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean)
-    .includes(user.email.toLowerCase());
+/**
+ * Platform admins. Prefer PLATFORM_ADMIN_USER_IDS: emails are not verified at signup, so an admin
+ * email that has no account yet could be claimed by anyone. When user ids are set, emails are ignored.
+ */
+export function isPlatformAdmin(user: User, cfg: { PLATFORM_ADMIN_USER_IDS?: string; PLATFORM_ADMIN_EMAILS?: string }): boolean {
+  const list = (v: string | undefined) => (v ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+  const ids = list(cfg.PLATFORM_ADMIN_USER_IDS);
+  if (ids.length) return ids.includes(user.id.toLowerCase());
+  return list(cfg.PLATFORM_ADMIN_EMAILS).includes(user.email.toLowerCase());
 }
 
 export function normalizeEmail(value: unknown): string | null {

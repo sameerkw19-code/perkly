@@ -9,6 +9,7 @@ import { assetIds, defaultDesign, designChecks, sanitizeDesign } from "../../../
 import { assetMeta, liveDesign, ownsAssets, publishedDesign } from "../../../lib/server/designs";
 import { releaseArchivedPhone } from "../../../lib/server/customers";
 import { businessAccess } from "../../../lib/server/billing";
+import { formatBirthday, parseBirthday, upcomingKeys } from "../../../lib/birthday";
 
 export const dynamic = "force-dynamic";
 
@@ -61,7 +62,7 @@ export async function GET(request: Request) {
   const memberships = await getMemberships(db, user.id);
   const wanted = url.searchParams.get("business");
   const membership = memberships.find((m) => m.business === wanted) ?? memberships[0];
-  const me = { name: user.name, email: user.email, platformAdmin: isPlatformAdmin(user, env.PLATFORM_ADMIN_EMAILS) };
+  const me = { name: user.name, email: user.email, platformAdmin: isPlatformAdmin(user, env) };
   if (!membership) return json({ me, memberships, business: null, role: null });
 
   const business = await loadBusiness(db, membership.business);
@@ -69,7 +70,17 @@ export async function GET(request: Request) {
   const branches = await activeBranches(db, business!.id);
   // Whether stamping and new customers are allowed now (subscription, admin suspension or free access).
   const access = await businessAccess(db, business!.id);
-  const base = { me, memberships, role, business, branches, myBranch: membership.branch, design: await liveDesign(db, business!), access };
+  // Birthdays today and in the next 6 days (Israel time). Names only, for owner and staff.
+  const upcoming = upcomingKeys(new Date());
+  const keys = [...upcoming.keys()];
+  const bdays = await db
+    .prepare(`SELECT id, name, birthday FROM customers WHERE business = ? AND archived IS NULL AND birthday IN (${keys.map(() => "?").join(",")})`)
+    .bind(business!.id, ...keys)
+    .all<{ id: string; name: string; birthday: string }>();
+  const birthdays = bdays.results
+    .map((c) => ({ id: c.id, name: c.name, date: formatBirthday(c.birthday), inDays: upcoming.get(c.birthday) ?? 0 }))
+    .sort((a, b) => a.inDays - b.inDays);
+  const base = { me, memberships, role, business, branches, myBranch: membership.branch, design: await liveDesign(db, business!), access, birthdays };
 
   if (role === "staff") {
     const mine = await db
@@ -95,7 +106,7 @@ export async function GET(request: Request) {
   const dayAgo = new Date(Date.now() - 86_400_000).toISOString();
   const [customers, events, stats, team, invites, busyCustomers, busyStaff, perBranch, staffFixes] = await db.batch([
     db.prepare(
-      `SELECT c.id, c.name, c.phone, c.stamps, c.target, c.created, c.source, c.consent_marketing, c.card_hash IS NOT NULL AS has_link,
+      `SELECT c.id, c.name, c.phone, c.stamps, c.target, c.created, c.source, c.consent_marketing, c.birthday, c.card_hash IS NOT NULL AS has_link,
          (SELECT COUNT(*) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2))
            + (CASE WHEN ?3 = 'block' AND c.stamps >= c.target THEN 1 ELSE 0 END) AS rewards
        FROM customers c WHERE c.business = ?1 AND c.archived IS NULL ORDER BY c.created DESC LIMIT 5000`,
@@ -211,10 +222,20 @@ export async function POST(request: Request) {
   const role = membership.role;
   const business = (await loadBusiness(db, p.business as string))!;
   const ownerOnly = () => (role === "owner" ? null : fail("forbidden", 403, "Owner permission required"));
-  // Businesses with an inactive subscription can still view their data, but cannot change cards.
-  if (["stamp", "redeem", "adjust", "register_customer"].includes(String(p.action))) {
+  // Access rules. Redeeming a reward a customer already earned is always allowed.
+  // - Inactive subscription: no new stamps, adjustments or customers. Everything else still works.
+  // - Suspended by a platform admin: nothing changes except redeeming, looking up and removing customers.
+  const action = String(p.action);
+  const SUB_GATED = ["stamp", "adjust", "register_customer"];
+  const ALLOWED_WHILE_SUSPENDED = ["lookup", "redeem", "archive_customer"];
+  if (action !== "redeem") {
     const access = await businessAccess(db, business.id);
-    if (!access.ok) return fail(access.code, 402, access.code === "business_suspended" ? "Business is suspended" : "Subscription is not active");
+    if (!access.ok && access.code === "business_suspended" && !ALLOWED_WHILE_SUSPENDED.includes(action)) {
+      return fail(access.code, 402, "Business is suspended");
+    }
+    if (!access.ok && access.code === "subscription_required" && SUB_GATED.includes(action)) {
+      return fail(access.code, 402, "Subscription is not active");
+    }
   }
 
   switch (p.action) {
@@ -254,15 +275,17 @@ export async function POST(request: Request) {
       const name = str(p.name, 80);
       const phone = normalizePhone(p.phone);
       if (!name || !phone) return fail("bad_details", 400, "Invalid name or phone");
+      const birthday = parseBirthday(p.birthday);
+      if (birthday === "invalid") return fail("bad_details", 400, "Invalid birthday");
       const id = crypto.randomUUID();
       const scan = randomToken(16);
       const card = await newCardSecret();
       const insert = db
         .prepare(
-          `INSERT OR IGNORE INTO customers(id, business, name, phone, token, stamps, target, created, card_hash, scan_code, source, consent_marketing)
-           VALUES(?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 0)`,
+          `INSERT OR IGNORE INTO customers(id, business, name, phone, token, stamps, target, created, card_hash, scan_code, source, consent_marketing, birthday)
+           VALUES(?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 0, ?)`,
         )
-        .bind(id, business.id, name, phone, scan, business.target, now, card.hash, scan, role);
+        .bind(id, business.id, name, phone, scan, business.target, now, card.hash, scan, role, birthday);
       const [, r] = await db.batch([releaseArchivedPhone(db, business.id, phone), insert]);
       if (!r.meta.changes) return fail("phone_exists", 409, "Phone already registered");
       return json({ id, cardUrl: `${origin}/c/${card.secret}` });

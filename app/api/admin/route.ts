@@ -10,18 +10,17 @@ const MAX_COMP_DAYS = 366;
 // Platform admin actions on one business. Every change is written to admin_log in the same batch.
 // Actions: suspend (with reason), unsuspend, grant_comp (free access for N days), clear_comp.
 export async function POST(request: Request) {
+  const db = getD1();
+  const user = await getUser(db, request.headers.get("cookie"));
+  // Same answer as a missing route for everyone who is not an admin, checked before anything else.
+  if (!user || !isPlatformAdmin(user, env)) return fail("not_found", 404);
   if (!sameOrigin(request)) return fail("bad_origin", 403, "Invalid origin");
   const body = await readJson(request);
   if (!body) return fail("bad_request", 400);
-  const db = getD1();
-  const user = await getUser(db, request.headers.get("cookie"));
-  if (!user) return fail("unauthorized", 401);
-  // Same answer as a missing route, so the endpoint does not reveal itself.
-  if (!isPlatformAdmin(user, env.PLATFORM_ADMIN_EMAILS)) return fail("not_found", 404);
 
   const businessId = str(body.business, 64);
   if (!businessId) return fail("bad_request", 400);
-  const business = await db.prepare("SELECT id, comp_until FROM businesses WHERE id = ?").bind(businessId).first<{ id: string; comp_until: string | null }>();
+  const business = await db.prepare("SELECT id FROM businesses WHERE id = ?").bind(businessId).first<{ id: string }>();
   if (!business) return fail("not_found", 404, "Business not found");
 
   const now = new Date();
@@ -35,7 +34,8 @@ export async function POST(request: Request) {
       const reason = str(body.reason, 200);
       if (!reason) return fail("reason_required", 400, "A reason is required");
       await db.batch([
-        db.prepare("UPDATE businesses SET suspended = ?, suspend_reason = ? WHERE id = ?").bind(nowIso, reason, businessId),
+        // Keeps the original "suspended since" time if it is already suspended; the reason is updated.
+        db.prepare("UPDATE businesses SET suspended = COALESCE(suspended, ?), suspend_reason = ? WHERE id = ?").bind(nowIso, reason, businessId),
         log("suspend", reason),
       ]);
       return json({ ok: true });
@@ -50,13 +50,16 @@ export async function POST(request: Request) {
     case "grant_comp": {
       const days = Number(body.days);
       if (!Number.isInteger(days) || days < 1 || days > MAX_COMP_DAYS) return fail("bad_details", 400, "Days must be 1–366");
-      // Extends from the current grant if it is still running, otherwise from now.
-      const from = business.comp_until && business.comp_until > nowIso ? new Date(business.comp_until) : now;
-      const until = new Date(from.getTime() + days * 86_400_000).toISOString();
-      await db.batch([
-        db.prepare("UPDATE businesses SET comp_until = ? WHERE id = ?").bind(until, businessId),
-        log("grant_comp", `${days} days, until ${until}`),
+      // Extends from the current grant if it is still running, otherwise from now. One statement,
+      // so two grants at the same time both count. The result keeps the toISOString format.
+      const [updated] = await db.batch([
+        db.prepare(
+          `UPDATE businesses SET comp_until = strftime('%Y-%m-%dT%H:%M:%fZ', MAX(COALESCE(comp_until, ?1), ?1), '+' || ?2 || ' days')
+           WHERE id = ?3 RETURNING comp_until`,
+        ).bind(nowIso, days, businessId),
+        log("grant_comp", `${days} days`),
       ]);
+      const until = (updated.results?.[0] as { comp_until?: string } | undefined)?.comp_until ?? null;
       return json({ ok: true, until });
     }
     case "clear_comp": {

@@ -32,12 +32,12 @@ export function AdminActions({ business, suspended, compUntil }: { business: str
         <h3>השהיית עסק</h3>
         {suspended ? (
           <>
-            <p className="muted">העסק מושהה: לא ניתן להוסיף חותמות או לקוחות חדשים. הלקוחות עדיין רואים את הכרטיס.</p>
+            <p className="muted">העסק מושהה: אין חותמות, לקוחות חדשים או שינויי הגדרות. מימוש הטבות שנצברו עדיין אפשרי, והלקוחות רואים את הכרטיס.</p>
             <button className="btn primary small" disabled={busy} onClick={() => run("unsuspend", {}, "להחזיר את העסק לפעילות?")}>החזרה לפעילות</button>
           </>
         ) : (
           <>
-            <p className="muted">חוסם חותמות והרשמת לקוחות. הלקוחות ממשיכים לראות את הכרטיס.</p>
+            <p className="muted">חוסם חותמות, הרשמת לקוחות ושינויי הגדרות ועיצוב. מימוש הטבות שנצברו נשאר אפשרי.</p>
             <input value={reason} maxLength={200} onChange={(e) => setReason(e.target.value)} placeholder="סיבה (חובה, נשמרת ביומן)" aria-label="סיבת השהיה" />
             <button className="btn soft small danger" disabled={busy || !reason.trim()} onClick={() => run("suspend", { reason }, "להשהות את העסק?")}>השהיה</button>
           </>

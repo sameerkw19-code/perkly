@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Activity, AlertTriangle, Check, Copy, CreditCard, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode, Shield,
+  Activity, AlertTriangle, Cake, Check, Copy, CreditCard, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode, Shield,
   Palette, RefreshCw, ScanLine, Search, Settings, Share2, Store, Users, Wallet, X,
 } from "lucide-react";
 import type { Design } from "../lib/design";
@@ -12,6 +12,8 @@ import { copyText, post, whatsappLink } from "../lib/api";
 import { LangSwitch } from "../components/lang-switch";
 import { LoyaltyCard, Num } from "../components/loyalty-card";
 import { QrImage } from "../components/qr";
+import { BirthdayFields } from "../components/birthday-fields";
+import { birthdayFromParts, formatBirthday } from "../lib/birthday";
 
 type Role = "owner" | "staff";
 type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number };
@@ -19,6 +21,7 @@ type CardState = { id: string; name: string; stamps: number; target: number; rew
 type Data = {
   me: { name: string; email: string; platformAdmin?: boolean };
   access?: { ok: true } | { ok: false; code: "business_suspended" | "subscription_required" };
+  birthdays?: { id: string; name: string; date: string; inDays: number }[];
   memberships: { business: string; role: Role; businessName: string; branch: string | null }[];
   branches?: { id: string; name: string }[];
   myBranch?: string | null;
@@ -173,8 +176,8 @@ export default function Dashboard() {
 
   function exportCSV() {
     const safe = (s: unknown) => '"' + String(s ?? "").replace(/^[=+@\-\t\r]/, "'$&").replaceAll('"', '""') + '"';
-    const rows = [["Name", "Phone", "Stamps", "Target", "Marketing consent", "Joined", "Source"],
-      ...customers.map((c) => [c.name, c.phone, c.stamps, c.target, c.consent_marketing ? "yes" : "no", c.created, c.source])];
+    const rows = [["Name", "Phone", "Stamps", "Target", "Birthday (DD/MM)", "Marketing consent", "Joined", "Source"],
+      ...customers.map((c) => [c.name, c.phone, c.stamps, c.target, formatBirthday(c.birthday), c.consent_marketing ? "yes" : "no", c.created, c.source])];
     const csv = "﻿" + rows.map((r) => r.map(safe).join(",")).join("\r\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
@@ -228,6 +231,17 @@ export default function Dashboard() {
             <AlertTriangle size={16} />
             <span>{t(data.access.code === "business_suspended" ? "accessSuspended" : "accessNoSub")}</span>
             {isOwner && data.access.code === "subscription_required" && <a className="btn primary small" href="/billing">{t("billingLink")}</a>}
+          </div>
+        )}
+        {!!data.birthdays?.length && (
+          <div className="birthday-bar" role="status">
+            <Cake size={16} />
+            <span>{t("birthdaysTitle")}</span>
+            <ul>
+              {data.birthdays.map((x) => (
+                <li key={x.id}><b>{x.name}</b> · {x.inDays === 0 ? t("bdayToday") : x.inDays === 1 ? t("bdayTomorrow") : <Num>{x.date}</Num>}</li>
+              ))}
+            </ul>
           </div>
         )}
 
@@ -307,7 +321,7 @@ export default function Dashboard() {
               ) : (
                 <div className="table-wrap">
                   <table>
-                    <thead><tr><th>{t("name")}</th><th>{t("phone")}</th><th>{t("balance")}</th><th>{t("marketingCol")}</th><th>{t("actions")}</th></tr></thead>
+                    <thead><tr><th>{t("name")}</th><th>{t("phone")}</th><th>{t("balance")}</th><th>{t("birthdayCol")}</th><th>{t("marketingCol")}</th><th>{t("actions")}</th></tr></thead>
                     <tbody>
                       {filtered.map((c) => (
                         <tr key={c.id}>
@@ -320,6 +334,7 @@ export default function Dashboard() {
                               {c.rewards > 0 && <span className="pill ready-pill"><Gift size={11} /> <Num>{c.rewards}</Num></span>}
                             </div>
                           </td>
+                          <td><Num>{formatBirthday(c.birthday) || "—"}</Num></td>
                           <td>{c.consent_marketing ? t("yes") : t("no")}</td>
                           <td>
                             <div className="row-actions">
@@ -401,13 +416,14 @@ export default function Dashboard() {
               <form onSubmit={async (e) => {
                 e.preventDefault();
                 const form = new FormData(e.currentTarget);
-                const r = await call({ action: "register_customer", name: form.get("name"), phone: form.get("phone") });
+                const r = await call({ action: "register_customer", name: form.get("name"), phone: form.get("phone"), birthday: birthdayFromParts(form.get("bday"), form.get("bmonth")) });
                 if (r) { load(); setModal({ type: "link", url: r.cardUrl, title: String(form.get("name")) }); }
               }}>
                 <span className="modal-icon"><Plus /></span>
                 <h2>{t("newCustomer")}</h2>
                 <label>{t("name")}<input name="name" required maxLength={80} autoFocus /></label>
                 <label>{t("phone")}<input name="phone" type="tel" required maxLength={20} dir="ltr" placeholder={t("phoneHint")} /></label>
+                <BirthdayFields t={t} hint={false} />
                 <p className="form-hint">{t("privacy")} {t("phoneNotVerified")}</p>
                 <div className="form-actions">
                   <button className="btn primary" disabled={busy}>{t("save")}</button>

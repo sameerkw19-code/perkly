@@ -234,6 +234,7 @@ export function designChecks(d: Design, assets: AssetMeta[]): Check[] {
   if (langs.some((l) => d.texts[l].title.length > WALLET_LIMITS.title || d.texts[l].reward.length > WALLET_LIMITS.reward)) {
     out.push({ level: "warn", key: "chkLongForWallet" });
   }
+  if (d.layout !== "solid" || d.look.font !== "system") out.push({ level: "info", key: "chkWalletLook" });
   return out;
 }
 

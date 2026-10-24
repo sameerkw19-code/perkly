@@ -19,7 +19,7 @@
     "db:generate": "drizzle-kit generate",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "test": "node --test tests/unit.test.mjs",
+    "test": "node --test tests/unit.test.mjs tests/features.test.mjs",
     "test:api": "node --test tests/api.test.mjs"
   },
   "dependencies": {

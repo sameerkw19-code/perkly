@@ -29,10 +29,11 @@ function one(v: string | string[] | undefined): string {
 }
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  await requireAdminPage();
+  const me = await requireAdminPage();
   const params = await searchParams;
   const q = one(params.q).trim().slice(0, 80);
-  const statusFilter = one(params.status) as AdminStatus | "";
+  const statusRaw = one(params.status);
+  const statusFilter = (Object.hasOwn(STATUS_LABEL, statusRaw) ? statusRaw : "") as AdminStatus | "";
   // Only whitelisted keys reach the ORDER BY clause.
   const sort: SortKey = Object.hasOwn(SORTS, one(params.sort)) ? (one(params.sort) as SortKey) : "created";
 
@@ -43,9 +44,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const since30 = new Date(now.getTime() - 30 * day).toISOString();
   const since7 = new Date(now.getTime() - 7 * day).toISOString();
   const sinceWeeks = new Date(now.getTime() - WEEKS * 7 * day).toISOString();
-  const like = `%${q.replace(/[%_]/g, "")}%`;
+  // Escape LIKE wildcards so "_" and "%" in names and emails match literally.
+  const like = `%${q.replace(/[\\%_]/g, "\\$&")}%`;
 
-  const [list, totals, weeklyBiz, weeklyCust] = await Promise.all([
+  const [list, totals, weeklyBiz, weeklyCust, statusRows] = await Promise.all([
     db.prepare(
       `SELECT b.id, b.name, b.created, b.suspended, b.comp_until, s.status, u.email AS owner_email,
          (SELECT COUNT(*) FROM customers c WHERE c.business = b.id AND c.archived IS NULL) AS customers,
@@ -55,7 +57,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
        FROM businesses b
        LEFT JOIN subscriptions s ON s.business = b.id
        LEFT JOIN users u ON u.id = b.owner
-       WHERE (?2 = '' OR b.name LIKE ?3 OR u.email LIKE ?3)
+       WHERE (?2 = '' OR b.name LIKE ?3 ESCAPE '\\' OR u.email LIKE ?3 ESCAPE '\\')
        ORDER BY ${SORTS[sort]} LIMIT 500`,
     ).bind(since30, q, like).all<Row>(),
     db.prepare(
@@ -76,11 +78,15 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       `SELECT CAST((julianday(?1) - julianday(created)) / 7 AS INTEGER) AS w, COUNT(*) AS n
        FROM customers WHERE created >= ?2 GROUP BY w`,
     ).bind(nowIso, sinceWeeks).all<{ w: number; n: number }>(),
+    // Status counts and revenue always cover every business, whatever the search or filter.
+    db.prepare(
+      `SELECT b.suspended, b.comp_until, s.status FROM businesses b LEFT JOIN subscriptions s ON s.business = b.id`,
+    ).all<{ suspended: string | null; comp_until: string | null; status: string | null }>(),
   ]);
 
   const all = list.results.map((r) => ({ ...r, st: adminStatus(r, nowIso) }));
-  const counts = all.reduce<Record<AdminStatus, number>>(
-    (acc, r) => ((acc[r.st] = (acc[r.st] ?? 0) + 1), acc),
+  const counts = statusRows.results.map((r) => adminStatus(r, nowIso)).reduce<Record<AdminStatus, number>>(
+    (acc, st) => ((acc[st] = (acc[st] ?? 0) + 1), acc),
     { suspended: 0, comp: 0, active: 0, trialing: 0, past_due: 0, canceled: 0, none: 0 },
   );
   const rows = statusFilter ? all.filter((r) => r.st === statusFilter) : all;
@@ -113,6 +119,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       <main>
         <h1>סקירת מערכת</h1>
         <p className="muted">נכון ל־{shortDateTime(nowIso)}. פרטי לקוחות (שם, טלפון) לא מוצגים כאן.</p>
+        <p className="form-hint">מזהה המשתמש שלך: <code dir="ltr">{me.id}</code></p>
 
         <section className="stats admin-stats">
           <Stat label="הכנסה חודשית משוערת" value={`${mrr.toLocaleString("he-IL")} ₪`} hint={`${counts.active} משלמים × ${MONTHLY_PRICE_ILS} ₪`} />
