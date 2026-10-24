@@ -1,3 +1,4 @@
+import { AdminHeader } from "./admin-header";
 import { getD1 } from "../../db";
 import { MONTHLY_PRICE_ILS } from "../../lib/server/billing";
 import { WalletPanel } from "./wallet-panel";
@@ -111,11 +112,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   return (
     <div className="admin" dir="rtl">
-      <header className="admin-top">
-        <span className="brand">perkly<span>.</span></span>
-        <span className="pill">ניהול מערכת</span>
-        <a className="text-btn" href="/">← לדשבורד</a>
-      </header>
+      <AdminHeader active="/admin" />
 
       <main>
         <h1>סקירת מערכת</h1>

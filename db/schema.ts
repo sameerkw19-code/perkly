@@ -28,6 +28,8 @@ export const businesses = sqliteTable(
     suspendReason: text("suspend_reason"),
     // Free access granted by a platform admin, until this ISO time. Overrides the subscription.
     compUntil: text("comp_until"),
+    // Archived by a platform admin: hidden from owners and staff, data kept, can be restored.
+    archived: text("archived"),
   },
   (t) => [uniqueIndex("businesses_join_code").on(t.joinCode)],
 );
@@ -92,6 +94,8 @@ export const users = sqliteTable("users", {
   name: text("name").notNull(),
   passHash: text("pass_hash").notNull(),
   created: text("created").notNull(),
+  // Set by a platform admin. A blocked user cannot sign in and all sessions are ended.
+  blocked: text("blocked"),
 });
 
 export const sessions = sqliteTable(
@@ -233,3 +237,11 @@ export const adminLog = sqliteTable(
   },
   (t) => [index("admin_log_business").on(t.business, t.created)],
 );
+
+/** Platform-wide settings (see lib/server/settings.ts). Values are JSON. */
+export const settings = sqliteTable("settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updated: text("updated").notNull(),
+  updatedBy: text("updated_by"),
+});

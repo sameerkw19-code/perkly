@@ -11,6 +11,7 @@ import { releaseArchivedPhone } from "../../../lib/server/customers";
 import { businessAccess } from "../../../lib/server/billing";
 import { formatBirthday, parseBirthday, upcomingKeys } from "../../../lib/birthday";
 import { syncGoogleWallet } from "../../../lib/server/wallet-sync";
+import { getSettings } from "../../../lib/server/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -64,7 +65,12 @@ export async function GET(request: Request) {
   const wanted = url.searchParams.get("business");
   const membership = memberships.find((m) => m.business === wanted) ?? memberships[0];
   const me = { name: user.name, email: user.email, platformAdmin: isPlatformAdmin(user, env) };
-  if (!membership) return json({ me, memberships, business: null, role: null });
+  const settingsNow = await getSettings(db);
+  const system = {
+    maintenance: settingsNow.maintenance, maintenanceMessage: settingsNow.maintenanceMessage,
+    announcement: settingsNow.announcement, signupsOpen: settingsNow.signupsOpen,
+  };
+  if (!membership) return json({ me, memberships, business: null, role: null, system });
 
   const business = await loadBusiness(db, membership.business);
   const role = membership.role;
@@ -84,7 +90,7 @@ export async function GET(request: Request) {
   const birthdays = bdays.results
     .map((c) => ({ id: c.id, name: c.name, date: formatBirthday(c.birthday), inDays: upcoming.get(c.birthday) ?? 0 }))
     .sort((a, b) => a.inDays - b.inDays);
-  const base = { me, memberships, role, business, branches, myBranch: membership.branch, design: await liveDesign(db, business!), access, birthdays };
+  const base = { me, memberships, role, business, branches, myBranch: membership.branch, design: await liveDesign(db, business!), access, birthdays, system };
 
   if (role === "staff") {
     const mine = await db
@@ -199,9 +205,13 @@ export async function POST(request: Request) {
   if (!p) return fail("bad_request", 400, "Invalid request");
   const origin = new URL(request.url).origin;
   const now = new Date().toISOString();
+  const sys = await getSettings(db);
+  // Maintenance: nothing changes, except for platform admins (so they can test).
+  if (sys.maintenance && !isPlatformAdmin(user, env)) return fail("maintenance", 503, "Maintenance");
 
   // Creating a business is the only action that does not need an existing membership.
   if (p.action === "create_business") {
+    if (!sys.signupsOpen && !isPlatformAdmin(user, env)) return fail("signups_closed", 403, "New businesses are closed");
     if (!(await allow(db, `create-business:${user.id}`, 10, 86_400))) return fail("rate_limited", 429);
     const name = str(p.name, 80);
     const reward = str(p.reward, 160);
@@ -216,6 +226,14 @@ export async function POST(request: Request) {
         .bind(id, user.id, name, reward, p.target, p.color, now, randomCode(10), mode),
       db.prepare("INSERT INTO memberships(id, business, user, role, created) VALUES(?, ?, ?, 'owner', ?)")
         .bind(crypto.randomUUID(), id, user.id, now),
+      // With "require subscription": a free trial, then a subscription is needed (status 'none' is not entitled).
+      ...(sys.requireSubscription
+        ? [
+            db.prepare("INSERT OR IGNORE INTO subscriptions(business, status, updated) VALUES(?, 'none', ?)").bind(id, now),
+            db.prepare("UPDATE businesses SET comp_until = ? WHERE id = ?")
+              .bind(sys.trialDays > 0 ? new Date(Date.now() + sys.trialDays * 86_400_000).toISOString() : null, id),
+          ]
+        : []),
     ]);
     return json({ id });
   }

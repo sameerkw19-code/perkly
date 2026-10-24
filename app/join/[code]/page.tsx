@@ -11,7 +11,7 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
   const business =
     code.length <= 40
       ? await db
-          .prepare("SELECT id, name, reward, target, color, birthdays FROM businesses WHERE join_code = ?")
+          .prepare("SELECT id, name, reward, target, color, birthdays FROM businesses WHERE join_code = ? AND archived IS NULL")
           .bind(code)
           .first<{ id: string; name: string; reward: string; target: number; color: string; birthdays: number }>()
       : null;

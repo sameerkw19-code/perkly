@@ -56,7 +56,7 @@ export async function getUser(db: D1Database, cookieHeader: string | null): Prom
   return db
     .prepare(
       `SELECT u.id, u.email, u.name FROM sessions s JOIN users u ON u.id = s.user
-       WHERE s.id = ? AND s.expires > ?`,
+       WHERE s.id = ? AND s.expires > ? AND u.blocked IS NULL`,
     )
     .bind(await sha256(token), new Date().toISOString())
     .first<User>();
@@ -68,7 +68,7 @@ export async function getMemberships(db: D1Database, userId: string): Promise<Me
     .prepare(
       `SELECT m.business, m.role, m.branch, b.name AS businessName FROM memberships m
        JOIN businesses b ON b.id = m.business
-       WHERE m.user = ? AND m.revoked IS NULL ORDER BY b.created`,
+       WHERE m.user = ? AND m.revoked IS NULL AND b.archived IS NULL ORDER BY b.created`,
     )
     .bind(userId)
     .all<Membership>();
@@ -79,7 +79,11 @@ export async function getMemberships(db: D1Database, userId: string): Promise<Me
 export async function getMembership(db: D1Database, userId: string, businessId: unknown): Promise<{ role: Role; branch: string | null } | null> {
   if (typeof businessId !== "string" || !businessId) return null;
   return db
-    .prepare("SELECT role, branch FROM memberships WHERE user = ? AND business = ? AND revoked IS NULL")
+    // Archived businesses are invisible to their members.
+    .prepare(
+      `SELECT m.role, m.branch FROM memberships m JOIN businesses b ON b.id = m.business
+       WHERE m.user = ? AND m.business = ? AND m.revoked IS NULL AND b.archived IS NULL`,
+    )
     .bind(userId, businessId)
     .first<{ role: Role; branch: string | null }>();
 }
@@ -88,7 +92,10 @@ export async function getMembership(db: D1Database, userId: string, businessId: 
 export async function getRole(db: D1Database, userId: string, businessId: unknown): Promise<Role | null> {
   if (typeof businessId !== "string" || !businessId) return null;
   const row = await db
-    .prepare("SELECT role FROM memberships WHERE user = ? AND business = ? AND revoked IS NULL")
+    .prepare(
+      `SELECT m.role FROM memberships m JOIN businesses b ON b.id = m.business
+       WHERE m.user = ? AND m.business = ? AND m.revoked IS NULL AND b.archived IS NULL`,
+    )
     .bind(userId, businessId)
     .first<{ role: Role }>();
   return row?.role ?? null;

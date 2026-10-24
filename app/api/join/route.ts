@@ -6,6 +6,7 @@ import { normalizePhone } from "../../../lib/phone";
 import { releaseArchivedPhone } from "../../../lib/server/customers";
 import { businessAccess } from "../../../lib/server/billing";
 import { parseBirthday } from "../../../lib/birthday";
+import { getSettings } from "../../../lib/server/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -20,8 +21,9 @@ export async function POST(request: Request) {
   if (!(await allow(db, `join-ip:${ip}`, 10, 600))) return fail("rate_limited", 429, "Too many attempts");
 
   const code = typeof body.code === "string" ? body.code.slice(0, 40) : "";
-  const business = await db.prepare("SELECT id, target, birthdays FROM businesses WHERE join_code = ?").bind(code).first<{ id: string; target: number; birthdays: number }>();
+  const business = await db.prepare("SELECT id, target, birthdays FROM businesses WHERE join_code = ? AND archived IS NULL").bind(code).first<{ id: string; target: number; birthdays: number }>();
   if (!code || !business) return fail("join_invalid", 404, "This join link is not active");
+  if ((await getSettings(db)).maintenance) return fail("maintenance", 503, "Maintenance");
   if (!(await allow(db, `join-business:${business.id}`, 300, 3600))) return fail("rate_limited", 429);
   const access = await businessAccess(db, business.id);
   if (!access.ok) return fail(access.code, 402, "This business is not accepting new customers right now");

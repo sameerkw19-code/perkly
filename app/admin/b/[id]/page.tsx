@@ -1,3 +1,4 @@
+import { AdminHeader } from "../../admin-header";
 import { notFound } from "next/navigation";
 import { getD1 } from "../../../../db";
 import { liveDesign } from "../../../../lib/server/designs";
@@ -66,11 +67,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
 
   return (
     <div className="admin" dir="rtl">
-      <header className="admin-top">
-        <span className="brand">perkly<span>.</span></span>
-        <span className="pill">ניהול מערכת</span>
-        <a className="text-btn" href="/admin">← כל העסקים</a>
-      </header>
+      <AdminHeader active="/admin" />
       <main>
         <div className="page-head">
           <div>

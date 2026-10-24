@@ -22,6 +22,7 @@ type Data = {
   me: { name: string; email: string; platformAdmin?: boolean };
   access?: { ok: true } | { ok: false; code: "business_suspended" | "subscription_required" };
   birthdays?: { id: string; name: string; date: string; inDays: number }[];
+  system?: { maintenance: boolean; maintenanceMessage: string; announcement: string; signupsOpen?: boolean };
   memberships: { business: string; role: Role; businessName: string; branch: string | null }[];
   branches?: { id: string; name: string }[];
   myBranch?: string | null;
@@ -227,6 +228,12 @@ export default function Dashboard() {
           </div>
         </header>
         {!online && <div className="offline-bar" role="alert">{t("offline")}</div>}
+        {data.system?.maintenance && (
+          <div className="access-bar" role="alert"><AlertTriangle size={16} /><span>{data.system.maintenanceMessage || t("maintenanceBanner")}</span></div>
+        )}
+        {!!data.system?.announcement && (
+          <div className="announce-bar" role="status"><span>{data.system.announcement}</span></div>
+        )}
         {data.access && !data.access.ok && (
           <div className="access-bar" role="alert">
             <AlertTriangle size={16} />

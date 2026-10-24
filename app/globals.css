@@ -300,3 +300,6 @@ select.needs-choice{border-color:#f0a050;box-shadow:0 0 0 3px #f0a05022}
 .side-bottom .text-btn{text-decoration:none}
 .birthday-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fdf1fb;color:#7a2a6b;border-bottom:1px solid #f3d6ec;padding:10px 40px;font-size:13px}.birthday-bar ul{display:flex;flex-wrap:wrap;gap:6px 14px;list-style:none;margin:0;padding:0}@media(max-width:760px){.birthday-bar{padding:10px 18px}}
 fieldset.birthday{border:0;padding:0;margin:0 0 14px}fieldset.birthday legend{font-size:12px;margin-bottom:6px;padding:0}fieldset.birthday select{width:100%;margin-top:6px}
+.announce-bar{background:#eef3ff;color:#2f4a8a;border-bottom:1px solid #d6e1fb;padding:10px 40px;font-size:13px;font-weight:600}@media(max-width:760px){.announce-bar{padding:10px 18px}}
+.admin-nav{display:flex;gap:4px;flex-wrap:wrap;margin-inline-start:24px}.admin-nav a{padding:8px 12px;border-radius:8px;font-size:13px;color:#555}.admin-nav a[aria-current=page]{background:#f0ecfc;color:#5a3fc4;font-weight:700}
+.admin-form{display:grid;gap:18px;max-width:640px}.admin-form .check{align-items:flex-start}.admin-form textarea{width:100%;min-height:70px;border:1px solid var(--line);border-radius:9px;padding:10px 12px;font:inherit}.admin-form input[type=number]{width:120px}
