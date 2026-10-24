@@ -21,7 +21,16 @@ export default function CardView({ card, secret, googleWallet, isIOS }: { card: 
         <div className="auth-card panel"><h1>{t("cardNotFound")}</h1></div>
       ) : (
         <div className="card-stack">
-          <LoyaltyCard design={card.design} lang={lang} stamps={card.stamps} target={card.target} customerName={card.name} rewards={card.rewards} t={t} />
+          <LoyaltyCard
+            design={card.design}
+            lang={lang}
+            stamps={card.stamps}
+            target={card.target}
+            customerName={card.name}
+            rewards={card.rewards}
+            t={t}
+            qr={<QrImage text={"perkly:" + card.scan_code} size={336} label={t("showQr")} />}
+          />
           {card.rewards > 0 && (
             <div className="ready-banner" role="status">
               {t("earned")}
@@ -29,8 +38,7 @@ export default function CardView({ card, secret, googleWallet, isIOS }: { card: 
               {card.nextExpiry && <small className="ready-expiry">{t("expiresOnShort", { d: new Date(card.nextExpiry).toLocaleDateString(lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB") })}</small>}
             </div>
           )}
-          <div className="panel qr-panel">
-            <QrImage text={"perkly:" + card.scan_code} size={210} label={t("showQr")} />
+          <div className="qr-note">
             <p>{t("showQr")}</p>
             <small className="form-hint">{t("qrNote")}</small>
           </div>

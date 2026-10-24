@@ -209,6 +209,7 @@ Object.assign(words, {
   design: ["עיצוב הכרטיס", "تصميم البطاقة", "Card design"],
   earnedShort: ["ההטבה מוכנה!", "المكافأة جاهزة!", "Reward ready!"],
   stampsWord: ["חותמות", "أختام", "Stamps"],
+  rewardsWord: ["הטבות זמינות", "مكافآت متاحة", "Rewards"],
   loyaltyCard: ["כרטיס נאמנות", "بطاقة ولاء", "Loyalty card"],
   langName_he: ["עברית", "العبرية", "Hebrew"],
   langName_ar: ["ערבית", "العربية", "Arabic"],
