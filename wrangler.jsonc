@@ -25,7 +25,7 @@
         {
           "binding": "DB",
           "database_name": "perkly-staging",
-          "database_id": "REPLACE_WITH_STAGING_DATABASE_ID",
+          "database_id": "04914039-e15e-4f9a-a5d1-a20dd333fda4",
           "migrations_dir": "drizzle"
         }
       ]
