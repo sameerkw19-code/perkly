@@ -108,6 +108,10 @@ const words: Record<string, Entry> = {
   refresh: ["רענון", "تحديث", "Refresh"],
   customerName: ["שם הלקוח", "اسم الزبون", "Name"],
   walletHintIOS: ["הוספה ל־Apple Wallet עדיין לא זמינה.", "الإضافة إلى Apple Wallet غير متاحة بعد.", "Adding to Apple Wallet isn't available yet."],
+  birthday: ["יום הולדת (לא חובה)", "عيد الميلاد (اختياري)", "Birthday (optional)"],
+  bday: ["יום", "اليوم", "Day"],
+  bmonth: ["חודש", "الشهر", "Month"],
+  birthdayHint: ["נשמור רק יום וחודש, בלי שנה. נשתמש בזה למתנה ביום ההולדת.", "نحفظ اليوم والشهر فقط بدون السنة. سنستخدمه لهدية عيد الميلاد.", "We store only the day and month, without the year. Used for a birthday gift."],
   walletAddGoogle: ["הוספה ל-Google Wallet", "الإضافة إلى Google Wallet", "Add to Google Wallet"],
   saveLinkHint: ["שמרו את הקישור הזה (מועדפים או מסך הבית). הוא הכרטיס שלכם.", "احفظ هذا الرابط (المفضلة أو الشاشة الرئيسية). هذه بطاقتك.", "Save this link (bookmark or home screen). It is your card."],
 

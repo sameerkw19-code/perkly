@@ -8,6 +8,16 @@ import { isEntitled } from "../../../lib/server/billing";
 
 export const dynamic = "force-dynamic";
 
+/** "MM-DD" with a real calendar day. 02-29 is allowed because the year is unknown. */
+function validMonthDay(value: string): boolean {
+  const m = /^(\d{2})-(\d{2})$/.exec(value);
+  if (!m) return false;
+  const month = Number(m[1]);
+  const day = Number(m[2]);
+  const days = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
+  return days !== undefined && day >= 1 && day <= days;
+}
+
 // Public: a customer joins a business by scanning the business's join QR.
 export async function POST(request: Request) {
   const body = await readJson(request);
@@ -30,16 +40,19 @@ export async function POST(request: Request) {
   if (!name || !phone) return fail("bad_details", 400, "Invalid name or phone");
   if (body.terms !== true) return fail("terms_required", 400, "Terms must be accepted");
   const marketing = body.marketing === true ? 1 : 0;
+  // Optional day and month only ("MM-DD"). The year is never collected.
+  const birthday = body.birthday == null || body.birthday === "" ? null : String(body.birthday);
+  if (birthday !== null && !validMonthDay(birthday)) return fail("bad_details", 400, "Invalid birthday");
 
   const now = new Date().toISOString();
   const secret = randomToken(24);
   const scan = randomToken(16);
   const insert = db
     .prepare(
-      `INSERT OR IGNORE INTO customers(id, business, name, phone, token, stamps, target, created, card_hash, scan_code, consent_terms, consent_marketing, source)
-       VALUES(?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, 'self')`,
+      `INSERT OR IGNORE INTO customers(id, business, name, phone, token, stamps, target, created, card_hash, scan_code, consent_terms, consent_marketing, source, birthday)
+       VALUES(?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, 'self', ?)`,
     )
-    .bind(crypto.randomUUID(), business.id, name, phone, scan, business.target, now, await sha256(secret), scan, now, marketing);
+    .bind(crypto.randomUUID(), business.id, name, phone, scan, business.target, now, await sha256(secret), scan, now, marketing, birthday);
   // A removed customer's phone may join again: free it first, in the same batch as the insert.
   const [, r] = await db.batch([releaseArchivedPhone(db, business.id, phone), insert]);
   // Never hand out an existing card to someone who only knows the phone number.
