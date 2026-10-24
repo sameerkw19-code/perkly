@@ -24,6 +24,7 @@
       // Keep plain-text variables added in the Cloudflare dashboard (e.g. PLATFORM_ADMIN_EMAILS).
       // Without this, every deploy deletes them. Secrets are never affected.
       "keep_vars": true,
+      "observability": { "enabled": true },
       // Not secret: the Google Wallet issuer id is visible in every "save to wallet" link.
       "vars": { "GOOGLE_WALLET_ISSUER_ID": "3388000000023227862" },
       "d1_databases": [
@@ -38,6 +39,7 @@
     "production": {
       "name": "perkly",
       "keep_vars": true,
+      "observability": { "enabled": true },
       // Your own domain. Works once perkly.shop is active in the same Cloudflare account.
       "routes": [
         { "pattern": "perkly.shop", "custom_domain": true },
