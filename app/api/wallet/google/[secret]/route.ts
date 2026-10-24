@@ -29,11 +29,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ secr
   // From now on, stamps for this customer are pushed to Google (see lib/server/wallet-sync.ts).
   await db.prepare("UPDATE customers SET google_wallet = ? WHERE id = ?").bind(new Date().toISOString(), row.customer_id).run();
 
-  // One shared class for now. Per-business classes (own colours and logo) come with the Google approval.
+  // One shared class for now (GOOGLE_WALLET_CLASS_ID). Per-business classes can come later.
   const url = await saveUrl(
     config,
     { customerId: row.customer_id, businessId: row.business_id, stamps: row.stamps, target: row.target, scanCode: row.scan_code, rewards: row.rewards },
-    "perkly_loyalty",
     new URL(request.url).origin,
   );
   return new Response(null, { status: 302, headers: { Location: url, "Cache-Control": "no-store" } });

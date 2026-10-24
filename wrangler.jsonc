@@ -26,7 +26,11 @@
       "keep_vars": true,
       "observability": { "enabled": true },
       // Not secret: the Google Wallet issuer id is visible in every "save to wallet" link.
-      "vars": { "GOOGLE_WALLET_ISSUER_ID": "3388000000023227862" },
+      "vars": {
+        "GOOGLE_WALLET_ISSUER_ID": "3388000000023227862",
+        // The console added the issuer id in front of "3388000000023227862.perkly_loyalty".
+        "GOOGLE_WALLET_CLASS_ID": "3388000000023227862.3388000000023227862.perkly_loyalty"
+      },
       "d1_databases": [
         {
           "binding": "DB",

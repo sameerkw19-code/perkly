@@ -4,16 +4,22 @@
 
 import { base64url } from "./crypto";
 
-export type WalletConfig = { issuerId: string; serviceEmail: string; privateKeyPem: string };
+export type WalletConfig = { issuerId: string; serviceEmail: string; privateKeyPem: string; classId: string };
 
-export function walletConfig(env: { GOOGLE_WALLET_SA_KEY?: string; GOOGLE_WALLET_ISSUER_ID?: string }): WalletConfig | null {
+/**
+ * GOOGLE_WALLET_CLASS_ID is the full class id exactly as Google has it. A class created in the
+ * Google Pay console gets the issuer id added in front of what you type, so it can look like
+ * "<issuer>.<issuer>.perkly_loyalty". Default: "<issuer>.perkly_loyalty".
+ */
+export function walletConfig(env: { GOOGLE_WALLET_SA_KEY?: string; GOOGLE_WALLET_ISSUER_ID?: string; GOOGLE_WALLET_CLASS_ID?: string }): WalletConfig | null {
   const issuerId = env.GOOGLE_WALLET_ISSUER_ID?.trim();
   const raw = env.GOOGLE_WALLET_SA_KEY?.trim();
   if (!issuerId || !raw) return null;
   try {
     const key = JSON.parse(raw) as { client_email?: unknown; private_key?: unknown };
     if (typeof key.client_email !== "string" || typeof key.private_key !== "string") return null;
-    return { issuerId, serviceEmail: key.client_email, privateKeyPem: key.private_key };
+    const classId = env.GOOGLE_WALLET_CLASS_ID?.trim() || `${issuerId}.perkly_loyalty`;
+    return { issuerId, serviceEmail: key.client_email, privateKeyPem: key.private_key, classId };
   } catch {
     return null;
   }
@@ -70,10 +76,10 @@ function liveFields(card: LoyaltyCard) {
 }
 
 /** The loyalty object Google shows in the pass. The class must already exist (see the Google console). */
-export function loyaltyObject(config: WalletConfig, card: LoyaltyCard, classSuffix: string) {
+export function loyaltyObject(config: WalletConfig, card: LoyaltyCard) {
   return {
     id: objectIdFor(config, card.customerId),
-    classId: `${config.issuerId}.${safeId(classSuffix)}`,
+    classId: config.classId,
     state: "ACTIVE",
     accountId: safeId(card.customerId),
     accountName: "Perkly",
@@ -98,8 +104,8 @@ async function signJwt(config: WalletConfig, claims: Record<string, unknown>): P
 }
 
 /** Signs the "save to Google Wallet" token. Returns the full save URL. */
-export async function saveUrl(config: WalletConfig, card: LoyaltyCard, classSuffix: string, origin: string): Promise<string> {
-  const object = loyaltyObject(config, card, classSuffix);
+export async function saveUrl(config: WalletConfig, card: LoyaltyCard, origin: string): Promise<string> {
+  const object = loyaltyObject(config, card);
   const now = Math.floor(Date.now() / 1000);
   const token = await signJwt(config, {
     iss: config.serviceEmail,
@@ -167,8 +173,6 @@ export async function updateLoyaltyObject(config: WalletConfig, card: LoyaltyCar
 
 // ---- Loyalty class (shared by all businesses for now) ----
 
-export const LOYALTY_CLASS_SUFFIX = "perkly_loyalty";
-
 export type ClassStatus = { status: "draft" | "underReview" | "approved" | "rejected" | "unknown" | "missing"; raw?: string };
 
 function normalizeReview(v: unknown): ClassStatus["status"] {
@@ -181,7 +185,7 @@ function normalizeReview(v: unknown): ClassStatus["status"] {
 }
 
 function classId(config: WalletConfig): string {
-  return `${config.issuerId}.${safeId(LOYALTY_CLASS_SUFFIX)}`;
+  return config.classId;
 }
 
 /** The class's review status at Google. */
