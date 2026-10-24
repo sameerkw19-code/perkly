@@ -54,6 +54,8 @@ export const customers = sqliteTable(
     consentMarketing: integer("consent_marketing").notNull().default(0),
     // Day and month only, "MM-DD". No year is stored. Optional.
     birthday: text("birthday"),
+    // When the customer last opened "Add to Google Wallet". Only these passes get live updates.
+    googleWallet: text("google_wallet"),
     source: text("source").notNull().default("staff"),
     // Set when the owner removes the customer. Hidden everywhere, history kept, card link disabled.
     archived: text("archived"),

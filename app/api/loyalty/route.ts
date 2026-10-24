@@ -10,11 +10,12 @@ import { assetMeta, liveDesign, ownsAssets, publishedDesign } from "../../../lib
 import { releaseArchivedPhone } from "../../../lib/server/customers";
 import { businessAccess } from "../../../lib/server/billing";
 import { formatBirthday, parseBirthday, upcomingKeys } from "../../../lib/birthday";
+import { syncGoogleWallet } from "../../../lib/server/wallet-sync";
 
 export const dynamic = "force-dynamic";
 
 type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust: number; reward_mode: "bank" | "block"; reward_expiry_days: number; birthdays: number };
-type Customer = { id: string; business: string; name: string; phone: string; stamps: number; target: number; scan_code: string };
+type Customer = { id: string; business: string; name: string; phone: string; stamps: number; target: number; scan_code: string; google_wallet?: string | null };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const COLOR = /^#[0-9a-fA-F]{6}$/;
@@ -351,7 +352,9 @@ export async function POST(request: Request) {
       const replayed = async () => !!(await db.prepare("SELECT id FROM events WHERE id = ? AND customer = ?").bind(requestId, c!.id).first());
       const done = async (extra: Record<string, unknown> = {}) => {
         const fresh = (await db.prepare("SELECT * FROM customers WHERE id = ?").bind(c!.id).first<Customer>())!;
-        return json({ ok: true, card: await cardState(db, fresh, business.reward_mode), ...extra });
+        const card = await cardState(db, fresh, business.reward_mode);
+        syncGoogleWallet(db, fresh, card.rewards);
+        return json({ ok: true, card, ...extra });
       };
       const refuse = async (code: string) => {
         const fresh = (await db.prepare("SELECT * FROM customers WHERE id = ?").bind(c!.id).first<Customer>())!;

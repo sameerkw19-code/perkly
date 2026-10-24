@@ -18,17 +18,21 @@ export async function GET(request: Request, { params }: { params: Promise<{ secr
   const db = getD1();
   const row = await db
     .prepare(
-      `SELECT c.id AS customer_id, c.business AS business_id, c.stamps, c.target, c.scan_code
-       FROM customers c WHERE c.card_hash = ?1 AND c.archived IS NULL`,
+      `SELECT c.id AS customer_id, c.business AS business_id, c.stamps, c.target, c.scan_code,
+         (SELECT COUNT(*) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2))
+           + (CASE WHEN b.reward_mode = 'block' AND c.stamps >= c.target THEN 1 ELSE 0 END) AS rewards
+       FROM customers c JOIN businesses b ON b.id = c.business WHERE c.card_hash = ?1 AND c.archived IS NULL`,
     )
-    .bind(await sha256(secret))
-    .first<{ customer_id: string; business_id: string; stamps: number; target: number; scan_code: string }>();
+    .bind(await sha256(secret), new Date().toISOString())
+    .first<{ customer_id: string; business_id: string; stamps: number; target: number; scan_code: string; rewards: number }>();
   if (!row) return fail("unknown_card", 404, "Card not found");
+  // From now on, stamps for this customer are pushed to Google (see lib/server/wallet-sync.ts).
+  await db.prepare("UPDATE customers SET google_wallet = ? WHERE id = ?").bind(new Date().toISOString(), row.customer_id).run();
 
   // One shared class for now. Per-business classes (own colours and logo) come with the Google approval.
   const url = await saveUrl(
     config,
-    { customerId: row.customer_id, businessId: row.business_id, stamps: row.stamps, target: row.target, scanCode: row.scan_code },
+    { customerId: row.customer_id, businessId: row.business_id, stamps: row.stamps, target: row.target, scanCode: row.scan_code, rewards: row.rewards },
     "perkly_loyalty",
     new URL(request.url).origin,
   );
