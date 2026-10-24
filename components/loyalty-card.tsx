@@ -95,8 +95,8 @@ export function LoyaltyCard({ design, lang, stamps, target, customerName, reward
       </div>
       <div className="card-title">{text.reward}</div>
       <div className="card-progress">
-        <span><Num>{stamps}/{target}</Num></span>
-        <span>{full ? t("earnedShort") : t("toGo", { k: Math.max(0, target - stamps) })}</span>
+        <span className="card-progress-count">{t("stampsOf", { n: stamps, t: target })}</span>
+        <span className="card-progress-next">{full ? t("earnedShort") : t("toGo", { k: Math.max(0, target - stamps) })}</span>
       </div>
       <StampGrid design={design} stamps={stamps} target={target} giftLabel={text.gift} ready={ready} />
       {ready && !full && (
