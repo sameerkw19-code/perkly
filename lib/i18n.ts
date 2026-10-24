@@ -222,7 +222,6 @@ Object.assign(words, {
   birthdaysTitle: ["ימי הולדת השבוע:", "أعياد ميلاد هذا الأسبوع:", "Birthdays this week:"],
   bdayToday: ["היום!", "اليوم!", "today!"],
   bdayTomorrow: ["מחר", "غداً", "tomorrow"],
-  adminLink: ["ניהול מערכת", "إدارة المنصة", "Platform admin"],
   accessSuspended: ["החשבון מושהה. אפשר לממש הטבות שהלקוחות כבר צברו, אבל אי אפשר להוסיף חותמות, לקוחות או לשנות הגדרות. לפרטים: support@perkly.shop", "الحساب موقوف. يمكن صرف المكافآت المكتسبة، لكن لا يمكن إضافة أختام أو زبائن أو تغيير الإعدادات. للتفاصيل: support@perkly.shop", "This account is suspended. Earned rewards can still be redeemed, but stamps, new customers and settings changes are paused. Contact support@perkly.shop"],
   accessNoSub: ["המנוי לא פעיל. אפשר לממש הטבות שנצברו, אבל אי אפשר להוסיף חותמות או לקוחות חדשים עד שיופעל.", "الاشتراك غير فعال. يمكن صرف المكافآت المكتسبة، لكن لا يمكن إضافة أختام أو زبائن جدد حتى تفعيله.", "The subscription isn't active. Earned rewards can still be redeemed, but stamps and new customers are paused until it is."],
   rewardsWord: ["הטבות זמינות", "مكافآت متاحة", "Rewards"],

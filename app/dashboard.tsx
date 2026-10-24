@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Activity, AlertTriangle, Cake, Check, Copy, CreditCard, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode, Shield,
+  Activity, AlertTriangle, Cake, Check, Copy, CreditCard, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode,
   Palette, RefreshCw, ScanLine, Search, Settings, Share2, Store, Users, Wallet, X,
 } from "lucide-react";
 import type { Design } from "../lib/design";
@@ -19,7 +19,7 @@ type Role = "owner" | "staff";
 type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number };
 type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; rewards?: number; nextExpiry?: string | null; phone?: string };
 type Data = {
-  me: { name: string; email: string; platformAdmin?: boolean };
+  me: { name: string; email: string };
   access?: { ok: true } | { ok: false; code: "business_suspended" | "subscription_required" };
   birthdays?: { id: string; name: string; date: string; inDays: number }[];
   system?: { maintenance: boolean; maintenanceMessage: string; announcement: string; signupsOpen?: boolean };
@@ -207,7 +207,6 @@ export default function Dashboard() {
         <div className="side-bottom">
           <div className="profile"><span>{data.me.name.charAt(0)}</span><div><strong>{data.me.name}</strong><small dir="ltr">{data.me.email}</small></div></div>
           {isOwner && <a className="text-btn" href="/billing"><CreditCard size={15} />{t("billingLink")}</a>}
-          {data.me.platformAdmin && <a className="text-btn" href="/admin"><Shield size={15} />{t("adminLink")}</a>}
           <button className="text-btn" onClick={signOut}><LogOut size={15} />{t("signOut")}</button>
         </div>
       </aside>
@@ -223,7 +222,6 @@ export default function Dashboard() {
             )}
             <LangSwitch lang={lang} setLang={setLang} />
             {isOwner && <a className="icon-btn mobile-only" href="/billing" aria-label={t("billingLink")} title={t("billingLink")}><CreditCard size={16} /></a>}
-            {data.me.platformAdmin && <a className="icon-btn mobile-only" href="/admin" aria-label={t("adminLink")} title={t("adminLink")}><Shield size={16} /></a>}
             <button className="icon-btn mobile-only" aria-label={t("signOut")} title={t("signOut")} onClick={signOut}><LogOut size={16} /></button>
           </div>
         </header>

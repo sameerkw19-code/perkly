@@ -1,3 +1,5 @@
+import { SignOut } from "./sign-out";
+
 const TABS = [
   { href: "/admin", label: "סקירה" },
   { href: "/admin/users", label: "משתמשים" },
@@ -5,7 +7,7 @@ const TABS = [
   { href: "/admin/settings", label: "הגדרות מערכת" },
 ];
 
-/** Top bar of the platform control center, with section tabs. */
+/** Top bar of the platform control center, with section tabs. Separate from the site: no link back to it. */
 export function AdminHeader({ active }: { active: string }) {
   return (
     <header className="admin-top">
@@ -16,7 +18,7 @@ export function AdminHeader({ active }: { active: string }) {
           <a key={t.href} href={t.href} aria-current={active === t.href ? "page" : undefined}>{t.label}</a>
         ))}
       </nav>
-      <a className="text-btn" href="/">← לדשבורד</a>
+      <SignOut />
     </header>
   );
 }

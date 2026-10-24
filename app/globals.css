@@ -306,3 +306,4 @@ fieldset.birthday{border:0;padding:0;margin:0 0 14px}fieldset.birthday legend{fo
 .admin-top .admin-nav{flex-direction:row;align-items:center;height:auto}.admin-form label:not(.check){display:grid;gap:6px;font-size:13px}.admin-wrap{white-space:normal;min-width:180px;font-size:12px}
 .admin-edit{display:grid;grid-template-columns:2fr 2fr 1fr auto;gap:8px;align-items:end}.admin-edit label{display:grid;gap:4px;font-size:12px}@media(max-width:860px){.admin-edit{grid-template-columns:1fr}}
 .admin-row-warn td{background:#fff8ec}
+.admin-signout{margin-inline-start:auto}

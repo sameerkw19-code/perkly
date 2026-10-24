@@ -64,7 +64,8 @@ export async function GET(request: Request) {
   const memberships = await getMemberships(db, user.id);
   const wanted = url.searchParams.get("business");
   const membership = memberships.find((m) => m.business === wanted) ?? memberships[0];
-  const me = { name: user.name, email: user.email, platformAdmin: isPlatformAdmin(user, env) };
+  // The admin control center is not linked from the site, so nothing here says who is an admin.
+  const me = { name: user.name, email: user.email };
   const settingsNow = await getSettings(db);
   const system = {
     maintenance: settingsNow.maintenance, maintenanceMessage: settingsNow.maintenanceMessage,
