@@ -1,5 +1,6 @@
 import { getD1 } from "../../db";
 import { MONTHLY_PRICE_ILS } from "../../lib/server/billing";
+import { WalletPanel } from "./wallet-panel";
 import { STATUS_LABEL, adminStatus, requireAdminPage, shortDate, shortDateTime, type AdminStatus } from "../../lib/server/admin";
 
 export const dynamic = "force-dynamic";
@@ -127,6 +128,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <Stat label="לקוחות פעילים" value={t.customers} hint={`${t.customers30} הצטרפו ב־30 יום (כולל שהוסרו)`} />
           <Stat label="חותמות ב־30 יום" value={t.stamps30} hint={`${t.redeems30} הטבות מומשו`} />
         </section>
+
+        <WalletPanel />
 
         <section className="panel admin-status">
           <h2>מנויים</h2>

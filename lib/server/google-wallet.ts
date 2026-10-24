@@ -164,3 +164,48 @@ export async function updateLoyaltyObject(config: WalletConfig, card: LoyaltyCar
     return "failed";
   }
 }
+
+// ---- Loyalty class (shared by all businesses for now) ----
+
+export const LOYALTY_CLASS_SUFFIX = "perkly_loyalty";
+
+export type ClassStatus = { status: "draft" | "underReview" | "approved" | "rejected" | "unknown" | "missing"; raw?: string };
+
+function normalizeReview(v: unknown): ClassStatus["status"] {
+  const s = String(v ?? "").toLowerCase().replace(/_/g, "");
+  if (s === "draft") return "draft";
+  if (s === "underreview") return "underReview";
+  if (s === "approved") return "approved";
+  if (s === "rejected") return "rejected";
+  return "unknown";
+}
+
+function classId(config: WalletConfig): string {
+  return `${config.issuerId}.${safeId(LOYALTY_CLASS_SUFFIX)}`;
+}
+
+/** The class's review status at Google. */
+export async function getClassStatus(config: WalletConfig): Promise<ClassStatus> {
+  const token = await accessToken(config);
+  const r = await fetch(`${API}/loyaltyClass/${encodeURIComponent(classId(config))}`, { headers: { Authorization: `Bearer ${token}` } });
+  if (r.status === 404) return { status: "missing" };
+  if (!r.ok) throw new Error(`google_class_${r.status}`);
+  const data = (await r.json()) as { reviewStatus?: string };
+  return { status: normalizeReview(data.reviewStatus), raw: data.reviewStatus };
+}
+
+/** Asks Google to review the class. Only valid from draft (or after a rejection was fixed). */
+export async function submitClassForReview(config: WalletConfig): Promise<ClassStatus> {
+  const token = await accessToken(config);
+  const r = await fetch(`${API}/loyaltyClass/${encodeURIComponent(classId(config))}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ reviewStatus: "UNDER_REVIEW" }),
+  });
+  if (!r.ok) {
+    const text = await r.text().catch(() => "");
+    throw new Error(`google_class_${r.status}: ${text.slice(0, 300)}`);
+  }
+  const data = (await r.json()) as { reviewStatus?: string };
+  return { status: normalizeReview(data.reviewStatus), raw: data.reviewStatus };
+}
