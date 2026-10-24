@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { headers } from "next/headers";
 import { getD1 } from "../../../db";
 import { sha256 } from "../../../lib/server/crypto";
 import { liveDesign } from "../../../lib/server/designs";
@@ -37,7 +38,10 @@ export default async function CardPage({ params }: { params: Promise<{ secret: s
   if (!row) return <CardView card={null} secret={secret} googleWallet={false} />;
   const design = await liveDesign(db, { id: row.business_id, name: row.business, reward: row.reward, color: row.color });
   const rewards = row.saved + (row.reward_mode === "block" && row.stamps >= row.target ? 1 : 0);
-  const googleWallet = walletConfig(env) !== null;
+  // Google Wallet does not run on iPhone, so the Google button is shown only to non-iOS devices.
+  const ua = (await headers()).get("user-agent") ?? "";
+  const isIOS = /iPhone|iPad|iPod/i.test(ua);
+  const googleWallet = !isIOS && walletConfig(env) !== null;
   return (
     <CardView
       card={{ name: row.name, stamps: row.stamps, target: row.target, scan_code: row.scan_code, design, rewards, nextExpiry: row.next_expiry }}
