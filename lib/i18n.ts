@@ -56,6 +56,8 @@ const words: Record<string, Entry> = {
   err_weak_password: ["הסיסמה צריכה לפחות 8 תווים.", "كلمة المرور تحتاج 8 أحرف على الأقل.", "The password needs at least 8 characters."],
   err_signup_code: ["קוד ההרשמה חסר או שגוי.", "رمز التسجيل مفقود أو غير صحيح.", "The signup code is missing or wrong."],
   err_rate_limited: ["יותר מדי ניסיונות. נסו שוב בעוד כמה דקות.", "محاولات كثيرة. حاول بعد بضع دقائق.", "Too many attempts. Try again in a few minutes."],
+  err_subscription_required: ["המנוי של העסק לא פעיל כרגע. לא ניתן להוסיף חותמות או לקוחות חדשים.", "اشتراك المشروع غير فعال حالياً. لا يمكن إضافة أختام أو زبائن جدد.", "This business's subscription isn't active. Stamps and new customers are paused."],
+  err_business_suspended: ["החשבון של העסק מושהה. לפרטים: support@perkly.shop", "حساب المشروع موقوف. للتفاصيل: support@perkly.shop", "This business account is suspended. Contact support@perkly.shop"],
   err_bad_details: ["בדקו את הפרטים שהוזנו.", "تحقق من البيانات المدخلة.", "Check the details you entered."],
   err_phone_exists: ["מספר הטלפון כבר רשום בעסק הזה.", "رقم الهاتف مسجل في هذا المشروع.", "This phone is already registered in this business."],
   err_forbidden: ["אין לך הרשאה לפעולה הזו.", "ليس لديك صلاحية لهذه العملية.", "You don't have permission for this action."],

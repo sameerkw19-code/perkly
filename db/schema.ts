@@ -21,6 +21,11 @@ export const businesses = sqliteTable(
     rewardMode: text("reward_mode").notNull().default("block"),
     // Days a saved reward stays valid (0 = no expiry). Applies to rewards earned after the change.
     rewardExpiryDays: integer("reward_expiry_days").notNull().default(0),
+    // Set by a platform admin. A suspended business cannot stamp or accept new customers.
+    suspended: text("suspended"),
+    suspendReason: text("suspend_reason"),
+    // Free access granted by a platform admin, until this ISO time. Overrides the subscription.
+    compUntil: text("comp_until"),
   },
   (t) => [uniqueIndex("businesses_join_code").on(t.joinCode)],
 );
@@ -209,4 +214,18 @@ export const subscriptions = sqliteTable(
     updated: text("updated").notNull(),
   },
   (t) => [uniqueIndex("subscriptions_external_subscription").on(t.externalSubscription)],
+);
+
+/** Every platform-admin action, for accountability. */
+export const adminLog = sqliteTable(
+  "admin_log",
+  {
+    id: text("id").primaryKey(),
+    admin: text("admin").notNull(),
+    business: text("business"),
+    action: text("action").notNull(),
+    detail: text("detail"),
+    created: text("created").notNull(),
+  },
+  (t) => [index("admin_log_business").on(t.business, t.created)],
 );
