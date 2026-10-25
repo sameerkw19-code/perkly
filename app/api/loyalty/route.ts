@@ -8,7 +8,7 @@ import { formatPhone, maskPhone, normalizePhone } from "../../../lib/phone";
 import { assetIds, defaultDesign, designChecks, sanitizeDesign } from "../../../lib/design";
 import { assetMeta, liveDesign, ownsAssets, publishedDesign } from "../../../lib/server/designs";
 import { releaseArchivedPhone } from "../../../lib/server/customers";
-import { businessAccess, freeLimitReached } from "../../../lib/server/billing";
+import { businessAccess, freeLimitReached, hasPaidDesign } from "../../../lib/server/billing";
 import { formatBirthday, parseBirthday, upcomingKeys } from "../../../lib/birthday";
 import { syncGoogleWallet } from "../../../lib/server/wallet-sync";
 import { walletConfig } from "../../../lib/server/google-wallet";
@@ -394,7 +394,7 @@ export async function POST(request: Request) {
       const done = async (extra: Record<string, unknown> = {}) => {
         const fresh = (await db.prepare("SELECT * FROM customers WHERE id = ?").bind(c!.id).first<Customer>())!;
         const card = await cardState(db, fresh, business.reward_mode);
-        syncGoogleWallet(db, fresh, card.rewards);
+        syncGoogleWallet(db, fresh, card.rewards, new URL(request.url).origin);
         return json({ ok: true, card, ...extra });
       };
       const refuse = async (code: string) => {
@@ -598,6 +598,14 @@ export async function POST(request: Request) {
       const design = sanitizeDesign(p.design);
       if (!design) return fail("bad_details", 400, "Invalid design");
       if (!(await ownsAssets(db, business.id, design))) return fail("not_found", 404, "Image not found");
+      // Without a subscription: no new logo, background image or stamp image (ones already on the card may stay).
+      if (!hasPaidDesign(await businessAccess(db, business.id))) {
+        const kept = new Set(assetIds((await publishedDesign(db, business.id))?.design ?? defaultDesign(business)));
+        const draftRow = await db.prepare("SELECT design_draft FROM businesses WHERE id = ?").bind(business.id).first<{ design_draft: string | null }>();
+        const draft = draftRow?.design_draft ? sanitizeDesign(JSON.parse(draftRow.design_draft)) : null;
+        if (draft) assetIds(draft).forEach((id) => kept.add(id));
+        if (assetIds(design).some((id) => !kept.has(id))) return fail("paid_feature", 402, "Available with a subscription");
+      }
       await db.prepare("UPDATE businesses SET design_draft = ? WHERE id = ?").bind(JSON.stringify(design), business.id).run();
       return json({ ok: true });
     }

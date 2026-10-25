@@ -3,6 +3,7 @@
 // so deploying this code before Google approves the account changes nothing for customers.
 
 import { base64url } from "./crypto";
+import { lookFields, type PassLook } from "../wallet-look";
 
 export type WalletConfig = { issuerId: string; serviceEmail: string; privateKeyPem: string; classId: string };
 
@@ -25,6 +26,8 @@ export function walletConfig(env: { GOOGLE_WALLET_SA_KEY?: string; GOOGLE_WALLET
   }
 }
 
+export type { PassLook };
+
 export type LoyaltyCard = {
   customerId: string;
   businessId: string;
@@ -33,7 +36,10 @@ export type LoyaltyCard = {
   scanCode: string;
   /** Rewards the customer can use now. */
   rewards?: number;
+  /** The business's own look on the pass (see passLook). */
+  look?: PassLook;
 };
+
 
 const encoder = new TextEncoder();
 
@@ -84,6 +90,7 @@ export function loyaltyObject(config: WalletConfig, card: LoyaltyCard) {
     accountId: safeId(card.customerId),
     accountName: "Perkly",
     ...liveFields(card),
+    ...(card.look ? lookFields(card.look) : {}),
     barcode: { type: "QR_CODE", value: card.scanCode, alternateText: "" },
   };
 }
@@ -157,7 +164,7 @@ export async function updateLoyaltyObject(config: WalletConfig, card: LoyaltyCar
     const r = await fetch(`${API}/loyaltyObject/${encodeURIComponent(objectIdFor(config, card.customerId))}`, {
       method: "PATCH",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify(liveFields(card)),
+      body: JSON.stringify({ ...liveFields(card), ...(card.look ? lookFields(card.look) : {}) }),
     });
     if (r.status === 404) return "not_saved";
     if (!r.ok) {

@@ -172,6 +172,12 @@ export function LoyaltyCard({ design, lang, stamps, target, customerName, reward
 
       {qr && <div className="pcard-qr">{qr}</div>}
       <p className="sr-only">{t("stampsOf", { n: stamps, t: target })}</p>
+      {/* Shown on every card, for all plans. A link only on the customer's own card (previews stay plain). */}
+      {qr ? (
+        <a className="pcard-powered" href="https://perkly.shop/?ref=card" target="_blank" rel="noopener" dir="ltr">Powered by <b>Perkly</b></a>
+      ) : (
+        <span className="pcard-powered" dir="ltr">Powered by <b>Perkly</b></span>
+      )}
     </div>
   );
 }
