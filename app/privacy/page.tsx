@@ -4,10 +4,10 @@ import { OPERATOR, OPERATOR_LINE } from "../legal/operator";
 
 export const metadata: Metadata = { title: "Perkly | מדיניות פרטיות", alternates: { canonical: "/privacy" } };
 
-// Reviewed by a lawyer on 25 October 2026. Describes what the code actually does: keep it in sync.
+// Reviewed by a lawyer on 25 October 2026; the analytics line (26 Oct) still needs review. Describes what the code actually does: keep it in sync.
 export default function PrivacyPage() {
   return (
-    <LegalPage title="מדיניות פרטיות" updated="25 באוקטובר 2026">
+    <LegalPage title="מדיניות פרטיות" updated="26 באוקטובר 2026">
       <p>מדיניות זו מסבירה איזה מידע Perkly ({OPERATOR_LINE}) אוספת, למה, איפה הוא נשמר ומה הזכויות שלכם.</p>
 
       <h2>מי אחראי על המידע</h2>
@@ -39,11 +39,11 @@ export default function PrivacyPage() {
       <p>הודעות שיווקיות נשלחות רק למי שסימן הסכמה נפרדת לכך. ההסכמה לא מסומנת מראש, ואינה תנאי להצטרפות לכרטיס או לשירות. אפשר לבטל אותה בכל עת. הסכמה של לקוח לקבל עדכונים בכרטיס היא כלפי העסק בלבד.</p>
 
       <h2>עוגיות ואחסון בדפדפן</h2>
-      <p>האתר משתמש בעוגיית התחברות הכרחית לבעלי עסקים ולעובדים, ושומר בדפדפן את בחירת השפה. אין באתר כלי פרסום או מעקב של צד שלישי.</p>
+      <p>האתר משתמש בעוגיית התחברות הכרחית לבעלי עסקים ולעובדים, ושומר בדפדפן את בחירת השפה. בדפים הציבוריים (דף הבית, פתיחת חשבון, יצירת קשר, דף הקישורים והדפים המשפטיים) אנחנו סופרים כניסות באמצעות Cloudflare Web Analytics, בלי עוגיות ובלי לזהות את המבקר. בכרטיסי הלקוחות ובלוח הניהול אין מדידה כזו. אין באתר כלי פרסום.</p>
 
       <h2>היכן המידע נשמר ומי מקבל אותו</h2>
       <ul>
-        <li><strong>Cloudflare:</strong> אחסון האתר ומסד הנתונים. השרתים יכולים להיות גם מחוץ לישראל.</li>
+        <li><strong>Cloudflare:</strong> אחסון האתר, מסד הנתונים וספירת כניסות אנונימית לדפים הציבוריים. השרתים יכולים להיות גם מחוץ לישראל.</li>
         <li><strong>Polar:</strong> עיבוד תשלומים של בעלי עסקים.</li>
         <li><strong>Google Wallet:</strong> רק אם לקוח בוחר להוסיף את הכרטיס לארנק. במקרה כזה נשלחים לגוגל מספר החותמות, מספר ההטבות וקוד הסריקה, בלי שם ובלי טלפון.</li>
       </ul>

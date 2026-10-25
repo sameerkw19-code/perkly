@@ -2,6 +2,7 @@
 import { PERKLY_SOCIAL, PERKLY_WHATSAPP_TEXT } from "../../lib/perkly-social";
 import { SOCIAL_COLOR, socialLinks } from "../../lib/social";
 import { SocialIcon } from "../../lib/social-icon";
+import SiteAnalytics from "../../components/site-analytics";
 
 export const metadata = {
   title: "Perkly | קישורים",
@@ -92,6 +93,7 @@ export default function LinksPage() {
           </footer>
         </div>
       </main>
+      <SiteAnalytics />
     </>
   );
 }
