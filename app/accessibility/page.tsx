@@ -3,7 +3,7 @@ import LegalPage from "../legal/legal-page";
 import { OPERATOR } from "../legal/operator";
 import { WHATSAPP_DISPLAY } from "../landing/content";
 
-export const metadata: Metadata = { title: "Perkly | הצהרת נגישות (טיוטה)", robots: { index: false } };
+export const metadata: Metadata = { title: "Perkly | הצהרת נגישות", alternates: { canonical: "/accessibility" } };
 
 export default function AccessibilityPage() {
   return (

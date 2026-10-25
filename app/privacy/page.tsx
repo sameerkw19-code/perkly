@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import LegalPage from "../legal/legal-page";
 import { OPERATOR, OPERATOR_LINE } from "../legal/operator";
 
-export const metadata: Metadata = { title: "Perkly | מדיניות פרטיות (טיוטה)", robots: { index: false } };
+export const metadata: Metadata = { title: "Perkly | מדיניות פרטיות", alternates: { canonical: "/privacy" } };
 
-// DRAFT until a lawyer reviews it. Describes what the code actually does.
+// Reviewed by a lawyer on 25 October 2026. Describes what the code actually does: keep it in sync.
 export default function PrivacyPage() {
   return (
     <LegalPage title="מדיניות פרטיות" updated="25 באוקטובר 2026">

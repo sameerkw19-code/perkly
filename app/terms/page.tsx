@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import LegalPage from "../legal/legal-page";
 import { OPERATOR, OPERATOR_LINE } from "../legal/operator";
 
-export const metadata: Metadata = { title: "Perkly | תנאי שימוש (טיוטה)", robots: { index: false } };
+export const metadata: Metadata = { title: "Perkly | תנאי שימוש", alternates: { canonical: "/terms" } };
 
-// DRAFT until a lawyer reviews it.
+// Reviewed by a lawyer on 25 October 2026.
 export default function TermsPage() {
   return (
     <LegalPage title="תנאי שימוש" updated="25 באוקטובר 2026">
