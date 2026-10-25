@@ -483,3 +483,9 @@
 .st h1:focus { outline: none; }
 .st-later { background: none; border: 0; font: inherit; cursor: pointer; }
 .st-free { display: flex; flex-direction: column; gap: 10px; align-items: center; text-align: center; }
+.st-glossary { background: #F7F5FE; border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; font-size: 14.5px; }
+.st-glossary p { font-weight: 700; margin-bottom: 6px; }
+.st-glossary dl { margin: 0; display: grid; gap: 4px; }
+.st-glossary dl div { display: flex; justify-content: space-between; gap: 12px; }
+.st-glossary dt { font-family: ui-monospace, Menlo, monospace; font-size: 13.5px; color: var(--ink); }
+.st-glossary dd { margin: 0; color: var(--muted); text-align: end; }
