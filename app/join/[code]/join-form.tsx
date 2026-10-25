@@ -9,6 +9,7 @@ import { birthdayFromParts } from "../../../lib/birthday";
 
 import type { Design } from "../../../lib/design";
 import { textsFor } from "../../../lib/design";
+import { Brand } from "../../../components/brand";
 
 type Business = { name: string; target: number; design: Design; birthdays: boolean };
 
@@ -42,7 +43,7 @@ export default function JoinForm({ code, business }: { code: string; business: B
   return (
     <div className="auth-page" dir={dir}>
       <div className="auth-top">
-        <span className="brand">perkly<span>.</span></span>
+        <Brand />
         <LangSwitch lang={lang} setLang={setLang} />
       </div>
       {!business ? (

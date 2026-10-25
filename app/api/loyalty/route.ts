@@ -11,6 +11,7 @@ import { releaseArchivedPhone } from "../../../lib/server/customers";
 import { businessAccess } from "../../../lib/server/billing";
 import { formatBirthday, parseBirthday, upcomingKeys } from "../../../lib/birthday";
 import { syncGoogleWallet } from "../../../lib/server/wallet-sync";
+import { walletConfig } from "../../../lib/server/google-wallet";
 import { getSettings } from "../../../lib/server/settings";
 import { normalizeSocial, parseSocial, type Social } from "../../../lib/social";
 
@@ -96,7 +97,7 @@ export async function GET(request: Request) {
   const birthdays = bdays.results
     .map((c) => ({ id: c.id, name: c.name, date: formatBirthday(c.birthday), inDays: upcoming.get(c.birthday) ?? 0 }))
     .sort((a, b) => a.inDays - b.inDays);
-  const base = { me, memberships, role, business, branches, myBranch: membership.branch, design: await liveDesign(db, business!), access, birthdays, system };
+  const base = { me, memberships, role, business, branches, myBranch: membership.branch, design: await liveDesign(db, business!), access, birthdays, system, googleWallet: walletConfig(env) !== null };
 
   if (role === "staff") {
     const mine = await db

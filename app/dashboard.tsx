@@ -16,6 +16,7 @@ import { LoyaltyCard, Num } from "../components/loyalty-card";
 import { QrImage } from "../components/qr";
 import { BirthdayFields } from "../components/birthday-fields";
 import { birthdayFromParts, formatBirthday } from "../lib/birthday";
+import { Brand } from "../components/brand";
 
 type Role = "owner" | "staff";
 type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social };
@@ -24,6 +25,7 @@ type Data = {
   me: { name: string; email: string };
   access?: { ok: true } | { ok: false; code: "business_suspended" | "subscription_required" };
   birthdays?: { id: string; name: string; date: string; inDays: number }[];
+  googleWallet?: boolean;
   system?: { maintenance: boolean; maintenanceMessage: string; announcement: string; signupsOpen?: boolean };
   memberships: { business: string; role: Role; businessName: string; branch: string | null }[];
   branches?: { id: string; name: string }[];
@@ -156,7 +158,7 @@ export default function Dashboard() {
     return (
       <div className="center-page" dir={dir}>
         <div className="onboarding">
-          <div className="auth-top"><span className="brand">perkly<span>.</span></span><LangSwitch lang={lang} setLang={setLang} /></div>
+          <div className="auth-top"><Brand /><LangSwitch lang={lang} setLang={setLang} /></div>
           <span className="welcome-icon"><Store size={38} /></span>
           <h2>{t("welcome")}</h2>
           <p>{t("welcomeHint")}</p>
@@ -194,7 +196,7 @@ export default function Dashboard() {
   return (
     <div className="app" dir={dir}>
       <aside className="sidebar">
-        <span className="brand">perkly<span>.</span></span>
+        <Brand />
         <div className="workspace">
           <span className="mini-logo" style={{ background: b.color, color: "white" }}>{b.name.charAt(0)}</span>
           <div><strong>{b.name}</strong><small>{isOwner ? t("roleOwner") : t("roleStaff")}</small></div>
@@ -289,7 +291,7 @@ export default function Dashboard() {
                 <div className="panel card-panel">
                   <div className="section-head"><h2>{t("card")}</h2></div>
                   <LoyaltyCard design={data.design!} lang={lang} stamps={Math.min(3, b.target)} target={b.target} t={t} />
-                  <p className="wallet-note"><Wallet size={15} />{t("walletHint")}</p>
+                  <p className="wallet-note"><Wallet size={15} />{data.googleWallet ? t("walletOwnerNote") : t("walletHint")}</p>
                 </div>
                 <div className="panel activity-panel">
                   <div className="section-head"><h2>{t("history")}</h2></div>

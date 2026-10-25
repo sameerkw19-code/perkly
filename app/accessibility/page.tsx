@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: "Perkly | הצהרת נגישות (ט
 
 export default function AccessibilityPage() {
   return (
-    <LegalPage title="הצהרת נגישות" updated="24 באוקטובר 2026">
+    <LegalPage title="הצהרת נגישות" updated="25 באוקטובר 2026">
       <p>אנחנו רוצים שכל אחד יוכל להשתמש ב־Perkly. ההצהרה מתארת מה נעשה עד עכשיו ומה עוד לא נבדק.</p>
       <h2>מה נעשה בדף הבית ובטופס ההצטרפות</h2>
       <ul>

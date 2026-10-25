@@ -122,6 +122,7 @@ const words: Record<string, Entry> = {
   cardNotFound: ["הכרטיס לא נמצא. ייתכן שהקישור הוחלף. בקשו מהעסק קישור חדש.", "البطاقة غير موجودة. ربما تم تغيير الرابط. اطلب رابطاً جديداً من المشروع.", "Card not found. The link may have been replaced. Ask the business for a new one."],
   refresh: ["רענון", "تحديث", "Refresh"],
   customerName: ["שם הלקוח", "اسم الزبون", "Name"],
+  walletOwnerNote: ["לקוחות עם אנדרואיד יכולים להוסיף את הכרטיס ל־Google Wallet, והוא מתעדכן לבד. Apple Wallet עדיין לא זמין.", "يمكن لزبائن أندرويد إضافة البطاقة إلى Google Wallet وهي تتحدث تلقائياً. Apple Wallet غير متاح بعد.", "Android customers can add the card to Google Wallet, and it updates by itself. Apple Wallet isn't available yet."],
   walletHintIOS: ["הוספה ל־Apple Wallet עדיין לא זמינה.", "الإضافة إلى Apple Wallet غير متاحة بعد.", "Adding to Apple Wallet isn't available yet."],
   birthday: ["יום הולדת (לא חובה)", "عيد الميلاد (اختياري)", "Birthday (optional)"],
   bday: ["יום", "اليوم", "Day"],

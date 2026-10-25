@@ -8,6 +8,7 @@ import { QrImage } from "../../../components/qr";
 import type { Design } from "../../../lib/design";
 import { SOCIAL_COLOR, type SocialKey } from "../../../lib/social";
 import { SocialIcon } from "../../../lib/social-icon";
+import { Brand } from "../../../components/brand";
 
 type Card = { name: string; stamps: number; target: number; scan_code: string; design: Design; rewards: number; nextExpiry: string | null; business: string; links: { key: SocialKey; label: string; url: string }[] };
 
@@ -16,7 +17,7 @@ export default function CardView({ card, secret, googleWallet, isIOS }: { card: 
   return (
     <div className="card-page" dir={dir}>
       <div className="auth-top">
-        <span className="brand">perkly<span>.</span></span>
+        <Brand />
         <LangSwitch lang={lang} setLang={setLang} />
       </div>
       {!card ? (

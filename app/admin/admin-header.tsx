@@ -1,4 +1,5 @@
 import { SignOut } from "./sign-out";
+import { Brand } from "../../components/brand";
 
 const TABS = [
   { href: "/admin", label: "סקירה" },
@@ -12,7 +13,7 @@ const TABS = [
 export function AdminHeader({ active }: { active: string }) {
   return (
     <header className="admin-top">
-      <span className="brand">perkly<span>.</span></span>
+      <Brand />
       <span className="pill">מרכז שליטה</span>
       <nav className="admin-nav" aria-label="מרכז שליטה">
         {TABS.map((t) => (

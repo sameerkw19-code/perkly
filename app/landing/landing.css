@@ -1,24 +1,6 @@
 /* Public marketing page. Everything is scoped under .lp so the app's global styles stay untouched. */
 
-/* ---- Fonts (self-hosted; Hebrew, Arabic and Latin subsets) ---- */
-@font-face { font-family: "Rubik"; font-weight: 500; font-display: swap; src: url(/fonts/rubik-hebrew-500-normal.woff2) format("woff2"); unicode-range: U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F; }
-@font-face { font-family: "Rubik"; font-weight: 700; font-display: swap; src: url(/fonts/rubik-hebrew-700-normal.woff2) format("woff2"); unicode-range: U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F; }
-@font-face { font-family: "Rubik"; font-weight: 800; font-display: swap; src: url(/fonts/rubik-hebrew-800-normal.woff2) format("woff2"); unicode-range: U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F; }
-@font-face { font-family: "Rubik"; font-weight: 500; font-display: swap; src: url(/fonts/rubik-arabic-500-normal.woff2) format("woff2"); unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC; }
-@font-face { font-family: "Rubik"; font-weight: 700; font-display: swap; src: url(/fonts/rubik-arabic-700-normal.woff2) format("woff2"); unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC; }
-@font-face { font-family: "Rubik"; font-weight: 800; font-display: swap; src: url(/fonts/rubik-arabic-800-normal.woff2) format("woff2"); unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC; }
-@font-face { font-family: "Rubik"; font-weight: 500; font-display: swap; src: url(/fonts/rubik-latin-500-normal.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2212; }
-@font-face { font-family: "Rubik"; font-weight: 700; font-display: swap; src: url(/fonts/rubik-latin-700-normal.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2212; }
-@font-face { font-family: "Rubik"; font-weight: 800; font-display: swap; src: url(/fonts/rubik-latin-800-normal.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2212; }
-@font-face { font-family: "Heebo"; font-weight: 400; font-display: swap; src: url(/fonts/heebo-hebrew-400-normal.woff2) format("woff2"); unicode-range: U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F; }
-@font-face { font-family: "Heebo"; font-weight: 500; font-display: swap; src: url(/fonts/heebo-hebrew-500-normal.woff2) format("woff2"); unicode-range: U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F; }
-@font-face { font-family: "Heebo"; font-weight: 700; font-display: swap; src: url(/fonts/heebo-hebrew-700-normal.woff2) format("woff2"); unicode-range: U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F; }
-@font-face { font-family: "Heebo"; font-weight: 400; font-display: swap; src: url(/fonts/heebo-latin-400-normal.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2212; }
-@font-face { font-family: "Heebo"; font-weight: 500; font-display: swap; src: url(/fonts/heebo-latin-500-normal.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2212; }
-@font-face { font-family: "Heebo"; font-weight: 700; font-display: swap; src: url(/fonts/heebo-latin-700-normal.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2212; }
-@font-face { font-family: "Plex Arabic"; font-weight: 400; font-display: swap; src: url(/fonts/ibm-plex-sans-arabic-arabic-400-normal.woff2) format("woff2"); unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC; }
-@font-face { font-family: "Plex Arabic"; font-weight: 500; font-display: swap; src: url(/fonts/ibm-plex-sans-arabic-arabic-500-normal.woff2) format("woff2"); unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC; }
-@font-face { font-family: "Plex Arabic"; font-weight: 700; font-display: swap; src: url(/fonts/ibm-plex-sans-arabic-arabic-700-normal.woff2) format("woff2"); unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC; }
+/* Fonts are declared in app/fonts.css (loaded by the root layout). */
 
 /* ---- Tokens ---- */
 .lp {
