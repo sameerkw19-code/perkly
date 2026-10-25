@@ -37,6 +37,7 @@ const T = {
     payTitle: "מפעילים את המנוי", payIntro: "הכרטיס שלכם מוכן. מזינים פרטי אשראי, מקבלים את ה־QR ומתחילים מיד.",
     plan: "מנוי Perkly", price: "99 ₪", per: "לחודש", noSetup: "3 ימי ניסיון חינם. החיוב הראשון רק אחרי 3 ימים, ואם מבטלים לפני כן לא משלמים כלום. בלי דמי הקמה.",
     features: ["כרטיס בעיצוב העסק", "הצטרפות לקוחות ב־QR", "Google Wallet ללקוחות אנדרואיד", "עמדת עובד והזמנת עובדים", "לוח בקרה והתראות"],
+    englishNote: { title: "דף התשלום של Polar באנגלית. מה כתוב שם:", rows: [["3 days free", "3 ימים חינם"], ["Due today ₪0", "היום משלמים 0 ₪"], ["Then ₪99/month", "אחר כך 99 ₪ לחודש"], ["Start trial", "התחלת הניסיון (הכפתור בסוף)"]] },
     pay: "התחלת 3 ימי ניסיון", paying: "פותחים את דף התשלום…", secure: "התשלום מתבצע אצל Polar, ספק תשלומים מאובטח. פרטי האשראי לא מגיעים אלינו.",
     later: "להתחיל בלי מנוי (עד 10 לקוחות)",
     freeNote: "בלי מנוי אפשר לצרף עד 10 לקוחות. כדי להמשיך מעבר לזה, מפעילים מנוי עם 3 ימי ניסיון חינם.", activate: "הפעלת מנוי", billingOff: "התשלום באתר עדיין לא מופעל. כתבו לנו ל־support@perkly.shop ונפעיל לכם את החשבון.",
@@ -61,6 +62,7 @@ const T = {
     payTitle: "تفعيل الاشتراك", payIntro: "بطاقتكم جاهزة. أدخلوا تفاصيل البطاقة الائتمانية، احصلوا على رمز QR وابدؤوا فوراً.",
     plan: "اشتراك Perkly", price: "99 ₪", per: "شهرياً", noSetup: "3 أيام تجربة مجانية. أول دفعة بعد 3 أيام فقط، وإن ألغيتم قبل ذلك لا تدفعون شيئاً. بدون رسوم تأسيس.",
     features: ["بطاقة بتصميم مشروعك", "انضمام الزبائن عبر QR", "Google Wallet لزبائن أندرويد", "محطة موظف ودعوة موظفين", "لوحة تحكم وتنبيهات"],
+    englishNote: { title: "صفحة الدفع في Polar بالإنجليزية. ماذا يعني المكتوب:", rows: [["3 days free", "3 أيام مجاناً"], ["Due today ₪0", "تدفعون اليوم 0 ₪"], ["Then ₪99/month", "بعدها 99 ₪ شهرياً"], ["Start trial", "بدء التجربة (الزر في الأسفل)"]] },
     pay: "ابدأوا 3 أيام تجربة", paying: "نفتح صفحة الدفع…", secure: "الدفع يتم عبر Polar، مزود دفع آمن. تفاصيل البطاقة لا تصل إلينا.",
     later: "البدء بدون اشتراك (حتى 10 زبائن)",
     freeNote: "بدون اشتراك يمكن إضافة حتى 10 زبائن. للمتابعة بعد ذلك فعّلوا الاشتراك مع 3 أيام تجربة مجانية.", activate: "تفعيل الاشتراك", billingOff: "الدفع في الموقع غير مفعّل بعد. راسلونا على support@perkly.shop وسنفعّل حسابكم.",
@@ -85,6 +87,7 @@ const T = {
     payTitle: "Activate your subscription", payIntro: "Your card is ready. Add your payment card, get your QR code and start right away.",
     plan: "Perkly subscription", price: "₪99", per: "a month", noSetup: "3-day free trial. You're first charged after 3 days, and if you cancel before then you pay nothing. No setup fee.",
     features: ["A card in your business's look", "Customers join with a QR code", "Google Wallet for Android customers", "Staff station and team invites", "Dashboard and alerts"],
+    englishNote: null,
     pay: "Start the 3-day trial", paying: "Opening the payment page…", secure: "Payment is handled by Polar, a secure payment provider. Your card details never reach us.",
     later: "Start without a subscription (up to 10 customers)",
     freeNote: "Without a subscription you can add up to 10 customers. To go beyond that, activate a subscription with a 3-day free trial.", activate: "Activate subscription", billingOff: "Online payment isn't switched on yet. Email support@perkly.shop and we'll activate your account.",
@@ -335,6 +338,16 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
                     <ul>{t.features.map((f) => <li key={f}><Icon name="check" size={17} stroke={2.6} />{f}</li>)}</ul>
                     <p className="su-opt">{t.noSetup}</p>
                   </div>
+                  {t.englishNote && (
+                    <div className="st-glossary">
+                      <p>{t.englishNote.title}</p>
+                      <dl>
+                        {t.englishNote.rows.map(([en, local]) => (
+                          <div key={en}><dt dir="ltr">{en}</dt><dd>{local}</dd></div>
+                        ))}
+                      </dl>
+                    </div>
+                  )}
                   {error && <p className="su-summary" role="alert">{error}</p>}
                   <button type="button" className="lp-btn lp-btn-primary lp-btn-lg lp-btn-wide" onClick={pay} disabled={busy || !billingOn} aria-busy={busy}>
                     <Icon name="lock" size={18} />{busy ? t.paying : t.pay}
