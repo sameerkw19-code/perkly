@@ -4,7 +4,7 @@ import { clientIp, fail, json, readJson, sameOrigin, str } from "../../../lib/se
 import { allow } from "../../../lib/server/rate-limit";
 import { normalizePhone } from "../../../lib/phone";
 import { releaseArchivedPhone } from "../../../lib/server/customers";
-import { businessAccess } from "../../../lib/server/billing";
+import { businessAccess, freeLimitReached } from "../../../lib/server/billing";
 import { parseBirthday } from "../../../lib/birthday";
 import { getSettings } from "../../../lib/server/settings";
 
@@ -27,6 +27,7 @@ export async function POST(request: Request) {
   if (!(await allow(db, `join-business:${business.id}`, 300, 3600))) return fail("rate_limited", 429);
   const access = await businessAccess(db, business.id);
   if (!access.ok) return fail(access.code, 402, "This business is not accepting new customers right now");
+  if (freeLimitReached(access)) return fail("subscription_required", 402, "This business is not accepting new customers right now");
 
   const name = str(body.name, 80);
   const phone = normalizePhone(body.phone);

@@ -8,7 +8,7 @@ import { formatPhone, maskPhone, normalizePhone } from "../../../lib/phone";
 import { assetIds, defaultDesign, designChecks, sanitizeDesign } from "../../../lib/design";
 import { assetMeta, liveDesign, ownsAssets, publishedDesign } from "../../../lib/server/designs";
 import { releaseArchivedPhone } from "../../../lib/server/customers";
-import { businessAccess } from "../../../lib/server/billing";
+import { businessAccess, freeLimitReached } from "../../../lib/server/billing";
 import { formatBirthday, parseBirthday, upcomingKeys } from "../../../lib/birthday";
 import { syncGoogleWallet } from "../../../lib/server/wallet-sync";
 import { walletConfig } from "../../../lib/server/google-wallet";
@@ -97,6 +97,8 @@ export async function GET(request: Request) {
   const birthdays = bdays.results
     .map((c) => ({ id: c.id, name: c.name, date: formatBirthday(c.birthday), inDays: upcoming.get(c.birthday) ?? 0 }))
     .sort((a, b) => a.inDays - b.inDays);
+  // No QR or join link until the business may accept customers (paid, free access, or not suspended).
+  if (!access.ok) business!.join_code = null;
   const base = { me, memberships, role, business, branches, myBranch: membership.branch, design: await liveDesign(db, business!), access, birthdays, system, googleWallet: walletConfig(env) !== null };
 
   if (role === "staff") {
@@ -254,7 +256,7 @@ export async function POST(request: Request) {
   const business = (await loadBusiness(db, p.business as string))!;
   const ownerOnly = () => (role === "owner" ? null : fail("forbidden", 403, "Owner permission required"));
   // Access rules. Redeeming a reward a customer already earned is always allowed.
-  // - Inactive subscription: no new stamps, adjustments or customers. Everything else still works.
+  // - No subscription: free up to FREE_CUSTOMERS customers; beyond that no new stamps, adjustments or customers.
   // - Suspended by a platform admin: nothing changes except redeeming, looking up and removing customers.
   const action = String(p.action);
   const SUB_GATED = ["stamp", "adjust", "register_customer"];
@@ -266,6 +268,10 @@ export async function POST(request: Request) {
     }
     if (!access.ok && access.code === "subscription_required" && SUB_GATED.includes(action)) {
       return fail(access.code, 402, "Subscription is not active");
+    }
+    // Without a subscription: up to FREE_CUSTOMERS customers, then a subscription is needed for more.
+    if (action === "register_customer" && freeLimitReached(access)) {
+      return fail("free_limit", 402, "Free customer limit reached");
     }
   }
 

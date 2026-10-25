@@ -59,9 +59,11 @@ export default function AuthForm({ needsCode, next = "/", initialMode = "login" 
         )}
         {error && <p className="form-error" role="alert">{error}</p>}
         <button className="btn primary wide" disabled={busy}>{busy ? t("loading") : mode === "login" ? t("signIn") : t("signUp")}</button>
-        <button type="button" className="text-btn" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(""); }}>
-          {mode === "login" ? t("noAccount") : t("haveAccount")}
-        </button>
+        {mode === "login" ? (
+          <a className="text-btn" href="/start">{t("noAccount")}</a>
+        ) : (
+          <button type="button" className="text-btn" onClick={() => { setMode("login"); setError(""); }}>{t("haveAccount")}</button>
+        )}
         <p className="form-hint">{t("staffNoAccount")}</p>
         {mode === "login" && <p className="form-hint">{t("noPasswordReset")}</p>}
       </form>

@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { validMonthDay, parseBirthday, birthdayFromParts, formatBirthday, upcomingKeys } from "../lib/birthday.ts";
 import { sanitizeDesign, defaultDesign, designChecks, FONTS } from "../lib/design.ts";
-import { businessAccess } from "../lib/server/billing.ts";
+import { businessAccess, freeLimitReached } from "../lib/server/billing.ts";
 
 // ---- Birthdays ----
 
@@ -90,8 +90,8 @@ test("design: gradient readability checks the weaker of the two colors", () => {
 
 // ---- Access (subscription, suspension, free access) ----
 
-function fakeDb(row) {
-  return { prepare: () => ({ bind: () => ({ first: async () => row }) }) };
+function fakeDb(row, customers = 0) {
+  return { prepare: (sql) => ({ bind: () => ({ first: async () => (sql.includes("COUNT(*)") ? { n: customers } : row) }) }) };
 }
 const NOW = "2026-10-24T12:00:00.000Z";
 
@@ -103,7 +103,7 @@ test("access: suspension blocks even with an active subscription or free access"
 test("access: free access allows without a subscription, until it ends", async () => {
   assert.deepEqual(await businessAccess(fakeDb({ suspended: null, comp_until: "2026-11-01T00:00:00.000Z", status: "canceled" }), "b", NOW), { ok: true });
   assert.deepEqual(
-    await businessAccess(fakeDb({ suspended: null, comp_until: "2026-10-01T00:00:00.000Z", status: "canceled" }), "b", NOW),
+    await businessAccess(fakeDb({ suspended: null, comp_until: "2026-10-01T00:00:00.000Z", status: "canceled" }, 25), "b", NOW),
     { ok: false, code: "subscription_required" },
   );
 });
@@ -111,7 +111,7 @@ test("access: free access allows without a subscription, until it ends", async (
 test("access: subscription status, and pilot businesses without one", async () => {
   assert.deepEqual(await businessAccess(fakeDb({ suspended: null, comp_until: null, status: "active" }), "b", NOW), { ok: true });
   assert.deepEqual(await businessAccess(fakeDb({ suspended: null, comp_until: null, status: "trialing" }), "b", NOW), { ok: true });
-  assert.deepEqual(await businessAccess(fakeDb({ suspended: null, comp_until: null, status: "past_due" }), "b", NOW), { ok: false, code: "subscription_required" });
+  assert.deepEqual(await businessAccess(fakeDb({ suspended: null, comp_until: null, status: "past_due" }, 11), "b", NOW), { ok: false, code: "subscription_required" });
   assert.deepEqual(await businessAccess(fakeDb({ suspended: null, comp_until: null, status: null }), "b", NOW), { ok: true });
   assert.deepEqual(await businessAccess(fakeDb(null), "missing", NOW), { ok: false, code: "subscription_required" });
 });
@@ -136,4 +136,18 @@ test("settings: saving is all or nothing", async () => {
   assert.equal(writes.length, 0);
   assert.deepEqual(await saveSettings(db, { announcement: "ok", trialDays: 7 }, "a@b.c"), []);
   assert.equal(writes.length, 4); // two settings, each with a log entry
+});
+
+test("access: without a subscription, free up to 10 customers", async () => {
+  const none = { suspended: null, comp_until: null, status: "none" };
+  assert.deepEqual(await businessAccess(fakeDb(none, 0), "b", NOW), { ok: true, free: { limit: 10, used: 0 } });
+  const at10 = await businessAccess(fakeDb(none, 10), "b", NOW);
+  assert.deepEqual(at10, { ok: true, free: { limit: 10, used: 10 } });
+  assert.equal(freeLimitReached(at10), true);
+  assert.equal(freeLimitReached(await businessAccess(fakeDb(none, 9), "b", NOW)), false);
+  assert.deepEqual(await businessAccess(fakeDb(none, 11), "b", NOW), { ok: false, code: "subscription_required" });
+  // Paying, trialing and pre-billing businesses have no limit.
+  for (const status of ["active", "trialing", null]) {
+    assert.deepEqual(await businessAccess(fakeDb({ ...none, status }, 500), "b", NOW), { ok: true });
+  }
 });

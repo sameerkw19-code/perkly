@@ -16,6 +16,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const params = await searchParams;
   const next = safeNext(params.next);
   if (await currentUser()) redirect(next);
-  const signup = params.mode === "signup" || params.signup === "1";
-  return <AuthForm needsCode={!!env.SIGNUP_CODE} next={next} initialMode={signup ? "signup" : "login"} />;
+  // New accounts are opened in the guided setup.
+  if (params.mode === "signup" || params.signup === "1") redirect(typeof params.lang === "string" && ["ar", "en"].includes(params.lang) ? `/start?lang=${params.lang}` : "/start");
+  return <AuthForm needsCode={!!env.SIGNUP_CODE} next={next} initialMode="login" />;
 }

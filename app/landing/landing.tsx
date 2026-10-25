@@ -318,6 +318,7 @@ export default function Landing({ lang }: { lang: Lang }) {
             <a href={h.privacy}>{c.footer.privacy}</a>
             <a href={h.accessibility}>{c.footer.accessibility}</a>
             <a href={h.login}>{c.footer.login}</a>
+            <a href={h.contact}>{c.footer.contact}</a>
             <a href="/links">{c.footer.links}</a>
           </nav>
           <span className="lp-footer-rights">{c.footer.rights}</span>

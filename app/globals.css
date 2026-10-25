@@ -320,3 +320,4 @@ fieldset.birthday{border:0;padding:0;margin:0 0 14px}fieldset.birthday legend{fo
 .social-field-name{display:flex;align-items:center;gap:7px;font-weight:bold}
 .social-field input{width:100%;text-align:left}
 @media(prefers-reduced-motion:reduce){.social-row a{transition:none}.social-row a:hover{transform:none}}
+.free-bar{background:#f0ecfc;color:#4b3aa8;border-bottom-color:#e2daf9}
