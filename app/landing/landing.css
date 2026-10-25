@@ -481,3 +481,5 @@
   .st-poster-scan { font-size: 28px; }
 }
 .st h1:focus { outline: none; }
+.st-later { background: none; border: 0; font: inherit; cursor: pointer; }
+.st-free { display: flex; flex-direction: column; gap: 10px; align-items: center; text-align: center; }

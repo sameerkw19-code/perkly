@@ -23,7 +23,7 @@ type Business = { id: string; name: string; reward: string; target: number; colo
 type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; rewards?: number; nextExpiry?: string | null; phone?: string };
 type Data = {
   me: { name: string; email: string };
-  access?: { ok: true } | { ok: false; code: "business_suspended" | "subscription_required" };
+  access?: { ok: true; free?: { limit: number; used: number } } | { ok: false; code: "business_suspended" | "subscription_required" };
   birthdays?: { id: string; name: string; date: string; inDays: number }[];
   googleWallet?: boolean;
   system?: { maintenance: boolean; maintenanceMessage: string; announcement: string; signupsOpen?: boolean };
@@ -241,6 +241,12 @@ export default function Dashboard() {
             <AlertTriangle size={16} />
             <span>{t(data.access.code === "business_suspended" ? "accessSuspended" : "accessNoSub")}</span>
             {isOwner && data.access.code === "subscription_required" && <a className="btn primary small" href={`/start?b=${encodeURIComponent(b.id)}`}>{t("activateSub")}</a>}
+          </div>
+        )}
+        {data.access?.ok && data.access.free && isOwner && (
+          <div className="access-bar free-bar" role="status">
+            <span>{t("freeBanner", { used: data.access.free.used, limit: data.access.free.limit })}</span>
+            <a className="btn primary small" href={`/start?b=${encodeURIComponent(b.id)}`}>{t("activateSub")}</a>
           </div>
         )}
         {!!data.birthdays?.length && (

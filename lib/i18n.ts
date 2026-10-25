@@ -60,6 +60,8 @@ const words: Record<string, Entry> = {
   err_weak_password: ["הסיסמה צריכה לפחות 8 תווים.", "كلمة المرور تحتاج 8 أحرف على الأقل.", "The password needs at least 8 characters."],
   err_signup_code: ["קוד ההרשמה חסר או שגוי.", "رمز التسجيل مفقود أو غير صحيح.", "The signup code is missing or wrong."],
   err_rate_limited: ["יותר מדי ניסיונות. נסו שוב בעוד כמה דקות.", "محاولات كثيرة. حاول بعد بضع دقائق.", "Too many attempts. Try again in a few minutes."],
+  err_free_limit: ["הגעתם ל־10 לקוחות, המקסימום בלי מנוי. כדי לצרף עוד לקוחות, הפעילו מנוי (3 ימי ניסיון חינם).", "وصلتم إلى 10 زبائن، الحد الأقصى بدون اشتراك. لإضافة المزيد فعّلوا الاشتراك (3 أيام تجربة مجانية).", "You've reached 10 customers, the most without a subscription. To add more, activate a subscription (3-day free trial)."],
+  freeBanner: ["חשבון ללא מנוי: {used} מתוך {limit} לקוחות. להמשך צירוף לקוחות, הפעילו מנוי.", "حساب بدون اشتراك: {used} من {limit} زبائن. لمواصلة إضافة الزبائن فعّلوا الاشتراك.", "No subscription yet: {used} of {limit} customers. Activate a subscription to keep adding customers."],
   err_subscription_required: ["המנוי של העסק לא פעיל כרגע. לא ניתן להוסיף חותמות או לקוחות חדשים.", "اشتراك المشروع غير فعال حالياً. لا يمكن إضافة أختام أو زبائن جدد.", "This business's subscription isn't active. Stamps and new customers are paused."],
   err_maintenance: ["המערכת בתחזוקה כרגע. נסו שוב מאוחר יותר.", "النظام قيد الصيانة حالياً. حاول لاحقاً.", "The system is under maintenance. Please try again later."],
   err_signups_closed: ["פתיחת עסקים חדשים סגורה כרגע.", "تسجيل مشاريع جديدة مغلق حالياً.", "New business sign-ups are closed right now."],

@@ -38,7 +38,8 @@ const T = {
     plan: "מנוי Perkly", price: "99 ₪", per: "לחודש", noSetup: "3 ימי ניסיון חינם. החיוב הראשון רק אחרי 3 ימים, ואם מבטלים לפני כן לא משלמים כלום. בלי דמי הקמה.",
     features: ["כרטיס בעיצוב העסק", "הצטרפות לקוחות ב־QR", "Google Wallet ללקוחות אנדרואיד", "עמדת עובד והזמנת עובדים", "לוח בקרה והתראות"],
     pay: "התחלת 3 ימי ניסיון", paying: "פותחים את דף התשלום…", secure: "התשלום מתבצע אצל Polar, ספק תשלומים מאובטח. פרטי האשראי לא מגיעים אלינו.",
-    later: "אמשיך אחר כך", billingOff: "התשלום באתר עדיין לא מופעל. כתבו לנו ל־support@perkly.shop ונפעיל לכם את החשבון.",
+    later: "להתחיל בלי מנוי (עד 10 לקוחות)",
+    freeNote: "בלי מנוי אפשר לצרף עד 10 לקוחות. כדי להמשיך מעבר לזה, מפעילים מנוי עם 3 ימי ניסיון חינם.", activate: "הפעלת מנוי", billingOff: "התשלום באתר עדיין לא מופעל. כתבו לנו ל־support@perkly.shop ונפעיל לכם את החשבון.",
     payFail: "לא הצלחנו לפתוח את דף התשלום. נסו שוב.",
     waitTitle: "מאשרים את הפרטים…", waitText: "זה לוקח בדרך כלל כמה שניות.",
     waitSlow: "הפרטים התקבלו, והאישור מתעכב. רעננו את הדף בעוד דקה. אם זה נמשך, כתבו ל־support@perkly.shop.",
@@ -61,7 +62,8 @@ const T = {
     plan: "اشتراك Perkly", price: "99 ₪", per: "شهرياً", noSetup: "3 أيام تجربة مجانية. أول دفعة بعد 3 أيام فقط، وإن ألغيتم قبل ذلك لا تدفعون شيئاً. بدون رسوم تأسيس.",
     features: ["بطاقة بتصميم مشروعك", "انضمام الزبائن عبر QR", "Google Wallet لزبائن أندرويد", "محطة موظف ودعوة موظفين", "لوحة تحكم وتنبيهات"],
     pay: "ابدأوا 3 أيام تجربة", paying: "نفتح صفحة الدفع…", secure: "الدفع يتم عبر Polar، مزود دفع آمن. تفاصيل البطاقة لا تصل إلينا.",
-    later: "سأكمل لاحقاً", billingOff: "الدفع في الموقع غير مفعّل بعد. راسلونا على support@perkly.shop وسنفعّل حسابكم.",
+    later: "البدء بدون اشتراك (حتى 10 زبائن)",
+    freeNote: "بدون اشتراك يمكن إضافة حتى 10 زبائن. للمتابعة بعد ذلك فعّلوا الاشتراك مع 3 أيام تجربة مجانية.", activate: "تفعيل الاشتراك", billingOff: "الدفع في الموقع غير مفعّل بعد. راسلونا على support@perkly.shop وسنفعّل حسابكم.",
     payFail: "لم نتمكن من فتح صفحة الدفع. حاولوا مجدداً.",
     waitTitle: "نؤكد الدفع…", waitText: "يستغرق ذلك عادة بضع ثوانٍ.",
     waitSlow: "تم استلام الدفع والتأكيد يتأخر. حدّثوا الصفحة بعد دقيقة. إن استمر ذلك راسلونا على support@perkly.shop.",
@@ -84,7 +86,8 @@ const T = {
     plan: "Perkly subscription", price: "₪99", per: "a month", noSetup: "3-day free trial. You're first charged after 3 days, and if you cancel before then you pay nothing. No setup fee.",
     features: ["A card in your business's look", "Customers join with a QR code", "Google Wallet for Android customers", "Staff station and team invites", "Dashboard and alerts"],
     pay: "Start the 3-day trial", paying: "Opening the payment page…", secure: "Payment is handled by Polar, a secure payment provider. Your card details never reach us.",
-    later: "I'll finish later", billingOff: "Online payment isn't switched on yet. Email support@perkly.shop and we'll activate your account.",
+    later: "Start without a subscription (up to 10 customers)",
+    freeNote: "Without a subscription you can add up to 10 customers. To go beyond that, activate a subscription with a 3-day free trial.", activate: "Activate subscription", billingOff: "Online payment isn't switched on yet. Email support@perkly.shop and we'll activate your account.",
     payFail: "We couldn't open the payment page. Please try again.",
     waitTitle: "Confirming your payment…", waitText: "This usually takes a few seconds.",
     waitSlow: "Your payment went through and the confirmation is running late. Refresh in a minute. If it continues, email support@perkly.shop.",
@@ -137,6 +140,7 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
 
   const [step, setStep] = useState<Step>(() => firstStep(signedIn, initialBusiness, billingOn, paidReturn));
   const [business, setBusiness] = useState<StartBusiness | null>(initialBusiness);
+  const [authed, setAuthed] = useState(signedIn);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -177,9 +181,11 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
         setLiveDesign(data.design ?? null);
         setLiveTarget(data.business.target ?? 10);
         const ok = !!data.access?.ok;
-        setBusiness((b) => (b ? { ...b, joinCode: data.business.join_code ?? null, canWork: ok } : b));
+        // No "free" part means a subscription (or free access) covers the business.
+        const paidNow = ok && !data.access.free;
+        setBusiness((b) => (b ? { ...b, joinCode: data.business.join_code ?? null, canWork: ok, paid: b.paid || paidNow } : b));
         if (step === "wait") {
-          if (ok && data.business.join_code) { setStep("done"); return; }
+          if (paidNow && data.business.join_code) { setStep("done"); return; }
           tries += 1;
           if (tries > 24) { setSlow(true); return; }
           setTimeout(load, 2500);
@@ -202,6 +208,7 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
     const r = await post("/api/auth", { action: "signup", name: f.get("name"), email: f.get("email"), password: f.get("password"), signupCode: f.get("signupCode") || undefined });
     setBusy(false);
     if (!r.ok) { setError(errorText(lang, r.code)); return; }
+    setAuthed(true);
     setStep("business");
   }
 
@@ -244,7 +251,7 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
       <header className="lp-header st-noprint">
         <div className="lp-wrap lp-header-row">
           <a href={lang === "he" ? "/" : `/${lang}`} className="lp-home-link"><Logo label="Perkly" /></a>
-          {!signedIn ? <a href={`/login?next=/start`} className="lp-login">{t.login}</a> : <a href="/" className="lp-login">{t.dashboard}</a>}
+          {!authed ? <a href={`/login?next=/start`} className="lp-login">{t.login}</a> : <a href="/" className="lp-login">{t.dashboard}</a>}
         </div>
       </header>
       <main className="lp-main lp-wrap su-main">
@@ -334,7 +341,7 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
                   </button>
                   {!billingOn && <p className="su-summary" role="status">{t.billingOff}</p>}
                   <p className="su-opt st-secure">{t.secure}</p>
-                  <a className="st-later" href="/">{t.later}</a>
+                  {business?.canWork && <button type="button" className="st-later" onClick={() => setStep("done")}>{t.later}</button>}
                 </>
               )}
             </section>
@@ -357,6 +364,12 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
               </div>
             ) : (
               <p className="su-summary st-noprint">{t.billingOff}</p>
+            )}
+            {!business.paid && joinUrl && (
+              <div className="su-kit st-noprint st-free">
+                <span>{t.freeNote}</span>
+                {billingOn && <button type="button" className="lp-btn lp-btn-dark lp-btn-sm" onClick={() => setStep("pay")}>{t.activate}</button>}
+              </div>
             )}
             <div className="su-done-actions st-noprint">
               {joinUrl && <button type="button" className="lp-btn lp-btn-primary" onClick={() => window.print()}><Icon name="printer" size={18} />{t.print}</button>}

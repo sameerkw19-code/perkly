@@ -43,7 +43,7 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
           id: row.id,
           name: row.name,
           joinCode: row.join_code,
-          paid: isEntitled(row.status),
+          paid: isEntitled(row.status) || (access.ok && !access.free),
           canWork: access.ok,
           status: row.status ?? "none",
         };
