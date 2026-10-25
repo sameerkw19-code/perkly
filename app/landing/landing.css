@@ -368,6 +368,24 @@
   .lp-scene { height: 440px; }
 }
 
+/* ---- Real customer card (components/loyalty-card) used for the examples ---- */
+.lp-pcard { width: 100%; min-width: 0; }
+.lp-pcard .pcard { max-width: 440px; margin-inline: 0; }
+.lp-pcard-sm { width: 340px; zoom: 0.735; }
+.lp-pcard-sm .pcard { max-width: none; }
+.lp-phone-screen .lp-pcard-sm .pcard { box-shadow: 0 10px 22px rgba(23, 19, 41, 0.18); }
+.lp-back .lp-pcard-sm .pcard { box-shadow: 0 24px 40px rgba(23, 19, 41, 0.22); }
+.lp-example-card .pcard { box-shadow: -18px 30px 50px rgba(23, 19, 41, 0.22), -4px 8px 16px rgba(23, 19, 41, 0.12); }
+.lp-pcard .pcard-stamp.is-pressed { animation: lp-pcard-pop .5s cubic-bezier(.2, .9, .3, 1.4); }
+@keyframes lp-pcard-pop { 0% { transform: scale(.4); } 60% { transform: scale(1.18); } 100% { transform: scale(1); } }
+@media (max-width: 760px) {
+  .lp-phone-screen .lp-pcard-sm { zoom: 0.6; }
+  .lp-back-1 .lp-pcard-sm { zoom: 0.59; }
+}
+@media (max-width: 380px) {
+  .lp-phone-screen .lp-pcard-sm { zoom: 0.54; }
+}
+
 /* ---- Reduced motion: no floating, tilt, or stamp animation ---- */
 @media (prefers-reduced-motion: reduce) {
   .lp *, .lp *::before, .lp *::after { animation: none !important; transition: none !important; }

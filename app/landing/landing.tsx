@@ -3,7 +3,8 @@ import "./landing.css";
 import { COPY, hrefs, waLink, WHATSAPP_DISPLAY, type Lang } from "./content";
 import { DemoPanel, ExamplesPicker, Logo, SiteNav, TiltStage } from "./landing-client";
 import { SocialRow, Testimonials } from "./landing-parts";
-import { CafeLogo, CardVisual, Icon, QrArt } from "./visuals";
+import { CafeLogo, Icon, QrArt } from "./visuals";
+import { ExampleCard } from "./example-card";
 
 const STEP_ICONS = ["palette", "qr", "stamp", "repeat"];
 
@@ -14,17 +15,16 @@ function Check() {
 function HeroScene({ lang }: { lang: Lang }) {
   const c = COPY[lang];
   const [cafe, barber, , icecream] = c.examples.list;
-  const d = c.demo;
   return (
     <div className="lp-hero-visual" role="img" aria-label={c.hero.sceneLabel}>
       <TiltStage className="lp-scene">
         <div className="lp-stage" aria-hidden="true">
           <div className="lp-glow" />
           <div className="lp-float lp-back lp-back-1">
-            <CardVisual k="barber" name={barber.name} rewardLine={c.examples.rewardLine(barber.target, barber.reward)} target={barber.target} filled={barber.filled} footStart={`${barber.filled} ${d.of} ${barber.target}`} footEnd={d.left(barber.target - barber.filled, barber.reward)} size="sm" />
+            <ExampleCard k="barber" lang={lang} name={barber.name} rewardLine={c.examples.rewardLine(barber.target, barber.reward)} target={barber.target} filled={barber.filled} size="sm" showName={false} />
           </div>
           <div className="lp-float lp-back lp-back-2">
-            <CardVisual k="icecream" name={icecream.name} rewardLine={c.examples.rewardLine(icecream.target, icecream.reward)} target={icecream.target} filled={icecream.filled} footStart={`${icecream.filled} ${d.of} ${icecream.target}`} footEnd={d.left(icecream.target - icecream.filled, icecream.reward)} size="sm" />
+            <ExampleCard k="icecream" lang={lang} name={icecream.name} rewardLine={c.examples.rewardLine(icecream.target, icecream.reward)} target={icecream.target} filled={icecream.filled} size="sm" showName={false} />
           </div>
           <div className="lp-phone">
             <div className="lp-phone-screen">
@@ -32,7 +32,7 @@ function HeroScene({ lang }: { lang: Lang }) {
                 <span>{c.hero.myCard}</span>
                 <span dir="ltr">perkly.shop</span>
               </div>
-              <CardVisual k="cafe" name={cafe.name} rewardLine={c.examples.rewardLine(cafe.target, cafe.reward)} target={cafe.target} filled={cafe.filled} footStart={`${cafe.filled} ${d.of} ${cafe.target}`} footEnd={d.left(cafe.target - cafe.filled, cafe.reward)} size="sm" />
+              <ExampleCard k="cafe" lang={lang} name={cafe.name} rewardLine={c.examples.rewardLine(cafe.target, cafe.reward)} target={cafe.target} filled={cafe.filled} size="sm" />
               <div className="lp-phone-qr">
                 <QrArt size={92} />
                 <span>{c.hero.qrCaption}</span>
