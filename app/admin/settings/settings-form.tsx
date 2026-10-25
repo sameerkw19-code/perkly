@@ -40,12 +40,12 @@ export function SettingsForm({ initial }: { initial: Settings }) {
         <h3>מנוי ותקופת ניסיון</h3>
         <label className="check">
           <input type="checkbox" checked={s.requireSubscription} onChange={(e) => set("requireSubscription", e.target.checked)} />
-          <span>עסק חדש צריך מנוי אחרי תקופת ניסיון<br /><small className="form-hint">חל רק על עסקים שייפתחו מעכשיו. עסקים קיימים לא מושפעים. כשכבוי: עסק חדש עובד ללא הגבלה.</small></span>
+          <span>עסק חדש צריך מנוי<br /><small className="form-hint">חל על עסקים שייפתחו מעכשיו. בלי מנוי עסק יכול לצרף עד 10 לקוחות. 3 ימי הניסיון עם אשראי מגיעים מ־Polar. כשכבוי: עסק חדש עובד ללא הגבלה.</small></span>
         </label>
         <label>ימי ניסיון
           <input type="number" min={0} max={365} value={s.trialDays} disabled={!s.requireSubscription}
             onChange={(e) => set("trialDays", Math.max(0, Math.min(365, Math.round(Number(e.target.value) || 0))))} />
-          <small className="form-hint">0 = צריך מנוי מהיום הראשון.</small>
+          <small className="form-hint">גישה מלאה בחינם בלי אשראי, לפני מגבלת 10 הלקוחות. מומלץ 0, כי הניסיון מגיע מ־Polar.</small>
         </label>
       </div>
 
