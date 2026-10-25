@@ -482,6 +482,13 @@
 }
 .st h1:focus { outline: none; }
 .st-later { background: none; border: 0; font: inherit; cursor: pointer; }
+.st-plan-more { margin: 0; font-weight: 700; color: var(--ink); }
+.st-free-compare { margin: 0; padding-top: 10px; border-top: 1px dashed var(--line, #E4E0EE); }
+.st-design { display: flex; flex-direction: column; gap: 18px; }
+.st-design-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.st-design-head .lp-body { margin: 6px 0 0; }
+.st-design-head .paid-note { margin: 12px 0 0; }
+.st-editor { font-family: var(--font-body, inherit); }
 .st-free { display: flex; flex-direction: column; gap: 10px; align-items: center; text-align: center; }
 .st-glossary { background: #F7F5FE; border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; font-size: 14.5px; }
 .st-glossary p { font-weight: 700; margin-bottom: 6px; }

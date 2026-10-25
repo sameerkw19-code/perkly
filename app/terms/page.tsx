@@ -4,10 +4,10 @@ import { OPERATOR, OPERATOR_LINE } from "../legal/operator";
 
 export const metadata: Metadata = { title: "Perkly | תנאי שימוש", alternates: { canonical: "/terms" } };
 
-// Reviewed by a lawyer on 25 October 2026.
+// Reviewed by a lawyer on 25 October 2026. Pending review: the trial, free-start and design-extras lines in section 5.
 export default function TermsPage() {
   return (
-    <LegalPage title="תנאי שימוש" updated="25 באוקטובר 2026">
+    <LegalPage title="תנאי שימוש" updated="26 באוקטובר 2026">
       <p>
         התנאים חלים על השימוש באתר perkly.shop ובשירות Perkly, המופעל על ידי {OPERATOR_LINE}. השימוש בשירות מהווה הסכמה
         לתנאים ול<a href="/privacy">מדיניות הפרטיות</a>.
@@ -42,7 +42,7 @@ export default function TermsPage() {
       <ul>
         <li>מנוי: 99 ₪ לחודש, בלי דמי הקמה.</li>
         <li>ערכת קופה (2 פוסטרים וסטנד QR): 99 ₪ חד־פעמי, לבחירה, גם בלי מנוי.</li>
-        <li>בלי מנוי אפשר להשתמש בשירות עבור עד 10 לקוחות. כדי לצרף לקוחות נוספים נדרש מנוי.</li>
+        <li>בלי מנוי אפשר להשתמש בשירות עבור עד 10 לקוחות, עם העיצובים, הצבעים והאייקונים המוכנים. כדי לצרף לקוחות נוספים, ולהעלות לוגו, תמונת רקע או חותמת מתמונה, נדרש מנוי.</li>
         <li>למנוי חדש יש 3 ימי ניסיון חינם. פרטי האשראי נמסרים בתחילת הניסיון, והחיוב הראשון מתבצע בתום 3 הימים. ביטול לפני תום הניסיון אינו כרוך בחיוב.</li>
         <li>התשלום על המנוי מתבצע אצל Polar, שהיא המוכרת הרשמית (Merchant of Record), ומתחדש כל חודש עד לביטול.</li>
         <li>אפשר לבטל בכל עת. הביטול נכנס לתוקף בסוף תקופת החיוב הנוכחית.</li>

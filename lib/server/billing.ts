@@ -50,3 +50,12 @@ export async function businessAccess(db: D1Database, businessId: string, now = n
 export function freeLimitReached(access: Access): boolean {
   return access.ok && !!access.free && access.free.used >= access.free.limit;
 }
+
+/**
+ * Design extras for paying businesses: own logo, background image and stamp image.
+ * Free-tier businesses (no subscription yet) use the ready designs, colors and stamp icons.
+ * Admin free access and businesses from before billing count as paid.
+ */
+export function hasPaidDesign(access: Access): boolean {
+  return access.ok && !access.free;
+}

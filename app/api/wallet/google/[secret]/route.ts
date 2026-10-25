@@ -4,6 +4,7 @@ import { sha256 } from "../../../../../lib/server/crypto";
 import { fail } from "../../../../../lib/server/http";
 import { getSettings } from "../../../../../lib/server/settings";
 import { saveUrl, walletConfig } from "../../../../../lib/server/google-wallet";
+import { passLook } from "../../../../../lib/server/designs";
 
 export const dynamic = "force-dynamic";
 
@@ -32,11 +33,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ secr
     await db.prepare("UPDATE customers SET google_wallet = ? WHERE id = ?").bind(new Date().toISOString(), row.customer_id).run();
   }
 
-  // One shared class for now (GOOGLE_WALLET_CLASS_ID). Per-business classes can come later.
+  // One shared class for now (GOOGLE_WALLET_CLASS_ID): Perkly's logo and color. Each pass adds the
+  // business's name, reward and banner image. Per-business classes can come later.
+  const origin = new URL(request.url).origin;
+  const business = await db.prepare("SELECT id, name, reward, color FROM businesses WHERE id = ?").bind(row.business_id)
+    .first<{ id: string; name: string; reward: string; color: string }>();
+  const look = business ? await passLook(db, business, origin).catch(() => undefined) : undefined;
   const url = await saveUrl(
     config,
-    { customerId: row.customer_id, businessId: row.business_id, stamps: row.stamps, target: row.target, scanCode: row.scan_code, rewards: row.rewards },
-    new URL(request.url).origin,
+    { customerId: row.customer_id, businessId: row.business_id, stamps: row.stamps, target: row.target, scanCode: row.scan_code, rewards: row.rewards, look },
+    origin,
   );
   return new Response(null, { status: 302, headers: { Location: url, "Cache-Control": "no-store" } });
 }

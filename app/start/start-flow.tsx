@@ -12,12 +12,13 @@ import { QrImage } from "../../components/qr";
 import { darken, defaultDesign, defaultLook, onColor, type Design, type PresetIcon } from "../../lib/design";
 import { errorText, translate } from "../../lib/i18n";
 import { post } from "../../lib/api";
+import { CardEditor } from "../../components/card-editor";
 
 export type StartBusiness = { id: string; name: string; joinCode: string | null; paid: boolean; canWork: boolean; status: string };
 
 type Kind = ExampleKey | "other";
-type Step = "account" | "business" | "pay" | "wait" | "done";
-const STEPS: Exclude<Step, "wait">[] = ["account", "business", "pay", "done"];
+type Step = "account" | "business" | "design" | "pay" | "wait" | "done";
+const STEPS: Exclude<Step, "wait">[] = ["account", "business", "design", "pay", "done"];
 
 const ICON: Record<Kind, PresetIcon> = { cafe: "coffee", barber: "scissors", pizza: "pizza", icecream: "icecream", studio: "sparkle", bakery: "croissant", other: "star" };
 const KIND_ICON: Record<Kind, string> = { cafe: "coffee", barber: "scissors", pizza: "pizza", icecream: "icecream", studio: "star", bakery: "cake", other: "store" };
@@ -25,18 +26,21 @@ const OTHER_THEME = { bg: "#2F2A4A", fg: "#FFFFFF", stamp: "#D9F493" };
 
 const T = {
   he: {
-    steps: ["חשבון", "העסק והכרטיס", "תשלום", "מתחילים"],
+    steps: ["חשבון", "העסק", "עיצוב", "תשלום", "מתחילים"],
     login: "כבר יש לי חשבון", home: "לדף הבית",
     accountTitle: "פותחים חשבון", accountIntro: "שלוש דקות, ואתם מוכנים לחותמת הראשונה.",
     name: "השם שלך", email: "אימייל", password: "סיסמה", passwordHint: "לפחות 8 תווים", code: "קוד הרשמה",
     agree: "בהמשך אני מאשר/ת את", terms: "תנאי השימוש", and: "ואת", privacy: "מדיניות הפרטיות",
     next: "המשך", working: "רגע…",
-    bizTitle: "העסק והכרטיס", bizIntro: "בוחרים סוג עסק ורואים את הכרטיס מתעדכן. את כל העיצוב אפשר לשנות אחר כך.",
+    bizTitle: "העסק", bizIntro: "בוחרים סוג עסק, ואנחנו מכינים כרטיס מתאים. בשלב הבא מעצבים אותו בדיוק כמו שאתם רוצים.",
     kind: "סוג העסק", bizName: "שם העסק", reward: "ההטבה", target: "חותמות להטבה", other: "אחר",
-    preview: "כך הלקוחות יראו את הכרטיס", createBiz: "שמירה והמשך לתשלום",
+    preview: "כך הלקוחות יראו את הכרטיס", createBiz: "שמירה והמשך לעיצוב",
+    designTitle: "מעצבים את הכרטיס", designIntro: "צבעים, רקע, חותמת, גופן וטקסטים. כל שינוי מופיע מיד בתצוגה.",
+    designPaid: "לוגו, תמונת רקע מעוצבת וחותמת מתמונה משלכם נפתחים עם המנוי, כבר בימי הניסיון.", designSave: "שמירה והמשך", designSkip: "להמשיך בלי שינויים",
     payTitle: "מפעילים את המנוי", payIntro: "הכרטיס שלכם מוכן. מזינים פרטי אשראי, מקבלים את ה־QR ומתחילים מיד.",
     plan: "מנוי Perkly", price: "99 ₪", per: "לחודש", noSetup: "3 ימי ניסיון חינם. החיוב הראשון רק אחרי 3 ימים, ואם מבטלים לפני כן לא משלמים כלום. בלי דמי הקמה.",
-    features: ["כרטיס בעיצוב העסק", "הצטרפות לקוחות ב־QR", "Google Wallet ללקוחות אנדרואיד", "עמדת עובד והזמנת עובדים", "לוח בקרה והתראות"],
+    features: ["לקוחות ללא הגבלה", "לוגו ותמונת רקע מעוצבת", "חותמת מתמונה משלכם", "באנר בעיצוב שלכם ב־Google Wallet", "עמדת עובד והזמנת עובדים", "לוח בקרה והתראות"],
+    planMore: "במנוי מקבלים הרבה יותר:", freeCompare: "בלי מנוי: עד 10 לקוחות ועיצוב מהתבניות, הצבעים והאייקונים המוכנים.",
     englishNote: { title: "דף התשלום של Polar באנגלית. מה כתוב שם:", rows: [["3 days free", "3 ימים חינם"], ["Due today ₪0", "היום משלמים 0 ₪"], ["Then ₪99/month", "אחר כך 99 ₪ לחודש"], ["Start trial", "התחלת הניסיון (הכפתור בסוף)"]] },
     pay: "התחלת 3 ימי ניסיון", paying: "פותחים את דף התשלום…", secure: "התשלום מתבצע אצל Polar, ספק תשלומים מאובטח. פרטי האשראי לא מגיעים אלינו.",
     later: "להתחיל בלי מנוי (עד 10 לקוחות)",
@@ -47,21 +51,24 @@ const T = {
     doneTitle: "הכל מוכן. אפשר להתחיל!", doneIntro: "תלו את ה־QR ליד הקופה. לקוח סורק, נרשם בשנייה ומקבל כרטיס אישי.",
     scan: "סרקו והצטרפו לכרטיס", print: "הדפסת ה־QR", dashboard: "ללוח הבקרה", station: "פתיחת עמדת עובד",
     staffOnly: "החשבון שלך הוא חשבון עובד. כדי לפתוח עסק משלך, אפשר להמשיך כאן.",
-    tip: "טיפ: אפשר להזמין עובדים ולשנות עיצוב בכל רגע מלוח הבקרה.",
+    tip: "טיפ: אפשר להזמין עובדים ולשנות עיצוב בכל רגע מלוח הבקרה.", designNow: "להוספת לוגו ותמונת רקע",
   },
   ar: {
-    steps: ["الحساب", "المشروع والبطاقة", "الدفع", "نبدأ"],
+    steps: ["الحساب", "المشروع", "التصميم", "الدفع", "نبدأ"],
     login: "لدي حساب", home: "الصفحة الرئيسية",
     accountTitle: "إنشاء حساب", accountIntro: "ثلاث دقائق وتكونون جاهزين للختم الأول.",
     name: "اسمك", email: "البريد الإلكتروني", password: "كلمة المرور", passwordHint: "8 أحرف على الأقل", code: "رمز التسجيل",
     agree: "بالمتابعة أوافق على", terms: "شروط الاستخدام", and: "و", privacy: "سياسة الخصوصية",
     next: "متابعة", working: "لحظة…",
-    bizTitle: "المشروع والبطاقة", bizIntro: "اختاروا نوع المشروع وشاهدوا البطاقة تتحدث. يمكن تغيير التصميم كله لاحقاً.",
+    bizTitle: "المشروع", bizIntro: "اختاروا نوع المشروع ونجهّز لكم بطاقة مناسبة. في الخطوة التالية تصممونها كما تريدون تماماً.",
     kind: "نوع المشروع", bizName: "اسم المشروع", reward: "المكافأة", target: "أختام للمكافأة", other: "آخر",
-    preview: "هكذا يرى الزبائن البطاقة", createBiz: "حفظ ومتابعة للدفع",
+    preview: "هكذا يرى الزبائن البطاقة", createBiz: "حفظ ومتابعة للتصميم",
+    designTitle: "تصميم البطاقة", designIntro: "الألوان، الخلفية، الختم، الخط والنصوص. كل تغيير يظهر فوراً في المعاينة.",
+    designPaid: "الشعار وصورة الخلفية المصممة والختم من صورتكم تُفتح مع الاشتراك، حتى خلال أيام التجربة.", designSave: "حفظ ومتابعة", designSkip: "المتابعة بدون تغيير",
     payTitle: "تفعيل الاشتراك", payIntro: "بطاقتكم جاهزة. أدخلوا تفاصيل البطاقة الائتمانية، احصلوا على رمز QR وابدؤوا فوراً.",
     plan: "اشتراك Perkly", price: "99 ₪", per: "شهرياً", noSetup: "3 أيام تجربة مجانية. أول دفعة بعد 3 أيام فقط، وإن ألغيتم قبل ذلك لا تدفعون شيئاً. بدون رسوم تأسيس.",
-    features: ["بطاقة بتصميم مشروعك", "انضمام الزبائن عبر QR", "Google Wallet لزبائن أندرويد", "محطة موظف ودعوة موظفين", "لوحة تحكم وتنبيهات"],
+    features: ["زبائن بلا حدود", "الشعار وصورة خلفية مصممة", "ختم من صورتكم الخاصة", "بانر بتصميمكم في Google Wallet", "محطة موظف ودعوة موظفين", "لوحة تحكم وتنبيهات"],
+    planMore: "مع الاشتراك تحصلون على الكثير:", freeCompare: "بدون اشتراك: حتى 10 زبائن وتصميم من القوالب والألوان والأيقونات الجاهزة.",
     englishNote: { title: "صفحة الدفع في Polar بالإنجليزية. ماذا يعني المكتوب:", rows: [["3 days free", "3 أيام مجاناً"], ["Due today ₪0", "تدفعون اليوم 0 ₪"], ["Then ₪99/month", "بعدها 99 ₪ شهرياً"], ["Start trial", "بدء التجربة (الزر في الأسفل)"]] },
     pay: "ابدأوا 3 أيام تجربة", paying: "نفتح صفحة الدفع…", secure: "الدفع يتم عبر Polar، مزود دفع آمن. تفاصيل البطاقة لا تصل إلينا.",
     later: "البدء بدون اشتراك (حتى 10 زبائن)",
@@ -72,21 +79,24 @@ const T = {
     doneTitle: "كل شيء جاهز. لنبدأ!", doneIntro: "علّقوا رمز QR بجانب الصندوق. الزبون يمسح، يسجل بثانية ويحصل على بطاقة شخصية.",
     scan: "امسحوا وانضموا للبطاقة", print: "طباعة رمز QR", dashboard: "إلى لوحة التحكم", station: "فتح محطة الموظف",
     staffOnly: "حسابك حساب موظف. لفتح مشروع خاص بك، تابع هنا.",
-    tip: "نصيحة: يمكن دعوة موظفين وتغيير التصميم في أي وقت من لوحة التحكم.",
+    tip: "نصيحة: يمكن دعوة موظفين وتغيير التصميم في أي وقت من لوحة التحكم.", designNow: "لإضافة الشعار وصورة الخلفية",
   },
   en: {
-    steps: ["Account", "Business & card", "Payment", "Start"],
+    steps: ["Account", "Business", "Design", "Payment", "Start"],
     login: "I have an account", home: "Home",
     accountTitle: "Create your account", accountIntro: "Three minutes and you're ready for the first stamp.",
     name: "Your name", email: "Email", password: "Password", passwordHint: "At least 8 characters", code: "Sign-up code",
     agree: "By continuing I accept the", terms: "terms of use", and: "and the", privacy: "privacy policy",
     next: "Continue", working: "One moment…",
-    bizTitle: "Your business and card", bizIntro: "Pick your type of business and watch the card update. You can change the whole design later.",
+    bizTitle: "Your business", bizIntro: "Pick your type of business and we'll prepare a matching card. Next, you design it exactly the way you want.",
     kind: "Type of business", bizName: "Business name", reward: "Reward", target: "Stamps for a reward", other: "Other",
-    preview: "What your customers will see", createBiz: "Save and continue to payment",
+    preview: "What your customers will see", createBiz: "Save and continue to design",
+    designTitle: "Design your card", designIntro: "Colors, background, stamp, font and texts. Every change shows right away in the preview.",
+    designPaid: "Your logo, a designed background image and a stamp from your own image unlock with a subscription, already during the trial.", designSave: "Save and continue", designSkip: "Continue without changes",
     payTitle: "Activate your subscription", payIntro: "Your card is ready. Add your payment card, get your QR code and start right away.",
     plan: "Perkly subscription", price: "₪99", per: "a month", noSetup: "3-day free trial. You're first charged after 3 days, and if you cancel before then you pay nothing. No setup fee.",
-    features: ["A card in your business's look", "Customers join with a QR code", "Google Wallet for Android customers", "Staff station and team invites", "Dashboard and alerts"],
+    features: ["Unlimited customers", "Your logo and a designed background image", "A stamp from your own image", "Your own banner in Google Wallet", "Staff station and team invites", "Dashboard and alerts"],
+    planMore: "A subscription gives you much more:", freeCompare: "Without a subscription: up to 10 customers, with the ready designs, colors and icons.",
     englishNote: null,
     pay: "Start the 3-day trial", paying: "Opening the payment page…", secure: "Payment is handled by Polar, a secure payment provider. Your card details never reach us.",
     later: "Start without a subscription (up to 10 customers)",
@@ -97,7 +107,7 @@ const T = {
     doneTitle: "All set. Let's start!", doneIntro: "Put the QR code by the register. A customer scans, signs up in seconds and gets a personal card.",
     scan: "Scan to join our card", print: "Print the QR code", dashboard: "Go to dashboard", station: "Open the staff station",
     staffOnly: "Your account is a staff account. To open a business of your own, continue here.",
-    tip: "Tip: invite staff and change the design anytime from the dashboard.",
+    tip: "Tip: invite staff and change the design anytime from the dashboard.", designNow: "Add your logo and background",
   },
 };
 
@@ -160,13 +170,34 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
   const shownReward = rewardEdited ? reward : suggestedReward;
   const design = useMemo(() => startDesign(kind, bizName || (ex?.name ?? t.bizName), shownReward), [kind, bizName, shownReward, ex, t.bizName]);
 
+  // Full card editor (step 3), loaded once the business exists.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [editorData, setEditorData] = useState<{ editor: any; target: number; paid: boolean } | null>(null);
+  const afterDesign: Step = business?.paid ? "done" : "pay";
+  useEffect(() => {
+    if (step !== "design" || !business) return;
+    let stop = false;
+    fetch(`/api/loyalty?business=${encodeURIComponent(business.id)}`, { credentials: "same-origin" })
+      .then((r) => r.json())
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .then((data: any) => {
+        if (stop) return;
+        if (!data?.editor) { setStep(afterDesign); return; }
+        setEditorData({ editor: data.editor, target: data.business?.target ?? 10, paid: !!data.access?.ok && !data.access.free });
+      })
+      .catch(() => { if (!stop) setError(tr("err_network")); });
+    return () => { stop = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, business?.id]);
+
   // Live card for the payment step, read from the server once the business exists.
   const [liveDesign, setLiveDesign] = useState<Design | null>(null);
   const [liveTarget, setLiveTarget] = useState(10);
   const [slow, setSlow] = useState(false);
 
   useEffect(() => {
-    headingRef.current?.focus();
+    window.scrollTo(0, 0);
+    headingRef.current?.focus({ preventScroll: true });
     setError("");
   }, [step]);
 
@@ -232,7 +263,7 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
     if (saved.ok) await post("/api/loyalty", { business: id, action: "publish_design" });
     setBusiness({ id, name, joinCode: null, paid: false, canWork: false, status: "none" });
     setBusy(false);
-    setStep("pay");
+    setStep("design");
   }
 
   async function pay() {
@@ -321,6 +352,29 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
           </div>
         )}
 
+        {step === "design" && business && (
+          <section className="st-design" aria-labelledby="st-design">
+            <div className="su-card st-design-head">
+              <div>
+                <h1 id="st-design" ref={headingRef} tabIndex={-1} className="lp-h2">{t.designTitle}</h1>
+                <p className="lp-body">{t.designIntro}</p>
+                {editorData && !editorData.paid && <p className="paid-note">{t.designPaid}</p>}
+                {error && <p className="su-summary" role="alert">{error}</p>}
+              </div>
+              <button type="button" className="st-later" onClick={() => setStep(afterDesign)}>{t.designSkip}</button>
+            </div>
+            {editorData ? (
+              <div className="st-editor">
+                <CardEditor businessId={business.id} target={editorData.target} editor={editorData.editor} t={tr} lang={lang}
+                  notify={(msg, bad) => { if (bad) setError(msg); }} reload={() => setStep(afterDesign)}
+                  paid={editorData.paid} setup={{ publishLabel: t.designSave }} />
+              </div>
+            ) : (
+              !error && <span className="st-spinner" aria-hidden="true" />
+            )}
+          </section>
+        )}
+
         {(step === "pay" || step === "wait") && (
           <div className="st-grid">
             <section className="su-card" aria-labelledby="st-pay">
@@ -335,8 +389,10 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
                   <p className="lp-body">{t.payIntro}</p>
                   <div className="st-plan">
                     <div className="st-plan-head"><strong>{t.plan}</strong><span><b className="lp-num">{t.price}</b> {t.per}</span></div>
+                    <p className="st-plan-more">{t.planMore}</p>
                     <ul>{t.features.map((f) => <li key={f}><Icon name="check" size={17} stroke={2.6} />{f}</li>)}</ul>
                     <p className="su-opt">{t.noSetup}</p>
+                    <p className="su-opt st-free-compare">{t.freeCompare}</p>
                   </div>
                   {t.englishNote && (
                     <div className="st-glossary">
@@ -388,7 +444,7 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
               {joinUrl && <button type="button" className="lp-btn lp-btn-primary" onClick={() => window.print()}><Icon name="printer" size={18} />{t.print}</button>}
               <a className="lp-btn lp-btn-ghost" href="/">{t.dashboard}</a>
             </div>
-            <p className="su-opt st-noprint">{t.tip}</p>
+            <p className="su-opt st-noprint">{t.tip} {business.paid && <a href="/#design">{t.designNow}</a>}</p>
           </section>
         )}
       </main>

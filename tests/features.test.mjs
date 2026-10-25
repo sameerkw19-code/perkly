@@ -3,7 +3,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { validMonthDay, parseBirthday, birthdayFromParts, formatBirthday, upcomingKeys } from "../lib/birthday.ts";
 import { sanitizeDesign, defaultDesign, designChecks, FONTS } from "../lib/design.ts";
-import { businessAccess, freeLimitReached } from "../lib/server/billing.ts";
+import { businessAccess, freeLimitReached, hasPaidDesign } from "../lib/server/billing.ts";
+import { lookFields } from "../lib/wallet-look.ts";
 
 // ---- Birthdays ----
 
@@ -150,4 +151,24 @@ test("access: without a subscription, free up to 10 customers", async () => {
   for (const status of ["active", "trialing", null]) {
     assert.deepEqual(await businessAccess(fakeDb({ ...none, status }, 500), "b", NOW), { ok: true });
   }
+});
+
+test("design extras: logo and images only with a subscription, trial or free access", async () => {
+  const none = { suspended: null, comp_until: null, status: "none" };
+  assert.equal(hasPaidDesign(await businessAccess(fakeDb(none, 3), "b", NOW)), false);
+  assert.equal(hasPaidDesign(await businessAccess(fakeDb(none, 11), "b", NOW)), false);
+  for (const status of ["active", "trialing", null]) {
+    assert.equal(hasPaidDesign(await businessAccess(fakeDb({ ...none, status }), "b", NOW)), true, String(status));
+  }
+  assert.equal(hasPaidDesign(await businessAccess(fakeDb({ ...none, comp_until: "2027-01-01T00:00:00.000Z" }), "b", NOW)), true);
+  assert.equal(hasPaidDesign(await businessAccess(fakeDb({ ...none, status: "active", suspended: NOW }), "b", NOW)), false);
+});
+
+test("google wallet: each pass carries the business name, banner and Powered by Perkly", () => {
+  const look = { title: "קפה רון", reward: "קפה חינם", heroUrl: "https://perkly.shop/api/asset/x" };
+  const o = lookFields(look);
+  assert.equal(o.heroImage.sourceUri.uri, look.heroUrl);
+  assert.deepEqual(o.textModulesData, [{ id: "business", header: "קפה רון", body: "קפה חינם" }]);
+  assert.equal(o.linksModuleData.uris[0].description, "Powered by Perkly");
+  assert.equal(lookFields({ ...look, heroUrl: null }).heroImage, undefined);
 });

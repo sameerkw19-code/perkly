@@ -59,6 +59,8 @@ export default function Dashboard() {
   const [days, setDays] = useState<string>("30");
   const [branchView, setBranchView] = useState<string>("");
   const [view, setView] = useState("overview");
+  // "/#design" opens the card editor (link from the sign-up flow).
+  useEffect(() => { if (window.location.hash === "#design") setView("design"); }, []);
   const [modal, setModal] = useState<Modal | null>(null);
   const [toast, setToast] = useState<{ text: string; bad?: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -383,7 +385,8 @@ export default function Dashboard() {
           {view === "design" && isOwner && data.editor && (
             <>
               <div className="page-head"><div><h1>{t("design")}</h1><p className="muted">{t("designNoBalance")}</p></div></div>
-              <CardEditor key={b.id + ":" + data.editor.publishedVersion} businessId={b.id} target={b.target} editor={data.editor} t={t} lang={lang} notify={notify} reload={load} />
+              <CardEditor key={b.id + ":" + data.editor.publishedVersion} businessId={b.id} target={b.target} editor={data.editor} t={t} lang={lang} notify={notify} reload={load}
+                paid={!!data.access?.ok && !data.access.free} upgradeHref={`/start?b=${encodeURIComponent(b.id)}`} />
             </>
           )}
 

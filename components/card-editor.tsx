@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import { ImagePlus, Shuffle, Trash2, UploadCloud } from "lucide-react";
+import { ImagePlus, Lock, Shuffle, Trash2, UploadCloud } from "lucide-react";
 import {
   FONTS, GRADIENTS, GRADIENT_DIRS, IMAGE_MIN, LIMITS, PALETTES, STAMP_ICONS, darken, designChecks,
   type AssetMeta, type CardLook, type Design, type FontId, type Layout, type Size, type StampIcon, type Texts,
@@ -23,8 +23,11 @@ const ALL_FONTS_HREF =
   "&display=swap";
 const pick = <T,>(list: readonly T[]): T => list[Math.floor(Math.random() * list.length)];
 
-/** Shrinks an image in the browser before upload (keeps transparency). */
-async function shrink(file: File, maxSide: number): Promise<Blob> {
+/**
+ * Shrinks an image in the browser before upload (WebP keeps transparency).
+ * Background images go up as JPEG, because Google Wallet shows them as the card banner and does not take WebP.
+ */
+async function shrink(file: File, maxSide: number, type: "image/webp" | "image/jpeg" = "image/webp"): Promise<Blob> {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -37,8 +40,10 @@ async function shrink(file: File, maxSide: number): Promise<Blob> {
     const canvas = document.createElement("canvas");
     canvas.width = Math.round(img.naturalWidth * scale);
     canvas.height = Math.round(img.naturalHeight * scale);
-    canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/webp", 0.86));
+    const ctx = canvas.getContext("2d")!;
+    if (type === "image/jpeg") { ctx.fillStyle = "#FFFFFF"; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, type, 0.86));
     // Some browsers can't write WebP and silently return PNG; both are accepted.
     return blob ?? (await new Promise<Blob>((r, j) => canvas.toBlob((b) => (b ? r(b) : j()), "image/png")));
   } finally {
@@ -46,9 +51,18 @@ async function shrink(file: File, maxSide: number): Promise<Blob> {
   }
 }
 
-export function CardEditor({ businessId, target, editor, t, lang, notify, reload }: {
+/** A small "with subscription" tag on design options that free-tier businesses can't use. */
+function PaidTag({ t }: { t: T }) {
+  return <span className="paid-tag"><Lock size={11} aria-hidden="true" />{t("paidTag")}</span>;
+}
+
+export function CardEditor({ businessId, target, editor, t, lang, notify, reload, paid = true, upgradeHref, setup }: {
   businessId: string; target: number; editor: Editor; t: T; lang: Lang;
   notify: (s: string, bad?: boolean) => void; reload: () => void;
+  /** Logo, background image and stamp image need a subscription (see hasPaidDesign). */
+  paid?: boolean; upgradeHref?: string;
+  /** In the sign-up flow: publish without asking, with the flow's own button text. */
+  setup?: { publishLabel: string };
 }) {
   const [design, setDesign] = useState<Design>(editor.draft);
   const [saved, setSaved] = useState(JSON.stringify(editor.draft));
@@ -82,7 +96,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
     if (!/^image\/(png|jpeg|webp)$/.test(file.type)) { notify(errorText(lang, "image_type"), true); return; }
     setBusy(kind);
     try {
-      const blob = await shrink(file, MAX_SIDE[kind]);
+      const blob = await shrink(file, MAX_SIDE[kind], kind === "hero" ? "image/jpeg" : "image/webp");
       const r = await fetch(`/api/asset?business=${encodeURIComponent(businessId)}&kind=${kind}`, {
         method: "POST", headers: { "Content-Type": blob.type }, body: blob, credentials: "same-origin",
       });
@@ -109,13 +123,13 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
   }
 
   async function publish() {
-    if (!confirm(t("publishConfirm"))) return;
+    if (!setup && !confirm(t("publishConfirm"))) return;
     if (dirty && !(await saveDraft())) return;
     setBusy("publish");
     const r = await post("/api/loyalty", { action: "publish_design", business: businessId });
     setBusy("");
     if (!r.ok) { notify(errorText(lang, r.code), true); return; }
-    notify(t("publishedOk"));
+    if (!setup) notify(t("publishedOk"));
     reload();
   }
 
@@ -152,7 +166,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
           {dirty ? <p className="dirty-note">{t("unsaved")}</p> : editor.hasUnpublished && <p className="dirty-note">{t("unpublishedDraft")}</p>}
           <div className="form-actions">
             <button className="btn soft" disabled={!!busy || !dirty} onClick={async () => { if (await saveDraft()) notify(t("draftSaved")); }}>{busy === "save" ? t("sending") : t("saveDraft")}</button>
-            <button className="btn primary" disabled={!!busy || blocked} onClick={publish}>{busy === "publish" ? t("sending") : t("publish")}</button>
+            <button className="btn primary" disabled={!!busy || blocked} onClick={publish}>{busy === "publish" ? t("sending") : setup ? setup.publishLabel : t("publish")}</button>
           </div>
           {blocked && <p className="form-error">{t("err_design_checks")}</p>}
           <p className="form-hint">{t("designNoBalance")} {t("walletPublishNote")}</p>
@@ -174,20 +188,29 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
             <button type="button" className="icon-choice" aria-pressed={design.stamp.icon === "logo"} disabled={!design.logo} title={t("ic_logo")} onClick={() => set({ stamp: { icon: "logo", image: null } })}>
               {design.logo ? <img src={`/api/asset/${design.logo}`} alt="" /> : <ImagePlus size={22} />}<span>{t("ic_logo")}</span>
             </button>
-            <label className="icon-choice" aria-pressed={design.stamp.icon === "image"}>
-              <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => { upload("stamp", e.target.files?.[0]); e.target.value = ""; }} />
-              {design.stamp.icon === "image" && design.stamp.image ? <img src={`/api/asset/${design.stamp.image}`} alt="" /> : <UploadCloud size={22} />}
-              <span>{busy === "stamp" ? t("uploading") : t("ic_image")}</span>
-            </label>
+            {paid ? (
+              <label className="icon-choice" aria-pressed={design.stamp.icon === "image"}>
+                <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => { upload("stamp", e.target.files?.[0]); e.target.value = ""; }} />
+                {design.stamp.icon === "image" && design.stamp.image ? <img src={`/api/asset/${design.stamp.image}`} alt="" /> : <UploadCloud size={22} />}
+                <span>{busy === "stamp" ? t("uploading") : t("ic_image")}</span>
+              </label>
+            ) : (
+              <button type="button" className="icon-choice locked" aria-pressed={design.stamp.icon === "image"} disabled={design.stamp.icon !== "image"}
+                onClick={() => design.stamp.image && set({ stamp: { icon: "image", image: design.stamp.image } })}>
+                {design.stamp.icon === "image" && design.stamp.image ? <img src={`/api/asset/${design.stamp.image}`} alt="" /> : <UploadCloud size={22} />}
+                <span>{t("ic_image")}</span><PaidTag t={t} />
+              </button>
+            )}
           </div>
-          <p className="form-hint">{t("productHint")}</p>
+          <p className="form-hint">{paid ? t("productHint") : t("paidStampHint")}</p>
         </section>
 
         <section className="panel">
           <h2>{t("edLayout")}</h2>
           <div className="seg">
             {(["gradient", "solid", "photo"] as Layout[]).map((l) => (
-              <button key={l} type="button" aria-pressed={design.layout === l} onClick={() => set({ layout: l })}>{t("layout_" + l)}</button>
+              <button key={l} type="button" aria-pressed={design.layout === l} disabled={l === "photo" && !paid && !design.hero}
+                onClick={() => set({ layout: l })}>{t("layout_" + l)}{l === "photo" && !paid && <PaidTag t={t} />}</button>
             ))}
           </div>
           <h3 className="sub-head">{t("edPalettes")}</h3>
@@ -275,7 +298,15 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
         </section>
 
         <section className="panel">
-          <h2>{t("edImages")}</h2>
+          <div className="section-head" style={{ marginBottom: 8 }}>
+            <h2>{t("edImages")}</h2>
+            {!paid && <PaidTag t={t} />}
+          </div>
+          {!paid && (
+            <p className="paid-note">
+              {t("paidImagesNote")} {upgradeHref && <a href={upgradeHref}>{t("activateSub")}</a>}
+            </p>
+          )}
           <div className="uploads">
             {([["logo", "edLogo", "edLogoHint"], ["hero", "edHero", "edHeroHint"]] as const).map(([kind, label, hint]) => {
               const id = kind === "logo" ? design.logo : design.hero;
@@ -288,10 +319,14 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
                     <small className="form-hint">{t(hint)}</small>
                     {meta && <small className="form-hint" dir="ltr">{meta.width}×{meta.height}{Math.min(meta.width, meta.height) < IMAGE_MIN[kind] ? " ⚠" : ""}</small>}
                     <div className="row-actions">
-                      <label className="btn soft small">
-                        <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => { upload(kind, e.target.files?.[0]); e.target.value = ""; }} />
-                        <UploadCloud size={14} />{busy === kind ? t("uploading") : t("upload")}
-                      </label>
+                      {paid ? (
+                        <label className="btn soft small">
+                          <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => { upload(kind, e.target.files?.[0]); e.target.value = ""; }} />
+                          <UploadCloud size={14} />{busy === kind ? t("uploading") : t("upload")}
+                        </label>
+                      ) : (
+                        <button type="button" className="btn soft small" disabled><Lock size={14} />{t("upload")}</button>
+                      )}
                       {id && (
                         <button type="button" className="btn soft small" onClick={() => kind === "logo"
                           ? set({ logo: null, stamp: design.stamp.icon === "logo" ? { icon: "star", image: null } : design.stamp })

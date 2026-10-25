@@ -138,6 +138,11 @@ td.start{text-align:start}
 .seg{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
 .seg button{border:1px solid var(--line);background:#faf9fc;border-radius:999px;padding:8px 14px;font-size:12.5px}
 .seg button[aria-pressed=true]{border-color:var(--purple);background:#f3effe;color:#5a3fc4;font-weight:bold}
+.paid-tag{display:inline-flex;align-items:center;gap:3px;margin-inline-start:6px;padding:2px 7px;border-radius:999px;background:#f3effe;color:#5a3fc4;font-size:10.5px;font-weight:bold;line-height:1.4;vertical-align:middle;white-space:nowrap}
+.icon-choice.locked .paid-tag{margin:0}
+.icon-choice:disabled,.seg button:disabled{opacity:.6;cursor:not-allowed}
+.paid-note{margin:0 0 12px;padding:10px 12px;border-radius:10px;background:#f7f4ff;color:#3d3657;font-size:13px;line-height:1.5}
+.paid-note a{color:#5a3fc4;font-weight:bold}
 .palettes{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:8px;margin-bottom:14px}
 .palette{height:40px;border-radius:10px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;gap:5px}
 .palette i{width:12px;height:12px;border-radius:50%;box-shadow:0 0 0 1px #0002}
@@ -241,6 +246,9 @@ select.needs-choice{border-color:#f0a050;box-shadow:0 0 0 3px #f0a05022}
 
 .pcard-fields{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;padding-top:2px}
 .pcard-hint{margin:-8px 0 0;font-size:calc(12px * var(--c-ts));opacity:.72}
+.pcard-powered{align-self:center;margin:-6px 0 -4px;font-size:10.5px;letter-spacing:.02em;color:inherit!important;opacity:.62;text-decoration:none!important;font-family:Heebo,system-ui,sans-serif}
+.pcard-powered b{font-weight:700}
+.pcard-powered:hover{opacity:.9}
 .pcard-qr{align-self:center;background:#fff;border-radius:16px;padding:12px;display:grid;place-items:center;box-shadow:0 6px 18px -8px #0006;margin-top:4px}
 .pcard-qr img{display:block;width:clamp(132px,40vw,168px);height:auto;border-radius:0!important}
 
