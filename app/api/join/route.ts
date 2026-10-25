@@ -4,6 +4,9 @@ import { clientIp, fail, json, readJson, sameOrigin, str } from "../../../lib/se
 import { allow } from "../../../lib/server/rate-limit";
 import { normalizePhone } from "../../../lib/phone";
 import { releaseArchivedPhone } from "../../../lib/server/customers";
+import { businessAccess } from "../../../lib/server/billing";
+import { parseBirthday } from "../../../lib/birthday";
+import { getSettings } from "../../../lib/server/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -18,25 +21,32 @@ export async function POST(request: Request) {
   if (!(await allow(db, `join-ip:${ip}`, 10, 600))) return fail("rate_limited", 429, "Too many attempts");
 
   const code = typeof body.code === "string" ? body.code.slice(0, 40) : "";
-  const business = await db.prepare("SELECT id, target FROM businesses WHERE join_code = ?").bind(code).first<{ id: string; target: number }>();
+  const business = await db.prepare("SELECT id, target, birthdays FROM businesses WHERE join_code = ? AND archived IS NULL").bind(code).first<{ id: string; target: number; birthdays: number }>();
   if (!code || !business) return fail("join_invalid", 404, "This join link is not active");
+  if ((await getSettings(db)).maintenance) return fail("maintenance", 503, "Maintenance");
   if (!(await allow(db, `join-business:${business.id}`, 300, 3600))) return fail("rate_limited", 429);
+  const access = await businessAccess(db, business.id);
+  if (!access.ok) return fail(access.code, 402, "This business is not accepting new customers right now");
 
   const name = str(body.name, 80);
   const phone = normalizePhone(body.phone);
   if (!name || !phone) return fail("bad_details", 400, "Invalid name or phone");
   if (body.terms !== true) return fail("terms_required", 400, "Terms must be accepted");
   const marketing = body.marketing === true ? 1 : 0;
+  // Optional day and month only ("MM-DD"). The year is never collected.
+  // Ignored when the business has birthdays turned off.
+  const birthday = business.birthdays ? parseBirthday(body.birthday) : null;
+  if (birthday === "invalid") return fail("bad_details", 400, "Invalid birthday");
 
   const now = new Date().toISOString();
   const secret = randomToken(24);
   const scan = randomToken(16);
   const insert = db
     .prepare(
-      `INSERT OR IGNORE INTO customers(id, business, name, phone, token, stamps, target, created, card_hash, scan_code, consent_terms, consent_marketing, source)
-       VALUES(?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, 'self')`,
+      `INSERT OR IGNORE INTO customers(id, business, name, phone, token, stamps, target, created, card_hash, scan_code, consent_terms, consent_marketing, source, birthday)
+       VALUES(?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, 'self', ?)`,
     )
-    .bind(crypto.randomUUID(), business.id, name, phone, scan, business.target, now, await sha256(secret), scan, now, marketing);
+    .bind(crypto.randomUUID(), business.id, name, phone, scan, business.target, now, await sha256(secret), scan, now, marketing, birthday);
   // A removed customer's phone may join again: free it first, in the same batch as the insert.
   const [, r] = await db.batch([releaseArchivedPhone(db, business.id, phone), insert]);
   // Never hand out an existing card to someone who only knows the phone number.

@@ -21,6 +21,15 @@ export const businesses = sqliteTable(
     rewardMode: text("reward_mode").notNull().default("block"),
     // Days a saved reward stays valid (0 = no expiry). Applies to rewards earned after the change.
     rewardExpiryDays: integer("reward_expiry_days").notNull().default(0),
+    // 1 = ask customers for a birthday (day and month) and show upcoming birthdays. Owner setting.
+    birthdays: integer("birthdays").notNull().default(1),
+    // Set by a platform admin. A suspended business cannot stamp or accept new customers.
+    suspended: text("suspended"),
+    suspendReason: text("suspend_reason"),
+    // Free access granted by a platform admin, until this ISO time. Overrides the subscription.
+    compUntil: text("comp_until"),
+    // Archived by a platform admin: hidden from owners and staff, data kept, can be restored.
+    archived: text("archived"),
     // Social links shown on customer cards (JSON). See lib/social.tsx.
     social: text("social"),
   },
@@ -47,6 +56,10 @@ export const customers = sqliteTable(
     scanCode: text("scan_code"),
     consentTerms: text("consent_terms"),
     consentMarketing: integer("consent_marketing").notNull().default(0),
+    // Day and month only, "MM-DD". No year is stored. Optional.
+    birthday: text("birthday"),
+    // When the customer last opened "Add to Google Wallet". Only these passes get live updates.
+    googleWallet: text("google_wallet"),
     source: text("source").notNull().default("staff"),
     // The staff member (user id) who registered this customer. Used for field-manager attribution.
     referredBy: text("referred_by"),
@@ -85,6 +98,8 @@ export const users = sqliteTable("users", {
   name: text("name").notNull(),
   passHash: text("pass_hash").notNull(),
   created: text("created").notNull(),
+  // Set by a platform admin. A blocked user cannot sign in and all sessions are ended.
+  blocked: text("blocked"),
 });
 
 export const sessions = sqliteTable(
@@ -198,6 +213,52 @@ export const rewards = sqliteTable(
   (t) => [index("rewards_customer").on(t.customer, t.redeemed), index("rewards_business").on(t.business, t.redeemed)],
 );
 
+// Subscription state per business, written only by the server from the payment provider's callbacks.
+export const subscriptions = sqliteTable(
+  "subscriptions",
+  {
+    business: text("business").primaryKey().references(() => businesses.id),
+    status: text("status").notNull().default("none"),
+    plan: text("plan"),
+    externalCustomer: text("external_customer"),
+    externalSubscription: text("external_subscription"),
+    currentPeriodEnd: text("current_period_end"),
+    updated: text("updated").notNull(),
+  },
+  (t) => [uniqueIndex("subscriptions_external_subscription").on(t.externalSubscription)],
+);
+
+/** Every platform-admin action, for accountability. */
+export const adminLog = sqliteTable(
+  "admin_log",
+  {
+    id: text("id").primaryKey(),
+    admin: text("admin").notNull(),
+    business: text("business"),
+    action: text("action").notNull(),
+    detail: text("detail"),
+    created: text("created").notNull(),
+  },
+  (t) => [index("admin_log_business").on(t.business, t.created)],
+);
+
+/** Platform-wide settings (see lib/server/settings.ts). Values are JSON. */
+export const settings = sqliteTable("settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updated: text("updated").notNull(),
+  updatedBy: text("updated_by"),
+});
+
+/** One-time password reset links, created by a platform admin. Only the SHA-256 of the token is stored. */
+export const passwordResets = sqliteTable("password_resets", {
+  id: text("id").primaryKey(),
+  user: text("user").notNull().references(() => users.id),
+  created: text("created").notNull(),
+  createdBy: text("created_by").notNull(),
+  expires: text("expires").notNull(),
+  used: text("used"),
+});
 // Pilot requests from the public site (/signup). Read only by platform admins (/admin).
 export const leads = sqliteTable(
   "leads",

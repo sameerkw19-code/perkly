@@ -1,5 +1,6 @@
+import { env } from "cloudflare:workers";
 import { getD1 } from "../../../db";
-import { getMembership, getMemberships, getUser } from "../../../lib/server/auth";
+import { getMembership, getMemberships, getUser, isPlatformAdmin } from "../../../lib/server/auth";
 import { randomCode, randomToken, sha256 } from "../../../lib/server/crypto";
 import { fail, json, readJson, sameOrigin, str } from "../../../lib/server/http";
 import { allow } from "../../../lib/server/rate-limit";
@@ -7,12 +8,17 @@ import { formatPhone, maskPhone, normalizePhone } from "../../../lib/phone";
 import { assetIds, defaultDesign, designChecks, sanitizeDesign } from "../../../lib/design";
 import { assetMeta, liveDesign, ownsAssets, publishedDesign } from "../../../lib/server/designs";
 import { releaseArchivedPhone } from "../../../lib/server/customers";
+import { businessAccess } from "../../../lib/server/billing";
+import { formatBirthday, parseBirthday, upcomingKeys } from "../../../lib/birthday";
+import { syncGoogleWallet } from "../../../lib/server/wallet-sync";
+import { walletConfig } from "../../../lib/server/google-wallet";
+import { getSettings } from "../../../lib/server/settings";
 import { normalizeSocial, parseSocial, type Social } from "../../../lib/social";
 
 export const dynamic = "force-dynamic";
 
-type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust: number; reward_mode: "bank" | "block"; reward_expiry_days: number; social: Social };
-type Customer = { id: string; business: string; name: string; phone: string; stamps: number; target: number; scan_code: string };
+type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust: number; reward_mode: "bank" | "block"; reward_expiry_days: number; birthdays: number; social: Social };
+type Customer = { id: string; business: string; name: string; phone: string; stamps: number; target: number; scan_code: string; google_wallet?: string | null };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const COLOR = /^#[0-9a-fA-F]{6}$/;
@@ -23,7 +29,7 @@ function validTarget(v: unknown): v is number {
 
 async function loadBusiness(db: D1Database, id: string) {
   const row = await db
-    .prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, social FROM businesses WHERE id = ?")
+    .prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays, social FROM businesses WHERE id = ?")
     .bind(id)
     .first<Omit<Business, "social"> & { social: string | null }>();
   return row ? { ...row, social: parseSocial(row.social) } : null;
@@ -64,13 +70,34 @@ export async function GET(request: Request) {
   const memberships = await getMemberships(db, user.id);
   const wanted = url.searchParams.get("business");
   const membership = memberships.find((m) => m.business === wanted) ?? memberships[0];
+  // The admin control center is not linked from the site, so nothing here says who is an admin.
   const me = { name: user.name, email: user.email };
-  if (!membership) return json({ me, memberships, business: null, role: null });
+  const settingsNow = await getSettings(db);
+  const system = {
+    maintenance: settingsNow.maintenance, maintenanceMessage: settingsNow.maintenanceMessage,
+    announcement: settingsNow.announcement, signupsOpen: settingsNow.signupsOpen,
+  };
+  if (!membership) return json({ me, memberships, business: null, role: null, system });
 
   const business = await loadBusiness(db, membership.business);
   const role = membership.role;
   const branches = await activeBranches(db, business!.id);
-  const base = { me, memberships, role, business, branches, myBranch: membership.branch, design: await liveDesign(db, business!) };
+  // Whether stamping and new customers are allowed now (subscription, admin suspension or free access).
+  const access = await businessAccess(db, business!.id);
+  // Birthdays today and in the next 6 days (Israel time). Names only, for owner and staff.
+  // Only when the business has birthdays turned on.
+  const upcoming = upcomingKeys(new Date());
+  const keys = [...upcoming.keys()];
+  const bdays = business!.birthdays
+    ? await db
+        .prepare(`SELECT id, name, birthday FROM customers WHERE business = ? AND archived IS NULL AND birthday IN (${keys.map(() => "?").join(",")})`)
+        .bind(business!.id, ...keys)
+        .all<{ id: string; name: string; birthday: string }>()
+    : { results: [] as { id: string; name: string; birthday: string }[] };
+  const birthdays = bdays.results
+    .map((c) => ({ id: c.id, name: c.name, date: formatBirthday(c.birthday), inDays: upcoming.get(c.birthday) ?? 0 }))
+    .sort((a, b) => a.inDays - b.inDays);
+  const base = { me, memberships, role, business, branches, myBranch: membership.branch, design: await liveDesign(db, business!), access, birthdays, system, googleWallet: walletConfig(env) !== null };
 
   if (role === "staff") {
     const mine = await db
@@ -96,7 +123,7 @@ export async function GET(request: Request) {
   const dayAgo = new Date(Date.now() - 86_400_000).toISOString();
   const [customers, events, stats, team, invites, busyCustomers, busyStaff, perBranch, staffFixes] = await db.batch([
     db.prepare(
-      `SELECT c.id, c.name, c.phone, c.stamps, c.target, c.created, c.source, c.consent_marketing, c.card_hash IS NOT NULL AS has_link,
+      `SELECT c.id, c.name, c.phone, c.stamps, c.target, c.created, c.source, c.consent_marketing, c.birthday, c.card_hash IS NOT NULL AS has_link,
          (SELECT COUNT(*) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2))
            + (CASE WHEN ?3 = 'block' AND c.stamps >= c.target THEN 1 ELSE 0 END) AS rewards
        FROM customers c WHERE c.business = ?1 AND c.archived IS NULL ORDER BY c.created DESC LIMIT 5000`,
@@ -187,9 +214,13 @@ export async function POST(request: Request) {
   if (!p) return fail("bad_request", 400, "Invalid request");
   const origin = new URL(request.url).origin;
   const now = new Date().toISOString();
+  const sys = await getSettings(db);
+  // Maintenance: nothing changes, except for platform admins (so they can test).
+  if (sys.maintenance && !isPlatformAdmin(user, env)) return fail("maintenance", 503, "Maintenance");
 
   // Creating a business is the only action that does not need an existing membership.
   if (p.action === "create_business") {
+    if (!sys.signupsOpen && !isPlatformAdmin(user, env)) return fail("signups_closed", 403, "New businesses are closed");
     if (!(await allow(db, `create-business:${user.id}`, 10, 86_400))) return fail("rate_limited", 429);
     const name = str(p.name, 80);
     const reward = str(p.reward, 160);
@@ -204,6 +235,14 @@ export async function POST(request: Request) {
         .bind(id, user.id, name, reward, p.target, p.color, now, randomCode(10), mode),
       db.prepare("INSERT INTO memberships(id, business, user, role, created) VALUES(?, ?, ?, 'owner', ?)")
         .bind(crypto.randomUUID(), id, user.id, now),
+      // With "require subscription": a free trial, then a subscription is needed (status 'none' is not entitled).
+      ...(sys.requireSubscription
+        ? [
+            db.prepare("INSERT OR IGNORE INTO subscriptions(business, status, updated) VALUES(?, 'none', ?)").bind(id, now),
+            db.prepare("UPDATE businesses SET comp_until = ? WHERE id = ?")
+              .bind(sys.trialDays > 0 ? new Date(Date.now() + sys.trialDays * 86_400_000).toISOString() : null, id),
+          ]
+        : []),
     ]);
     return json({ id });
   }
@@ -214,6 +253,21 @@ export async function POST(request: Request) {
   const role = membership.role;
   const business = (await loadBusiness(db, p.business as string))!;
   const ownerOnly = () => (role === "owner" ? null : fail("forbidden", 403, "Owner permission required"));
+  // Access rules. Redeeming a reward a customer already earned is always allowed.
+  // - Inactive subscription: no new stamps, adjustments or customers. Everything else still works.
+  // - Suspended by a platform admin: nothing changes except redeeming, looking up and removing customers.
+  const action = String(p.action);
+  const SUB_GATED = ["stamp", "adjust", "register_customer"];
+  const ALLOWED_WHILE_SUSPENDED = ["lookup", "redeem", "archive_customer"];
+  if (action !== "redeem") {
+    const access = await businessAccess(db, business.id);
+    if (!access.ok && access.code === "business_suspended" && !ALLOWED_WHILE_SUSPENDED.includes(action)) {
+      return fail(access.code, 402, "Business is suspended");
+    }
+    if (!access.ok && access.code === "subscription_required" && SUB_GATED.includes(action)) {
+      return fail(access.code, 402, "Subscription is not active");
+    }
+  }
 
   switch (p.action) {
     case "update_business": {
@@ -225,6 +279,7 @@ export async function POST(request: Request) {
       }
       // A new target applies to new cards and to existing cards from their next round (after redemption).
       const staffAdjust = typeof p.staffAdjust === "boolean" ? (p.staffAdjust ? 1 : 0) : business.staff_adjust;
+      const birthdaysOn = typeof p.birthdays === "boolean" ? (p.birthdays ? 1 : 0) : business.birthdays;
       const mode = p.rewardMode === "bank" || p.rewardMode === "block" ? p.rewardMode : business.reward_mode;
       const expiry = p.rewardExpiryDays === undefined ? business.reward_expiry_days : p.rewardExpiryDays;
       if (![0, 30, 60, 90, 180, 365].includes(expiry as number)) return fail("bad_details", 400, "Invalid expiry");
@@ -237,8 +292,8 @@ export async function POST(request: Request) {
       }
       const socialJson = Object.keys(social).length ? JSON.stringify(social) : null;
       const statements = [
-        db.prepare("UPDATE businesses SET name = ?, reward = ?, target = ?, color = ?, staff_adjust = ?, reward_mode = ?, reward_expiry_days = ?, social = ? WHERE id = ?")
-          .bind(name, reward, p.target, p.color, staffAdjust, mode, expiry, socialJson, business.id),
+        db.prepare("UPDATE businesses SET name = ?, reward = ?, target = ?, color = ?, staff_adjust = ?, reward_mode = ?, reward_expiry_days = ?, birthdays = ?, social = ? WHERE id = ?")
+          .bind(name, reward, p.target, p.color, staffAdjust, mode, expiry, birthdaysOn, socialJson, business.id),
       ];
       if (business.reward_mode === "block" && mode === "bank") {
         // Switching to collect mode: cards that are full now become a saved reward and start a new round.
@@ -260,15 +315,18 @@ export async function POST(request: Request) {
       const name = str(p.name, 80);
       const phone = normalizePhone(p.phone);
       if (!name || !phone) return fail("bad_details", 400, "Invalid name or phone");
+      // Ignored when the business has birthdays turned off.
+      const birthday = business.birthdays ? parseBirthday(p.birthday) : null;
+      if (birthday === "invalid") return fail("bad_details", 400, "Invalid birthday");
       const id = crypto.randomUUID();
       const scan = randomToken(16);
       const card = await newCardSecret();
       const insert = db
         .prepare(
-          `INSERT OR IGNORE INTO customers(id, business, name, phone, token, stamps, target, created, card_hash, scan_code, source, consent_marketing, referred_by)
-           VALUES(?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 0, ?)`,
+          `INSERT OR IGNORE INTO customers(id, business, name, phone, token, stamps, target, created, card_hash, scan_code, source, consent_marketing, birthday, referred_by)
+           VALUES(?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 0, ?, ?)`,
         )
-        .bind(id, business.id, name, phone, scan, business.target, now, card.hash, scan, role, user.id);
+        .bind(id, business.id, name, phone, scan, business.target, now, card.hash, scan, role, birthday, user.id);
       const [, r] = await db.batch([releaseArchivedPhone(db, business.id, phone), insert]);
       if (!r.meta.changes) return fail("phone_exists", 409, "Phone already registered");
       return json({ id, cardUrl: `${origin}/c/${card.secret}` });
@@ -329,7 +387,9 @@ export async function POST(request: Request) {
       const replayed = async () => !!(await db.prepare("SELECT id FROM events WHERE id = ? AND customer = ?").bind(requestId, c!.id).first());
       const done = async (extra: Record<string, unknown> = {}) => {
         const fresh = (await db.prepare("SELECT * FROM customers WHERE id = ?").bind(c!.id).first<Customer>())!;
-        return json({ ok: true, card: await cardState(db, fresh, business.reward_mode), ...extra });
+        const card = await cardState(db, fresh, business.reward_mode);
+        syncGoogleWallet(db, fresh, card.rewards);
+        return json({ ok: true, card, ...extra });
       };
       const refuse = async (code: string) => {
         const fresh = (await db.prepare("SELECT * FROM customers WHERE id = ?").bind(c!.id).first<Customer>())!;

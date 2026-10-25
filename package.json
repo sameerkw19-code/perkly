@@ -11,15 +11,15 @@
     "build:staging": "node scripts/build.mjs staging",
     "build:production": "node scripts/build.mjs production",
     "preview": "wrangler dev --config dist/server/wrangler.json --local --persist-to .wrangler/state --port 8787",
-    "deploy:staging": "npm run build:staging && wrangler deploy --config dist/server/wrangler.json",
-    "deploy:production": "npm run build:production && wrangler deploy --config dist/server/wrangler.json",
+    "deploy:staging": "npm run build:staging && wrangler deploy --config dist/server/wrangler.json --keep-vars",
+    "deploy:production": "npm run build:production && wrangler deploy --config dist/server/wrangler.json --keep-vars",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:staging": "wrangler d1 migrations apply DB --remote --env staging",
     "db:migrate:production": "wrangler d1 migrations apply DB --remote --env production",
     "db:generate": "drizzle-kit generate",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "test": "node --test tests/unit.test.mjs",
+    "test": "node --test tests/unit.test.mjs tests/features.test.mjs",
     "test:api": "node --test tests/api.test.mjs"
   },
   "dependencies": {

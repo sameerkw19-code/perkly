@@ -2,7 +2,7 @@ import {
   Beer, Cake, Coffee, Croissant, CupSoda, Gift, GlassWater, Hamburger, Heart, IceCreamCone, Martini,
   Pizza, Sandwich, Scissors, ShoppingBag, Sparkles, Star, Utensils,
 } from "lucide-react";
-import { assetUrl, onColor, textsFor, type Design, type PresetIcon } from "../lib/design";
+import { FONTS, assetUrl, fontHref, onColor, textsFor, type Design, type PresetIcon } from "../lib/design";
 import type { Lang } from "../lib/i18n-types";
 
 export const ICONS: Record<PresetIcon, any> = {
@@ -63,6 +63,8 @@ type Props = {
   /** Rewards available now (saved rewards, or a full card in redeem-first mode). */
   rewards?: number;
   t: T;
+  /** Optional QR shown inside the card (customer card page only). */
+  qr?: React.ReactNode;
 };
 
 export function cardStyle(design: Design): React.CSSProperties {
@@ -75,33 +77,100 @@ export function cardStyle(design: Design): React.CSSProperties {
   } as React.CSSProperties;
 }
 
-/** Customer card as shown in the browser. */
-export function LoyaltyCard({ design, lang, stamps, target, customerName, rewards, t }: Props) {
+const TEXT_SCALE = { s: 0.9, m: 1, l: 1.14 } as const;
+const STAMP_SIZE = { s: "44px", m: "56px", l: "68px" } as const;
+const GRADIENT_ANGLE = { down: "180deg", diag: "150deg", side: "90deg" } as const;
+
+/** Extra variables for the wallet-style card: gradient, photo overlay, font and sizes. */
+function lookStyle(design: Design): React.CSSProperties {
+  const look = design.look;
+  const fill = look.dir === "radial"
+    ? `radial-gradient(120% 120% at 50% 0%, ${design.colors.bg} 0%, ${look.bg2} 100%)`
+    : `linear-gradient(${GRADIENT_ANGLE[look.dir]}, ${design.colors.bg} 0%, ${look.bg2} 100%)`;
+  return {
+    ...cardStyle(design),
+    "--c-bg2": look.bg2,
+    "--c-fill": fill,
+    "--c-ov": `${look.overlay}%`,
+    "--c-font": FONTS[look.font]?.family ?? FONTS.system.family,
+    "--c-ts": TEXT_SCALE[look.text],
+    "--c-ss": STAMP_SIZE[look.stamps],
+  } as React.CSSProperties;
+}
+
+/** Loads the card font once. Browsers accept a stylesheet link anywhere in the page. */
+function FontLink({ design }: { design: Design }) {
+  const href = fontHref(design.look.font);
+  return href ? <link rel="stylesheet" href={href} /> : null;
+}
+
+/** One stamp slot. Empty slots show the same mark, dimmed. */
+function PassStamp({ design, filled }: { design: Design; filled: boolean }) {
+  const kind = design.stamp.icon === "image" && design.stamp.image ? "photo" : "mark";
+  return (
+    <span className={`pcard-stamp ${kind} ${filled ? "is-filled" : "is-empty"}`} aria-hidden="true">
+      <StampMark design={design} size={22} />
+    </span>
+  );
+}
+
+/**
+ * Customer card, wallet-pass style. Order (reading direction follows the page language):
+ * brand and customer name, reward line, stamp grid, two fields (stamps, rewards), optional QR.
+ */
+export function LoyaltyCard({ design, lang, stamps, target, customerName, rewards, t, qr }: Props) {
   const text = textsFor(design, lang);
   const available = rewards ?? (stamps >= target ? 1 : 0);
   const ready = available > 0;
   const full = stamps >= target;
+  const total = target + 1;
+  const columns = total <= 6 ? total : Math.ceil(total / 2);
+  const showName = design.showCustomerName && !!customerName;
   return (
-    <div className={`loyalty-card layout-${design.layout}`} style={cardStyle(design)}>
-      <div className="card-top">
-        <Logo design={design} title={text.title} />
-        <div className="card-name">
-          <strong>{text.title}</strong>
-          {text.subtitle && <small>{text.subtitle}</small>}
+    <div className={`pcard layout-${design.layout} stamps-${design.look.stamps}${ready ? " is-ready" : ""}`} style={lookStyle(design)}>
+      <FontLink design={design} />
+      <div className="pcard-head">
+        <div className="pcard-brand">
+          {design.logo ? (
+            <img className="pcard-logo" src={assetUrl(design.logo)!} alt={text.title} />
+          ) : (
+            <strong className="pcard-title">{text.title}</strong>
+          )}
+          {text.subtitle && <small className="pcard-sub">{text.subtitle}</small>}
         </div>
-        {design.showCustomerName && customerName ? (
-          <span className="card-customer"><small>{t("customerName")}</small><b>{customerName}</b></span>
-        ) : null}
+        {showName && (
+          <div className="pcard-field pcard-end">
+            <small>{t("yourName")}</small>
+            <b className="pcard-name">{customerName}</b>
+          </div>
+        )}
       </div>
-      <div className="card-title">{text.reward}</div>
-      <div className="card-progress">
-        <span><Num>{stamps}/{target}</Num></span>
-        <span>{full ? t("earnedShort") : t("toGo", { k: Math.max(0, target - stamps) })}</span>
+
+      <div className="pcard-reward">{text.reward}</div>
+
+      <div className="pcard-stamps" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+        {Array.from({ length: target }, (_, i) => (
+          <PassStamp key={i} design={design} filled={i < stamps} />
+        ))}
+        <span className={"pcard-stamp gift" + (ready ? " is-filled" : "")} aria-hidden="true">
+          <Gift size={20} />
+          {text.gift && <em>{text.gift}</em>}
+        </span>
       </div>
-      <StampGrid design={design} stamps={stamps} target={target} giftLabel={text.gift} ready={ready} />
-      {ready && !full && (
-        <div className="rewards-badge"><Gift size={16} />{available === 1 ? t("rewardAvail1") : t("rewardsAvail", { n: available })}</div>
-      )}
+
+      <div className="pcard-fields">
+        <div className="pcard-field">
+          <small>{t("stampsWord")}</small>
+          <b><Num>{stamps}/{target}</Num></b>
+        </div>
+        <div className="pcard-field pcard-end">
+          <small>{t("rewardsWord")}</small>
+          <b><Num>{available}</Num></b>
+        </div>
+      </div>
+      <p className="pcard-hint">{full || ready ? t("earnedShort") : t("toGo", { k: Math.max(0, target - stamps) })}</p>
+
+      {qr && <div className="pcard-qr">{qr}</div>}
       <p className="sr-only">{t("stampsOf", { n: stamps, t: target })}</p>
     </div>
   );

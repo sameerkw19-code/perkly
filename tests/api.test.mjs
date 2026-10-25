@@ -70,6 +70,24 @@ test("forged identity headers are ignored; pages require sign-in", async () => {
   const english = await fetch(BASE + "/en", { redirect: "manual" });
   assert.equal(english.status, 200);
   assert.match(await english.text(), /The card that brings customers back/);
+  // The admin control center sends visitors to sign in and back.
+  const admin = await anon.get("/admin");
+  assert.ok([302, 303, 307, 308].includes(admin.status), `admin status ${admin.status}`);
+  assert.match(admin.location, /\/login\?next=\/admin$/);
+  for (const path of ["/terms", "/privacy", "/accessibility"]) {
+    const legal = await anon.get(path);
+    assert.equal(legal.status, 200, path);
+    assert.match(legal.text, /036884823/, path);
+  }
+});
+
+test("password reset links: unknown or reused tokens are refused", async () => {
+  const r = await new Client().post("/api/auth", { action: "reset_password", token: "not-a-real-token", password: "new password 1" });
+  assert.equal(r.status, 404);
+  assert.equal(r.body.code, "reset_invalid");
+  const weak = await new Client().post("/api/auth", { action: "reset_password", token: "x", password: "short" });
+  assert.equal(weak.status, 400);
+  assert.equal((await new Client().get("/reset/whatever")).status, 200);
 });
 
 test("mutations from another site are rejected", async () => {

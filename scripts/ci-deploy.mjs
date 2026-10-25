@@ -1,7 +1,9 @@
 // CI helper: deploy the built Worker; on failure, show Wrangler's message as a GitHub annotation.
 import { spawnSync } from "node:child_process";
 
-const r = spawnSync("npx", ["wrangler", "deploy", "--config", "dist/server/wrangler.json"], { encoding: "utf8" });
+// --keep-vars: keep plain-text variables set in the Cloudflare dashboard. The generated config
+// does not carry "keep_vars" from wrangler.jsonc, so without this flag every deploy deletes them.
+const r = spawnSync("npx", ["wrangler", "deploy", "--config", "dist/server/wrangler.json", "--keep-vars"], { encoding: "utf8" });
 process.stdout.write(r.stdout ?? "");
 process.stderr.write(r.stderr ?? "");
 const url = /https:\/\/[^\s]+\.workers\.dev/.exec(r.stdout ?? "")?.[0];

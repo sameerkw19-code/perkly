@@ -4,6 +4,7 @@ import { Users } from "lucide-react";
 import { errorText, useLang } from "../../../lib/i18n";
 import { post } from "../../../lib/api";
 import { LangSwitch } from "../../../components/lang-switch";
+import { Brand } from "../../../components/brand";
 
 export default function InviteForm({ token, business, signedInEmail }: { token: string; business: string | null; signedInEmail: string | null }) {
   const { lang, setLang, t, dir } = useLang();
@@ -34,7 +35,7 @@ export default function InviteForm({ token, business, signedInEmail }: { token: 
   return (
     <div className="auth-page" dir={dir}>
       <div className="auth-top">
-        <a className="brand" href="/">perkly<span>.</span></a>
+        <Brand href="/" />
         <LangSwitch lang={lang} setLang={setLang} />
       </div>
       <form className="auth-card panel" onSubmit={submit}>

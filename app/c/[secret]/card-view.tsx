@@ -8,22 +8,32 @@ import { QrImage } from "../../../components/qr";
 import type { Design } from "../../../lib/design";
 import { SOCIAL_COLOR, type SocialKey } from "../../../lib/social";
 import { SocialIcon } from "../../../lib/social-icon";
+import { Brand } from "../../../components/brand";
 
 type Card = { name: string; stamps: number; target: number; scan_code: string; design: Design; rewards: number; nextExpiry: string | null; business: string; links: { key: SocialKey; label: string; url: string }[] };
 
-export default function CardView({ card }: { card: Card | null }) {
+export default function CardView({ card, secret, googleWallet, isIOS }: { card: Card | null; secret: string; googleWallet: boolean; isIOS: boolean }) {
   const { lang, setLang, t, dir } = useLang();
   return (
     <div className="card-page" dir={dir}>
       <div className="auth-top">
-        <span className="brand">perkly<span>.</span></span>
+        <Brand />
         <LangSwitch lang={lang} setLang={setLang} />
       </div>
       {!card ? (
         <div className="auth-card panel"><h1>{t("cardNotFound")}</h1></div>
       ) : (
         <div className="card-stack">
-          <LoyaltyCard design={card.design} lang={lang} stamps={card.stamps} target={card.target} customerName={card.name} rewards={card.rewards} t={t} />
+          <LoyaltyCard
+            design={card.design}
+            lang={lang}
+            stamps={card.stamps}
+            target={card.target}
+            customerName={card.name}
+            rewards={card.rewards}
+            t={t}
+            qr={<QrImage text={"perkly:" + card.scan_code} size={336} label={t("showQr")} />}
+          />
           {card.rewards > 0 && (
             <div className="ready-banner" role="status">
               {t("earned")}
@@ -31,8 +41,7 @@ export default function CardView({ card }: { card: Card | null }) {
               {card.nextExpiry && <small className="ready-expiry">{t("expiresOnShort", { d: new Date(card.nextExpiry).toLocaleDateString(lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB") })}</small>}
             </div>
           )}
-          <div className="panel qr-panel">
-            <QrImage text={"perkly:" + card.scan_code} size={210} label={t("showQr")} />
+          <div className="qr-note">
             <p>{t("showQr")}</p>
             <small className="form-hint">{t("qrNote")}</small>
           </div>
@@ -49,8 +58,15 @@ export default function CardView({ card }: { card: Card | null }) {
             </section>
           )}
           <button className="btn soft wide" onClick={() => window.location.reload()}><RefreshCw size={16} />{t("refresh")}</button>
-          <p className="wallet-note"><Wallet size={15} />{t("walletHint")}</p>
+          {googleWallet ? (
+            <a className="btn primary wide" href={`/api/wallet/google/${encodeURIComponent(secret)}`} target="_blank" rel="noreferrer">
+              <Wallet size={16} />{t("walletAddGoogle")}
+            </a>
+          ) : (
+            <p className="wallet-note"><Wallet size={15} />{isIOS ? t("walletHintIOS") : t("walletHint")}</p>
+          )}
           <p className="form-hint center">{t("saveLinkHint")}</p>
+          <p className="form-hint center legal-links"><a href="/privacy">{t("privacyLink")}</a></p>
         </div>
       )}
     </div>

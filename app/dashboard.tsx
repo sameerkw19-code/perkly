@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { SOCIAL_KEYS, SOCIAL_LABEL, normalizeSocial, socialDisplay, type Social } from "../lib/social";
 import { SocialIcon } from "../lib/social-icon";
 import {
-  Activity, AlertTriangle, Check, Copy, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode,
+  Activity, AlertTriangle, Cake, Check, Copy, CreditCard, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode,
   Palette, RefreshCw, ScanLine, Search, Settings, Share2, Store, Users, Wallet, X,
 } from "lucide-react";
 import type { Design } from "../lib/design";
@@ -14,12 +14,19 @@ import { copyText, post, whatsappLink } from "../lib/api";
 import { LangSwitch } from "../components/lang-switch";
 import { LoyaltyCard, Num } from "../components/loyalty-card";
 import { QrImage } from "../components/qr";
+import { BirthdayFields } from "../components/birthday-fields";
+import { birthdayFromParts, formatBirthday } from "../lib/birthday";
+import { Brand } from "../components/brand";
 
 type Role = "owner" | "staff";
-type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; social?: Social };
+type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social };
 type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; rewards?: number; nextExpiry?: string | null; phone?: string };
 type Data = {
   me: { name: string; email: string };
+  access?: { ok: true } | { ok: false; code: "business_suspended" | "subscription_required" };
+  birthdays?: { id: string; name: string; date: string; inDays: number }[];
+  googleWallet?: boolean;
+  system?: { maintenance: boolean; maintenanceMessage: string; announcement: string; signupsOpen?: boolean };
   memberships: { business: string; role: Role; businessName: string; branch: string | null }[];
   branches?: { id: string; name: string }[];
   myBranch?: string | null;
@@ -151,7 +158,7 @@ export default function Dashboard() {
     return (
       <div className="center-page" dir={dir}>
         <div className="onboarding">
-          <div className="auth-top"><span className="brand">perkly<span>.</span></span><LangSwitch lang={lang} setLang={setLang} /></div>
+          <div className="auth-top"><Brand /><LangSwitch lang={lang} setLang={setLang} /></div>
           <span className="welcome-icon"><Store size={38} /></span>
           <h2>{t("welcome")}</h2>
           <p>{t("welcomeHint")}</p>
@@ -174,8 +181,9 @@ export default function Dashboard() {
 
   function exportCSV() {
     const safe = (s: unknown) => '"' + String(s ?? "").replace(/^[=+@\-\t\r]/, "'$&").replaceAll('"', '""') + '"';
-    const rows = [["Name", "Phone", "Stamps", "Target", "Marketing consent", "Joined", "Source"],
-      ...customers.map((c) => [c.name, c.phone, c.stamps, c.target, c.consent_marketing ? "yes" : "no", c.created, c.source])];
+    const withBirthday = b?.birthdays !== 0;
+    const rows = [["Name", "Phone", "Stamps", "Target", ...(withBirthday ? ["Birthday (DD/MM)"] : []), "Marketing consent", "Joined", "Source"],
+      ...customers.map((c) => [c.name, c.phone, c.stamps, c.target, ...(withBirthday ? [formatBirthday(c.birthday)] : []), c.consent_marketing ? "yes" : "no", c.created, c.source])];
     const csv = "﻿" + rows.map((r) => r.map(safe).join(",")).join("\r\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
@@ -188,7 +196,7 @@ export default function Dashboard() {
   return (
     <div className="app" dir={dir}>
       <aside className="sidebar">
-        <span className="brand">perkly<span>.</span></span>
+        <Brand />
         <div className="workspace">
           <span className="mini-logo" style={{ background: b.color, color: "white" }}>{b.name.charAt(0)}</span>
           <div><strong>{b.name}</strong><small>{isOwner ? t("roleOwner") : t("roleStaff")}</small></div>
@@ -202,6 +210,7 @@ export default function Dashboard() {
         </nav>
         <div className="side-bottom">
           <div className="profile"><span>{data.me.name.charAt(0)}</span><div><strong>{data.me.name}</strong><small dir="ltr">{data.me.email}</small></div></div>
+          {isOwner && <a className="text-btn" href="/billing"><CreditCard size={15} />{t("billingLink")}</a>}
           <button className="text-btn" onClick={signOut}><LogOut size={15} />{t("signOut")}</button>
         </div>
       </aside>
@@ -216,10 +225,35 @@ export default function Dashboard() {
               </select>
             )}
             <LangSwitch lang={lang} setLang={setLang} />
+            {isOwner && <a className="icon-btn mobile-only" href="/billing" aria-label={t("billingLink")} title={t("billingLink")}><CreditCard size={16} /></a>}
             <button className="icon-btn mobile-only" aria-label={t("signOut")} title={t("signOut")} onClick={signOut}><LogOut size={16} /></button>
           </div>
         </header>
         {!online && <div className="offline-bar" role="alert">{t("offline")}</div>}
+        {data.system?.maintenance && (
+          <div className="access-bar" role="alert"><AlertTriangle size={16} /><span>{data.system.maintenanceMessage || t("maintenanceBanner")}</span></div>
+        )}
+        {!!data.system?.announcement && (
+          <div className="announce-bar" role="status"><span>{data.system.announcement}</span></div>
+        )}
+        {data.access && !data.access.ok && (
+          <div className="access-bar" role="alert">
+            <AlertTriangle size={16} />
+            <span>{t(data.access.code === "business_suspended" ? "accessSuspended" : "accessNoSub")}</span>
+            {isOwner && data.access.code === "subscription_required" && <a className="btn primary small" href="/billing">{t("billingLink")}</a>}
+          </div>
+        )}
+        {!!data.birthdays?.length && (
+          <div className="birthday-bar" role="status">
+            <Cake size={16} />
+            <span>{t("birthdaysTitle")}</span>
+            <ul>
+              {data.birthdays.map((x) => (
+                <li key={x.id}><b>{x.name}</b> · {x.inDays === 0 ? t("bdayToday") : x.inDays === 1 ? t("bdayTomorrow") : <Num>{x.date}</Num>}</li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <main>
           {view === "overview" && isOwner && (
@@ -257,7 +291,7 @@ export default function Dashboard() {
                 <div className="panel card-panel">
                   <div className="section-head"><h2>{t("card")}</h2></div>
                   <LoyaltyCard design={data.design!} lang={lang} stamps={Math.min(3, b.target)} target={b.target} t={t} />
-                  <p className="wallet-note"><Wallet size={15} />{t("walletHint")}</p>
+                  <p className="wallet-note"><Wallet size={15} />{data.googleWallet ? t("walletOwnerNote") : t("walletHint")}</p>
                 </div>
                 <div className="panel activity-panel">
                   <div className="section-head"><h2>{t("history")}</h2></div>
@@ -297,7 +331,7 @@ export default function Dashboard() {
               ) : (
                 <div className="table-wrap">
                   <table>
-                    <thead><tr><th>{t("name")}</th><th>{t("phone")}</th><th>{t("balance")}</th><th>{t("marketingCol")}</th><th>{t("actions")}</th></tr></thead>
+                    <thead><tr><th>{t("name")}</th><th>{t("phone")}</th><th>{t("balance")}</th>{b.birthdays !== 0 && <th>{t("birthdayCol")}</th>}<th>{t("marketingCol")}</th><th>{t("actions")}</th></tr></thead>
                     <tbody>
                       {filtered.map((c) => (
                         <tr key={c.id}>
@@ -310,6 +344,7 @@ export default function Dashboard() {
                               {c.rewards > 0 && <span className="pill ready-pill"><Gift size={11} /> <Num>{c.rewards}</Num></span>}
                             </div>
                           </td>
+                          {b.birthdays !== 0 && <td><Num>{formatBirthday(c.birthday) || "—"}</Num></td>}
                           <td>{c.consent_marketing ? t("yes") : t("no")}</td>
                           <td>
                             <div className="row-actions">
@@ -391,13 +426,14 @@ export default function Dashboard() {
               <form onSubmit={async (e) => {
                 e.preventDefault();
                 const form = new FormData(e.currentTarget);
-                const r = await call({ action: "register_customer", name: form.get("name"), phone: form.get("phone") });
+                const r = await call({ action: "register_customer", name: form.get("name"), phone: form.get("phone"), birthday: birthdayFromParts(form.get("bday"), form.get("bmonth")) });
                 if (r) { load(); setModal({ type: "link", url: r.cardUrl, title: String(form.get("name")) }); }
               }}>
                 <span className="modal-icon"><Plus /></span>
                 <h2>{t("newCustomer")}</h2>
                 <label>{t("name")}<input name="name" required maxLength={80} autoFocus /></label>
                 <label>{t("phone")}<input name="phone" type="tel" required maxLength={20} dir="ltr" placeholder={t("phoneHint")} /></label>
+                {b.birthdays !== 0 && <BirthdayFields t={t} hint={false} />}
                 <p className="form-hint">{t("privacy")} {t("phoneNotVerified")}</p>
                 <div className="form-actions">
                   <button className="btn primary" disabled={busy}>{t("save")}</button>
@@ -509,7 +545,7 @@ function LinkBox({ url, t, notify }: { url: string; t: any; notify: (s: string, 
       <input readOnly value={url} dir="ltr" onFocus={(e) => e.currentTarget.select()} aria-label="Link" />
       <div className="row-actions">
         <button type="button" className="btn soft small" onClick={async () => notify((await copyText(url)) ? t("copied") : t("err_generic"))}><Copy size={14} />{t("copy")}</button>
-        <a className="btn lime small" href={whatsappLink(url)} target="_blank" rel="noreferrer"><Share2 size={14} />{t("whatsapp")}</a>
+        <a className="btn soft small" href={whatsappLink(url)} target="_blank" rel="noreferrer" title={t("whatsapp")}><Share2 size={14} />{t("whatsapp")}</a>
       </div>
     </div>
   );
@@ -522,7 +558,7 @@ const SOCIAL_PLACEHOLDER: Record<string, string> = {
 
 function BusinessForm({ t, busy, initial, submitLabel, onSubmit, onInvalid }: {
   t: any; busy: boolean; initial?: Business; submitLabel: string;
-  onSubmit: (v: { name: string; reward: string; target: number; color: string; staffAdjust?: boolean; rewardMode?: string; rewardExpiryDays?: number; social?: Social }) => void;
+  onSubmit: (v: { name: string; reward: string; target: number; color: string; staffAdjust?: boolean; birthdays?: boolean; rewardMode?: string; rewardExpiryDays?: number; social?: Social }) => void;
   onInvalid?: (message: string) => void;
 }) {
   return (
@@ -543,7 +579,7 @@ function BusinessForm({ t, busy, initial, submitLabel, onSubmit, onInvalid }: {
       }
       onSubmit({
         name: String(f.get("name")), reward: String(f.get("reward")), target: Number(f.get("target")), color: String(f.get("color")),
-        ...(initial ? { staffAdjust: f.get("staffAdjust") === "on", rewardMode: String(f.get("rewardMode")), rewardExpiryDays: Number(f.get("rewardExpiryDays")), social } : {}),
+        ...(initial ? { staffAdjust: f.get("staffAdjust") === "on", birthdays: f.get("birthdays") === "on", rewardMode: String(f.get("rewardMode")), rewardExpiryDays: Number(f.get("rewardExpiryDays")), social } : {}),
       });
     }}>
       <label>{t("businessName")}<input name="name" required maxLength={80} defaultValue={initial?.name} /></label>
@@ -568,6 +604,8 @@ function BusinessForm({ t, busy, initial, submitLabel, onSubmit, onInvalid }: {
             <small className="form-hint">{t("expiryNote")}</small>
           </label>
           <label className="check"><input type="checkbox" name="staffAdjust" defaultChecked={!!initial.staff_adjust} /><span>{t("staffAdjustSetting")}</span></label>
+          <label className="check"><input type="checkbox" name="birthdays" defaultChecked={initial.birthdays !== 0} /><span>{t("birthdaysSetting")}</span></label>
+          <small className="form-hint">{t("birthdaysSettingHint")}</small>
           <fieldset className="mode-set social-set">
             <legend>{t("socialTitle")}</legend>
             <small className="form-hint">{t("socialHint")}</small>

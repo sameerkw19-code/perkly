@@ -23,17 +23,34 @@
   "env": {
     "staging": {
       "name": "perkly-staging",
+      // Keep plain-text variables added in the Cloudflare dashboard (e.g. PLATFORM_ADMIN_EMAILS).
+      // Without this, every deploy deletes them. Secrets are never affected.
+      "keep_vars": true,
+      "observability": { "enabled": true },
+      // Not secret: the Google Wallet issuer id is visible in every "save to wallet" link.
+      "vars": {
+        "GOOGLE_WALLET_ISSUER_ID": "3388000000023227862",
+        // The console added the issuer id in front of "3388000000023227862.perkly_loyalty".
+        "GOOGLE_WALLET_CLASS_ID": "3388000000023227862.3388000000023227862.perkly_loyalty"
+      },
       "d1_databases": [
         {
           "binding": "DB",
           "database_name": "perkly-staging",
-          "database_id": "REPLACE_WITH_STAGING_DATABASE_ID",
+          "database_id": "04914039-e15e-4f9a-a5d1-a20dd333fda4",
           "migrations_dir": "drizzle"
         }
       ]
     },
     "production": {
       "name": "perkly",
+      "keep_vars": true,
+      "observability": { "enabled": true },
+      // Same Google Wallet issuer and class as staging (one issuer account). Not secret.
+      "vars": {
+        "GOOGLE_WALLET_ISSUER_ID": "3388000000023227862",
+        "GOOGLE_WALLET_CLASS_ID": "3388000000023227862.3388000000023227862.perkly_loyalty"
+      },
       // Your own domain. Works once perkly.shop is active in the same Cloudflare account.
       "routes": [
         { "pattern": "perkly.shop", "custom_domain": true },

@@ -1,6 +1,9 @@
+import { env } from "cloudflare:workers";
+import { headers } from "next/headers";
 import { getD1 } from "../../../db";
 import { sha256 } from "../../../lib/server/crypto";
 import { liveDesign } from "../../../lib/server/designs";
+import { walletConfig } from "../../../lib/server/google-wallet";
 import { parseSocial, socialLinks } from "../../../lib/social";
 import CardView from "./card-view";
 
@@ -33,8 +36,19 @@ export default async function CardPage({ params }: { params: Promise<{ secret: s
           .bind(await sha256(secret), new Date().toISOString())
           .first<{ name: string; stamps: number; target: number; scan_code: string; business_id: string; business: string; reward: string; color: string; reward_mode: string; social: string | null; saved: number; next_expiry: string | null }>()
       : null;
-  if (!row) return <CardView card={null} />;
+  if (!row) return <CardView card={null} secret={secret} googleWallet={false} isIOS={false} />;
   const design = await liveDesign(db, { id: row.business_id, name: row.business, reward: row.reward, color: row.color });
   const rewards = row.saved + (row.reward_mode === "block" && row.stamps >= row.target ? 1 : 0);
-  return <CardView card={{ name: row.name, stamps: row.stamps, target: row.target, scan_code: row.scan_code, design, rewards, nextExpiry: row.next_expiry, business: row.business, links: socialLinks(parseSocial(row.social)) }} />;
+  // Google Wallet does not run on iPhone, so the Google button is shown only to non-iOS devices.
+  const ua = (await headers()).get("user-agent") ?? "";
+  const isIOS = /iPhone|iPad|iPod/i.test(ua);
+  const googleWallet = !isIOS && walletConfig(env) !== null;
+  return (
+    <CardView
+      card={{ name: row.name, stamps: row.stamps, target: row.target, scan_code: row.scan_code, design, rewards, nextExpiry: row.next_expiry, business: row.business, links: socialLinks(parseSocial(row.social)) }}
+      secret={secret}
+      googleWallet={googleWallet}
+      isIOS={isIOS}
+    />
+  );
 }

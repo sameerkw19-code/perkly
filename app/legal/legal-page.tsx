@@ -1,7 +1,8 @@
 /* eslint-disable @next/next/no-html-link-for-pages -- plain links on purpose: client-side navigation breaks on this server */
-// Shared frame for the legal pages. These are DRAFTS until a lawyer reviews them.
+// Shared frame for the legal pages (terms, privacy, accessibility).
 import "../landing/landing.css";
 import { waLink, WHATSAPP_DISPLAY } from "../landing/content";
+import { OPERATOR, OPERATOR_LINE } from "./operator";
 
 export default function LegalPage({ title, updated, children }: { title: string; updated: string; children: React.ReactNode }) {
   return (
@@ -13,15 +14,13 @@ export default function LegalPage({ title, updated, children }: { title: string;
         </div>
       </header>
       <main className="lp-main lp-wrap lg-main">
-        <p className="lg-draft" role="note">
-          <strong>טיוטה לבדיקה.</strong> המסמך עדיין לא נבדק על ידי עורך דין ואינו מאושר משפטית. פרטים בסוגריים מרובעים ממתינים להשלמה.
-        </p>
         <h1 className="lp-h2">{title}</h1>
         <p className="lp-muted lg-updated">עדכון אחרון: {updated}</p>
         <div className="lg-body">{children}</div>
         <p className="lg-contact">
-          לשאלות: <a href={waLink("היי, יש לי שאלה לגבי המסמכים באתר Perkly")} target="_blank" rel="noopener noreferrer">וואטסאפ <bdi className="lp-num">{WHATSAPP_DISPLAY}</bdi></a>
+          לשאלות: <a href={`mailto:${OPERATOR.email}`} dir="ltr">{OPERATOR.email}</a> או <a href={waLink("היי, יש לי שאלה לגבי המסמכים באתר Perkly")} target="_blank" rel="noopener noreferrer">וואטסאפ <bdi className="lp-num">{WHATSAPP_DISPLAY}</bdi></a>
         </p>
+        <p className="lp-muted lg-updated">Perkly מופעלת על ידי {OPERATOR_LINE}.</p>
       </main>
     </div>
   );

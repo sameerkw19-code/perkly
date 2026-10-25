@@ -2,7 +2,8 @@
 /* eslint-disable @next/next/no-html-link-for-pages -- plain links on purpose: client-side navigation breaks on this server */
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { COPY, hrefs, type Lang } from "./content";
-import { CardVisual, Icon } from "./visuals";
+import { Icon } from "./visuals";
+import { ExampleCard } from "./example-card";
 
 /** Remember the language for the app pages (login, sign-up), which read this key. */
 function rememberLang(lang: Lang) {
@@ -174,19 +175,7 @@ function StampDemo({ lang }: { lang: Lang }) {
         <span className="lp-chip lp-chip-yellow">{d.badge}</span>
       </div>
       <div className="lp-demo-card">
-        <CardVisual
-          k="cafe"
-          name={ex.name}
-          rewardLine={c.examples.rewardLine(TARGET, ex.reward)}
-          target={TARGET}
-          filled={count}
-          pressed={press ? count - 1 : undefined}
-          pressKey={press}
-          footStart={`${count} ${d.of} ${TARGET}`}
-          footEnd={full ? d.ready : d.left(TARGET - count, ex.reward)}
-          size="lg"
-          ready={full}
-        />
+        <ExampleCard k="cafe" lang={lang} name={ex.name} rewardLine={c.examples.rewardLine(TARGET, ex.reward)} target={TARGET} filled={count} pressKey={press} />
         <span className={`lp-toast${toast ? " is-on" : ""}`} aria-hidden="true">
           <Icon name="check" size={16} stroke={3} /> {d.added}
         </span>
@@ -289,14 +278,12 @@ export function DemoPanel({ lang }: { lang: Lang }) {
 /** Pick a business type and see a large example card. Swipe on phones. */
 export function ExamplesPicker({ lang }: { lang: Lang }) {
   const c = COPY[lang].examples;
-  const d = COPY[lang].demo;
   const rtl = COPY[lang].dir === "rtl";
   const list = c.list;
   const [i, setI] = useState(0);
   const start = useRef<number | null>(null);
   const go = useCallback((n: number) => setI((n + list.length) % list.length), [list.length]);
   const ex = list[i];
-  const left = ex.target - ex.filled;
 
   return (
     <div className="lp-examples">
@@ -323,16 +310,7 @@ export function ExamplesPicker({ lang }: { lang: Lang }) {
         }}
       >
         <div className="lp-example-card" key={ex.key}>
-          <CardVisual
-            k={ex.key}
-            name={ex.name}
-            rewardLine={c.rewardLine(ex.target, ex.reward)}
-            target={ex.target}
-            filled={ex.filled}
-            footStart={`${ex.filled} ${d.of} ${ex.target}`}
-            footEnd={d.left(left, ex.reward)}
-            size="lg"
-          />
+          <ExampleCard k={ex.key} lang={lang} name={ex.name} rewardLine={c.rewardLine(ex.target, ex.reward)} target={ex.target} filled={ex.filled} />
         </div>
       </div>
       <div className="lp-example-controls">

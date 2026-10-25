@@ -11,6 +11,7 @@ import {
 import { DUMMY_HASH, hashPassword, sha256, verifyPassword } from "../../../lib/server/crypto";
 import { clientIp, fail, json, readJson, sameOrigin, str } from "../../../lib/server/http";
 import { allow } from "../../../lib/server/rate-limit";
+import { getSettings } from "../../../lib/server/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -39,8 +40,12 @@ export async function POST(request: Request) {
     case "signup": {
       if (!(await allow(db, `signup:${ip}`, 5, 3600))) return fail("rate_limited", 429, "Too many attempts");
       if (env.SIGNUP_CODE && body.signupCode !== env.SIGNUP_CODE) return fail("signup_code", 403, "Signup code required");
+      const sys = await getSettings(db);
       const name = str(body.name, 80);
       const email = normalizeEmail(body.email);
+      // Closed sign-ups never lock out a configured platform admin email.
+      const adminEmail = !!email && (env.PLATFORM_ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).includes(email);
+      if ((!sys.signupsOpen || sys.maintenance) && !adminEmail) return fail(sys.maintenance ? "maintenance" : "signups_closed", 403, "Sign-ups are closed");
       if (!name || !email) return fail("bad_details", 400, "Invalid name or email");
       if (!validPassword(body.password)) return fail("weak_password", 400, "Password must be 8+ characters");
       const userId = await newUser(db, name, email, body.password);
@@ -56,11 +61,42 @@ export async function POST(request: Request) {
       if (!okIp || !okEmail) return fail("rate_limited", 429, "Too many attempts. Try again in 10 minutes.");
       const password = typeof body.password === "string" ? body.password.slice(0, 200) : "";
       const user = email
-        ? await db.prepare("SELECT id, pass_hash FROM users WHERE email = ?").bind(email).first<{ id: string; pass_hash: string }>()
+        ? await db.prepare("SELECT id, pass_hash, blocked FROM users WHERE email = ?").bind(email).first<{ id: string; pass_hash: string; blocked: string | null }>()
         : null;
       const valid = await verifyPassword(password, user?.pass_hash ?? DUMMY_HASH);
       if (!user || !valid) return fail("bad_login", 401, "Wrong email or password");
+      // Only after a correct password, so the message does not reveal which emails exist.
+      if (user.blocked) return fail("account_blocked", 403, "This account is blocked");
       const token = await createSession(db, user.id);
+      return json({ ok: true }, 200, { "Set-Cookie": sessionCookie(token, request) });
+    }
+
+    case "reset_password": {
+      if (!(await allow(db, `reset:${ip}`, 10, 600))) return fail("rate_limited", 429, "Too many attempts");
+      const tokenText = typeof body.token === "string" && body.token.length <= 100 ? body.token : "";
+      if (!validPassword(body.password)) return fail("weak_password", 400, "Password must be 8+ characters");
+      const now = new Date().toISOString();
+      const reset = tokenText
+        ? await db
+            .prepare(
+              `SELECT r.id, r.user FROM password_resets r JOIN users u ON u.id = r.user
+               WHERE r.id = ? AND r.used IS NULL AND r.expires > ? AND u.blocked IS NULL`,
+            )
+            .bind(await sha256(tokenText), now)
+            .first<{ id: string; user: string }>()
+        : null;
+      if (!reset) return fail("reset_invalid", 404, "This reset link expired or was already used");
+      const [used] = await db.batch([
+        // Marks the link used first, so the same link cannot be used twice at the same time.
+        db.prepare("UPDATE password_resets SET used = ? WHERE id = ? AND used IS NULL").bind(now, reset.id),
+      ]);
+      if (!used.meta.changes) return fail("reset_invalid", 404, "This reset link expired or was already used");
+      await db.batch([
+        db.prepare("UPDATE users SET pass_hash = ? WHERE id = ?").bind(await hashPassword(body.password), reset.user),
+        // Signs out every device that used the old password.
+        db.prepare("DELETE FROM sessions WHERE user = ?").bind(reset.user),
+      ]);
+      const token = await createSession(db, reset.user);
       return json({ ok: true }, 200, { "Set-Cookie": sessionCookie(token, request) });
     }
 
@@ -74,8 +110,13 @@ export async function POST(request: Request) {
       const tokenText = typeof body.token === "string" && body.token.length <= 100 ? body.token : "";
       const inviteId = await sha256(tokenText);
       const now = new Date().toISOString();
+      if ((await getSettings(db)).maintenance) return fail("maintenance", 503, "Maintenance");
+      // Invites to archived businesses do not work.
       const invite = await db
-        .prepare("SELECT business, role, branch FROM invites WHERE id = ? AND used IS NULL AND revoked IS NULL AND expires > ?")
+        .prepare(
+          `SELECT i.business, i.role, i.branch FROM invites i JOIN businesses b ON b.id = i.business
+           WHERE i.id = ? AND i.used IS NULL AND i.revoked IS NULL AND i.expires > ? AND b.archived IS NULL`,
+        )
         .bind(inviteId, now)
         .first<{ business: string; role: string; branch: string | null }>();
       if (!tokenText || !invite) return fail("invite_invalid", 404, "Invite expired or already used");
