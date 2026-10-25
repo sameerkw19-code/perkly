@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import ContactForm from "./contact-form";
+import SiteAnalytics from "../../components/site-analytics";
 
 export const metadata: Metadata = {
   title: "Perkly | דברו איתנו",
@@ -9,5 +10,10 @@ export const metadata: Metadata = {
 
 // "Talk to us": for owners who prefer a call before signing up. Requests are shown in /admin/leads.
 export default function ContactPage() {
-  return <ContactForm />;
+  return (
+    <>
+      <ContactForm />
+      <SiteAnalytics />
+    </>
+  );
 }

@@ -3,6 +3,7 @@
 import "../landing/landing.css";
 import { waLink, WHATSAPP_DISPLAY } from "../landing/content";
 import { OPERATOR, OPERATOR_LINE } from "./operator";
+import SiteAnalytics from "../../components/site-analytics";
 
 export default function LegalPage({ title, updated, children }: { title: string; updated: string; children: React.ReactNode }) {
   return (
@@ -22,6 +23,7 @@ export default function LegalPage({ title, updated, children }: { title: string;
         </p>
         <p className="lp-muted lg-updated">Perkly מופעלת על ידי {OPERATOR_LINE}.</p>
       </main>
+      <SiteAnalytics />
     </div>
   );
 }

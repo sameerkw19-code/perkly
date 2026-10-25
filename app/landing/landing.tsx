@@ -5,6 +5,7 @@ import { DemoPanel, ExamplesPicker, Logo, SiteNav, TiltStage } from "./landing-c
 import { SocialRow, Testimonials } from "./landing-parts";
 import { CafeLogo, Icon, QrArt } from "./visuals";
 import { ExampleCard } from "./example-card";
+import SiteAnalytics from "../../components/site-analytics";
 
 const STEP_ICONS = ["palette", "qr", "stamp", "repeat"];
 
@@ -127,6 +128,7 @@ export default function Landing({ lang }: { lang: Lang }) {
   const h = hrefs(lang);
   return (
     <div className="lp" lang={lang} dir={c.dir}>
+      <SiteAnalytics />
       <a href="#main" className="lp-skip">{c.nav.skip}</a>
       <SiteNav lang={lang} />
 

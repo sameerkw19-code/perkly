@@ -6,19 +6,26 @@ import { businessAccess, isEntitled } from "../../lib/server/billing";
 import { currentUser } from "../../lib/server/page-session";
 import { polarConfigured } from "../../lib/server/polar";
 import StartFlow, { type StartBusiness } from "./start-flow";
+import SiteAnalytics from "../../components/site-analytics";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Perkly | פתיחת חשבון",
-  description: "פותחים חשבון, מעצבים כרטיס נאמנות ומתחילים לעבוד. 99 ₪ לחודש, בלי התחייבות.",
+  description:
+    "פותחים חשבון, מעצבים כרטיס נאמנות ומתחילים לעבוד. 99 ₪ לחודש, בלי התחייבות.",
   alternates: { canonical: "/start" },
 };
 
 // Guided setup for a new business owner: account, business and card, payment, then the QR to print.
 // Signed-in owners land on the first step they have not finished.
-export default async function StartPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+export default async function StartPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const params = await searchParams;
-  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
+  const one = (v: string | string[] | undefined) =>
+    (Array.isArray(v) ? v[0] : v) ?? "";
   const user = await currentUser();
   let business: StartBusiness | null = null;
   let isStaffOnly = false;
@@ -36,7 +43,13 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
            LEFT JOIN subscriptions s ON s.business = b.id WHERE b.id = ?`,
         )
         .bind(pick.business)
-        .first<{ id: string; name: string; join_code: string | null; comp_until: string | null; status: string | null }>();
+        .first<{
+          id: string;
+          name: string;
+          join_code: string | null;
+          comp_until: string | null;
+          status: string | null;
+        }>();
       if (row) {
         const access = await businessAccess(db, row.id);
         business = {
@@ -51,14 +64,17 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
     }
   }
   return (
-    <StartFlow
-      signedIn={!!user}
-      userName={user?.name ?? ""}
-      needsCode={!!env.SIGNUP_CODE}
-      business={business}
-      isStaffOnly={isStaffOnly}
-      billingOn={polarConfigured(env)}
-      paidReturn={one(params.paid) === "1"}
-    />
+    <>
+      <SiteAnalytics />
+      <StartFlow
+        signedIn={!!user}
+        userName={user?.name ?? ""}
+        needsCode={!!env.SIGNUP_CODE}
+        business={business}
+        isStaffOnly={isStaffOnly}
+        billingOn={polarConfigured(env)}
+        paidReturn={one(params.paid) === "1"}
+      />
+    </>
   );
 }
