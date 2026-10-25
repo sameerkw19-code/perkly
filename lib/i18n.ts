@@ -43,7 +43,7 @@ const words: Record<string, Entry> = {
   passwordHint: ["לפחות 8 תווים", "8 أحرف على الأقل", "At least 8 characters"],
   yourName: ["השם שלך", "اسمك", "Your name"],
   signupCode: ["קוד הרשמה", "رمز التسجيل", "Signup code"],
-  signupCodeHint: ["נדרש רק אם קיבלתם קוד מ־Perkly", "مطلوب فقط إذا حصلت على رمز من Perkly", "Only needed if Perkly gave you a code"],
+  signupCodeHint: ["את הקוד מקבלים מ־Perkly אחרי הצטרפות לפיילוט", "تحصل على الرمز من Perkly بعد الانضمام للتجربة", "Perkly sends you the code after you join the pilot"],
   haveAccount: ["כבר יש לך חשבון? כניסה", "لديك حساب؟ تسجيل الدخول", "Already have an account? Sign in"],
   noAccount: ["בעל עסק חדש? פתיחת חשבון", "صاحب مشروع جديد؟ إنشاء حساب", "New business owner? Create an account"],
   staffNoAccount: ["עובדים מצטרפים רק דרך קישור הזמנה מבעל העסק.", "ينضم الموظفون فقط عبر رابط دعوة من صاحب المشروع.", "Staff join only through an invite link from the owner."],
@@ -65,6 +65,12 @@ const words: Record<string, Entry> = {
   err_signups_closed: ["פתיחת עסקים חדשים סגורה כרגע.", "تسجيل مشاريع جديدة مغلق حالياً.", "New business sign-ups are closed right now."],
   err_account_blocked: ["החשבון חסום. לפרטים: support@perkly.shop", "الحساب محظور. للتفاصيل: support@perkly.shop", "This account is blocked. Contact support@perkly.shop"],
   err_business_suspended: ["החשבון של העסק מושהה. לפרטים: support@perkly.shop", "حساب المشروع موقوف. للتفاصيل: support@perkly.shop", "This business account is suspended. Contact support@perkly.shop"],
+  err_bad_social: ["אחד הקישורים לרשתות לא תקין. בדקו אותו ונסו שוב.", "أحد روابط الشبكات غير صالح. تحقق منه وحاول مجدداً.", "One of the social links isn't valid. Check it and try again."],
+  socialBadField: ["הקישור ל־{field} לא תקין. אפשר להדביק את הקישור לפרופיל או לכתוב את שם המשתמש.", "رابط {field} غير صالح. الصق رابط الصفحة أو اكتب اسم المستخدم.", "The {field} link isn't valid. Paste the profile link or type the username."],
+  socialTitle: ["רשתות חברתיות ויצירת קשר", "الشبكات الاجتماعية والتواصل", "Social links and contact"],
+  socialHint: ["מופיעים כאייקונים בכרטיס של כל לקוח. אפשר להדביק קישור או לכתוב שם משתמש. שדה ריק לא יוצג.", "تظهر كأيقونات في بطاقة كل عميل. الصق رابطاً أو اكتب اسم المستخدم. الحقل الفارغ لا يظهر.", "Shown as icons on every customer's card. Paste a link or type a username. Empty fields are hidden."],
+  socialWebsite: ["אתר", "الموقع", "Website"],
+  socialFollow: ["עקבו אחרינו", "تابعونا", "Follow us"],
   err_bad_details: ["בדקו את הפרטים שהוזנו.", "تحقق من البيانات المدخلة.", "Check the details you entered."],
   err_phone_exists: ["מספר הטלפון כבר רשום בעסק הזה.", "رقم الهاتف مسجل في هذا المشروع.", "This phone is already registered in this business."],
   err_forbidden: ["אין לך הרשאה לפעולה הזו.", "ليس لديك صلاحية لهذه العملية.", "You don't have permission for this action."],
@@ -173,6 +179,7 @@ const words: Record<string, Entry> = {
   myRecent: ["הפעולות האחרונות שלי", "آخر عملياتي", "My recent actions"],
 
   // Team
+  broughtCustomers: ["הביא/ה לקוחות פעילים", "أحضر عملاء نشطين", "Active customers brought"],
   teamHint: ["עובדים יכולים לסרוק, להוסיף חותמות, לממש הטבות ולרשום לקוחות. הם לא רואים את רשימת הלקוחות המלאה ולא משנים הגדרות.", "يمكن للموظفين المسح وإضافة الأختام واستخدام المكافآت وتسجيل الزبائن. لا يرون القائمة الكاملة ولا يغيرون الإعدادات.", "Staff can scan, add stamps, redeem rewards and register customers. They can't see the full customer list or change settings."],
   inviteStaff: ["הזמנת עובד", "دعوة موظف", "Invite staff"],
   inviteLabel: ["שם העובד (לזיהוי שלך)", "اسم الموظف (للتعريف)", "Staff name (for your reference)"],
@@ -209,6 +216,8 @@ const words: Record<string, Entry> = {
   joinIntro: ["ממלאים שם וטלפון ומקבלים כרטיס אישי בטלפון.", "أدخل اسمك وهاتفك واحصل على بطاقة شخصية على هاتفك.", "Enter your name and phone and get a personal card on your phone."],
   terms: ["אני מאשר/ת לעסק לשמור את השם והטלפון שלי לצורך כרטיס הנאמנות.", "أوافق على حفظ اسمي وهاتفي لدى المشروع لغرض بطاقة الولاء.", "I agree that the business may keep my name and phone for the loyalty card."],
   marketing: ["אשמח לקבל עדכונים ומבצעים מהעסק (לא חובה).", "أرغب بتلقي تحديثات وعروض من المشروع (اختياري).", "I'd like to receive updates and offers from the business (optional)."],
+  legalLinks: ["מדיניות פרטיות", "سياسة الخصوصية", "Privacy policy"],
+  termsLink: ["תנאי שימוש", "شروط الاستخدام", "Terms of use"],
   getCard: ["קבלת הכרטיס", "احصل على البطاقة", "Get my card"],
   phoneNotVerified: ["מספר הטלפון לא מאומת ב־SMS.", "رقم الهاتف غير مُتحقق منه برسالة SMS.", "The phone number isn't verified by SMS."],
 };
@@ -408,7 +417,9 @@ export function useLang() {
   const [lang, setLang] = useState<Lang>("he");
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("perkly-language");
+      // A ?lang= link (for example from the Arabic marketing page) wins over the saved choice.
+      const fromUrl = new URLSearchParams(window.location.search).get("lang");
+      const saved = fromUrl && LANGS.includes(fromUrl as Lang) ? fromUrl : localStorage.getItem("perkly-language");
       if (saved && LANGS.includes(saved as Lang)) setLang(saved as Lang);
     } catch {}
   }, []);

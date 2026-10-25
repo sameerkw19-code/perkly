@@ -2,6 +2,7 @@ import { SignOut } from "./sign-out";
 
 const TABS = [
   { href: "/admin", label: "סקירה" },
+  { href: "/admin/leads", label: "פניות" },
   { href: "/admin/users", label: "משתמשים" },
   { href: "/admin/billing", label: "מנויים וכסף" },
   { href: "/admin/settings", label: "הגדרות מערכת" },

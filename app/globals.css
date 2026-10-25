@@ -307,67 +307,17 @@ fieldset.birthday{border:0;padding:0;margin:0 0 14px}fieldset.birthday legend{fo
 .admin-edit{display:grid;grid-template-columns:2fr 2fr 1fr auto;gap:8px;align-items:end}.admin-edit label{display:grid;gap:4px;font-size:12px}@media(max-width:860px){.admin-edit{grid-template-columns:1fr}}
 .admin-row-warn td{background:#fff8ec}
 .admin-signout{margin-inline-start:auto}
-/* Legal pages */
-.legal-page{min-height:100vh;background:#fff}
-.legal-top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 24px;border-bottom:1px solid var(--line)}
-.legal-top .brand{font-size:28px}.legal-top nav{display:flex;gap:16px;flex-direction:row;font-size:13px}
-.legal-body{max-width:760px;margin:0 auto;padding:32px 20px 60px;line-height:1.75;font-size:15px}
-.legal-body h2{font-size:18px;margin:28px 0 8px}.legal-body ul{padding-inline-start:20px}.legal-body li{margin:6px 0}
-.legal-body a{color:var(--purple);text-decoration:underline}.legal-body hr{border:0;border-top:1px solid var(--line);margin:32px 0 16px}
 .legal-links a{color:var(--purple);text-decoration:underline}
-
-/* ---- Landing page (visitors) ---- */
-.lp{background:#fff;color:var(--ink);min-height:100vh;overflow-x:hidden}
-.lp-top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px clamp(16px,4vw,48px);border-bottom:1px solid var(--line);position:sticky;top:0;background:#ffffffeb;backdrop-filter:blur(8px);z-index:5}
-.lp-top .brand{font-size:30px}
-.lp-top-actions{display:flex;align-items:center;gap:10px}
-.lp-link{font-size:14px;font-weight:600;color:#4b4760;padding:8px 6px}
-.lp-hero{display:grid;grid-template-columns:1.1fr 1fr;gap:clamp(24px,5vw,64px);align-items:center;max-width:1160px;margin:0 auto;padding:clamp(36px,7vw,88px) clamp(16px,4vw,48px)}
-.lp-hero h1{font-size:clamp(32px,5.4vw,56px);line-height:1.08;letter-spacing:-1.2px;margin:0 0 18px}
-.lp-hero-text>p{font-size:clamp(16px,1.9vw,19px);color:#5d5a6b;line-height:1.65;margin:0 0 26px;max-width:540px}
-.lp-hero-cta{display:flex;gap:10px;flex-wrap:wrap}
-.lp-hero-cta .btn{padding:14px 22px;font-size:15px}
-.lp-price-hint{font-size:13px;color:var(--muted);margin-top:16px}
-.lp-hero-card{display:grid;place-items:center;padding:12px;position:relative}
-.lp-hero-card:before{content:"";position:absolute;inset:8% 4%;background:radial-gradient(closest-side,#d9f49366,transparent);filter:blur(20px);z-index:0}
-.lp-hero-card .pcard{position:relative;z-index:1;transform:rotate(-2deg)}
-[dir=ltr] .lp-hero-card .pcard{transform:rotate(2deg)}
-.lp-section{max-width:1160px;margin:0 auto;padding:clamp(36px,6vw,72px) clamp(16px,4vw,48px)}
-.lp-section h2{font-size:clamp(24px,3.4vw,34px);letter-spacing:-.6px;margin:0 0 26px}
-.lp-steps{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
-.lp-steps li{background:var(--bg);border:1px solid var(--line);border-radius:18px;padding:22px;position:relative;color:var(--purple)}
-.lp-steps h3{color:var(--ink);font-size:17px;margin:12px 0 6px}
-.lp-steps p{color:#5d5a6b;margin:0;font-size:14px}
-.lp-step-num{position:absolute;inset-inline-end:18px;top:16px;font-size:34px;font-weight:800;color:#e7e2fa;line-height:1}
-.lp-features{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.lp-feature{border:1px solid var(--line);border-radius:16px;padding:20px}
-.lp-feature h3{font-size:16px;margin:12px 0 6px}
-.lp-feature p{color:#5d5a6b;margin:0;font-size:14px}
-.lp-feature-icon{display:inline-grid;place-items:center;width:40px;height:40px;border-radius:12px;background:#f0ecfc;color:var(--purple)}
-.lp-price{max-width:420px;border:1px solid var(--line);border-radius:22px;padding:28px;box-shadow:0 20px 40px -24px #2a1e5a40}
-.lp-price-amount{display:flex;align-items:baseline;gap:8px}
-.lp-price-amount b{font-size:48px;letter-spacing:-1.5px}
-.lp-price-amount span{color:var(--muted)}
-.lp-trial{display:inline-block;background:#eef6de;color:#3f5923;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;margin:8px 0 0}
-.lp-price ul{list-style:none;padding:0;margin:18px 0 22px;display:grid;gap:10px}
-.lp-price li{display:flex;align-items:center;gap:8px;font-size:15px}
-.lp-price li svg{color:#4f8a2c}
-.lp-faq{display:grid;gap:10px;max-width:760px}
-.lp-faq details{border:1px solid var(--line);border-radius:14px;padding:16px 18px}
-.lp-faq summary{cursor:pointer;font-weight:700;font-size:15px}
-.lp-faq p{margin:10px 0 0;color:#5d5a6b}
-.lp-cta{text-align:center;background:linear-gradient(150deg,#7558e8,#3b2a8f);color:#fff;border-radius:28px;max-width:1080px;margin:20px auto 60px;padding:clamp(36px,6vw,64px) 20px}
-.lp-cta h2{font-size:clamp(26px,3.6vw,38px);margin:0 0 10px}
-.lp-cta p{opacity:.85;margin:0 0 22px}
-.lp-cta .btn{padding:14px 26px;font-size:15px}
-.lp-footer{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:24px clamp(16px,4vw,48px) 36px;border-top:1px solid var(--line)}
-.lp-footer .brand{font-size:24px}
-.lp-footer nav{display:flex;gap:18px;flex-direction:row;font-size:14px;color:#5d5a6b}
-@media(max-width:860px){
-  .lp-hero{grid-template-columns:1fr;text-align:start}
-  .lp-hero-card{order:-1;max-width:380px;margin:0 auto;width:100%}
-  .lp-steps,.lp-features{grid-template-columns:1fr}
-  .lp-top .brand{font-size:24px}
-  .lp-top-actions{gap:6px}.lp-top-actions .lang-select{max-width:84px}
-}
 .admin-reset-link{display:grid;gap:4px;min-width:240px}.admin-reset-link input{font-size:11px;padding:6px 8px}
+/* ---- Social links: card page and business settings ---- */
+.social-panel{display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;padding:18px}
+.social-panel p{margin:0;font-size:13px;color:var(--muted)}
+.social-panel p strong{color:var(--ink)}
+.social-row{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.social-row a{width:44px;height:44px;border-radius:50%;background:#f6f4fb;border:1px solid var(--line);display:grid;place-items:center;transition:transform .15s,background .15s}
+.social-row a:hover{transform:translateY(-2px);background:#efebfa}
+.social-set{gap:12px}
+.social-field{display:grid;gap:6px;font-size:12px}
+.social-field-name{display:flex;align-items:center;gap:7px;font-weight:bold}
+.social-field input{width:100%;text-align:left}
+@media(prefers-reduced-motion:reduce){.social-row a{transition:none}.social-row a:hover{transform:none}}

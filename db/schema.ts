@@ -30,6 +30,8 @@ export const businesses = sqliteTable(
     compUntil: text("comp_until"),
     // Archived by a platform admin: hidden from owners and staff, data kept, can be restored.
     archived: text("archived"),
+    // Social links shown on customer cards (JSON). See lib/social.tsx.
+    social: text("social"),
   },
   (t) => [uniqueIndex("businesses_join_code").on(t.joinCode)],
 );
@@ -59,6 +61,8 @@ export const customers = sqliteTable(
     // When the customer last opened "Add to Google Wallet". Only these passes get live updates.
     googleWallet: text("google_wallet"),
     source: text("source").notNull().default("staff"),
+    // The staff member (user id) who registered this customer. Used for field-manager attribution.
+    referredBy: text("referred_by"),
     // Set when the owner removes the customer. Hidden everywhere, history kept, card link disabled.
     archived: text("archived"),
   },
@@ -255,3 +259,24 @@ export const passwordResets = sqliteTable("password_resets", {
   expires: text("expires").notNull(),
   used: text("used"),
 });
+// Pilot requests from the public site (/signup). Read only by platform admins (/admin).
+export const leads = sqliteTable(
+  "leads",
+  {
+    id: text("id").primaryKey(),
+    created: text("created").notNull(),
+    business: text("business").notNull(),
+    contact: text("contact").notNull(),
+    phone: text("phone").notNull(),
+    email: text("email"),
+    kind: text("kind"),
+    city: text("city"),
+    kit: integer("kit").notNull().default(0),
+    note: text("note"),
+    lang: text("lang").notNull(),
+    // Separate, opt-in consent to receive marketing messages (never pre-ticked).
+    consentMarketing: integer("consent_marketing").notNull().default(0),
+    status: text("status").notNull().default("new"),
+  },
+  (t) => [index("leads_created").on(t.created)],
+);

@@ -55,15 +55,30 @@ test("forged identity headers are ignored; pages require sign-in", async () => {
   assert.equal(r.status, 401);
   const forged = await fetch(BASE + "/api/loyalty", { headers: { "oai-authenticated-user-id": "attacker", "oai-authenticated-user-email": "a@b.c" } });
   assert.equal(forged.status, 401);
-  // Visitors get the public landing page; the dashboard data itself needs a session (401 above).
-  const page = await anon.get("/");
+  // Signed-out visitors get the public landing page, never the dashboard.
+  const page = await fetch(BASE + "/", { redirect: "manual" });
   assert.equal(page.status, 200);
-  assert.match(page.text, /perkly/i);
+  const html = await page.text();
+  assert.match(html, /הכרטיס שגורם ללקוחות לחזור/);
+  assert.doesNotMatch(html, /oai-authenticated|join_code/);
+  const signup = await fetch(BASE + "/signup", { redirect: "manual" });
+  assert.equal(signup.status, 200);
+  assert.match(await signup.text(), /הצטרפות לפיילוט/);
+  const arabic = await fetch(BASE + "/ar", { redirect: "manual" });
+  assert.equal(arabic.status, 200);
+  assert.match(await arabic.text(), /البطاقة التي تجعل الزبائن يعودون/);
+  const english = await fetch(BASE + "/en", { redirect: "manual" });
+  assert.equal(english.status, 200);
+  assert.match(await english.text(), /The card that brings customers back/);
   // The admin control center sends visitors to sign in and back.
   const admin = await anon.get("/admin");
   assert.ok([302, 303, 307, 308].includes(admin.status), `admin status ${admin.status}`);
   assert.match(admin.location, /\/login\?next=\/admin$/);
-  for (const path of ["/terms", "/privacy"]) assert.equal((await anon.get(path)).status, 200, path);
+  for (const path of ["/terms", "/privacy", "/accessibility"]) {
+    const legal = await anon.get(path);
+    assert.equal(legal.status, 200, path);
+    assert.match(legal.text, /036884823/, path);
+  }
 });
 
 test("password reset links: unknown or reused tokens are refused", async () => {
@@ -243,6 +258,27 @@ test("new card link replaces the old one", async () => {
   assert.doesNotMatch(oldPage.text, /Dana/);
   const newPage = await new Client().get(new URL(r.body.cardUrl).pathname);
   assert.match(newPage.text, /Dana/);
+});
+
+test("social links: owner saves them, they show on the customer card, bad ones are rejected", async () => {
+  const base = { name: "Corner Cafe", reward: "Free coffee", target: 5, color: "#7558E8" };
+  const bad = await ownerA.act(bizA, "update_business", { ...base, social: { instagram: "https://evil.example/x" } });
+  assert.equal(bad.status, 400);
+  assert.equal(bad.body.code, "bad_social");
+  const ok = await ownerA.act(bizA, "update_business", { ...base, social: { instagram: "@corner.cafe", whatsapp: "050-111-2233", website: "" } });
+  assert.equal(ok.status, 200);
+  const biz = (await ownerA.get(`/api/loyalty?business=${bizA}`)).body.business;
+  assert.deepEqual(biz.social, { instagram: "corner.cafe", whatsapp: "+972501112233" });
+  // Saving other settings without `social` keeps the links.
+  await ownerA.act(bizA, "update_business", base);
+  assert.deepEqual((await ownerA.get(`/api/loyalty?business=${bizA}`)).body.business.social, { instagram: "corner.cafe", whatsapp: "+972501112233" });
+  const r = await ownerA.act(bizA, "new_card_link", { customer: dana });
+  const page = await new Client().get(new URL(r.body.cardUrl).pathname);
+  assert.match(page.text, /instagram\.com\/corner\.cafe/);
+  assert.match(page.text, /wa\.me\/972501112233/);
+  // Clearing every field removes them.
+  await ownerA.act(bizA, "update_business", { ...base, social: {} });
+  assert.deepEqual((await ownerA.get(`/api/loyalty?business=${bizA}`)).body.business.social, {});
 });
 
 test("login: wrong password rejected, then rate limited", async () => {
@@ -511,3 +547,19 @@ test("collect mode: expiry applies to new rewards only; switching modes converts
   assert.equal(used.status, 200);
   assert.equal(used.body.card.rewards, 1);
 });
+
+test("pilot request: validated per field, stored once, rate limited", async () => {
+  const c = new Client();
+  const bad = await c.post("/api/lead", { business: "", contact: "x", phone: "12", privacy: false });
+  assert.equal(bad.status, 400);
+  assert.deepEqual(Object.keys(bad.body.fields).sort(), ["business", "phone", "privacy"]);
+  const requestId = `lead-${run}`;
+  const lead = { business: "Test Cafe", contact: "Tester", phone: "050-123-4567", email: "", privacy: true, marketing: false, kit: true, lang: "he", requestId };
+  const ok = await c.post("/api/lead", lead);
+  assert.equal(ok.status, 200);
+  const again = await c.post("/api/lead", lead);
+  assert.equal(again.status, 200);
+  const evil = await c.post("/api/lead", lead, { origin: "https://evil.example" });
+  assert.equal(evil.status, 403);
+});
+

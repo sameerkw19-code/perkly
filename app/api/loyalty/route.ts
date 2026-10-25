@@ -12,10 +12,11 @@ import { businessAccess } from "../../../lib/server/billing";
 import { formatBirthday, parseBirthday, upcomingKeys } from "../../../lib/birthday";
 import { syncGoogleWallet } from "../../../lib/server/wallet-sync";
 import { getSettings } from "../../../lib/server/settings";
+import { normalizeSocial, parseSocial, type Social } from "../../../lib/social";
 
 export const dynamic = "force-dynamic";
 
-type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust: number; reward_mode: "bank" | "block"; reward_expiry_days: number; birthdays: number };
+type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust: number; reward_mode: "bank" | "block"; reward_expiry_days: number; birthdays: number; social: Social };
 type Customer = { id: string; business: string; name: string; phone: string; stamps: number; target: number; scan_code: string; google_wallet?: string | null };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -26,7 +27,11 @@ function validTarget(v: unknown): v is number {
 }
 
 async function loadBusiness(db: D1Database, id: string) {
-  return db.prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays FROM businesses WHERE id = ?").bind(id).first<Business>();
+  const row = await db
+    .prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays, social FROM businesses WHERE id = ?")
+    .bind(id)
+    .first<Omit<Business, "social"> & { social: string | null }>();
+  return row ? { ...row, social: parseSocial(row.social) } : null;
 }
 
 /** Saved rewards that can be used now, and the nearest expiry. */
@@ -138,7 +143,9 @@ export async function GET(request: Request) {
          (SELECT COUNT(*) FROM events WHERE business = ?1 AND kind = 'redeem' AND created >= ?2 AND (?3 = '' OR branch = ?3)) AS redemptions`,
     ).bind(business!.id, since, branchFilter, new Date().toISOString(), business!.reward_mode),
     db.prepare(
-      `SELECT u.id, u.name, u.email, m.role, m.created, m.revoked, m.branch FROM memberships m JOIN users u ON u.id = m.user
+      `SELECT u.id, u.name, u.email, m.role, m.created, m.revoked, m.branch,
+         (SELECT COUNT(*) FROM customers c WHERE c.business = m.business AND c.referred_by = m.user AND c.archived IS NULL) AS brought
+       FROM memberships m JOIN users u ON u.id = m.user
        WHERE m.business = ? ORDER BY m.role, m.created`,
     ).bind(business!.id),
     db.prepare(
@@ -275,9 +282,17 @@ export async function POST(request: Request) {
       const mode = p.rewardMode === "bank" || p.rewardMode === "block" ? p.rewardMode : business.reward_mode;
       const expiry = p.rewardExpiryDays === undefined ? business.reward_expiry_days : p.rewardExpiryDays;
       if (![0, 30, 60, 90, 180, 365].includes(expiry as number)) return fail("bad_details", 400, "Invalid expiry");
+      // Social links are optional; when sent, the whole set is replaced (an empty field removes that link).
+      let social = business.social;
+      if (p.social !== undefined) {
+        const checked = normalizeSocial(p.social);
+        if (!checked.ok) return fail("bad_social", 400, checked.field);
+        social = checked.value;
+      }
+      const socialJson = Object.keys(social).length ? JSON.stringify(social) : null;
       const statements = [
-        db.prepare("UPDATE businesses SET name = ?, reward = ?, target = ?, color = ?, staff_adjust = ?, reward_mode = ?, reward_expiry_days = ?, birthdays = ? WHERE id = ?")
-          .bind(name, reward, p.target, p.color, staffAdjust, mode, expiry, birthdaysOn, business.id),
+        db.prepare("UPDATE businesses SET name = ?, reward = ?, target = ?, color = ?, staff_adjust = ?, reward_mode = ?, reward_expiry_days = ?, birthdays = ?, social = ? WHERE id = ?")
+          .bind(name, reward, p.target, p.color, staffAdjust, mode, expiry, birthdaysOn, socialJson, business.id),
       ];
       if (business.reward_mode === "block" && mode === "bank") {
         // Switching to collect mode: cards that are full now become a saved reward and start a new round.
@@ -307,10 +322,10 @@ export async function POST(request: Request) {
       const card = await newCardSecret();
       const insert = db
         .prepare(
-          `INSERT OR IGNORE INTO customers(id, business, name, phone, token, stamps, target, created, card_hash, scan_code, source, consent_marketing, birthday)
-           VALUES(?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 0, ?)`,
+          `INSERT OR IGNORE INTO customers(id, business, name, phone, token, stamps, target, created, card_hash, scan_code, source, consent_marketing, birthday, referred_by)
+           VALUES(?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 0, ?, ?)`,
         )
-        .bind(id, business.id, name, phone, scan, business.target, now, card.hash, scan, role, birthday);
+        .bind(id, business.id, name, phone, scan, business.target, now, card.hash, scan, role, birthday, user.id);
       const [, r] = await db.batch([releaseArchivedPhone(db, business.id, phone), insert]);
       if (!r.meta.changes) return fail("phone_exists", 409, "Phone already registered");
       return json({ id, cardUrl: `${origin}/c/${card.secret}` });

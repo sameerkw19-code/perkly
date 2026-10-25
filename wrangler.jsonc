@@ -10,6 +10,8 @@
   "compatibility_date": "2026-05-15",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
+  // Videos go through the Worker so it can answer byte-range requests (needed by Safari on iPhone).
+  "assets": { "binding": "ASSETS", "run_worker_first": ["/videos/*"] },
   "d1_databases": [
     {
       "binding": "DB",
