@@ -2,7 +2,7 @@
 #   push to main            -> staging    (https://perkly-staging.<your-subdomain>.workers.dev)
 #   "Run workflow" button   -> production (https://perkly.<your-subdomain>.workers.dev)
 # Needs GitHub secret CLOUDFLARE_API_TOKEN (and optionally CLOUDFLARE_ACCOUNT_ID,
-# PERKLY_SIGNUP_CODE, PERKLY_ADMIN_EMAILS). Never put these values in the code.
+# PERKLY_ADMIN_EMAILS). Never put these values in the code. Sign-up is open; a SIGNUP_CODE, if ever needed, is set in Cloudflare.
 name: Test and deploy
 
 on:
@@ -72,11 +72,10 @@ jobs:
       - name: Deploy
         run: node scripts/ci-deploy.mjs
       # Values set in the Cloudflare dashboard win: if a name is already there (as text), this step skips it.
+      # SIGNUP_CODE is not set from here any more: sign-up is open and is managed in the Cloudflare dashboard.
       - name: Optional settings
         continue-on-error: true
         env:
-          SIGNUP_CODE: ${{ secrets.PERKLY_SIGNUP_CODE }}
           ADMIN_EMAILS: ${{ secrets.PERKLY_ADMIN_EMAILS }}
         run: |
-          if [ -n "$SIGNUP_CODE" ]; then printf '%s' "$SIGNUP_CODE" | npx wrangler secret put SIGNUP_CODE --env "$TARGET" || echo "SIGNUP_CODE is set in Cloudflare, skipped"; fi
           if [ -n "$ADMIN_EMAILS" ]; then printf '%s' "$ADMIN_EMAILS" | npx wrangler secret put PLATFORM_ADMIN_EMAILS --env "$TARGET" || echo "PLATFORM_ADMIN_EMAILS is set in Cloudflare, skipped"; fi

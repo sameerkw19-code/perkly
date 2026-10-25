@@ -98,7 +98,7 @@ npm run test:api
 2. ב־GitHub, במאגר: Settings → Secrets and variables → Actions → New repository secret:
    - `CLOUDFLARE_API_TOKEN` = הטוקן מהשלב הקודם (חובה).
    - `CLOUDFLARE_ACCOUNT_ID` = מזהה החשבון מלוח הבקרה של Cloudflare (מומלץ).
-   - `PERKLY_SIGNUP_CODE` = קוד שרק בעלי עסקים שהזמנתם יקבלו (מומלץ, כדי שזרים לא יפתחו חשבונות).
+   - ההרשמה פתוחה לכולם (perkly.shop/start). אם תרצו לסגור אותה זמנית, מוסיפים ב-Cloudflare משתנה `SIGNUP_CODE`.
    - `PERKLY_ADMIN_EMAILS` = האימייל שלכם, לדף `/admin` (אופציונלי).
 3. אם זו הפעם הראשונה ב־Cloudflare Workers: נכנסים פעם אחת ל־Workers & Pages ובוחרים כתובת משנה (subdomain) ל־workers.dev.
 
