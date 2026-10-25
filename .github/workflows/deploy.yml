@@ -71,10 +71,12 @@ jobs:
         run: node scripts/build.mjs "$TARGET"
       - name: Deploy
         run: node scripts/ci-deploy.mjs
+      # Values set in the Cloudflare dashboard win: if a name is already there (as text), this step skips it.
       - name: Optional settings
+        continue-on-error: true
         env:
           SIGNUP_CODE: ${{ secrets.PERKLY_SIGNUP_CODE }}
           ADMIN_EMAILS: ${{ secrets.PERKLY_ADMIN_EMAILS }}
         run: |
-          if [ -n "$SIGNUP_CODE" ]; then printf '%s' "$SIGNUP_CODE" | npx wrangler secret put SIGNUP_CODE --env "$TARGET"; fi
-          if [ -n "$ADMIN_EMAILS" ]; then printf '%s' "$ADMIN_EMAILS" | npx wrangler secret put PLATFORM_ADMIN_EMAILS --env "$TARGET"; fi
+          if [ -n "$SIGNUP_CODE" ]; then printf '%s' "$SIGNUP_CODE" | npx wrangler secret put SIGNUP_CODE --env "$TARGET" || echo "SIGNUP_CODE is set in Cloudflare, skipped"; fi
+          if [ -n "$ADMIN_EMAILS" ]; then printf '%s' "$ADMIN_EMAILS" | npx wrangler secret put PLATFORM_ADMIN_EMAILS --env "$TARGET" || echo "PLATFORM_ADMIN_EMAILS is set in Cloudflare, skipped"; fi
