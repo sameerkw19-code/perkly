@@ -434,3 +434,50 @@
 .lg-body h2 { font-family: var(--font-display); font-size: 21px; margin-top: 14px !important; }
 .lg-body ul { list-style: disc !important; padding-inline-start: 22px !important; display: flex; flex-direction: column; gap: 6px; }
 .lg-contact { margin-top: 24px !important; border-top: 1px solid var(--line); padding-top: 16px; }
+
+/* ---- Guided setup (/start): steps, card preview, plan, printable QR ---- */
+.st-steps { display: flex; gap: 8px; margin-bottom: 22px; counter-reset: st; flex-wrap: wrap; }
+.st-steps li { display: flex; align-items: center; gap: 8px; padding: 8px 14px 8px 10px; border-radius: 999px; background: #fff; border: 1px solid var(--line); color: var(--muted); font-weight: 700; font-size: 14.5px; }
+.st-dot { width: 26px; height: 26px; border-radius: 50%; display: inline-grid; place-items: center; background: #F3F0FD; color: var(--p-strong); font-size: 13px; flex: none; }
+.st-steps li.is-current { border-color: var(--p); color: var(--ink); box-shadow: 0 0 0 3px #EEE9FF; }
+.st-steps li.is-current .st-dot { background: var(--p); color: #fff; }
+.st-steps li.is-done .st-dot { background: var(--green); color: #fff; }
+.st-narrow { max-width: 520px; margin-inline: auto; }
+.st-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 26px; align-items: start; }
+.st-preview { position: sticky; top: 92px; display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+.st-kinds { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.st-kinds legend { margin-bottom: 8px; padding: 0; }
+.st-kinds button { display: inline-flex; align-items: center; gap: 7px; min-height: 42px; padding: 8px 14px; border-radius: 999px; border: 1.5px solid var(--line); background: #fff; color: var(--ink); font: inherit; font-weight: 700; font-size: 15px; cursor: pointer; }
+.st-kinds button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+.st .su-field select, .st .su-field input { min-height: 48px; }
+.st-plan { border: 1.5px solid var(--p); border-radius: 20px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; background: #FCFBFF; }
+.st-plan-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.st-plan-head strong { font-family: var(--font-display); font-size: 19px; }
+.st-plan-head b { font-family: var(--font-display); font-size: 30px; font-weight: 800; color: var(--ink); }
+.st-plan ul { display: flex; flex-direction: column; gap: 8px; }
+.st-plan li { display: flex; align-items: center; gap: 8px; font-size: 15.5px; }
+.st-plan li svg { color: var(--green); flex: none; }
+.st-secure { text-align: center; }
+.st-later { align-self: center; font-size: 15px; color: var(--muted) !important; text-decoration: underline; }
+.st-spinner { width: 34px; height: 34px; border-radius: 50%; border: 3px solid #E6E0F7; border-top-color: var(--p); animation: st-spin 0.9s linear infinite; }
+@keyframes st-spin { to { transform: rotate(360deg); } }
+.st-done { align-items: center; text-align: center; max-width: 640px; margin-inline: auto; }
+.st-poster { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 20px 26px; border: 1.5px dashed var(--line); border-radius: 22px; background: #fff; }
+.st-poster-name { font-family: var(--font-display); font-size: 24px; }
+.st-poster-scan { font-weight: 700; font-size: 17px; }
+.st-poster img { width: 240px; height: 240px; }
+@media (max-width: 860px) {
+  .st-grid { grid-template-columns: minmax(0, 1fr); }
+  .st-preview { position: static; order: -1; }
+  .st-steps .st-label { display: none; }
+  .st-steps li.is-current .st-label { display: inline; }
+}
+@media print {
+  .st-noprint, .lp-header { display: none !important; }
+  .st .su-card { border: 0; box-shadow: none; padding: 0; }
+  .st-poster { border: 0; margin-top: 40px; }
+  .st-poster img { width: 360px; height: 360px; }
+  .st-poster-name { font-size: 40px; }
+  .st-poster-scan { font-size: 28px; }
+}
+.st h1:focus { outline: none; }

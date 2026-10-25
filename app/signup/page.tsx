@@ -1,13 +1,10 @@
-import type { Metadata } from "next";
-import SignupFlow from "./signup-flow";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Perkly | הצטרפות לפיילוט",
-  description: "השאירו פרטים להצטרפות לפיילוט של Perkly, כרטיס נאמנות דיגיטלי לעסקים.",
-  alternates: { canonical: "/signup" },
-};
+export const dynamic = "force-dynamic";
 
-// Pilot request form. Online payment is not connected yet, so nothing is charged here.
-export default function SignupPage() {
-  return <SignupFlow />;
+// Old address of the sign-up form. Sign-up is now the guided setup at /start.
+export default async function SignupPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const lang = (await searchParams).lang;
+  const l = Array.isArray(lang) ? lang[0] : lang;
+  redirect(l === "ar" || l === "en" ? `/start?lang=${l}` : "/start");
 }

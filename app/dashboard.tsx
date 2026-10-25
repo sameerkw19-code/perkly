@@ -240,7 +240,7 @@ export default function Dashboard() {
           <div className="access-bar" role="alert">
             <AlertTriangle size={16} />
             <span>{t(data.access.code === "business_suspended" ? "accessSuspended" : "accessNoSub")}</span>
-            {isOwner && data.access.code === "subscription_required" && <a className="btn primary small" href="/billing">{t("billingLink")}</a>}
+            {isOwner && data.access.code === "subscription_required" && <a className="btn primary small" href={`/start?b=${encodeURIComponent(b.id)}`}>{t("activateSub")}</a>}
           </div>
         )}
         {!!data.birthdays?.length && (
@@ -398,13 +398,22 @@ export default function Dashboard() {
               </section>
               <section className="panel join-panel">
                 <div className="section-head"><h2><QrCode size={18} /> {t("joinQr")}</h2></div>
-                {b.join_code && <QrImage text={`${window.location.origin}/join/${b.join_code}`} size={200} label={t("joinQr")} />}
-                <p className="muted">{t("joinQrHint")}</p>
-                {b.join_code && <LinkBox url={`${window.location.origin}/join/${b.join_code}`} t={t} notify={notify} />}
-                <button className="btn soft small" disabled={busy} onClick={async () => {
-                  if (!confirm(t("newJoinConfirm"))) return;
-                  if (await call({ action: "new_join_code" })) load();
-                }}><RefreshCw size={14} />{t("newJoinCode")}</button>
+                {b.join_code ? (
+                  <>
+                    <QrImage text={`${window.location.origin}/join/${b.join_code}`} size={200} label={t("joinQr")} />
+                    <p className="muted">{t("joinQrHint")}</p>
+                    <LinkBox url={`${window.location.origin}/join/${b.join_code}`} t={t} notify={notify} />
+                    <button className="btn soft small" disabled={busy} onClick={async () => {
+                      if (!confirm(t("newJoinConfirm"))) return;
+                      if (await call({ action: "new_join_code" })) load();
+                    }}><RefreshCw size={14} />{t("newJoinCode")}</button>
+                  </>
+                ) : (
+                  <>
+                    <p className="muted">{t(data.access && !data.access.ok && data.access.code === "business_suspended" ? "accessSuspended" : "joinLocked")}</p>
+                    {data.access && !data.access.ok && data.access.code === "subscription_required" && <a className="btn primary small" href={`/start?b=${encodeURIComponent(b.id)}`}>{t("activateSub")}</a>}
+                  </>
+                )}
               </section>
               <Branches branches={data.branches ?? []} t={t} busy={busy} call={call} reload={load} />
               <section className="panel">
@@ -413,7 +422,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          <footer><span>perkly. <span className="muted">Small card. Big connection.</span></span><span>{t("pilot")} · v0.6</span></footer>
+          <footer><span>Perkly <span className="muted">Small card. Big connection.</span></span><span>v1.0</span></footer>
         </main>
       </div>
 

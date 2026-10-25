@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { getD1 } from "../db";
+import { getMemberships } from "../lib/server/auth";
 import { currentUser } from "../lib/server/page-session";
 import Dashboard from "./dashboard";
 import Landing from "./landing/landing";
@@ -17,6 +20,9 @@ export const metadata: Metadata = {
 
 export default async function Page() {
   // Visitors who are not signed in see the marketing page; owners and staff see their dashboard.
-  if (!(await currentUser())) return <Landing lang="he" />;
+  const user = await currentUser();
+  if (!user) return <Landing lang="he" />;
+  // Signed in but no business yet (or the setup was left halfway): continue the guided setup.
+  if ((await getMemberships(getD1(), user.id)).length === 0) redirect("/start");
   return <Dashboard />;
 }

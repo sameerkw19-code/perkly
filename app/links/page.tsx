@@ -61,7 +61,7 @@ export default function LinksPage() {
           </header>
 
           <nav aria-label="קישורים" style={{ width: "100%", height: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
-            <a className="pl-btn" href="/signup" style={{ ...btn, background: "#17132B", color: "#FFFFFF", justifyContent: "center", fontSize: 18 }}>
+            <a className="pl-btn" href="/start" style={{ ...btn, background: "#17132B", color: "#FFFFFF", justifyContent: "center", fontSize: 18 }}>
               פתחו כרטיס לעסק שלכם
             </a>
             <a className="pl-btn" href="/#how" style={light}>

@@ -15,7 +15,7 @@ type Lead = {
   city: string | null; kit: number; note: string | null; lang: string; consent_marketing: number;
 };
 
-// Pilot requests from the public sign-up form (/signup). These are business contacts, not customers of a business.
+// Requests from the public "talk to us" form (/contact). These are business contacts, not customers of a business.
 export default async function AdminLeadsPage() {
   await requireAdminPage();
   const leads = await getD1()
@@ -28,10 +28,10 @@ export default async function AdminLeadsPage() {
     <div className="admin" dir="rtl">
       <AdminHeader active="/admin/leads" />
       <main>
-        <h1>פניות להצטרפות</h1>
+        <h1>פניות "דברו איתנו"</h1>
         <p className="muted">
-          {rows.length} פניות מטופס ההצטרפות, {rows.filter((l) => l.created >= week).length} מהן בשבוע האחרון.
-          כדי לפתוח לעסק חשבון, שלחו לו את קוד ההרשמה (SIGNUP_CODE) וקישור ל־perkly.shop/login?signup=1.
+          {rows.length} פניות מהטופס ב־perkly.shop/contact, {rows.filter((l) => l.created >= week).length} מהן בשבוע האחרון.
+          אחרי השיחה, שלחו לעסק את הקישור לפתיחת חשבון: perkly.shop/start.
         </p>
         <div className="panel table-wrap">
           {rows.length === 0 ? (

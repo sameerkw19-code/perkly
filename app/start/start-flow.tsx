@@ -1,0 +1,371 @@
+"use client";
+/* eslint-disable @next/next/no-html-link-for-pages -- plain links on purpose: client-side navigation breaks on this server */
+// Guided setup: 1 account, 2 business and card (live preview), 3 payment (Polar), 4 QR and start.
+// No QR to join until the business has paid: the server hides the join code until then.
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import "../landing/landing.css";
+import { Logo } from "../landing/landing-client";
+import { Icon, THEMES } from "../landing/visuals";
+import { COPY, type ExampleKey, type Lang } from "../landing/content";
+import { LoyaltyCard } from "../../components/loyalty-card";
+import { QrImage } from "../../components/qr";
+import { darken, defaultDesign, defaultLook, onColor, type Design, type PresetIcon } from "../../lib/design";
+import { errorText, translate } from "../../lib/i18n";
+import { post } from "../../lib/api";
+
+export type StartBusiness = { id: string; name: string; joinCode: string | null; paid: boolean; canWork: boolean; status: string };
+
+type Kind = ExampleKey | "other";
+type Step = "account" | "business" | "pay" | "wait" | "done";
+const STEPS: Exclude<Step, "wait">[] = ["account", "business", "pay", "done"];
+
+const ICON: Record<Kind, PresetIcon> = { cafe: "coffee", barber: "scissors", pizza: "pizza", icecream: "icecream", studio: "sparkle", bakery: "croissant", other: "star" };
+const KIND_ICON: Record<Kind, string> = { cafe: "coffee", barber: "scissors", pizza: "pizza", icecream: "icecream", studio: "star", bakery: "cake", other: "store" };
+const OTHER_THEME = { bg: "#2F2A4A", fg: "#FFFFFF", stamp: "#D9F493" };
+
+const T = {
+  he: {
+    steps: ["חשבון", "העסק והכרטיס", "תשלום", "מתחילים"],
+    login: "כבר יש לי חשבון", home: "לדף הבית",
+    accountTitle: "פותחים חשבון", accountIntro: "שלוש דקות, ואתם מוכנים לחותמת הראשונה.",
+    name: "השם שלך", email: "אימייל", password: "סיסמה", passwordHint: "לפחות 8 תווים", code: "קוד הרשמה",
+    agree: "בהמשך אני מאשר/ת את", terms: "תנאי השימוש", and: "ואת", privacy: "מדיניות הפרטיות",
+    next: "המשך", working: "רגע…",
+    bizTitle: "העסק והכרטיס", bizIntro: "בוחרים סוג עסק ורואים את הכרטיס מתעדכן. את כל העיצוב אפשר לשנות אחר כך.",
+    kind: "סוג העסק", bizName: "שם העסק", reward: "ההטבה", target: "חותמות להטבה", other: "אחר",
+    preview: "כך הלקוחות יראו את הכרטיס", createBiz: "שמירה והמשך לתשלום",
+    payTitle: "מפעילים את המנוי", payIntro: "הכרטיס שלכם מוכן. מזינים פרטי אשראי, מקבלים את ה־QR ומתחילים מיד.",
+    plan: "מנוי Perkly", price: "99 ₪", per: "לחודש", noSetup: "3 ימי ניסיון חינם. החיוב הראשון רק אחרי 3 ימים, ואם מבטלים לפני כן לא משלמים כלום. בלי דמי הקמה.",
+    features: ["כרטיס בעיצוב העסק", "הצטרפות לקוחות ב־QR", "Google Wallet ללקוחות אנדרואיד", "עמדת עובד והזמנת עובדים", "לוח בקרה והתראות"],
+    pay: "התחלת 3 ימי ניסיון", paying: "פותחים את דף התשלום…", secure: "התשלום מתבצע אצל Polar, ספק תשלומים מאובטח. פרטי האשראי לא מגיעים אלינו.",
+    later: "אמשיך אחר כך", billingOff: "התשלום באתר עדיין לא מופעל. כתבו לנו ל־support@perkly.shop ונפעיל לכם את החשבון.",
+    payFail: "לא הצלחנו לפתוח את דף התשלום. נסו שוב.",
+    waitTitle: "מאשרים את הפרטים…", waitText: "זה לוקח בדרך כלל כמה שניות.",
+    waitSlow: "הפרטים התקבלו, והאישור מתעכב. רעננו את הדף בעוד דקה. אם זה נמשך, כתבו ל־support@perkly.shop.",
+    doneTitle: "הכל מוכן. אפשר להתחיל!", doneIntro: "תלו את ה־QR ליד הקופה. לקוח סורק, נרשם בשנייה ומקבל כרטיס אישי.",
+    scan: "סרקו והצטרפו לכרטיס", print: "הדפסת ה־QR", dashboard: "ללוח הבקרה", station: "פתיחת עמדת עובד",
+    staffOnly: "החשבון שלך הוא חשבון עובד. כדי לפתוח עסק משלך, אפשר להמשיך כאן.",
+    tip: "טיפ: אפשר להזמין עובדים ולשנות עיצוב בכל רגע מלוח הבקרה.",
+  },
+  ar: {
+    steps: ["الحساب", "المشروع والبطاقة", "الدفع", "نبدأ"],
+    login: "لدي حساب", home: "الصفحة الرئيسية",
+    accountTitle: "إنشاء حساب", accountIntro: "ثلاث دقائق وتكونون جاهزين للختم الأول.",
+    name: "اسمك", email: "البريد الإلكتروني", password: "كلمة المرور", passwordHint: "8 أحرف على الأقل", code: "رمز التسجيل",
+    agree: "بالمتابعة أوافق على", terms: "شروط الاستخدام", and: "و", privacy: "سياسة الخصوصية",
+    next: "متابعة", working: "لحظة…",
+    bizTitle: "المشروع والبطاقة", bizIntro: "اختاروا نوع المشروع وشاهدوا البطاقة تتحدث. يمكن تغيير التصميم كله لاحقاً.",
+    kind: "نوع المشروع", bizName: "اسم المشروع", reward: "المكافأة", target: "أختام للمكافأة", other: "آخر",
+    preview: "هكذا يرى الزبائن البطاقة", createBiz: "حفظ ومتابعة للدفع",
+    payTitle: "تفعيل الاشتراك", payIntro: "بطاقتكم جاهزة. أدخلوا تفاصيل البطاقة الائتمانية، احصلوا على رمز QR وابدؤوا فوراً.",
+    plan: "اشتراك Perkly", price: "99 ₪", per: "شهرياً", noSetup: "3 أيام تجربة مجانية. أول دفعة بعد 3 أيام فقط، وإن ألغيتم قبل ذلك لا تدفعون شيئاً. بدون رسوم تأسيس.",
+    features: ["بطاقة بتصميم مشروعك", "انضمام الزبائن عبر QR", "Google Wallet لزبائن أندرويد", "محطة موظف ودعوة موظفين", "لوحة تحكم وتنبيهات"],
+    pay: "ابدأوا 3 أيام تجربة", paying: "نفتح صفحة الدفع…", secure: "الدفع يتم عبر Polar، مزود دفع آمن. تفاصيل البطاقة لا تصل إلينا.",
+    later: "سأكمل لاحقاً", billingOff: "الدفع في الموقع غير مفعّل بعد. راسلونا على support@perkly.shop وسنفعّل حسابكم.",
+    payFail: "لم نتمكن من فتح صفحة الدفع. حاولوا مجدداً.",
+    waitTitle: "نؤكد الدفع…", waitText: "يستغرق ذلك عادة بضع ثوانٍ.",
+    waitSlow: "تم استلام الدفع والتأكيد يتأخر. حدّثوا الصفحة بعد دقيقة. إن استمر ذلك راسلونا على support@perkly.shop.",
+    doneTitle: "كل شيء جاهز. لنبدأ!", doneIntro: "علّقوا رمز QR بجانب الصندوق. الزبون يمسح، يسجل بثانية ويحصل على بطاقة شخصية.",
+    scan: "امسحوا وانضموا للبطاقة", print: "طباعة رمز QR", dashboard: "إلى لوحة التحكم", station: "فتح محطة الموظف",
+    staffOnly: "حسابك حساب موظف. لفتح مشروع خاص بك، تابع هنا.",
+    tip: "نصيحة: يمكن دعوة موظفين وتغيير التصميم في أي وقت من لوحة التحكم.",
+  },
+  en: {
+    steps: ["Account", "Business & card", "Payment", "Start"],
+    login: "I have an account", home: "Home",
+    accountTitle: "Create your account", accountIntro: "Three minutes and you're ready for the first stamp.",
+    name: "Your name", email: "Email", password: "Password", passwordHint: "At least 8 characters", code: "Sign-up code",
+    agree: "By continuing I accept the", terms: "terms of use", and: "and the", privacy: "privacy policy",
+    next: "Continue", working: "One moment…",
+    bizTitle: "Your business and card", bizIntro: "Pick your type of business and watch the card update. You can change the whole design later.",
+    kind: "Type of business", bizName: "Business name", reward: "Reward", target: "Stamps for a reward", other: "Other",
+    preview: "What your customers will see", createBiz: "Save and continue to payment",
+    payTitle: "Activate your subscription", payIntro: "Your card is ready. Add your payment card, get your QR code and start right away.",
+    plan: "Perkly subscription", price: "₪99", per: "a month", noSetup: "3-day free trial. You're first charged after 3 days, and if you cancel before then you pay nothing. No setup fee.",
+    features: ["A card in your business's look", "Customers join with a QR code", "Google Wallet for Android customers", "Staff station and team invites", "Dashboard and alerts"],
+    pay: "Start the 3-day trial", paying: "Opening the payment page…", secure: "Payment is handled by Polar, a secure payment provider. Your card details never reach us.",
+    later: "I'll finish later", billingOff: "Online payment isn't switched on yet. Email support@perkly.shop and we'll activate your account.",
+    payFail: "We couldn't open the payment page. Please try again.",
+    waitTitle: "Confirming your payment…", waitText: "This usually takes a few seconds.",
+    waitSlow: "Your payment went through and the confirmation is running late. Refresh in a minute. If it continues, email support@perkly.shop.",
+    doneTitle: "All set. Let's start!", doneIntro: "Put the QR code by the register. A customer scans, signs up in seconds and gets a personal card.",
+    scan: "Scan to join our card", print: "Print the QR code", dashboard: "Go to dashboard", station: "Open the staff station",
+    staffOnly: "Your account is a staff account. To open a business of your own, continue here.",
+    tip: "Tip: invite staff and change the design anytime from the dashboard.",
+  },
+};
+
+const noSubscribe = () => () => {};
+function readLang(): Lang {
+  try {
+    const q = new URLSearchParams(window.location.search).get("lang");
+    if (q === "ar" || q === "he" || q === "en") return q;
+    const saved = localStorage.getItem("perkly-language");
+    if (saved === "ar" || saved === "en") return saved;
+  } catch {}
+  return "he";
+}
+
+/** The card a new business starts with: the example look for its type, with the owner's own texts. */
+function startDesign(kind: Kind, name: string, reward: string): Design {
+  const th = kind === "other" ? OTHER_THEME : THEMES[kind];
+  const base = defaultDesign({ name: name || "Perkly", reward: reward || "-", color: th.bg });
+  const light = onColor(th.bg) !== "#FFFFFF";
+  return {
+    ...base,
+    colors: { bg: th.bg, fg: th.fg, stamp: th.stamp },
+    stamp: { icon: ICON[kind], image: null },
+    look: { ...defaultLook(th.bg), bg2: light ? darken(th.bg, 0.1) : darken(th.bg, 0.32) },
+  };
+}
+
+function firstStep(signedIn: boolean, business: StartBusiness | null, billingOn: boolean, paidReturn: boolean): Step {
+  if (!signedIn) return "account";
+  if (!business) return "business";
+  if (business.paid) return "done";
+  if (paidReturn) return "wait";
+  return billingOn || !business.canWork ? "pay" : "done";
+}
+
+export default function StartFlow({ signedIn, userName, needsCode, business: initialBusiness, isStaffOnly, billingOn, paidReturn }: {
+  signedIn: boolean; userName: string; needsCode: boolean; business: StartBusiness | null; isStaffOnly: boolean; billingOn: boolean; paidReturn: boolean;
+}) {
+  const lang = useSyncExternalStore(noSubscribe, readLang, () => "he" as Lang);
+  const t = T[lang];
+  const tr = (key: string, vars?: Record<string, string | number>) => translate(lang, key, vars);
+  const dir = lang === "en" ? "ltr" : "rtl";
+
+  const [step, setStep] = useState<Step>(() => firstStep(signedIn, initialBusiness, billingOn, paidReturn));
+  const [business, setBusiness] = useState<StartBusiness | null>(initialBusiness);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const headingRef = useRef<HTMLHeadingElement>(null);
+
+  // Card being set up (step 2).
+  const examples = COPY[lang].examples.list;
+  const [kind, setKind] = useState<Kind>("cafe");
+  const ex = kind === "other" ? null : examples.find((e) => e.key === kind)!;
+  const [bizName, setBizName] = useState("");
+  const [reward, setReward] = useState("");
+  const [rewardEdited, setRewardEdited] = useState(false);
+  const [target, setTarget] = useState(10);
+  const suggestedReward = ex ? ex.reward.charAt(0).toUpperCase() + ex.reward.slice(1) : "";
+  const shownReward = rewardEdited ? reward : suggestedReward;
+  const design = useMemo(() => startDesign(kind, bizName || (ex?.name ?? t.bizName), shownReward), [kind, bizName, shownReward, ex, t.bizName]);
+
+  // Live card for the payment step, read from the server once the business exists.
+  const [liveDesign, setLiveDesign] = useState<Design | null>(null);
+  const [liveTarget, setLiveTarget] = useState(10);
+  const [slow, setSlow] = useState(false);
+
+  useEffect(() => {
+    headingRef.current?.focus();
+    setError("");
+  }, [step]);
+
+  // Load the business (card, join code, access) for the payment, waiting and done steps.
+  useEffect(() => {
+    if (!business || !["pay", "wait", "done"].includes(step)) return;
+    let stop = false;
+    let tries = 0;
+    async function load() {
+      try {
+        const r = await fetch(`/api/loyalty?business=${encodeURIComponent(business!.id)}`, { credentials: "same-origin" });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data: any = await r.json();
+        if (stop || !data?.business) return;
+        setLiveDesign(data.design ?? null);
+        setLiveTarget(data.business.target ?? 10);
+        const ok = !!data.access?.ok;
+        setBusiness((b) => (b ? { ...b, joinCode: data.business.join_code ?? null, canWork: ok } : b));
+        if (step === "wait") {
+          if (ok && data.business.join_code) { setStep("done"); return; }
+          tries += 1;
+          if (tries > 24) { setSlow(true); return; }
+          setTimeout(load, 2500);
+        }
+      } catch {
+        if (step === "wait" && !stop) setTimeout(load, 4000);
+      }
+    }
+    load();
+    return () => { stop = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, business?.id]);
+
+  async function submitAccount(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (busy) return;
+    const f = new FormData(e.currentTarget);
+    setBusy(true);
+    setError("");
+    const r = await post("/api/auth", { action: "signup", name: f.get("name"), email: f.get("email"), password: f.get("password"), signupCode: f.get("signupCode") || undefined });
+    setBusy(false);
+    if (!r.ok) { setError(errorText(lang, r.code)); return; }
+    setStep("business");
+  }
+
+  async function submitBusiness(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (busy) return;
+    const name = bizName.trim();
+    const rewardText = shownReward.trim();
+    if (!name || !rewardText) { setError(errorText(lang, "bad_details")); return; }
+    setBusy(true);
+    setError("");
+    const created = await post<{ id: string }>("/api/loyalty", { action: "create_business", name, reward: rewardText, target, color: design.colors.bg, rewardMode: "bank" });
+    if (!created.ok) { setBusy(false); setError(errorText(lang, created.code)); return; }
+    const id = created.data.id;
+    // The card look for this type of business. If saving it fails, the business still has the default card.
+    const finalDesign = startDesign(kind, name, rewardText);
+    const saved = await post("/api/loyalty", { business: id, action: "save_design", design: finalDesign });
+    if (saved.ok) await post("/api/loyalty", { business: id, action: "publish_design" });
+    setBusiness({ id, name, joinCode: null, paid: false, canWork: false, status: "none" });
+    setBusy(false);
+    setStep("pay");
+  }
+
+  async function pay() {
+    if (!business || busy) return;
+    setBusy(true);
+    setError("");
+    const r = await post<{ url: string }>("/api/billing/checkout", { business: business.id, from: "start" });
+    if (r.ok && r.data.url) { window.location.assign(r.data.url); return; }
+    setBusy(false);
+    setError(r.ok ? t.payFail : r.code === "billing_off" ? t.billingOff : t.payFail);
+  }
+
+  const visible: Exclude<Step, "wait"> = step === "wait" ? "pay" : step;
+  const current = STEPS.indexOf(visible);
+  const joinUrl = business?.joinCode && typeof window !== "undefined" ? `${window.location.origin}/join/${business.joinCode}` : "";
+
+  return (
+    <div className="lp su st" lang={lang} dir={dir}>
+      <header className="lp-header st-noprint">
+        <div className="lp-wrap lp-header-row">
+          <a href={lang === "he" ? "/" : `/${lang}`} className="lp-home-link"><Logo label="Perkly" /></a>
+          {!signedIn ? <a href={`/login?next=/start`} className="lp-login">{t.login}</a> : <a href="/" className="lp-login">{t.dashboard}</a>}
+        </div>
+      </header>
+      <main className="lp-main lp-wrap su-main">
+        <ol className="st-steps st-noprint" aria-label="steps">
+          {STEPS.map((s, i) => (
+            <li key={s} className={i < current ? "is-done" : i === current ? "is-current" : ""} aria-current={i === current ? "step" : undefined}>
+              <span className="st-dot" aria-hidden="true">{i < current ? <Icon name="check" size={14} stroke={3} /> : i + 1}</span>
+              <span className="st-label">{t.steps[i]}</span>
+            </li>
+          ))}
+        </ol>
+
+        {step === "account" && (
+          <form className="su-card st-narrow" onSubmit={submitAccount}>
+            <h1 ref={headingRef} tabIndex={-1} className="lp-h2">{t.accountTitle}</h1>
+            <p className="lp-body">{t.accountIntro}</p>
+            <label className="su-field">{t.name}<input name="name" required maxLength={80} autoComplete="name" /></label>
+            <label className="su-field">{t.email}<input name="email" type="email" required maxLength={200} autoComplete="email" dir="ltr" inputMode="email" /></label>
+            <label className="su-field">{t.password}<input name="password" type="password" required minLength={8} maxLength={200} autoComplete="new-password" dir="ltr" /><span className="su-opt">{t.passwordHint}</span></label>
+            {needsCode && <label className="su-field">{t.code}<input name="signupCode" required maxLength={100} dir="ltr" autoComplete="off" /></label>}
+            <p className="su-opt">{t.agree} <a href="/terms" target="_blank" rel="noopener">{t.terms}</a> {t.and} <a href="/privacy" target="_blank" rel="noopener">{t.privacy}</a>.</p>
+            {error && <p className="su-summary" role="alert">{error}</p>}
+            <button className="lp-btn lp-btn-primary lp-btn-lg lp-btn-wide" disabled={busy} aria-busy={busy}>{busy ? t.working : t.next}</button>
+          </form>
+        )}
+
+        {step === "business" && (
+          <div className="st-grid">
+            <form className="su-card" onSubmit={submitBusiness}>
+              <h1 ref={headingRef} tabIndex={-1} className="lp-h2">{t.bizTitle}</h1>
+              {isStaffOnly && <p className="su-kit">{t.staffOnly}</p>}
+              {!isStaffOnly && userName && <p className="lp-body">{userName}, {t.bizIntro}</p>}
+              {(isStaffOnly || !userName) && <p className="lp-body">{t.bizIntro}</p>}
+              <fieldset className="st-kinds">
+                <legend className="su-field">{t.kind}</legend>
+                {[...examples.map((e) => ({ key: e.key as Kind, label: e.kind })), { key: "other" as Kind, label: t.other }].map((k) => (
+                  <button key={k.key} type="button" aria-pressed={kind === k.key} onClick={() => {
+                    setKind(k.key);
+                    const e2 = examples.find((e) => e.key === k.key);
+                    if (e2) setTarget(e2.target);
+                  }}>
+                    <Icon name={KIND_ICON[k.key]} size={17} />{k.label}
+                  </button>
+                ))}
+              </fieldset>
+              <label className="su-field">{t.bizName}<input value={bizName} onChange={(e) => setBizName(e.target.value)} required maxLength={40} placeholder={ex?.name ?? ""} autoComplete="organization" /></label>
+              <div className="su-row">
+                <label className="su-field">{t.reward}<input value={shownReward} onChange={(e) => { setRewardEdited(true); setReward(e.target.value); }} required maxLength={80} /></label>
+                <label className="su-field">{t.target}
+                  <select value={target} onChange={(e) => setTarget(Number(e.target.value))}>
+                    {[4, 5, 6, 7, 8, 9, 10, 12, 15].map((n) => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                </label>
+              </div>
+              {error && <p className="su-summary" role="alert">{error}</p>}
+              <button className="lp-btn lp-btn-primary lp-btn-lg lp-btn-wide" disabled={busy} aria-busy={busy}>{busy ? t.working : t.createBiz}</button>
+            </form>
+            <aside className="st-preview" aria-label={t.preview}>
+              <p className="su-opt">{t.preview}</p>
+              <div className="lp-pcard">
+                <LoyaltyCard design={design} lang={lang} stamps={Math.min(3, target)} target={target} customerName={tr("sampleCustomer")} t={tr} />
+              </div>
+            </aside>
+          </div>
+        )}
+
+        {(step === "pay" || step === "wait") && (
+          <div className="st-grid">
+            <section className="su-card" aria-labelledby="st-pay">
+              <h1 id="st-pay" ref={headingRef} tabIndex={-1} className="lp-h2">{step === "wait" ? t.waitTitle : t.payTitle}</h1>
+              {step === "wait" ? (
+                <>
+                  <p className="lp-body" role="status">{slow ? t.waitSlow : t.waitText}</p>
+                  {!slow && <span className="st-spinner" aria-hidden="true" />}
+                </>
+              ) : (
+                <>
+                  <p className="lp-body">{t.payIntro}</p>
+                  <div className="st-plan">
+                    <div className="st-plan-head"><strong>{t.plan}</strong><span><b className="lp-num">{t.price}</b> {t.per}</span></div>
+                    <ul>{t.features.map((f) => <li key={f}><Icon name="check" size={17} stroke={2.6} />{f}</li>)}</ul>
+                    <p className="su-opt">{t.noSetup}</p>
+                  </div>
+                  {error && <p className="su-summary" role="alert">{error}</p>}
+                  <button type="button" className="lp-btn lp-btn-primary lp-btn-lg lp-btn-wide" onClick={pay} disabled={busy || !billingOn} aria-busy={busy}>
+                    <Icon name="lock" size={18} />{busy ? t.paying : t.pay}
+                  </button>
+                  {!billingOn && <p className="su-summary" role="status">{t.billingOff}</p>}
+                  <p className="su-opt st-secure">{t.secure}</p>
+                  <a className="st-later" href="/">{t.later}</a>
+                </>
+              )}
+            </section>
+            <aside className="st-preview">
+              {liveDesign && <div className="lp-pcard"><LoyaltyCard design={liveDesign} lang={lang} stamps={0} target={liveTarget} t={tr} /></div>}
+            </aside>
+          </div>
+        )}
+
+        {step === "done" && business && (
+          <section className="su-card st-done" aria-labelledby="st-done">
+            <span className="su-done-icon st-noprint" aria-hidden="true"><Icon name="check" size={40} stroke={2.8} /></span>
+            <h1 id="st-done" ref={headingRef} tabIndex={-1} className="lp-h2 st-noprint">{t.doneTitle}</h1>
+            <p className="lp-lead st-noprint">{t.doneIntro}</p>
+            {joinUrl ? (
+              <div className="st-poster">
+                <strong className="st-poster-name">{business.name}</strong>
+                <QrImage text={joinUrl} size={260} label={t.scan} />
+                <span className="st-poster-scan">{t.scan}</span>
+              </div>
+            ) : (
+              <p className="su-summary st-noprint">{t.billingOff}</p>
+            )}
+            <div className="su-done-actions st-noprint">
+              {joinUrl && <button type="button" className="lp-btn lp-btn-primary" onClick={() => window.print()}><Icon name="printer" size={18} />{t.print}</button>}
+              <a className="lp-btn lp-btn-ghost" href="/">{t.dashboard}</a>
+            </div>
+            <p className="su-opt st-noprint">{t.tip}</p>
+          </section>
+        )}
+      </main>
+    </div>
+  );
+}

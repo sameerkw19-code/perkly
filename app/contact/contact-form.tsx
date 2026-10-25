@@ -11,15 +11,15 @@ import { Icon } from "../landing/visuals";
 
 const T = {
   he: {
-    title: "הצטרפות לפיילוט",
-    intro: "השאירו פרטים ונחזור אליכם עם קוד לפתיחת חשבון. התשלום באתר עדיין לא מחובר, ולא נגבה תשלום בשלב הזה.",
+    title: "דברו איתנו",
+    intro: "רוצים שנעבור איתכם על המערכת לפני שמתחילים? השאירו פרטים ונחזור אליכם בוואטסאפ או בטלפון.",
     business: "שם העסק", contact: "שם איש הקשר", phone: "טלפון", email: "אימייל", optional: "(לא חובה)",
     kind: "סוג העסק", kindPick: "בחרו…", city: "עיר", note: "משהו שחשוב שנדע?",
     kinds: { cafe: "בית קפה", barber: "מספרה", food: "מסעדה או פיצרייה", icecream: "גלידרייה", studio: "סטודיו או חדר כושר", bar: "בר", other: "אחר" },
     kit: "מעוניינים גם בערכת קופה (99 ₪ חד־פעמי): 2 פוסטרים וסטנד QR",
     privacyBefore: "קראתי את ",
     privacyLink: "מדיניות הפרטיות",
-    privacyAfter: " ואני מסכים/ה ש־Perkly תיצור איתי קשר בנוגע לפיילוט",
+    privacyAfter: " ואני מסכים/ה ש־Perkly תיצור איתי קשר",
     marketing: "אשמח לקבל מ־Perkly עדכונים והצעות (לא חובה)",
     submit: "שליחת הבקשה", sending: "שולח…",
     errSummary: "יש שדות שצריך לתקן:",
@@ -27,27 +27,28 @@ const T = {
     errRate: "נשלחו יותר מדי בקשות. נסו שוב מאוחר יותר או כתבו לנו בוואטסאפ.",
     errNet: "השליחה נכשלה. בדקו את החיבור ונסו שוב.",
     doneTitle: "קיבלנו את הבקשה!",
-    doneText: "נחזור אליכם בוואטסאפ או בטלפון, ונשלח קוד לפתיחת החשבון.",
+    doneText: "נחזור אליכם בוואטסאפ או בטלפון. רוצים להתחיל כבר עכשיו? פותחים חשבון בשלוש דקות.",
     doneWa: "רוצים לזרז? שלחו לנו הודעה",
-    doneWaText: (b: string) => `היי, השארתי בקשה להצטרף לפיילוט של Perkly (${b})`,
-    askWaText: "היי, יש לי שאלה על הפיילוט של Perkly",
+    doneWaText: (b: string) => `היי, השארתי פרטים באתר של Perkly (${b})`,
+    askWaText: "היי, יש לי שאלה על Perkly",
     home: "חזרה לדף הבית",
-    nextTitle: "מה קורה אחרי השליחה",
-    next: ["אנחנו חוזרים אליכם ושולחים קוד לפתיחת חשבון", "פותחים חשבון ומעצבים את הכרטיס", "מציבים QR בקופה ומתחילים להחתים"],
+    nextTitle: "או שמתחילים לבד",
+    next: ["פותחים חשבון ומעצבים את הכרטיס", "משלמים 99 ₪ לחודש, בלי התחייבות", "מציבים QR בקופה ומתחילים להחתים"],
     price: "99 ₪ לחודש", priceNote: "בלי דמי הקמה",
     support: "שאלות? וואטסאפ",
     login: "כבר יש לי חשבון",
+    start: "פתיחת חשבון עכשיו",
   },
   ar: {
-    title: "الانضمام للتجربة",
-    intro: "اتركوا تفاصيلكم وسنعود إليكم برمز لفتح الحساب. الدفع في الموقع غير مربوط بعد، ولا يتم تحصيل أي مبلغ في هذه المرحلة.",
+    title: "تحدثوا معنا",
+    intro: "تريدون أن نعرض عليكم النظام قبل البدء؟ اتركوا تفاصيلكم وسنعود إليكم عبر واتساب أو الهاتف.",
     business: "اسم المشروع", contact: "اسم الشخص المسؤول", phone: "الهاتف", email: "البريد الإلكتروني", optional: "(اختياري)",
     kind: "نوع المشروع", kindPick: "اختاروا…", city: "المدينة", note: "شيء مهم نعرفه؟",
     kinds: { cafe: "مقهى", barber: "صالون حلاقة", food: "مطعم أو بيتزا", icecream: "بوظة", studio: "ستوديو أو نادٍ رياضي", bar: "بار", other: "آخر" },
     kit: "مهتمون أيضاً بطقم الصندوق (99 ₪ لمرة واحدة): ملصقان وحامل QR",
     privacyBefore: "قرأت ",
     privacyLink: "سياسة الخصوصية",
-    privacyAfter: " وأوافق على أن تتواصل معي Perkly بخصوص التجربة",
+    privacyAfter: " وأوافق على أن تتواصل معي Perkly",
     marketing: "يسعدني تلقي تحديثات وعروض من Perkly (اختياري)",
     submit: "إرسال الطلب", sending: "جارٍ الإرسال…",
     errSummary: "هناك حقول يجب تصحيحها:",
@@ -55,27 +56,28 @@ const T = {
     errRate: "تم إرسال طلبات كثيرة. حاولوا لاحقاً أو راسلونا عبر واتساب.",
     errNet: "فشل الإرسال. تحققوا من الاتصال وحاولوا مجدداً.",
     doneTitle: "استلمنا طلبكم!",
-    doneText: "سنعود إليكم عبر واتساب أو الهاتف، ونرسل رمزاً لفتح الحساب.",
+    doneText: "سنعود إليكم عبر واتساب أو الهاتف. تريدون البدء الآن؟ فتح الحساب يستغرق ثلاث دقائق.",
     doneWa: "تريدون التسريع؟ أرسلوا لنا رسالة",
-    doneWaText: (b: string) => `مرحباً، تركت طلباً للانضمام لتجربة Perkly (${b})`,
-    askWaText: "مرحباً، لدي سؤال عن تجربة Perkly",
+    doneWaText: (b: string) => `مرحباً، تركت تفاصيلي في موقع Perkly (${b})`,
+    askWaText: "مرحباً، لدي سؤال عن Perkly",
     home: "العودة للصفحة الرئيسية",
-    nextTitle: "ماذا يحدث بعد الإرسال",
-    next: ["نعود إليكم ونرسل رمزاً لفتح الحساب", "تفتحون الحساب وتصممون البطاقة", "تضعون رمز QR عند الصندوق وتبدؤون بالأختام"],
+    nextTitle: "أو ابدأوا بأنفسكم",
+    next: ["تفتحون حساباً وتصممون البطاقة", "تدفعون 99 ₪ شهرياً بدون التزام", "تضعون رمز QR عند الصندوق وتبدؤون بالأختام"],
     price: "99 ₪ شهرياً", priceNote: "بدون رسوم تأسيس",
     support: "أسئلة؟ واتساب",
     login: "لدي حساب",
+    start: "فتح حساب الآن",
   },
   en: {
-    title: "Join the pilot",
-    intro: "Leave your details and we'll get back to you with a code to open your account. Online payment isn't connected yet, and nothing is charged at this stage.",
+    title: "Talk to us",
+    intro: "Want us to walk you through Perkly before you start? Leave your details and we'll get back to you on WhatsApp or by phone.",
     business: "Business name", contact: "Contact name", phone: "Phone", email: "Email", optional: "(optional)",
     kind: "Type of business", kindPick: "Choose…", city: "City", note: "Anything we should know?",
     kinds: { cafe: "Café", barber: "Barbershop", food: "Restaurant or pizzeria", icecream: "Ice cream shop", studio: "Studio or gym", bar: "Bar", other: "Other" },
     kit: "I'm also interested in a counter kit (₪99 one-time): 2 posters and a QR stand",
     privacyBefore: "I've read the ",
     privacyLink: "privacy policy",
-    privacyAfter: " (in Hebrew) and agree that Perkly may contact me about the pilot",
+    privacyAfter: " (in Hebrew) and agree that Perkly may contact me",
     marketing: "Send me updates and offers from Perkly (optional)",
     submit: "Send request", sending: "Sending…",
     errSummary: "Please fix these fields:",
@@ -83,16 +85,17 @@ const T = {
     errRate: "Too many requests. Try again later or message us on WhatsApp.",
     errNet: "Sending failed. Check your connection and try again.",
     doneTitle: "We got your request!",
-    doneText: "We'll get back to you on WhatsApp or by phone, and send a code to open your account.",
+    doneText: "We'll get back to you on WhatsApp or by phone. Want to start right away? Opening an account takes three minutes.",
     doneWa: "In a hurry? Send us a message",
-    doneWaText: (b: string) => `Hi, I sent a request to join the Perkly pilot (${b})`,
-    askWaText: "Hi, I have a question about the Perkly pilot",
+    doneWaText: (b: string) => `Hi, I left my details on the Perkly site (${b})`,
+    askWaText: "Hi, I have a question about Perkly",
     home: "Back to home",
-    nextTitle: "What happens next",
-    next: ["We get back to you and send a code to open your account", "You open your account and design your card", "You put up the QR code and start stamping"],
+    nextTitle: "Or start on your own",
+    next: ["Open an account and design your card", "Pay ₪99 a month, no commitment", "Put up the QR code and start stamping"],
     price: "₪99 a month", priceNote: "No setup fee",
     support: "Questions? WhatsApp",
     login: "I have an account",
+    start: "Create an account now",
   },
 };
 
@@ -111,7 +114,7 @@ function readLang(): Lang {
   return "he";
 }
 
-export default function SignupFlow() {
+export default function ContactForm() {
   // Hebrew on the server; the browser picks ?lang= or the saved choice.
   const lang = useSyncExternalStore(noSubscribe, readLang, () => "he" as Lang);
   const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({});
@@ -210,6 +213,7 @@ export default function SignupFlow() {
             <p className="lp-lead">{t.doneText}</p>
             <div className="su-done-actions">
               <a className="lp-btn lp-btn-primary" href={waLink(t.doneWaText(done))} target="_blank" rel="noopener noreferrer"><Icon name="message" size={18} />{t.doneWa}</a>
+              <a className="lp-btn lp-btn-dark" href={h.signup}>{t.start}</a>
               <a className="lp-btn lp-btn-ghost" href={h.home}>{t.home}</a>
             </div>
           </section>
@@ -264,6 +268,7 @@ export default function SignupFlow() {
                 {t.next.map((s, i) => <li key={s}><span>{i + 1}</span>{s}</li>)}
               </ol>
               <p className="su-price"><strong>{t.price}</strong> · {t.priceNote}</p>
+              <a className="lp-btn lp-btn-dark lp-btn-wide" href={h.signup}>{t.start}</a>
               <a href={waLink(t.askWaText)} target="_blank" rel="noopener noreferrer" className="su-support"><Icon name="message" size={18} />{t.support}&nbsp;<bdi className="lp-num">{WHATSAPP_DISPLAY}</bdi></a>
             </aside>
           </div>

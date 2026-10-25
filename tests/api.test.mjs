@@ -61,9 +61,15 @@ test("forged identity headers are ignored; pages require sign-in", async () => {
   const html = await page.text();
   assert.match(html, /הכרטיס שגורם ללקוחות לחזור/);
   assert.doesNotMatch(html, /oai-authenticated|join_code/);
+  // Sign-up is the guided setup; the old address forwards there. "Talk to us" is a separate form.
   const signup = await fetch(BASE + "/signup", { redirect: "manual" });
-  assert.equal(signup.status, 200);
-  assert.match(await signup.text(), /הצטרפות לפיילוט/);
+  assert.ok([302, 303, 307, 308].includes(signup.status), `signup status ${signup.status}`);
+  assert.match(signup.headers.get("location") ?? "", /\/start$/);
+  const start = await fetch(BASE + "/start", { redirect: "manual" });
+  assert.equal(start.status, 200);
+  assert.match(await start.text(), /Perkly/);
+  const contact = await fetch(BASE + "/contact", { redirect: "manual" });
+  assert.equal(contact.status, 200);
   const arabic = await fetch(BASE + "/ar", { redirect: "manual" });
   assert.equal(arabic.status, 200);
   assert.match(await arabic.text(), /البطاقة التي تجعل الزبائن يعودون/);
