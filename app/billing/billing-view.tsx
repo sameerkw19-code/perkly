@@ -14,7 +14,7 @@ const STATUS_LABEL: Record<string, string> = {
   incomplete: "לא הושלם",
 };
 
-const PRICE_TEXT = "99 ₪ לחודש, בלי דמי הקמה";
+const PRICE_TEXT = "99 ₪ לחודש, בלי דמי הקמה. למנוי חדש 14 ימי ניסיון חינם.";
 
 export default function BillingView({ businesses, configured }: { businesses: BillingBusiness[]; configured: boolean }) {
   const [busy, setBusy] = useState<string | null>(null);
