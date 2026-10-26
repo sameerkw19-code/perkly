@@ -49,7 +49,6 @@ export function SiteNav({ lang }: { lang: Lang }) {
   const langLinks = (
     <span className="lp-langs" role="group" aria-label={c.lang}>
       <a href="/" lang="he" hrefLang="he" aria-current={lang === "he" ? "true" : undefined} onClick={() => rememberLang("he")}>עברית</a>
-      <a href="/ar" lang="ar" hrefLang="ar" aria-current={lang === "ar" ? "true" : undefined} onClick={() => rememberLang("ar")}>العربية</a>
       <a href="/en" lang="en" hrefLang="en" aria-current={lang === "en" ? "true" : undefined} onClick={() => rememberLang("en")}>English</a>
     </span>
   );
