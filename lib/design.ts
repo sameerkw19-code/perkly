@@ -39,11 +39,40 @@ export type CardLook = {
   font: FontId;
   text: Size;
   stamps: Size;
+  /** Logo height on the web card, 60–200 (% of the normal size). */
+  logoSize: number;
+  /** "none": the logo as it is; "circle" / "square": on a white badge (good for logos with a white background). */
+  logoFrame: LogoFrame;
+  /** Show the card name next to the logo. */
+  logoName: boolean;
 };
+export const LOGO_FRAMES = ["none", "circle", "square"] as const;
+export type LogoFrame = (typeof LOGO_FRAMES)[number];
 
 export function fontHref(font: FontId): string | null {
   const g = FONTS[font]?.google;
   return g ? `https://fonts.googleapis.com/css2?family=${g}&display=swap` : null;
+}
+
+/** Which scripts each font draws. Arial (system) has both Hebrew and Arabic on phones and computers. */
+export const FONT_SCRIPTS: Record<FontId, { he: boolean; ar: boolean }> = {
+  system: { he: true, ar: true }, rubik: { he: true, ar: true }, heebo: { he: true, ar: false },
+  assistant: { he: true, ar: false }, varela: { he: true, ar: false }, secular: { he: true, ar: false },
+  frank: { he: true, ar: false }, amatic: { he: true, ar: false }, cairo: { he: false, ar: true },
+};
+
+/**
+ * A font for the card text in this language. If the chosen font has no Hebrew or no Arabic,
+ * a matching font is added after it (Rubik for Hebrew, Cairo for Arabic), so letters never fall
+ * back to a random system font and the card keeps a designed look in right-to-left languages.
+ */
+export function cardFont(font: FontId, lang: Lang): { family: string; extra: FontId | null } {
+  const f = FONTS[font] ?? FONTS.system;
+  const scripts = FONT_SCRIPTS[font] ?? FONT_SCRIPTS.system;
+  const extra: FontId | null = lang === "ar" && !scripts.ar ? "cairo" : lang === "he" && !scripts.he ? "rubik" : null;
+  if (!extra) return { family: f.family, extra: null };
+  const [first, ...rest] = f.family.split(",");
+  return { family: [first, FONTS[extra].family.split(",")[0], ...rest].join(",").replace(/,\s*/g, ", "), extra };
 }
 
 export type Design = {
@@ -53,6 +82,8 @@ export type Design = {
   stamp: { icon: StampIcon; image: string | null };
   logo: string | null;
   hero: string | null;
+  /** Wallet banner (Google Wallet hero image, Apple strip later). Falls back to the background image. */
+  walletHero: string | null;
   texts: Record<Lang, Texts>;
   showCustomerName: boolean;
   look: CardLook;
@@ -60,7 +91,7 @@ export type Design = {
 
 export const LIMITS = { title: 40, subtitle: 40, reward: 80, gift: 14 };
 export const WALLET_LIMITS = { title: 24, reward: 36 };
-export const IMAGE_MIN = { logo: 660, hero: 1032, stamp: 120 };
+export const IMAGE_MIN = { logo: 660, hero: 1032, stamp: 120, wallet: 1032 };
 
 export const PALETTES: Record<string, { bg: string; fg: string; stamp: string }> = {
   charcoal: { bg: "#1E1B2E", fg: "#FFFFFF", stamp: "#D9F493" },
@@ -95,7 +126,7 @@ export function darken(hex: string, amount = 0.35): string {
 }
 
 export function defaultLook(bg: string): CardLook {
-  return { bg2: darken(HEX.test(bg) ? bg : "#1E1B2E"), dir: "diag", overlay: 55, font: "system", text: "m", stamps: "m" };
+  return { bg2: darken(HEX.test(bg) ? bg : "#1E1B2E"), dir: "diag", overlay: 55, font: "system", text: "m", stamps: "m", logoSize: 100, logoFrame: "none", logoName: false };
 }
 const ASSET_ID = /^[0-9a-f-]{36}$/;
 
@@ -110,6 +141,7 @@ export function defaultDesign(b: { name: string; reward: string; color: string }
     stamp: { icon: "coffee", image: null },
     logo: null,
     hero: null,
+    walletHero: null,
     texts: { he: t("he"), ar: t("ar"), en: t("en") },
     showCustomerName: true,
     look: defaultLook(HEX.test(b.color) ? b.color : "#1E1B2E"),
@@ -146,6 +178,7 @@ export function sanitizeDesign(input: unknown): Design | null {
     stamp: { icon, image: asset(d.stamp?.image) },
     logo: asset(d.logo),
     hero: asset(d.hero),
+    walletHero: asset(d.walletHero),
     texts,
     showCustomerName: d.showCustomerName !== false,
     look: sanitizeLook(d.look, colors.bg.toUpperCase()),
@@ -159,6 +192,7 @@ function sanitizeLook(input: unknown, bg: string): CardLook {
   const l = input as any;
   const size = (v: unknown, fb: Size): Size => (v === "s" || v === "m" || v === "l" ? v : fb);
   const overlay = Number(l.overlay);
+  const logoSize = Number(l.logoSize);
   return {
     bg2: typeof l.bg2 === "string" && HEX.test(l.bg2) ? l.bg2.toUpperCase() : base.bg2,
     dir: (GRADIENT_DIRS as readonly string[]).includes(l.dir) ? l.dir : base.dir,
@@ -166,11 +200,14 @@ function sanitizeLook(input: unknown, bg: string): CardLook {
     font: typeof l.font === "string" && Object.prototype.hasOwnProperty.call(FONTS, l.font) ? (l.font as FontId) : base.font,
     text: size(l.text, base.text),
     stamps: size(l.stamps, base.stamps),
+    logoSize: Number.isFinite(logoSize) ? Math.max(60, Math.min(200, Math.round(logoSize / 10) * 10)) : base.logoSize,
+    logoFrame: (LOGO_FRAMES as readonly string[]).includes(l.logoFrame) ? l.logoFrame : base.logoFrame,
+    logoName: l.logoName === true,
   };
 }
 
 export function assetIds(d: Design): string[] {
-  return [d.logo, d.hero, d.stamp.image].filter((x): x is string => !!x);
+  return [d.logo, d.hero, d.walletHero, d.stamp.image].filter((x): x is string => !!x);
 }
 
 // ---- Readability checks (WCAG contrast) ----
@@ -220,6 +257,9 @@ export function designChecks(d: Design, assets: AssetMeta[]): Check[] {
   if (d.hero && !hero) out.push({ level: "bad", key: "chkMissingImage" });
   else if (hero) out.push(hero.width < IMAGE_MIN.hero ? { level: "warn", key: "chkHeroSmall", vars: { w: hero.width } } : { level: "ok", key: "chkHeroOk" });
   if (d.layout === "photo" && !d.hero) out.push({ level: "bad", key: "chkPhotoNeedsImage" });
+  const wallet = meta(d.walletHero);
+  if (d.walletHero && !wallet) out.push({ level: "bad", key: "chkMissingImage" });
+  else if (wallet && wallet.width < IMAGE_MIN.wallet) out.push({ level: "warn", key: "chkWalletSmall", vars: { w: wallet.width } });
   if (d.stamp.icon === "logo" && !d.logo) out.push({ level: "bad", key: "chkStampLogoMissing" });
   if (d.stamp.icon === "image") {
     const img = meta(d.stamp.image);
@@ -233,6 +273,11 @@ export function designChecks(d: Design, assets: AssetMeta[]): Check[] {
   else out.push({ level: "ok", key: "chkAllLangs" });
   if (langs.some((l) => d.texts[l].title.length > WALLET_LIMITS.title || d.texts[l].reward.length > WALLET_LIMITS.reward)) {
     out.push({ level: "warn", key: "chkLongForWallet" });
+  }
+  // Arabic or English texts that are still the Hebrew ones: customers who read that language see Hebrew.
+  const HEBREW = /[\u0590-\u05FF]/;
+  for (const l of ["ar", "en"] as Lang[]) {
+    if (HEBREW.test(d.texts[l].reward) || HEBREW.test(d.texts[l].subtitle) || HEBREW.test(d.texts[l].gift)) out.push({ level: "warn", key: "chkNotTranslated", vars: { l } });
   }
   if (d.layout !== "solid" || d.look.font !== "system") out.push({ level: "info", key: "chkWalletLook" });
   return out;

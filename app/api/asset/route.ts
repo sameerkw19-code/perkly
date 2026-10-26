@@ -9,7 +9,7 @@ import { allow } from "../../../lib/server/rate-limit";
 export const dynamic = "force-dynamic";
 
 const MAX_BYTES = 800_000; // The editor shrinks images before upload; this is a safety cap.
-const KINDS = new Set(["logo", "hero", "stamp"]);
+const KINDS = new Set(["logo", "hero", "stamp", "wallet"]);
 
 // Upload one image (raw bytes in the body). Owner only. SVG is not accepted.
 export async function POST(request: Request) {

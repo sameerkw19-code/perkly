@@ -2,7 +2,7 @@ import {
   Beer, Cake, Coffee, Croissant, CupSoda, Gift, GlassWater, Hamburger, Heart, IceCreamCone, Martini,
   Pizza, Sandwich, Scissors, ShoppingBag, Sparkles, Star, Utensils,
 } from "lucide-react";
-import { FONTS, assetUrl, fontHref, onColor, textsFor, type Design, type PresetIcon } from "../lib/design";
+import { assetUrl, cardFont, fontHref, onColor, textsFor, type Design, type PresetIcon } from "../lib/design";
 import type { Lang } from "../lib/i18n-types";
 
 export const ICONS: Record<PresetIcon, any> = {
@@ -80,28 +80,32 @@ export function cardStyle(design: Design): React.CSSProperties {
 const TEXT_SCALE = { s: 0.9, m: 1, l: 1.14 } as const;
 const STAMP_SIZE = { s: "44px", m: "56px", l: "68px" } as const;
 const GRADIENT_ANGLE = { down: "180deg", diag: "150deg", side: "90deg" } as const;
+const GRADIENT_ANGLE_RTL = { down: "180deg", diag: "210deg", side: "270deg" } as const;
 
 /** Extra variables for the wallet-style card: gradient, photo overlay, font and sizes. */
-function lookStyle(design: Design): React.CSSProperties {
+function lookStyle(design: Design, lang: Lang): React.CSSProperties {
   const look = design.look;
+  // Right-to-left cards (Hebrew, Arabic) mirror sideways gradients, so the main color sits behind the logo and title.
+  const rtl = lang !== "en";
   const fill = look.dir === "radial"
     ? `radial-gradient(120% 120% at 50% 0%, ${design.colors.bg} 0%, ${look.bg2} 100%)`
-    : `linear-gradient(${GRADIENT_ANGLE[look.dir]}, ${design.colors.bg} 0%, ${look.bg2} 100%)`;
+    : `linear-gradient(${rtl ? GRADIENT_ANGLE_RTL[look.dir] : GRADIENT_ANGLE[look.dir]}, ${design.colors.bg} 0%, ${look.bg2} 100%)`;
   return {
     ...cardStyle(design),
     "--c-bg2": look.bg2,
     "--c-fill": fill,
     "--c-ov": `${look.overlay}%`,
-    "--c-font": FONTS[look.font]?.family ?? FONTS.system.family,
+    "--c-font": cardFont(look.font, lang).family,
     "--c-ts": TEXT_SCALE[look.text],
     "--c-ss": STAMP_SIZE[look.stamps],
+    "--c-logo": (look.logoSize ?? 100) / 100,
   } as React.CSSProperties;
 }
 
-/** Loads the card font once. Browsers accept a stylesheet link anywhere in the page. */
-function FontLink({ design }: { design: Design }) {
-  const href = fontHref(design.look.font);
-  return href ? <link rel="stylesheet" href={href} /> : null;
+/** Loads the card font (and a Hebrew or Arabic partner font when needed). Browsers accept a stylesheet link anywhere in the page. */
+function FontLink({ design, lang }: { design: Design; lang: Lang }) {
+  const hrefs = [fontHref(design.look.font), ...(cardFont(design.look.font, lang).extra ? [fontHref(cardFont(design.look.font, lang).extra!)] : [])].filter(Boolean) as string[];
+  return <>{hrefs.map((h) => <link key={h} rel="stylesheet" href={h} />)}</>;
 }
 
 /** One stamp slot. Empty slots show the same mark, dimmed. */
@@ -127,12 +131,17 @@ export function LoyaltyCard({ design, lang, stamps, target, customerName, reward
   const columns = total <= 6 ? total : Math.ceil(total / 2);
   const showName = design.showCustomerName && !!customerName;
   return (
-    <div className={`pcard layout-${design.layout} stamps-${design.look.stamps}${ready ? " is-ready" : ""}`} style={lookStyle(design)}>
-      <FontLink design={design} />
+    <div className={`pcard layout-${design.layout} stamps-${design.look.stamps}${ready ? " is-ready" : ""}`} style={lookStyle(design, lang)}>
+      <FontLink design={design} lang={lang} />
       <div className="pcard-head">
         <div className="pcard-brand">
           {design.logo ? (
-            <img className="pcard-logo" src={assetUrl(design.logo)!} alt={text.title} />
+            <div className={`pcard-logo-row frame-${design.look.logoFrame ?? "none"}`}>
+              <span className="pcard-logo-wrap">
+                <img className="pcard-logo" src={assetUrl(design.logo)!} alt={design.look.logoName ? "" : text.title} />
+              </span>
+              {design.look.logoName && <strong className="pcard-title">{text.title}</strong>}
+            </div>
           ) : (
             <strong className="pcard-title">{text.title}</strong>
           )}
@@ -185,6 +194,7 @@ export function LoyaltyCard({ design, lang, stamps, target, customerName, reward
 /** Approximate Apple Wallet store card: logo + header field, strip image with stamps, fields, code. */
 export function ApplePreview({ design, lang, stamps, target, customerName, t }: Props) {
   const text = textsFor(design, lang);
+  const banner = design.walletHero ?? design.hero;
   const label = { color: `color-mix(in srgb, ${design.colors.fg} 70%, transparent)` };
   return (
     <div className="wallet apple" style={{ ...cardStyle(design), background: design.colors.bg, color: design.colors.fg }}>
@@ -192,7 +202,7 @@ export function ApplePreview({ design, lang, stamps, target, customerName, t }: 
         <div className="ap-logo"><Logo design={design} title={text.title} className="card-logo small" /><b>{text.title}</b></div>
         {design.showCustomerName && customerName && <div className="ap-f"><small style={label}>{t("customerName")}</small><b>{customerName}</b></div>}
       </div>
-      <div className="ap-strip" style={design.hero ? { backgroundImage: `linear-gradient(color-mix(in srgb, ${design.colors.bg} 50%, transparent), color-mix(in srgb, ${design.colors.bg} 50%, transparent)), url(${assetUrl(design.hero)})` } : undefined}>
+      <div className="ap-strip" style={banner ? { backgroundImage: `linear-gradient(color-mix(in srgb, ${design.colors.bg} 50%, transparent), color-mix(in srgb, ${design.colors.bg} 50%, transparent)), url(${assetUrl(banner)})` } : undefined}>
         <StampGrid design={design} stamps={stamps} target={target} giftLabel={text.gift} />
       </div>
       <div className="ap-row">
@@ -207,6 +217,7 @@ export function ApplePreview({ design, lang, stamps, target, customerName, t }: 
 /** Approximate Google Wallet loyalty card: round logo, fixed header, rows, code, hero image. */
 export function GooglePreview({ design, lang, stamps, target, customerName, t }: Props) {
   const text = textsFor(design, lang);
+  const banner = design.walletHero ?? design.hero;
   const fg = onColor(design.colors.bg);
   return (
     <div className="wallet google" style={{ ...cardStyle(design), background: design.colors.bg, color: fg, ["--c-fg" as any]: fg }}>
@@ -220,7 +231,7 @@ export function GooglePreview({ design, lang, stamps, target, customerName, t }:
         </div>
         <div className="fake-qr">QR</div>
       </div>
-      <div className="gw-hero" style={design.hero ? { backgroundImage: `url(${assetUrl(design.hero)})` } : undefined}>
+      <div className="gw-hero" style={banner ? { backgroundImage: `url(${assetUrl(banner)})` } : undefined}>
         <StampGrid design={design} stamps={stamps} target={target} giftLabel={text.gift} />
       </div>
     </div>

@@ -219,7 +219,14 @@ select.needs-choice{border-color:#f0a050;box-shadow:0 0 0 3px #f0a05022}
 
 .pcard-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;min-height:44px}
 .pcard-brand{display:grid;gap:4px;min-width:0}
-.pcard-logo{display:block;height:calc(clamp(36px,9vw,48px) * var(--c-ts));width:auto;max-width:min(200px,55vw);object-fit:contain;object-position:center;background:none}
+.pcard-logo{display:block;height:calc(clamp(36px,9vw,48px) * var(--c-logo,1));width:auto;max-width:min(calc(200px * var(--c-logo,1)),58vw);object-fit:contain;object-position:center;background:none}
+.pcard-logo-row{display:flex;align-items:center;gap:12px;min-width:0}
+.pcard-logo-row .pcard-title{min-width:0}
+.pcard-logo-wrap{display:block;flex:none}
+.pcard-logo-row:not(.frame-none) .pcard-logo-wrap{--lw:calc(clamp(40px,10vw,52px) * var(--c-logo,1));width:var(--lw);height:var(--lw);background:#fff;padding:calc(var(--lw) * .1);box-shadow:0 2px 8px #0000002e;overflow:hidden}
+.pcard-logo-row.frame-circle .pcard-logo-wrap{border-radius:50%}
+.pcard-logo-row.frame-square .pcard-logo-wrap{border-radius:22%}
+.pcard-logo-row:not(.frame-none) .pcard-logo{width:100%;height:100%;max-width:none;object-position:center!important}
 [dir=rtl] .pcard-logo{object-position:right center}[dir=ltr] .pcard-logo{object-position:left center}
 .pcard-title{font-size:calc(clamp(17px,4.4vw,20px) * var(--c-ts));font-weight:700;letter-spacing:-.2px;line-height:1.2;overflow-wrap:anywhere}
 .pcard-sub{font-size:calc(11px * var(--c-ts));opacity:.68;letter-spacing:.3px}
@@ -334,3 +341,13 @@ fieldset.birthday{border:0;padding:0;margin:0 0 14px}fieldset.birthday legend{fo
 .clear-white{display:flex;gap:10px;align-items:flex-start;margin-top:12px;font-size:13.5px;cursor:pointer}
 .clear-white input{margin-top:3px;accent-color:var(--purple);width:16px;height:16px;flex:none}
 .clear-white span{display:grid;gap:2px}
+.logo-controls{margin-top:14px;padding-top:12px;border-top:1px dashed var(--line);display:grid;gap:10px}
+.logo-controls .sub-head{margin:0}
+.wallet-jump{justify-self:center}
+.design-help{display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:14px;background:#e9f9ef;color:#0d5c32;text-decoration:none;border:1px solid #bfe9cf}
+.design-help:hover{background:#dcf5e5}
+.design-help span{display:grid;gap:2px}
+.design-help small{font-size:12.5px;color:#2f6b49}
+.design-help svg{flex:none}
+.preview-langs{justify-content:center}
+.font-scripts{font-size:10px;color:var(--muted,#6b6880);letter-spacing:.02em;font-family:system-ui,sans-serif}

@@ -40,9 +40,11 @@ export async function passLook(db: D1Database, business: BusinessLike, origin: s
   const design = await liveDesign(db, business);
   const text = textsFor(design, "he");
   let heroUrl: string | null = null;
-  if (design.hero) {
-    const row = await db.prepare("SELECT mime FROM assets WHERE id = ? AND business = ?").bind(design.hero, business.id).first<{ mime: string }>();
-    if (row && (row.mime === "image/jpeg" || row.mime === "image/png")) heroUrl = `${origin}/api/asset/${design.hero}`;
+  // The wallet banner if the business made one, otherwise its background image.
+  const banner = design.walletHero ?? design.hero;
+  if (banner) {
+    const row = await db.prepare("SELECT mime FROM assets WHERE id = ? AND business = ?").bind(banner, business.id).first<{ mime: string }>();
+    if (row && (row.mime === "image/jpeg" || row.mime === "image/png")) heroUrl = `${origin}/api/asset/${banner}`;
   }
   return { title: (text.title || business.name).slice(0, 60), reward: (text.reward || business.reward).slice(0, 120), heroUrl };
 }
