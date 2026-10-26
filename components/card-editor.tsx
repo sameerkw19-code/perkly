@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import { ImagePlus, Lock, MessageCircle, Shuffle, Trash2, UploadCloud } from "lucide-react";
 import {
-  FONTS, FONT_SCRIPTS, GRADIENTS, GRADIENT_DIRS, IMAGE_MIN, LIMITS, PALETTES, STAMP_ICONS, cardLang, darken, designChecks,
+  FONTS, FONT_SCRIPTS, GRADIENTS, GRADIENT_DIRS, IMAGE_MIN, LIMITS, OFFERED_CARD_LANGS, PALETTES, STAMP_ICONS, cardLang, darken, designChecks,
   type AssetMeta, type CardLook, type Design, type FontId, type Layout, type LogoFrame, type Size, type StampIcon, type Texts,
 } from "../lib/design";
 import { CARD_LANGS, isRtl, type Lang } from "../lib/i18n-types";
@@ -252,7 +252,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
           <h2>{t("edLangs")}</h2>
           <p className="form-hint">{t("edLangsHint")}</p>
           <div className="seg langs-pick" role="group" aria-label={t("edLangs")}>
-            {CARD_LANGS.map((l) => {
+            {CARD_LANGS.filter((l) => OFFERED_CARD_LANGS.includes(l) || design.langs.includes(l)).map((l) => {
               const on = design.langs.includes(l);
               return (
                 <button key={l} type="button" aria-pressed={on} disabled={on && design.langs.length === 1} onClick={() => toggleLang(l)}>

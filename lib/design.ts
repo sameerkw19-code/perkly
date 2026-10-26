@@ -8,6 +8,12 @@
 export const CARD_LANGS = ["he", "ar", "en", "ru", "de", "fr"] as const;
 export type Lang = (typeof CARD_LANGS)[number];
 
+/**
+ * Card languages offered in the editor for now. Arabic, Russian, German and French are kept in the code
+ * and come back by adding them here. A language that is already on a card stays selectable until it is switched off.
+ */
+export const OFFERED_CARD_LANGS: Lang[] = ["he", "en"];
+
 /** Right-to-left card languages. */
 export function isRtl(l: Lang): boolean {
   return l === "he" || l === "ar";
