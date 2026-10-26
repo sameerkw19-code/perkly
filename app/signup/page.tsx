@@ -6,5 +6,5 @@ export const dynamic = "force-dynamic";
 export default async function SignupPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const lang = (await searchParams).lang;
   const l = Array.isArray(lang) ? lang[0] : lang;
-  redirect(l === "ar" || l === "en" ? `/start?lang=${l}` : "/start");
+  redirect(l === "en" ? `/start?lang=${l}` : "/start");
 }

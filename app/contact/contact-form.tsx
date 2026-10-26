@@ -107,9 +107,9 @@ const noSubscribe = () => () => {};
 function readLang(): Lang {
   try {
     const q = new URLSearchParams(window.location.search).get("lang");
-    if (q === "ar" || q === "he" || q === "en") return q;
+    if (q === "he" || q === "en") return q;
     const saved = localStorage.getItem("perkly-language");
-    if (saved === "ar" || saved === "en") return saved;
+    if (saved === "en") return saved;
   } catch {}
   return "he";
 }

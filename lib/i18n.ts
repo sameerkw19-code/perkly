@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import type { Lang, SiteLang } from "./i18n-types";
 export type { Lang, SiteLang };
 /** The site's own languages (menus, owner dashboard). Card languages are wider: see CARD_LANGS. */
-export const LANGS: SiteLang[] = ["he", "ar", "en"];
+/** Languages offered on the site and in menus for now. Arabic is off; the code stays for later. */
+export const LANGS: SiteLang[] = ["he", "en"];
 export const LANG_LABEL: Record<SiteLang, string> = { he: "עברית", ar: "العربية", en: "English" };
 
 /** Hebrew, Arabic, English, then Russian, German, French (the last three are used on cards only). */
