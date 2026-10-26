@@ -16,6 +16,8 @@ type Editor = { draft: Design; publishedVersion: number; publishedAt: string | n
 type T = (key: string, vars?: Record<string, string | number>) => string;
 
 const MAX_SIDE = { logo: 660, hero: 1200, wallet: 1100, stamp: 400 } as const;
+// Keep in step with MAX_BYTES in app/api/asset/route.ts (800 KB), with a margin for the request.
+const UPLOAD_CAP = 780_000;
 const SIZES: Size[] = ["s", "m", "l"];
 /** All selectable Google Fonts in one request, so the font buttons preview in their own face. */
 const ALL_FONTS_HREF =
@@ -151,7 +153,12 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
       const photo = kind === "hero" || kind === "wallet";
       // Logos are PNG: Google Wallet needs PNG or JPEG for a business's class logo, and PNG keeps the transparent background.
       const format = kind === "logo" ? "image/png" : photo ? "image/jpeg" : "image/webp";
-      const blob = await shrink(file, MAX_SIDE[kind], format, !photo && clearWhite);
+      let blob = await shrink(file, MAX_SIDE[kind], format, !photo && clearWhite);
+      // A PNG is lossless, so a detailed logo can stay large even when small. Shrink again until it fits the upload cap.
+      for (let side = Math.round(MAX_SIDE[kind] * 0.7); kind === "logo" && blob.size > UPLOAD_CAP && side >= 240; side = Math.round(side * 0.7)) {
+        blob = await shrink(file, side, format, clearWhite);
+      }
+      if (blob.size > UPLOAD_CAP) { notify(errorText(lang, "image_too_big"), true); return; }
       const r = await fetch(`/api/asset?business=${encodeURIComponent(businessId)}&kind=${kind}`, {
         method: "POST", headers: { "Content-Type": blob.type }, body: blob, credentials: "same-origin",
       });
