@@ -27,6 +27,7 @@ const OTHER_THEME = { bg: "#2F2A4A", fg: "#FFFFFF", stamp: "#D9F493" };
 const T = {
   he: {
     steps: ["חשבון", "העסק", "עיצוב", "תשלום", "מתחילים"],
+    backDesign: "חזרה לעיצוב", forward: "המשך",
     login: "כבר יש לי חשבון", home: "לדף הבית",
     accountTitle: "פותחים חשבון", accountIntro: "שלוש דקות, ואתם מוכנים לחותמת הראשונה.",
     name: "השם שלך", email: "אימייל", password: "סיסמה", passwordHint: "לפחות 8 תווים", code: "קוד הרשמה",
@@ -55,6 +56,7 @@ const T = {
   },
   ar: {
     steps: ["الحساب", "المشروع", "التصميم", "الدفع", "نبدأ"],
+    backDesign: "رجوع إلى التصميم", forward: "متابعة",
     login: "لدي حساب", home: "الصفحة الرئيسية",
     accountTitle: "إنشاء حساب", accountIntro: "ثلاث دقائق وتكونون جاهزين للختم الأول.",
     name: "اسمك", email: "البريد الإلكتروني", password: "كلمة المرور", passwordHint: "8 أحرف على الأقل", code: "رمز التسجيل",
@@ -83,6 +85,7 @@ const T = {
   },
   en: {
     steps: ["Account", "Business", "Design", "Payment", "Start"],
+    backDesign: "Back to design", forward: "Continue",
     login: "I have an account", home: "Home",
     accountTitle: "Create your account", accountIntro: "Three minutes and you're ready for the first stamp.",
     name: "Your name", email: "Email", password: "Password", passwordHint: "At least 8 characters", code: "Sign-up code",
@@ -297,6 +300,16 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
             </li>
           ))}
         </ol>
+        {business && (step === "pay" || step === "done") && (
+          <nav className="st-nav st-noprint" aria-label="steps navigation">
+            <button type="button" className="st-later" onClick={() => setStep("design")}>{t.backDesign}</button>
+          </nav>
+        )}
+        {business && step === "design" && (
+          <nav className="st-nav st-noprint" aria-label="steps navigation">
+            <button type="button" className="st-later" onClick={() => setStep(afterDesign)}>{t.forward}</button>
+          </nav>
+        )}
 
         {step === "account" && (
           <form className="su-card st-narrow" onSubmit={submitAccount}>
