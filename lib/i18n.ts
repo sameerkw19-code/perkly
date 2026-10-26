@@ -290,6 +290,8 @@ Object.assign(words, {
   productHint: ["תמונת מוצר (למשל הכוס שלכם) מוצגת בצבע מלא כשנאספה, ובאפור כשעוד לא. רצוי PNG עם רקע שקוף.", "تظهر صورة المنتج (مثل كوبكم) ملوّنة عند جمعها ورمادية قبل ذلك. يُفضّل PNG بخلفية شفافة.", "A product image (like your cup) shows in full color once collected and grey before. A PNG with a transparent background works best."],
   edImages: ["לוגו ותמונה", "الشعار والصورة", "Logo and image"],
   edLogo: ["לוגו", "الشعار", "Logo"],
+  edClearWhite: ["הסרת רקע לבן בהעלאה", "إزالة الخلفية البيضاء عند الرفع", "Remove a white background on upload"],
+  edClearWhiteHint: ["ללוגו או לחותמת שמגיעים על רקע לבן: הרקע נעשה שקוף, והחלקים הלבנים בתוך הלוגו נשארים. אחרי שינוי, העלו את הלוגו שוב.", "للشعار أو الختم على خلفية بيضاء: تصبح الخلفية شفافة وتبقى الأجزاء البيضاء داخل الشعار. بعد التغيير ارفعوا الشعار من جديد.", "For a logo or stamp on a white background: the background turns transparent and white parts inside the logo stay. After changing this, upload the logo again."],
   edLogoHint: ["ריבועי: 660×660 פיקסלים לפחות.", "مربع: 660×660 بكسل على الأقل.", "Square: at least 660×660 px."],
   edHero: ["תמונת רקע או מוצר", "صورة خلفية أو منتج", "Background or product image"],
   edHeroHint: ["מומלץ 1032×812 פיקסלים, בלי טקסט בתוך התמונה.", "يُنصح بـ 1032×812 بكسل، دون نص داخل الصورة.", "Recommended 1032×812 px, with no text inside the image."],
