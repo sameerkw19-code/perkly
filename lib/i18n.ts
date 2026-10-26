@@ -1,12 +1,15 @@
 "use client";
 import { useEffect, useState } from "react";
 
-import type { Lang } from "./i18n-types";
-export type { Lang };
-export const LANGS: Lang[] = ["he", "ar", "en"];
-export const LANG_LABEL: Record<Lang, string> = { he: "עברית", ar: "العربية", en: "English" };
+import type { Lang, SiteLang } from "./i18n-types";
+export type { Lang, SiteLang };
+/** The site's own languages (menus, owner dashboard). Card languages are wider: see CARD_LANGS. */
+export const LANGS: SiteLang[] = ["he", "ar", "en"];
+export const LANG_LABEL: Record<SiteLang, string> = { he: "עברית", ar: "العربية", en: "English" };
 
-type Entry = [he: string, ar: string, en: string];
+/** Hebrew, Arabic, English, then Russian, German, French (the last three are used on cards only). */
+type Entry = [he: string, ar: string, en: string, ru?: string, de?: string, fr?: string];
+const LANG_INDEX: Record<Lang, number> = { he: 0, ar: 1, en: 2, ru: 3, de: 4, fr: 5 };
 
 // Placeholders like {n} are filled by t(key, { n: 3 }).
 const words: Record<string, Entry> = {
@@ -426,9 +429,60 @@ Object.assign(words, {
   err_busy_retry: ["הכרטיס מתעדכן ממכשיר אחר. נסו שוב.", "البطاقة تتحدث من جهاز آخر. حاول مجدداً.", "The card is being updated from another device. Try again."],
 } satisfies Record<string, Entry>);
 
+// Card words for the new card languages. A missing translation falls back to English.
+const CARD_EXTRA: Record<string, [ru: string, de: string, fr: string]> = {
+  stampsWord: ["Печати", "Stempel", "Tampons"],
+  rewardsWord: ["Награды", "Prämien", "Récompenses"],
+  earnedShort: ["Награда готова!", "Prämie bereit!", "Récompense prête !"],
+  toGo: ["Ещё {k} до награды", "Noch {k} bis zur Prämie", "Encore {k} pour la récompense"],
+  stampsOf: ["{n} из {t}", "{n} von {t}", "{n} sur {t}"],
+  customerName: ["Имя клиента", "Name des Kunden", "Nom du client"],
+  reward: ["Награда", "Prämie", "Récompense"],
+  loyaltyCard: ["Карта лояльности", "Treuekarte", "Carte de fidélité"],
+  yourName: ["Ваше имя", "Ihr Name", "Votre nom"],
+  sampleCustomer: ["Дана", "Dana", "Dana"],
+  expiresOnShort: ["Действует до {d}", "Gültig bis {d}", "Valable jusqu'au {d}"],
+  socialWebsite: ["Сайт", "Website", "Site web"],
+  socialFollow: ["Подписывайтесь", "Folgen Sie uns", "Suivez-nous"],
+  showQr: ["Покажите код сотруднику для сканирования.", "Zeigen Sie diesen Code dem Personal zum Scannen.", "Montrez ce code au personnel pour le scanner."],
+  walletHintIOS: ["Добавление в Apple Wallet пока недоступно.", "Das Hinzufügen zu Apple Wallet ist noch nicht verfügbar.", "L'ajout à Apple Wallet n'est pas encore disponible."],
+  walletHint: ["Добавление в Apple Wallet и Google Wallet пока недоступно.", "Das Hinzufügen zu Apple Wallet und Google Wallet ist noch nicht verfügbar.", "L'ajout à Apple Wallet et Google Wallet n'est pas encore disponible."],
+  walletAddGoogle: ["Добавить в Google Wallet", "Zu Google Wallet hinzufügen", "Ajouter à Google Wallet"],
+  saveLinkHint: ["Сохраните эту ссылку (закладки или главный экран). Это ваша карта.", "Speichern Sie diesen Link (Lesezeichen oder Startbildschirm). Das ist Ihre Karte.", "Enregistrez ce lien (favoris ou écran d'accueil). C'est votre carte."],
+  rewardsAvail: ["Наград доступно: {n}", "{n} Prämien verfügbar", "{n} récompenses disponibles"],
+  refresh: ["Обновить", "Aktualisieren", "Actualiser"],
+  qrNote: ["Одно сканирование не добавляет печать. Сотрудник подтверждает каждое действие.", "Das Scannen allein fügt keinen Stempel hinzu. Das Personal bestätigt jede Aktion.", "Scanner seul n'ajoute pas de tampon. Le personnel confirme chaque action."],
+  privacyLink: ["Политика конфиденциальности", "Datenschutzerklärung", "Politique de confidentialité"],
+  earned: ["Ваша награда ждёт! Покажите карту сотруднику.", "Ihre Prämie wartet! Zeigen Sie die Karte dem Personal.", "Votre récompense vous attend ! Montrez cette carte au personnel."],
+  cardNotFound: ["Карта не найдена. Возможно, ссылка изменилась. Попросите у заведения новую ссылку.", "Karte nicht gefunden. Der Link wurde vielleicht geändert. Bitten Sie das Geschäft um einen neuen Link.", "Carte introuvable. Le lien a peut-être changé. Demandez un nouveau lien à l'établissement."],
+  langName_he: ["Иврит", "Hebräisch", "Hébreu"],
+  langName_ar: ["Арабский", "Arabisch", "Arabe"],
+  langName_en: ["Английский", "Englisch", "Anglais"],
+};
+// New language names: Hebrew, Arabic and English labels for the card editor's language buttons.
+const NEW_NAMES: Record<string, Entry> = {
+  langName_ru: ["רוסית", "الروسية", "Russian", "Русский", "Russisch", "Russe"],
+  langName_de: ["גרמנית", "الألمانية", "German", "Немецкий", "Deutsch", "Allemand"],
+  langName_fr: ["צרפתית", "الفرنسية", "French", "Французский", "Französisch", "Français"],
+};
+Object.assign(words, NEW_NAMES);
+Object.assign(words, {
+  edLangs: ["שפות הכרטיס", "لغات البطاقة", "Card languages"],
+  edLangsHint: [
+    "בחרו את השפות שבהן הכרטיס יוצג ללקוחות. שפה שלא סימנתם לא תופיע בשום מקום: לא בכרטיס, לא בארנק ולא בעורך.",
+    "اختر اللغات التي تظهر فيها البطاقة للزبائن. اللغة غير المحددة لن تظهر في أي مكان: لا في البطاقة ولا في المحفظة ولا في المحرر.",
+    "Choose the languages your card is shown in. A language you don't pick appears nowhere: not on the card, not in the wallet, not in this editor.",
+  ],
+} satisfies Record<string, Entry>);
+for (const [key, [ru, de, fr]] of Object.entries(CARD_EXTRA)) {
+  const entry = words[key];
+  if (!entry) throw new Error("missing i18n key " + key);
+  entry.push(ru, de, fr);
+}
+
 export function translate(lang: Lang, key: string, vars?: Record<string, string | number>): string {
   const entry = words[key];
-  let text = entry ? entry[LANGS.indexOf(lang)] : key;
+  let text = entry ? (entry[LANG_INDEX[lang]] || entry[2]) : key;
   if (vars) for (const [k, v] of Object.entries(vars)) text = text.replaceAll(`{${k}}`, String(v));
   return text;
 }
@@ -439,13 +493,13 @@ export function errorText(lang: Lang, code: string | undefined): string {
 
 /** Language choice, remembered on this device, with page direction (RTL/LTR) kept in sync. */
 export function useLang() {
-  const [lang, setLang] = useState<Lang>("he");
+  const [lang, setLang] = useState<SiteLang>("he");
   useEffect(() => {
     try {
       // A ?lang= link (for example from the Arabic marketing page) wins over the saved choice.
       const fromUrl = new URLSearchParams(window.location.search).get("lang");
-      const saved = fromUrl && LANGS.includes(fromUrl as Lang) ? fromUrl : localStorage.getItem("perkly-language");
-      if (saved && LANGS.includes(saved as Lang)) setLang(saved as Lang);
+      const saved = fromUrl && LANGS.includes(fromUrl as SiteLang) ? fromUrl : localStorage.getItem("perkly-language");
+      if (saved && LANGS.includes(saved as SiteLang)) setLang(saved as SiteLang);
     } catch {}
   }, []);
   useEffect(() => {

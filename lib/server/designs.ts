@@ -1,4 +1,7 @@
-import { assetIds, defaultDesign, sanitizeDesign, textsFor, type AssetMeta, type Design } from "../design";
+import { assetIds, cardLang, defaultDesign, sanitizeDesign, textsFor, type AssetMeta, type Design, type Lang } from "../design";
+
+/** Google Wallet language tags for each card language. */
+export const GOOGLE_TAG: Record<Lang, string> = { he: "he", ar: "ar", en: "en-US", ru: "ru", de: "de", fr: "fr" };
 
 type BusinessLike = { id: string; name: string; reward: string; color: string };
 
@@ -38,7 +41,8 @@ export async function ownsAssets(db: D1Database, businessId: string, design: Des
  */
 export async function passLook(db: D1Database, business: BusinessLike, origin: string) {
   const design = await liveDesign(db, business);
-  const text = textsFor(design, "he");
+  const first = cardLang(design);
+  const text = textsFor(design, first);
   let heroUrl: string | null = null;
   // The wallet banner if the business made one, otherwise its background image.
   const banner = design.walletHero ?? design.hero;
@@ -46,5 +50,16 @@ export async function passLook(db: D1Database, business: BusinessLike, origin: s
     const row = await db.prepare("SELECT mime FROM assets WHERE id = ? AND business = ?").bind(banner, business.id).first<{ mime: string }>();
     if (row && (row.mime === "image/jpeg" || row.mime === "image/png")) heroUrl = `${origin}/api/asset/${banner}`;
   }
-  return { title: (text.title || business.name).slice(0, 60), reward: (text.reward || business.reward).slice(0, 120), heroUrl };
+  // The other languages the business picked, for phones that use them.
+  const translations = design.langs.filter((l) => l !== first).map((l) => {
+    const t = textsFor(design, l);
+    return { language: GOOGLE_TAG[l], title: (t.title || business.name).slice(0, 60), reward: (t.reward || business.reward).slice(0, 120) };
+  });
+  return {
+    title: (text.title || business.name).slice(0, 60),
+    reward: (text.reward || business.reward).slice(0, 120),
+    heroUrl,
+    language: GOOGLE_TAG[first],
+    translations,
+  };
 }

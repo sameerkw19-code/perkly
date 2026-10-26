@@ -2,11 +2,11 @@
 import { useMemo, useState } from "react";
 import { ImagePlus, Lock, MessageCircle, Shuffle, Trash2, UploadCloud } from "lucide-react";
 import {
-  FONTS, FONT_SCRIPTS, GRADIENTS, GRADIENT_DIRS, IMAGE_MIN, LIMITS, PALETTES, STAMP_ICONS, darken, designChecks,
+  FONTS, FONT_SCRIPTS, GRADIENTS, GRADIENT_DIRS, IMAGE_MIN, LIMITS, PALETTES, STAMP_ICONS, cardLang, darken, designChecks,
   type AssetMeta, type CardLook, type Design, type FontId, type Layout, type LogoFrame, type Size, type StampIcon, type Texts,
 } from "../lib/design";
-import type { Lang } from "../lib/i18n-types";
-import { LANGS, errorText, translate } from "../lib/i18n";
+import { CARD_LANGS, isRtl, type Lang } from "../lib/i18n-types";
+import { errorText, translate } from "../lib/i18n";
 import { post } from "../lib/api";
 import { ApplePreview, GooglePreview, ICONS, LoyaltyCard, Num } from "./loyalty-card";
 import { PERKLY_SOCIAL } from "../lib/perkly-social";
@@ -104,7 +104,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
   const [design, setDesign] = useState<Design>(editor.draft);
   const [saved, setSaved] = useState(JSON.stringify(editor.draft));
   const [images, setImages] = useState<Image[]>(editor.images);
-  const [textLang, setTextLang] = useState<Lang>(lang);
+  const [pickedLang, setTextLang] = useState<Lang>(() => cardLang(editor.draft, lang));
   const [tab, setTab] = useState<"web" | "apple" | "google">("web");
   const [demo, setDemo] = useState(Math.min(3, target));
   const [busy, setBusy] = useState("");
@@ -114,7 +114,20 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
   const checks = useMemo(() => designChecks(design, images), [design, images]);
   const blocked = checks.some((c) => c.level === "bad");
 
+  // The language whose texts are being edited and previewed: always one the business picked.
+  const textLang: Lang = design.langs.includes(pickedLang) ? pickedLang : design.langs[0];
   const set = (patch: Partial<Design>) => setDesign((d) => ({ ...d, ...patch }));
+
+  /** Adds or removes a card language. At least one stays. Other languages are never shown anywhere. */
+  function toggleLang(l: Lang) {
+    setDesign((d) => {
+      const on = d.langs.includes(l);
+      if (on && d.langs.length === 1) return d;
+      const langs = CARD_LANGS.filter((x) => (x === l ? !on : d.langs.includes(x)));
+      return { ...d, langs };
+    });
+    if (!design.langs.includes(l)) setTextLang(l);
+  }
   const setLook = (patch: Partial<CardLook>) => setDesign((d) => ({ ...d, look: { ...d.look, ...patch } }));
 
   /** Random gradient, direction and font. Logo, images, texts and stamps stay as they are. */
@@ -178,7 +191,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
   // (Hebrew and Arabic right to left, English left to right) and its own labels.
   const pt: T = (key, vars) => translate(textLang, key, vars);
   const preview = { design, lang: textLang, stamps: demo, target, customerName: pt("sampleCustomer"), t: pt };
-  const previewDir = textLang === "en" ? "ltr" : "rtl";
+  const previewDir = isRtl(textLang) ? "rtl" : "ltr";
   const locale = lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB";
 
   return (
@@ -191,9 +204,11 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
             </button>
           ))}
         </div>
-        <div className="seg preview-langs" role="group" aria-label={t("edTexts")}>
-          {LANGS.map((l) => <button key={l} type="button" aria-pressed={textLang === l} onClick={() => setTextLang(l)}>{t("langName_" + l)}</button>)}
-        </div>
+        {design.langs.length > 1 && (
+          <div className="seg preview-langs" role="group" aria-label={t("edTexts")}>
+            {design.langs.map((l) => <button key={l} type="button" aria-pressed={textLang === l} onClick={() => setTextLang(l)}>{t("langName_" + l)}</button>)}
+          </div>
+        )}
         <div className="preview-stage" dir={previewDir} lang={textLang}>
           {tab === "web" && <LoyaltyCard {...preview} />}
           {tab === "apple" && <ApplePreview {...preview} />}
@@ -226,13 +241,28 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
         </section>
 
         <a className="design-help" target="_blank" rel="noopener noreferrer"
-          href={`https://wa.me/${(PERKLY_SOCIAL.whatsapp ?? "").replace(/\D/g, "")}?text=${encodeURIComponent(t("designHelpText", { name: design.texts[lang]?.title || design.texts.he.title }))}`}>
+          href={`https://wa.me/${(PERKLY_SOCIAL.whatsapp ?? "").replace(/\D/g, "")}?text=${encodeURIComponent(t("designHelpText", { name: design.texts[textLang]?.title || design.texts[design.langs[0]].title }))}`}>
           <MessageCircle size={18} aria-hidden="true" />
           <span><b>{t("designHelpTitle")}</b><small>{t("designHelpSub")}</small></span>
         </a>
       </div>
 
       <div className="editor-controls">
+        <section className="panel">
+          <h2>{t("edLangs")}</h2>
+          <p className="form-hint">{t("edLangsHint")}</p>
+          <div className="seg langs-pick" role="group" aria-label={t("edLangs")}>
+            {CARD_LANGS.map((l) => {
+              const on = design.langs.includes(l);
+              return (
+                <button key={l} type="button" aria-pressed={on} disabled={on && design.langs.length === 1} onClick={() => toggleLang(l)}>
+                  {t("langName_" + l)}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
         <section className="panel">
           <h2>{t("edStampIcon")}</h2>
           <div className="icon-grid">
@@ -429,10 +459,10 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
         <section className="panel">
           <h2>{t("edTexts")}</h2>
           <div className="seg">
-            {LANGS.map((l) => <button key={l} type="button" aria-pressed={textLang === l} onClick={() => setTextLang(l)}>{t("langName_" + l)}</button>)}
+            {design.langs.map((l) => <button key={l} type="button" aria-pressed={textLang === l} onClick={() => setTextLang(l)}>{t("langName_" + l)}</button>)}
           </div>
           <p className="form-hint">{t("edTextsHint")}</p>
-          <div className="stack-form" dir={textLang === "en" ? "ltr" : "rtl"}>
+          <div className="stack-form" dir={isRtl(textLang) ? "rtl" : "ltr"}>
             {(["title", "subtitle", "reward", "gift"] as (keyof Texts)[]).map((k) => (
               <label key={k}>
                 <span className="label-row">{t("f" + k[0].toUpperCase() + k.slice(1))}<small><Num>{design.texts[textLang][k].length}/{LIMITS[k]}</Num></small></span>

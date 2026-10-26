@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { validMonthDay, parseBirthday, birthdayFromParts, formatBirthday, upcomingKeys } from "../lib/birthday.ts";
-import { sanitizeDesign, defaultDesign, designChecks, FONTS } from "../lib/design.ts";
+import { sanitizeDesign, defaultDesign, designChecks, FONTS, cardLang, textsFor, sanitizeLangs } from "../lib/design.ts";
 import { businessAccess, freeLimitReached, hasPaidDesign } from "../lib/server/billing.ts";
 import { lookFields } from "../lib/wallet-look.ts";
 
@@ -185,4 +185,60 @@ test("design: logo size, frame and wallet banner are validated", () => {
   assert.equal(d.walletHero, null);
   const ok = sanitizeDesign({ ...base, look: { ...base.look, logoSize: 143, logoFrame: "circle", logoName: true } });
   assert.deepEqual([ok.look.logoSize, ok.look.logoFrame, ok.look.logoName], [140, "circle", true]);
+});
+
+// ---- Card languages: only the languages a business picks appear anywhere ----
+
+const plainDesign = () => JSON.parse(JSON.stringify(defaultDesign({ name: "Cafe", reward: "Coffee", color: "#1E1B2E" })));
+
+test("card languages: a new card is Hebrew only, and only Hebrew is checked", () => {
+  const d = plainDesign();
+  assert.deepEqual(d.langs, ["he"]);
+  const checks = designChecks(d, []);
+  assert.equal(checks.some((c) => c.key === "chkMissingText"), false);
+});
+
+test("card languages: a picked language without its own text blocks publishing", () => {
+  const d = plainDesign();
+  d.langs = ["he", "ru"];
+  d.texts.ru.reward = "";
+  const bad = designChecks(d, []).filter((c) => c.key === "chkMissingText");
+  assert.deepEqual(bad.map((c) => c.vars.l), ["ru"]);
+  // Arabic was not picked, so its empty text does not matter.
+  assert.equal(bad.some((c) => c.vars.l === "ar"), false);
+});
+
+test("card languages: old cards (no list) keep Hebrew, Arabic and English", () => {
+  const d = plainDesign();
+  delete d.langs;
+  assert.deepEqual(sanitizeLangs(d.langs), ["he", "ar", "en"]);
+  assert.deepEqual(sanitizeDesign(d).langs, ["he", "ar", "en"]);
+});
+
+test("card languages: sanitized in card order, unknown and repeated ones dropped, never empty", () => {
+  const d = plainDesign();
+  d.langs = ["fr", "he", "xx", "he"];
+  assert.deepEqual(sanitizeDesign(d).langs, ["he", "fr"]);
+  d.langs = [];
+  assert.deepEqual(sanitizeDesign(d).langs, ["he"]);
+});
+
+test("card languages: a card shows a picked language, otherwise its first one", () => {
+  const d = plainDesign();
+  d.langs = ["he", "ru", "de"];
+  assert.equal(cardLang(d, "ru"), "ru");
+  assert.equal(cardLang(d, "ar"), "he");
+  assert.equal(cardLang(d, undefined), "he");
+  assert.equal(textsFor(d, "fr").title, "Cafe", "an unpicked language falls back to the first card language");
+});
+
+test("wallet pass: other picked languages get localized header and body", () => {
+  const plain = lookFields({ title: "Cafe", reward: "Coffee", heroUrl: null, language: "he" });
+  assert.equal(plain.textModulesData[0].localizedHeader, undefined);
+  const multi = lookFields({
+    title: "Cafe", reward: "Coffee", heroUrl: null, language: "he",
+    translations: [{ language: "ru", title: "Кафе", reward: "Кофе" }],
+  });
+  assert.equal(multi.textModulesData[0].localizedHeader.translatedValues[0].language, "ru");
+  assert.equal(multi.textModulesData[0].localizedBody.translatedValues[0].value, "Кофе");
 });
