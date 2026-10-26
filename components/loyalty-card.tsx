@@ -154,7 +154,6 @@ export function LoyaltyCard({ design, lang, stamps, target, customerName, reward
         </div>
         {showName && (
           <div className="pcard-field pcard-end">
-            <small>{t("yourName")}</small>
             <b className="pcard-name">{customerName}</b>
           </div>
         )}
@@ -232,7 +231,7 @@ export function GooglePreview({ design, lang, stamps, target, customerName }: Pr
     <div className="wallet google" dir={isRtl(cl) ? "rtl" : "ltr"} lang={cl} style={{ ...cardStyle(design), background: design.colors.bg, color: fg, ["--c-fg" as any]: fg }}>
       <div className="gw-body">
         <div className="gw-h"><Logo design={design} title={text.title} className="card-logo round" /><span>{text.title}</span></div>
-        <div className="gw-title">{text.subtitle || t("loyaltyCard")}</div>
+        <div className="gw-title">{text.subtitle}</div>
         <div className="gw-row">
           {design.showCustomerName && customerName && <div><small>{t("customerName")}</small><b>{customerName}</b></div>}
           <div><small>{t("stampsWord")}</small><b><Num>{stamps}/{target}</Num></b></div>
