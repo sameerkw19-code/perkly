@@ -165,11 +165,14 @@ const SUB: Record<Lang, string> = {
   he: "כרטיס נאמנות", ar: "بطاقة ولاء", en: "Loyalty card", ru: "Карта лояльности", de: "Treuekarte", fr: "Carte de fidélité",
 };
 
-/** Card languages in card order, without duplicates. A missing list means an older design: Hebrew, Arabic and English as before. */
+/**
+ * Card languages in card order, without duplicates, and only the ones offered for now (OFFERED_CARD_LANGS).
+ * A missing list means an older design: Hebrew, Arabic and English, which then leaves Hebrew and English.
+ * Other languages stay in the stored texts and come back when they are offered again.
+ */
 export function sanitizeLangs(input: unknown): Lang[] {
-  if (input === undefined || input === null) return ["he", "ar", "en"];
-  const picked = Array.isArray(input) ? input : [];
-  const langs = CARD_LANGS.filter((l) => picked.includes(l));
+  const picked = input === undefined || input === null ? ["he", "ar", "en"] : Array.isArray(input) ? input : [];
+  const langs = CARD_LANGS.filter((l) => picked.includes(l) && OFFERED_CARD_LANGS.includes(l));
   return langs.length ? langs : ["he"];
 }
 
