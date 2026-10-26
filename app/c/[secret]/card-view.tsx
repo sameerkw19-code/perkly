@@ -1,11 +1,12 @@
 "use client";
+import { useState } from "react";
 import { RefreshCw, Wallet } from "lucide-react";
-import { useLang } from "../../../lib/i18n";
-import { LangSwitch } from "../../../components/lang-switch";
+import { useLang, translate } from "../../../lib/i18n";
 import { LoyaltyCard } from "../../../components/loyalty-card";
 import { QrImage } from "../../../components/qr";
 
-import type { Design } from "../../../lib/design";
+import { cardLang, type Design } from "../../../lib/design";
+import { CARD_LANG_NAME, CARD_LOCALE, isRtl, type Lang } from "../../../lib/i18n-types";
 import { SOCIAL_COLOR, type SocialKey } from "../../../lib/social";
 import { SocialIcon } from "../../../lib/social-icon";
 import { Brand } from "../../../components/brand";
@@ -13,12 +14,24 @@ import { Brand } from "../../../components/brand";
 type Card = { name: string; stamps: number; target: number; scan_code: string; design: Design; rewards: number; nextExpiry: string | null; business: string; links: { key: SocialKey; label: string; url: string }[] };
 
 export default function CardView({ card, secret, googleWallet, isIOS }: { card: Card | null; secret: string; googleWallet: boolean; isIOS: boolean }) {
-  const { lang, setLang, t, dir } = useLang();
+  // The page's own chrome follows the visitor's site language; the card follows its business's languages.
+  const { lang: siteLang, dir: siteDir } = useLang();
+  const [picked, setPicked] = useState<Lang | null>(null);
+  const lang: Lang = card ? cardLang(card.design, picked ?? siteLang) : "he";
+  const t = (key: string, vars?: Record<string, string | number>) => translate(lang, key, vars);
+  const dir = card ? (isRtl(lang) ? "rtl" : "ltr") : siteDir;
+  const langs = card?.design.langs ?? [];
   return (
-    <div className="card-page" dir={dir}>
+    <div className="card-page" dir={dir} lang={lang}>
       <div className="auth-top">
         <Brand />
-        <LangSwitch lang={lang} setLang={setLang} />
+        {langs.length > 1 ? (
+          <div className="seg card-langs" role="group" aria-label="Language">
+            {langs.map((l) => (
+              <button key={l} type="button" aria-pressed={lang === l} onClick={() => setPicked(l)}>{CARD_LANG_NAME[l]}</button>
+            ))}
+          </div>
+        ) : null}
       </div>
       {!card ? (
         <div className="auth-card panel"><h1>{t("cardNotFound")}</h1></div>
@@ -38,7 +51,7 @@ export default function CardView({ card, secret, googleWallet, isIOS }: { card: 
             <div className="ready-banner" role="status">
               {t("earned")}
               {card.rewards > 1 && <> · {t("rewardsAvail", { n: card.rewards })}</>}
-              {card.nextExpiry && <small className="ready-expiry">{t("expiresOnShort", { d: new Date(card.nextExpiry).toLocaleDateString(lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB") })}</small>}
+              {card.nextExpiry && <small className="ready-expiry">{t("expiresOnShort", { d: new Date(card.nextExpiry).toLocaleDateString(CARD_LOCALE[lang]) })}</small>}
             </div>
           )}
           <div className="qr-note">

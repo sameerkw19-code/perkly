@@ -2,8 +2,9 @@ import {
   Beer, Cake, Coffee, Croissant, CupSoda, Gift, GlassWater, Hamburger, Heart, IceCreamCone, Martini,
   Pizza, Sandwich, Scissors, ShoppingBag, Sparkles, Star, Utensils,
 } from "lucide-react";
-import { assetUrl, cardFont, fontHref, onColor, textsFor, type Design, type PresetIcon } from "../lib/design";
-import type { Lang } from "../lib/i18n-types";
+import { assetUrl, cardFont, cardLang, fontHref, onColor, textsFor, type Design, type PresetIcon } from "../lib/design";
+import { translate } from "../lib/i18n";
+import { isRtl, type Lang } from "../lib/i18n-types";
 
 export const ICONS: Record<PresetIcon, any> = {
   coffee: Coffee, pizza: Pizza, burger: Hamburger, icecream: IceCreamCone, mojito: CupSoda, beer: Beer,
@@ -86,7 +87,7 @@ const GRADIENT_ANGLE_RTL = { down: "180deg", diag: "210deg", side: "270deg" } as
 function lookStyle(design: Design, lang: Lang): React.CSSProperties {
   const look = design.look;
   // Right-to-left cards (Hebrew, Arabic) mirror sideways gradients, so the main color sits behind the logo and title.
-  const rtl = lang !== "en";
+  const rtl = isRtl(cardLang(design, lang));
   const fill = look.dir === "radial"
     ? `radial-gradient(120% 120% at 50% 0%, ${design.colors.bg} 0%, ${look.bg2} 100%)`
     : `linear-gradient(${rtl ? GRADIENT_ANGLE_RTL[look.dir] : GRADIENT_ANGLE[look.dir]}, ${design.colors.bg} 0%, ${look.bg2} 100%)`;
@@ -104,7 +105,8 @@ function lookStyle(design: Design, lang: Lang): React.CSSProperties {
 
 /** Loads the card font (and a Hebrew or Arabic partner font when needed). Browsers accept a stylesheet link anywhere in the page. */
 function FontLink({ design, lang }: { design: Design; lang: Lang }) {
-  const hrefs = [fontHref(design.look.font), ...(cardFont(design.look.font, lang).extra ? [fontHref(cardFont(design.look.font, lang).extra!)] : [])].filter(Boolean) as string[];
+  const cl = cardLang(design, lang);
+  const hrefs = [fontHref(design.look.font), ...(cardFont(design.look.font, cl).extra ? [fontHref(cardFont(design.look.font, cl).extra!)] : [])].filter(Boolean) as string[];
   return <>{hrefs.map((h) => <link key={h} rel="stylesheet" href={h} />)}</>;
 }
 
@@ -122,8 +124,11 @@ function PassStamp({ design, filled }: { design: Design; filled: boolean }) {
  * Customer card, wallet-pass style. Order (reading direction follows the page language):
  * brand and customer name, reward line, stamp grid, two fields (stamps, rewards), optional QR.
  */
-export function LoyaltyCard({ design, lang, stamps, target, customerName, rewards, t, qr }: Props) {
-  const text = textsFor(design, lang);
+export function LoyaltyCard({ design, lang, stamps, target, customerName, rewards, qr }: Props) {
+  // The card speaks the language it is shown in (one the business picked), not the visitor's site language.
+  const cl = cardLang(design, lang);
+  const t: T = (key, vars) => translate(cl, key, vars);
+  const text = textsFor(design, cl);
   const available = rewards ?? (stamps >= target ? 1 : 0);
   const ready = available > 0;
   const full = stamps >= target;
@@ -131,8 +136,8 @@ export function LoyaltyCard({ design, lang, stamps, target, customerName, reward
   const columns = total <= 6 ? total : Math.ceil(total / 2);
   const showName = design.showCustomerName && !!customerName;
   return (
-    <div className={`pcard layout-${design.layout} stamps-${design.look.stamps}${ready ? " is-ready" : ""}`} style={lookStyle(design, lang)}>
-      <FontLink design={design} lang={lang} />
+    <div className={`pcard layout-${design.layout} stamps-${design.look.stamps}${ready ? " is-ready" : ""}`} style={lookStyle(design, cl)} dir={isRtl(cl) ? "rtl" : "ltr"} lang={cl}>
+      <FontLink design={design} lang={cl} />
       <div className="pcard-head">
         <div className="pcard-brand">
           {design.logo ? (
@@ -192,12 +197,14 @@ export function LoyaltyCard({ design, lang, stamps, target, customerName, reward
 }
 
 /** Approximate Apple Wallet store card: logo + header field, strip image with stamps, fields, code. */
-export function ApplePreview({ design, lang, stamps, target, customerName, t }: Props) {
-  const text = textsFor(design, lang);
+export function ApplePreview({ design, lang, stamps, target, customerName }: Props) {
+  const cl = cardLang(design, lang);
+  const t: T = (key, vars) => translate(cl, key, vars);
+  const text = textsFor(design, cl);
   const banner = design.walletHero ?? design.hero;
   const label = { color: `color-mix(in srgb, ${design.colors.fg} 70%, transparent)` };
   return (
-    <div className="wallet apple" style={{ ...cardStyle(design), background: design.colors.bg, color: design.colors.fg }}>
+    <div className="wallet apple" dir={isRtl(cl) ? "rtl" : "ltr"} lang={cl} style={{ ...cardStyle(design), background: design.colors.bg, color: design.colors.fg }}>
       <div className="ap-top">
         <div className="ap-logo"><Logo design={design} title={text.title} className="card-logo small" /><b>{text.title}</b></div>
         {design.showCustomerName && customerName && <div className="ap-f"><small style={label}>{t("customerName")}</small><b>{customerName}</b></div>}
@@ -215,12 +222,14 @@ export function ApplePreview({ design, lang, stamps, target, customerName, t }: 
 }
 
 /** Approximate Google Wallet loyalty card: round logo, fixed header, rows, code, hero image. */
-export function GooglePreview({ design, lang, stamps, target, customerName, t }: Props) {
-  const text = textsFor(design, lang);
+export function GooglePreview({ design, lang, stamps, target, customerName }: Props) {
+  const cl = cardLang(design, lang);
+  const t: T = (key, vars) => translate(cl, key, vars);
+  const text = textsFor(design, cl);
   const banner = design.walletHero ?? design.hero;
   const fg = onColor(design.colors.bg);
   return (
-    <div className="wallet google" style={{ ...cardStyle(design), background: design.colors.bg, color: fg, ["--c-fg" as any]: fg }}>
+    <div className="wallet google" dir={isRtl(cl) ? "rtl" : "ltr"} lang={cl} style={{ ...cardStyle(design), background: design.colors.bg, color: fg, ["--c-fg" as any]: fg }}>
       <div className="gw-body">
         <div className="gw-h"><Logo design={design} title={text.title} className="card-logo round" /><span>{text.title}</span></div>
         <div className="gw-title">{text.subtitle || t("loyaltyCard")}</div>

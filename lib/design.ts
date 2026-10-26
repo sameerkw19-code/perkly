@@ -1,7 +1,28 @@
 // Card design: shared by the editor (browser) and the server (validation before save/publish).
 // A design only changes how a card looks. It never touches stamps, targets or eligibility.
 
-import type { Lang } from "./i18n-types";
+/**
+ * Languages a loyalty card can be shown in. The business picks its own list (Design.langs).
+ * A language the business did not pick never appears on its card, editor or pass.
+ */
+export const CARD_LANGS = ["he", "ar", "en", "ru", "de", "fr"] as const;
+export type Lang = (typeof CARD_LANGS)[number];
+
+/** Right-to-left card languages. */
+export function isRtl(l: Lang): boolean {
+  return l === "he" || l === "ar";
+}
+
+/** Each card language written in its own script, for pickers. */
+export const CARD_LANG_NAME: Record<Lang, string> = {
+  he: "עברית", ar: "العربية", en: "English", ru: "Русский", de: "Deutsch", fr: "Français",
+};
+
+/** BCP-47 locale for dates on a card in this language. */
+export const CARD_LOCALE: Record<Lang, string> = {
+  he: "he-IL", ar: "ar", en: "en-GB", ru: "ru-RU", de: "de-DE", fr: "fr-FR",
+};
+
 
 export const STAMP_ICONS = [
   "coffee", "pizza", "burger", "icecream", "mojito", "beer", "shot", "cocktail", "sandwich",
@@ -55,10 +76,10 @@ export function fontHref(font: FontId): string | null {
 }
 
 /** Which scripts each font draws. Arial (system) has both Hebrew and Arabic on phones and computers. */
-export const FONT_SCRIPTS: Record<FontId, { he: boolean; ar: boolean }> = {
-  system: { he: true, ar: true }, rubik: { he: true, ar: true }, heebo: { he: true, ar: false },
-  assistant: { he: true, ar: false }, varela: { he: true, ar: false }, secular: { he: true, ar: false },
-  frank: { he: true, ar: false }, amatic: { he: true, ar: false }, cairo: { he: false, ar: true },
+export const FONT_SCRIPTS: Record<FontId, { he: boolean; ar: boolean; cyr: boolean }> = {
+  system: { he: true, ar: true, cyr: true }, rubik: { he: true, ar: true, cyr: true }, heebo: { he: true, ar: false, cyr: false },
+  assistant: { he: true, ar: false, cyr: false }, varela: { he: true, ar: false, cyr: false }, secular: { he: true, ar: false, cyr: false },
+  frank: { he: true, ar: false, cyr: false }, amatic: { he: true, ar: false, cyr: false }, cairo: { he: false, ar: true, cyr: false },
 };
 
 /**
@@ -69,7 +90,8 @@ export const FONT_SCRIPTS: Record<FontId, { he: boolean; ar: boolean }> = {
 export function cardFont(font: FontId, lang: Lang): { family: string; extra: FontId | null } {
   const f = FONTS[font] ?? FONTS.system;
   const scripts = FONT_SCRIPTS[font] ?? FONT_SCRIPTS.system;
-  const extra: FontId | null = lang === "ar" && !scripts.ar ? "cairo" : lang === "he" && !scripts.he ? "rubik" : null;
+  const extra: FontId | null =
+    lang === "ar" && !scripts.ar ? "cairo" : lang === "he" && !scripts.he ? "rubik" : lang === "ru" && !scripts.cyr ? "rubik" : null;
   if (!extra) return { family: f.family, extra: null };
   const [first, ...rest] = f.family.split(",");
   return { family: [first, FONTS[extra].family.split(",")[0], ...rest].join(",").replace(/,\s*/g, ", "), extra };
@@ -84,6 +106,8 @@ export type Design = {
   hero: string | null;
   /** Wallet banner (Google Wallet hero image, Apple strip later). Falls back to the background image. */
   walletHero: string | null;
+  /** Languages the card is shown in, in card order. Set by the business; a language not listed never appears. */
+  langs: Lang[];
   texts: Record<Lang, Texts>;
   showCustomerName: boolean;
   look: CardLook;
@@ -130,10 +154,27 @@ export function defaultLook(bg: string): CardLook {
 }
 const ASSET_ID = /^[0-9a-f-]{36}$/;
 
+const GIFT: Record<Lang, string> = { he: "מתנה", ar: "مجاناً", en: "FREE", ru: "Подарок", de: "GRATIS", fr: "OFFERT" };
+const SUB: Record<Lang, string> = {
+  he: "כרטיס נאמנות", ar: "بطاقة ولاء", en: "Loyalty card", ru: "Карта лояльности", de: "Treuekarte", fr: "Carte de fidélité",
+};
+
+/** Card languages in card order, without duplicates. A missing list means an older design: Hebrew, Arabic and English as before. */
+export function sanitizeLangs(input: unknown): Lang[] {
+  if (input === undefined || input === null) return ["he", "ar", "en"];
+  const picked = Array.isArray(input) ? input : [];
+  const langs = CARD_LANGS.filter((l) => picked.includes(l));
+  return langs.length ? langs : ["he"];
+}
+
+/** The language a card is shown in: the wanted one if the business picked it, otherwise its first language. */
+export function cardLang(d: Design, wanted?: string | null): Lang {
+  const langs: Lang[] = d.langs?.length ? d.langs : ["he"];
+  return langs.find((l) => l === wanted) ?? langs[0];
+}
+
 export function defaultDesign(b: { name: string; reward: string; color: string }): Design {
-  const gift = { he: "מתנה", ar: "مجاناً", en: "FREE" };
-  const sub = { he: "כרטיס נאמנות", ar: "بطاقة ولاء", en: "Loyalty card" };
-  const t = (l: Lang): Texts => ({ title: b.name.slice(0, LIMITS.title), subtitle: sub[l], reward: b.reward.slice(0, LIMITS.reward), gift: gift[l] });
+  const t = (l: Lang): Texts => ({ title: b.name.slice(0, LIMITS.title), subtitle: SUB[l], reward: b.reward.slice(0, LIMITS.reward), gift: GIFT[l] });
   return {
     v: 1,
     layout: "gradient",
@@ -142,7 +183,8 @@ export function defaultDesign(b: { name: string; reward: string; color: string }
     logo: null,
     hero: null,
     walletHero: null,
-    texts: { he: t("he"), ar: t("ar"), en: t("en") },
+    langs: ["he"],
+    texts: Object.fromEntries(CARD_LANGS.map((l) => [l, t(l)])) as Record<Lang, Texts>,
     showCustomerName: true,
     look: defaultLook(HEX.test(b.color) ? b.color : "#1E1B2E"),
   };
@@ -162,7 +204,7 @@ export function sanitizeDesign(input: unknown): Design | null {
   if (!(STAMP_ICONS as readonly string[]).includes(icon) && icon !== "logo" && icon !== "image") return null;
   const asset = (v: unknown) => (typeof v === "string" && ASSET_ID.test(v) ? v : null);
   const texts = {} as Record<Lang, Texts>;
-  for (const l of ["he", "ar", "en"] as Lang[]) {
+  for (const l of CARD_LANGS) {
     const t = d.texts?.[l] ?? {};
     texts[l] = {
       title: cleanText(t.title, LIMITS.title),
@@ -179,6 +221,7 @@ export function sanitizeDesign(input: unknown): Design | null {
     logo: asset(d.logo),
     hero: asset(d.hero),
     walletHero: asset(d.walletHero),
+    langs: sanitizeLangs(d.langs),
     texts,
     showCustomerName: d.showCustomerName !== false,
     look: sanitizeLook(d.look, colors.bg.toUpperCase()),
@@ -267,16 +310,17 @@ export function designChecks(d: Design, assets: AssetMeta[]): Check[] {
     else if (Math.min(img.width, img.height) < IMAGE_MIN.stamp) out.push({ level: "warn", key: "chkStampImageSmall" });
   }
 
-  const langs: Lang[] = ["he", "ar", "en"];
+  // Only the languages the business picked are checked. Other languages are not shown anywhere.
+  const langs = d.langs;
   const missing = langs.filter((l) => !d.texts[l].title || !d.texts[l].reward);
   if (missing.length) for (const l of missing) out.push({ level: "bad", key: "chkMissingText", vars: { l } });
   else out.push({ level: "ok", key: "chkAllLangs" });
   if (langs.some((l) => d.texts[l].title.length > WALLET_LIMITS.title || d.texts[l].reward.length > WALLET_LIMITS.reward)) {
     out.push({ level: "warn", key: "chkLongForWallet" });
   }
-  // Arabic or English texts that are still the Hebrew ones: customers who read that language see Hebrew.
+  // Texts in other languages that are still the Hebrew ones: customers who read that language see Hebrew.
   const HEBREW = /[\u0590-\u05FF]/;
-  for (const l of ["ar", "en"] as Lang[]) {
+  for (const l of langs.filter((x) => x !== "he")) {
     if (HEBREW.test(d.texts[l].reward) || HEBREW.test(d.texts[l].subtitle) || HEBREW.test(d.texts[l].gift)) out.push({ level: "warn", key: "chkNotTranslated", vars: { l } });
   }
   if (d.layout !== "solid" || d.look.font !== "system") out.push({ level: "info", key: "chkWalletLook" });
@@ -284,7 +328,8 @@ export function designChecks(d: Design, assets: AssetMeta[]): Check[] {
 }
 
 export function textsFor(d: Design, lang: Lang): Texts {
-  const pick = (k: keyof Texts) => d.texts[lang][k] || d.texts.he[k] || d.texts.en[k] || d.texts.ar[k];
+  const l = cardLang(d, lang);
+  const pick = (k: keyof Texts) => d.texts[l][k] || d.texts[d.langs[0]][k] || d.texts[d.langs[0]].title;
   return { title: pick("title"), subtitle: pick("subtitle"), reward: pick("reward"), gift: pick("gift") };
 }
 

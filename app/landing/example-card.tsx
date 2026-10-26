@@ -26,7 +26,8 @@ export function exampleDesign(k: ExampleKey, lang: Lang, name: string, rewardLin
     logo: null,
     hero: null,
     walletHero: null,
-    texts: { he: texts, ar: texts, en: texts },
+    langs: [lang],
+    texts: { he: texts, ar: texts, en: texts, ru: texts, de: texts, fr: texts },
     showCustomerName: true,
     look: { ...defaultLook(th.bg), bg2: light ? darken(th.bg, 0.1) : darken(th.bg, 0.32) },
   };

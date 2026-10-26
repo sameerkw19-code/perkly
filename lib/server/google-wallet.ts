@@ -58,10 +58,13 @@ export function objectIdFor(config: WalletConfig, customerId: string): string {
 }
 
 /** A label Google shows in the phone's language (Hebrew, Arabic, or English otherwise). */
-function label(en: string, he: string, ar: string) {
+function label(en: string, he: string, ar: string, others: [ru: string, de: string, fr: string]) {
   return {
     defaultValue: { language: "en-US", value: en },
-    translatedValues: [{ language: "he", value: he }, { language: "iw", value: he }, { language: "ar", value: ar }],
+    translatedValues: [
+      { language: "he", value: he }, { language: "iw", value: he }, { language: "ar", value: ar },
+      { language: "ru", value: others[0] }, { language: "de", value: others[1] }, { language: "fr", value: others[2] },
+    ],
   };
 }
 
@@ -70,12 +73,12 @@ function liveFields(card: LoyaltyCard) {
   return {
     loyaltyPoints: {
       label: "Stamps",
-      localizedLabel: label("Stamps", "חותמות", "أختام"),
+      localizedLabel: label("Stamps", "חותמות", "أختام", ["Печати", "Stempel", "Tampons"]),
       balance: { string: `${card.stamps}/${card.target}` },
     },
     secondaryLoyaltyPoints: {
       label: "Rewards",
-      localizedLabel: label("Rewards", "הטבות זמינות", "مكافآت متاحة"),
+      localizedLabel: label("Rewards", "הטבות זמינות", "مكافآت متاحة", ["Награды", "Prämien", "Récompenses"]),
       balance: { int: Math.max(0, card.rewards ?? 0) },
     },
   };
