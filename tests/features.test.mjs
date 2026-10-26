@@ -208,17 +208,26 @@ test("card languages: a picked language without its own text blocks publishing",
   assert.equal(bad.some((c) => c.vars.l === "ar"), false);
 });
 
-test("card languages: old cards (no list) keep Hebrew, Arabic and English", () => {
+test("card languages: old cards (no list) show Hebrew and English only for now", () => {
   const d = plainDesign();
   delete d.langs;
-  assert.deepEqual(sanitizeLangs(d.langs), ["he", "ar", "en"]);
-  assert.deepEqual(sanitizeDesign(d).langs, ["he", "ar", "en"]);
+  assert.deepEqual(sanitizeLangs(d.langs), ["he", "en"]);
+  assert.deepEqual(sanitizeDesign(d).langs, ["he", "en"]);
+});
+
+test("card languages: languages not offered yet never reach a card, but their texts stay stored", () => {
+  const d = plainDesign();
+  d.langs = ["ar", "he", "ru"];
+  d.texts.ar.reward = "مكافأة";
+  const clean = sanitizeDesign(d);
+  assert.deepEqual(clean.langs, ["he"]);
+  assert.equal(clean.texts.ar.reward, "مكافأة");
 });
 
 test("card languages: sanitized in card order, unknown and repeated ones dropped, never empty", () => {
   const d = plainDesign();
-  d.langs = ["fr", "he", "xx", "he"];
-  assert.deepEqual(sanitizeDesign(d).langs, ["he", "fr"]);
+  d.langs = ["en", "he", "xx", "he"];
+  assert.deepEqual(sanitizeDesign(d).langs, ["he", "en"]);
   d.langs = [];
   assert.deepEqual(sanitizeDesign(d).langs, ["he"]);
 });
