@@ -76,7 +76,7 @@ test("design: unknown or unsafe look values fall back, never pass through", () =
 
 test("design: valid look values are kept", () => {
   const d = sanitizeDesign({ ...base, look: { bg2: "#00aa11", dir: "radial", overlay: 33, font: "rubik", text: "l", stamps: "s" } });
-  assert.deepEqual(d.look, { bg2: "#00AA11", dir: "radial", overlay: 35, font: "rubik", text: "l", stamps: "s" });
+  assert.deepEqual(d.look, { bg2: "#00AA11", dir: "radial", overlay: 35, font: "rubik", text: "l", stamps: "s", logoSize: 100, logoFrame: "none", logoName: false });
   assert.ok(FONTS[d.look.font]);
 });
 
@@ -171,4 +171,18 @@ test("google wallet: each pass carries the business name, banner and Powered by 
   assert.deepEqual(o.textModulesData, [{ id: "business", header: "קפה רון", body: "קפה חינם" }]);
   assert.equal(o.linksModuleData.uris[0].description, "Powered by Perkly");
   assert.equal(lookFields({ ...look, heroUrl: null }).heroImage, undefined);
+});
+
+test("design: logo size, frame and wallet banner are validated", () => {
+  const base = defaultDesign({ name: "Cafe", reward: "Coffee", color: "#123456" });
+  assert.equal(base.look.logoSize, 100);
+  assert.equal(base.look.logoFrame, "none");
+  assert.equal(base.walletHero, null);
+  const d = sanitizeDesign({ ...base, walletHero: "../etc", look: { ...base.look, logoSize: 999, logoFrame: "star", logoName: "yes" } });
+  assert.equal(d.look.logoSize, 200);
+  assert.equal(d.look.logoFrame, "none");
+  assert.equal(d.look.logoName, false);
+  assert.equal(d.walletHero, null);
+  const ok = sanitizeDesign({ ...base, look: { ...base.look, logoSize: 143, logoFrame: "circle", logoName: true } });
+  assert.deepEqual([ok.look.logoSize, ok.look.logoFrame, ok.look.logoName], [140, "circle", true]);
 });

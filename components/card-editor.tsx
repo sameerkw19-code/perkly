@@ -1,20 +1,21 @@
 "use client";
 import { useMemo, useState } from "react";
-import { ImagePlus, Lock, Shuffle, Trash2, UploadCloud } from "lucide-react";
+import { ImagePlus, Lock, MessageCircle, Shuffle, Trash2, UploadCloud } from "lucide-react";
 import {
-  FONTS, GRADIENTS, GRADIENT_DIRS, IMAGE_MIN, LIMITS, PALETTES, STAMP_ICONS, darken, designChecks,
-  type AssetMeta, type CardLook, type Design, type FontId, type Layout, type Size, type StampIcon, type Texts,
+  FONTS, FONT_SCRIPTS, GRADIENTS, GRADIENT_DIRS, IMAGE_MIN, LIMITS, PALETTES, STAMP_ICONS, darken, designChecks,
+  type AssetMeta, type CardLook, type Design, type FontId, type Layout, type LogoFrame, type Size, type StampIcon, type Texts,
 } from "../lib/design";
 import type { Lang } from "../lib/i18n-types";
-import { LANGS, errorText } from "../lib/i18n";
+import { LANGS, errorText, translate } from "../lib/i18n";
 import { post } from "../lib/api";
 import { ApplePreview, GooglePreview, ICONS, LoyaltyCard, Num } from "./loyalty-card";
+import { PERKLY_SOCIAL } from "../lib/perkly-social";
 
 type Image = AssetMeta & { kind: string };
 type Editor = { draft: Design; publishedVersion: number; publishedAt: string | null; hasUnpublished: boolean; images: Image[] };
 type T = (key: string, vars?: Record<string, string | number>) => string;
 
-const MAX_SIDE = { logo: 800, hero: 1200, stamp: 400 } as const;
+const MAX_SIDE = { logo: 800, hero: 1200, wallet: 1100, stamp: 400 } as const;
 const SIZES: Size[] = ["s", "m", "l"];
 /** All selectable Google Fonts in one request, so the font buttons preview in their own face. */
 const ALL_FONTS_HREF =
@@ -129,12 +130,13 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
   const setText = (k: keyof Texts, v: string) =>
     setDesign((d) => ({ ...d, texts: { ...d.texts, [textLang]: { ...d.texts[textLang], [k]: v.slice(0, LIMITS[k]) } } }));
 
-  async function upload(kind: "logo" | "hero" | "stamp", file: File | undefined) {
+  async function upload(kind: "logo" | "hero" | "wallet" | "stamp", file: File | undefined) {
     if (!file) return;
     if (!/^image\/(png|jpeg|webp)$/.test(file.type)) { notify(errorText(lang, "image_type"), true); return; }
     setBusy(kind);
     try {
-      const blob = await shrink(file, MAX_SIDE[kind], kind === "hero" ? "image/jpeg" : "image/webp", kind !== "hero" && clearWhite);
+      const photo = kind === "hero" || kind === "wallet";
+      const blob = await shrink(file, MAX_SIDE[kind], photo ? "image/jpeg" : "image/webp", !photo && clearWhite);
       const r = await fetch(`/api/asset?business=${encodeURIComponent(businessId)}&kind=${kind}`, {
         method: "POST", headers: { "Content-Type": blob.type }, body: blob, credentials: "same-origin",
       });
@@ -143,6 +145,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
       setImages((list) => [{ id: data.id, kind, width: data.width, height: data.height }, ...list]);
       if (kind === "logo") set({ logo: data.id });
       if (kind === "hero") set({ hero: data.id });
+      if (kind === "wallet") set({ walletHero: data.id });
       if (kind === "stamp") set({ stamp: { icon: "image", image: data.id } });
     } catch {
       notify(t("err_network"), true);
@@ -171,7 +174,11 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
     reload();
   }
 
-  const preview = { design, lang, stamps: demo, target, customerName: t("sampleCustomer"), t };
+  // The preview shows the card in the language being edited, with that language's direction
+  // (Hebrew and Arabic right to left, English left to right) and its own labels.
+  const pt: T = (key, vars) => translate(textLang, key, vars);
+  const preview = { design, lang: textLang, stamps: demo, target, customerName: pt("sampleCustomer"), t: pt };
+  const previewDir = textLang === "en" ? "ltr" : "rtl";
   const locale = lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB";
 
   return (
@@ -184,12 +191,20 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
             </button>
           ))}
         </div>
-        <div className="preview-stage">
+        <div className="seg preview-langs" role="group" aria-label={t("edTexts")}>
+          {LANGS.map((l) => <button key={l} type="button" aria-pressed={textLang === l} onClick={() => setTextLang(l)}>{t("langName_" + l)}</button>)}
+        </div>
+        <div className="preview-stage" dir={previewDir} lang={textLang}>
           {tab === "web" && <LoyaltyCard {...preview} />}
           {tab === "apple" && <ApplePreview {...preview} />}
           {tab === "google" && <GooglePreview {...preview} />}
         </div>
         <p className="form-hint center">{t(tab === "web" ? "pvNoteWeb" : tab === "apple" ? "pvNoteApple" : "pvNoteGoogle")}</p>
+        {tab !== "web" && (
+          <button type="button" className="btn soft small wallet-jump" onClick={() => document.getElementById("ed-wallet")?.scrollIntoView({ behavior: "smooth", block: "center" })}>
+            <ImagePlus size={14} />{t("edWalletJump")}
+          </button>
+        )}
         <label className="demo-row">
           <span>{t("demoStamps")} <Num>{demo}/{target}</Num></span>
           <input type="range" min={0} max={target} value={demo} onChange={(e) => setDemo(Number(e.target.value))} />
@@ -209,6 +224,12 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
           {blocked && <p className="form-error">{t("err_design_checks")}</p>}
           <p className="form-hint">{t("designNoBalance")} {t("walletPublishNote")}</p>
         </section>
+
+        <a className="design-help" target="_blank" rel="noopener noreferrer"
+          href={`https://wa.me/${(PERKLY_SOCIAL.whatsapp ?? "").replace(/\D/g, "")}?text=${encodeURIComponent(t("designHelpText", { name: design.texts[lang]?.title || design.texts.he.title }))}`}>
+          <MessageCircle size={18} aria-hidden="true" />
+          <span><b>{t("designHelpTitle")}</b><small>{t("designHelpSub")}</small></span>
+        </a>
       </div>
 
       <div className="editor-controls">
@@ -320,7 +341,8 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
             {(Object.keys(FONTS) as FontId[]).map((k) => (
               <button key={k} type="button" className="icon-choice font-choice" aria-pressed={design.look.font === k}
                 style={{ fontFamily: FONTS[k].family }} onClick={() => setLook({ font: k })}>
-                <b>אבג Abc</b><span>{FONTS[k].label}</span>
+                <b>{FONT_SCRIPTS[k].ar && !FONT_SCRIPTS[k].he ? "أبج Abc" : "אבג Abc"}</b><span>{FONTS[k].label}</span>
+                <small className="font-scripts" dir="ltr">{[FONT_SCRIPTS[k].he && "עב", FONT_SCRIPTS[k].ar && "ع", "En"].filter(Boolean).join(" · ")}</small>
               </button>
             ))}
           </div>
@@ -346,16 +368,16 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
             </p>
           )}
           <div className="uploads">
-            {([["logo", "edLogo", "edLogoHint"], ["hero", "edHero", "edHeroHint"]] as const).map(([kind, label, hint]) => {
-              const id = kind === "logo" ? design.logo : design.hero;
+            {([["logo", "edLogo", "edLogoHint"], ["hero", "edHero", "edHeroHint"], ["wallet", "edWallet", "edWalletHint"]] as const).map(([kind, label, hint]) => {
+              const id = kind === "logo" ? design.logo : kind === "hero" ? design.hero : design.walletHero;
               const meta = images.find((i) => i.id === id);
               return (
-                <div className="upload" key={kind}>
+                <div className="upload" key={kind} id={"ed-" + kind}>
                   <span className="thumb">{id ? <img src={`/api/asset/${id}`} alt="" /> : <ImagePlus size={22} />}</span>
                   <div>
                     <b>{t(label)}</b>
                     <small className="form-hint">{t(hint)}</small>
-                    {meta && <small className="form-hint" dir="ltr">{meta.width}×{meta.height}{Math.min(meta.width, meta.height) < IMAGE_MIN[kind] ? " ⚠" : ""}</small>}
+                    {meta && <small className="form-hint" dir="ltr">{meta.width}×{meta.height}{(kind === "logo" ? Math.min(meta.width, meta.height) : meta.width) < IMAGE_MIN[kind] ? " ⚠" : ""}</small>}
                     <div className="row-actions">
                       {paid ? (
                         <label className="btn soft small">
@@ -368,7 +390,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
                       {id && (
                         <button type="button" className="btn soft small" onClick={() => kind === "logo"
                           ? set({ logo: null, stamp: design.stamp.icon === "logo" ? { icon: "star", image: null } : design.stamp })
-                          : set({ hero: null })}>
+                          : kind === "hero" ? set({ hero: null }) : set({ walletHero: null })}>
                           <Trash2 size={14} />{t("remove")}
                         </button>
                       )}
@@ -378,6 +400,24 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
               );
             })}
           </div>
+          {design.logo && (
+            <div className="logo-controls">
+              <h3 className="sub-head">{t("edLogoLook")}</h3>
+              <label className="demo-row">
+                <span>{t("edLogoSize")} <Num>{design.look.logoSize}%</Num></span>
+                <input type="range" min={60} max={200} step={10} value={design.look.logoSize} onChange={(e) => setLook({ logoSize: Number(e.target.value) })} />
+              </label>
+              <div className="seg">
+                {(["none", "circle", "square"] as LogoFrame[]).map((f) => (
+                  <button key={f} type="button" aria-pressed={design.look.logoFrame === f} onClick={() => setLook({ logoFrame: f })}>{t("logoFrame_" + f)}</button>
+                ))}
+              </div>
+              <label className="check-row clear-white">
+                <input type="checkbox" checked={design.look.logoName} onChange={(e) => setLook({ logoName: e.target.checked })} />
+                <span>{t("edLogoName")}</span>
+              </label>
+            </div>
+          )}
           {paid && (
             <label className="check-row clear-white">
               <input type="checkbox" checked={clearWhite} onChange={(e) => setClearWhite(e.target.checked)} />
