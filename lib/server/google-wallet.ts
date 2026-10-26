@@ -3,7 +3,7 @@
 // so deploying this code before Google approves the account changes nothing for customers.
 
 import { base64url } from "./crypto";
-import { lookFields, type PassLook } from "../wallet-look";
+import { classBody, lookFields, type ClassLook, type PassLook } from "../wallet-look";
 
 export type WalletConfig = { issuerId: string; serviceEmail: string; privateKeyPem: string; classId: string };
 
@@ -231,4 +231,38 @@ export async function listClassIds(config: WalletConfig): Promise<string[]> {
   if (!r.ok) throw new Error(`google_list_${r.status}`);
   const data = (await r.json()) as { resources?: { id?: string; reviewStatus?: string }[] };
   return (data.resources ?? []).map((c) => `${c.id} (${c.reviewStatus ?? "?"})`);
+}
+
+// ---- A class per business ----
+
+/** The business's own class id. Passes saved after this use it; older passes keep the shared class. */
+export function businessClassId(config: WalletConfig, businessId: string): string {
+  return `${config.issuerId}.biz_${safeId(businessId)}`;
+}
+
+/**
+ * Creates or updates the business's own class so its name, color and logo show on new passes.
+ * Returns the class id to use, or null when there is no PNG/JPEG logo or Google refused; then the shared class is used.
+ * Never throws, so a Google problem can't block a customer from saving a pass.
+ */
+export async function ensureBusinessClass(config: WalletConfig, businessId: string, look: ClassLook | null): Promise<string | null> {
+  if (!look) return null;
+  const id = businessClassId(config, businessId);
+  try {
+    const token = await accessToken(config);
+    const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+    const body = JSON.stringify(classBody(id, look));
+    const current = await fetch(`${API}/loyaltyClass/${encodeURIComponent(id)}`, { headers });
+    const r = current.status === 404
+      ? await fetch(`${API}/loyaltyClass`, { method: "POST", headers, body })
+      : await fetch(`${API}/loyaltyClass/${encodeURIComponent(id)}`, { method: "PATCH", headers, body });
+    if (!r.ok) {
+      console.warn(`google wallet class ${id} not saved: HTTP ${r.status}`);
+      return null;
+    }
+    return id;
+  } catch (e) {
+    console.warn(`google wallet class failed: ${(e as Error).message}`);
+    return null;
+  }
 }

@@ -15,7 +15,7 @@ type Image = AssetMeta & { kind: string };
 type Editor = { draft: Design; publishedVersion: number; publishedAt: string | null; hasUnpublished: boolean; images: Image[] };
 type T = (key: string, vars?: Record<string, string | number>) => string;
 
-const MAX_SIDE = { logo: 800, hero: 1200, wallet: 1100, stamp: 400 } as const;
+const MAX_SIDE = { logo: 660, hero: 1200, wallet: 1100, stamp: 400 } as const;
 const SIZES: Size[] = ["s", "m", "l"];
 /** All selectable Google Fonts in one request, so the font buttons preview in their own face. */
 const ALL_FONTS_HREF =
@@ -63,7 +63,7 @@ function clearWhiteBackground(ctx: CanvasRenderingContext2D, w: number, h: numbe
  * Shrinks an image in the browser before upload (WebP keeps transparency).
  * Background images go up as JPEG, because Google Wallet shows them as the card banner and does not take WebP.
  */
-async function shrink(file: File, maxSide: number, type: "image/webp" | "image/jpeg" = "image/webp", clearWhite = false): Promise<Blob> {
+async function shrink(file: File, maxSide: number, type: "image/webp" | "image/jpeg" | "image/png" = "image/webp", clearWhite = false): Promise<Blob> {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -149,7 +149,9 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
     setBusy(kind);
     try {
       const photo = kind === "hero" || kind === "wallet";
-      const blob = await shrink(file, MAX_SIDE[kind], photo ? "image/jpeg" : "image/webp", !photo && clearWhite);
+      // Logos are PNG: Google Wallet needs PNG or JPEG for a business's class logo, and PNG keeps the transparent background.
+      const format = kind === "logo" ? "image/png" : photo ? "image/jpeg" : "image/webp";
+      const blob = await shrink(file, MAX_SIDE[kind], format, !photo && clearWhite);
       const r = await fetch(`/api/asset?business=${encodeURIComponent(businessId)}&kind=${kind}`, {
         method: "POST", headers: { "Content-Type": blob.type }, body: blob, credentials: "same-origin",
       });

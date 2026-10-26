@@ -55,11 +55,20 @@ export async function passLook(db: D1Database, business: BusinessLike, origin: s
     const t = textsFor(design, l);
     return { language: GOOGLE_TAG[l], title: (t.title || business.name).slice(0, 60), reward: (t.reward || business.reward).slice(0, 120) };
   });
+  // The business's own Wallet class needs its logo as PNG or JPEG (not WebP).
+  let classLook: { name: string; color: string; logoUrl: string } | null = null;
+  if (design.logo) {
+    const logo = await db.prepare("SELECT mime FROM assets WHERE id = ? AND business = ?").bind(design.logo, business.id).first<{ mime: string }>();
+    if (logo && (logo.mime === "image/png" || logo.mime === "image/jpeg")) {
+      classLook = { name: (text.title || business.name).slice(0, 60), color: design.colors.bg, logoUrl: `${origin}/api/asset/${design.logo}` };
+    }
+  }
   return {
     title: (text.title || business.name).slice(0, 60),
     reward: (text.reward || business.reward).slice(0, 120),
     heroUrl,
     language: GOOGLE_TAG[first],
     translations,
+    classLook,
   };
 }

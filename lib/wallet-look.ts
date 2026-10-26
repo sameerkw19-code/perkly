@@ -11,6 +11,8 @@ export type PassLook = {
   /** Google language tag of the first card language, and the same texts in the other languages the business picked. */
   language?: string;
   translations?: { language: string; title: string; reward: string }[];
+  /** The business's own class look, when its logo can be used (see passLook). */
+  classLook?: ClassLook | null;
 };
 
 export function lookFields(look: PassLook) {
@@ -29,5 +31,26 @@ export function lookFields(look: PassLook) {
       : {}),
     textModulesData: [{ id: "business", header: look.title, body: look.reward, ...localized }],
     linksModuleData: { uris: [{ id: "perkly", uri: "https://perkly.shop", description: "Powered by Perkly" }] },
+  };
+}
+
+/** What a business's own Google Wallet class shows: name, background color and logo. */
+export type ClassLook = { name: string; color: string; logoUrl: string };
+
+/**
+ * The body of a business's own loyalty class. Google approves it on its own when reviewStatus is underReview.
+ * programLogo is required by Google, so a business without a PNG or JPEG logo gets no class (see google-wallet.ts).
+ */
+export function classBody(id: string, look: ClassLook) {
+  return {
+    id,
+    issuerName: "Perkly",
+    programName: look.name.slice(0, 60),
+    hexBackgroundColor: /^#[0-9a-fA-F]{6}$/.test(look.color) ? look.color.toUpperCase() : "#1E1B2E",
+    programLogo: {
+      sourceUri: { uri: look.logoUrl },
+      contentDescription: { defaultValue: { language: "en-US", value: look.name.slice(0, 60) } },
+    },
+    reviewStatus: "underReview",
   };
 }
