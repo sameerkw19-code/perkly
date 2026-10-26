@@ -24,10 +24,45 @@ const ALL_FONTS_HREF =
 const pick = <T,>(list: readonly T[]): T => list[Math.floor(Math.random() * list.length)];
 
 /**
+ * Makes a plain white (or near-white) background transparent: flood fill from the edges, so white
+ * parts inside the logo stay. Soft edges get partial transparency. Does nothing if the corners
+ * aren't white or the image already has transparency.
+ */
+function clearWhiteBackground(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+  const data = ctx.getImageData(0, 0, w, h);
+  const px = data.data;
+  const whiteness = (i: number) => Math.min(px[i], px[i + 1], px[i + 2]);
+  const corners = [0, (w - 1) * 4, (h - 1) * w * 4, ((h - 1) * w + w - 1) * 4];
+  if (corners.some((i) => px[i + 3] < 250 || whiteness(i) < 235)) return;
+  const HARD = 238; // at least this white: fully transparent
+  const SOFT = 200; // between SOFT and HARD: edge pixels fade
+  const seen = new Uint8Array(w * h);
+  const stack: number[] = [];
+  for (let x = 0; x < w; x++) stack.push(x, (h - 1) * w + x);
+  for (let y = 0; y < h; y++) stack.push(y * w, y * w + w - 1);
+  while (stack.length) {
+    const p = stack.pop()!;
+    if (seen[p]) continue;
+    seen[p] = 1;
+    const i = p * 4;
+    const wv = whiteness(i);
+    if (wv < SOFT) continue;
+    if (wv < HARD) { px[i + 3] = Math.round(((HARD - wv) / (HARD - SOFT)) * px[i + 3]); continue; }
+    px[i + 3] = 0;
+    const x = p % w;
+    if (x > 0) stack.push(p - 1);
+    if (x < w - 1) stack.push(p + 1);
+    if (p >= w) stack.push(p - w);
+    if (p < w * (h - 1)) stack.push(p + w);
+  }
+  ctx.putImageData(data, 0, 0);
+}
+
+/**
  * Shrinks an image in the browser before upload (WebP keeps transparency).
  * Background images go up as JPEG, because Google Wallet shows them as the card banner and does not take WebP.
  */
-async function shrink(file: File, maxSide: number, type: "image/webp" | "image/jpeg" = "image/webp"): Promise<Blob> {
+async function shrink(file: File, maxSide: number, type: "image/webp" | "image/jpeg" = "image/webp", clearWhite = false): Promise<Blob> {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -43,6 +78,7 @@ async function shrink(file: File, maxSide: number, type: "image/webp" | "image/j
     const ctx = canvas.getContext("2d")!;
     if (type === "image/jpeg") { ctx.fillStyle = "#FFFFFF"; ctx.fillRect(0, 0, canvas.width, canvas.height); }
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    if (clearWhite && type !== "image/jpeg") clearWhiteBackground(ctx, canvas.width, canvas.height);
     const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, type, 0.86));
     // Some browsers can't write WebP and silently return PNG; both are accepted.
     return blob ?? (await new Promise<Blob>((r, j) => canvas.toBlob((b) => (b ? r(b) : j()), "image/png")));
@@ -71,6 +107,8 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
   const [tab, setTab] = useState<"web" | "apple" | "google">("web");
   const [demo, setDemo] = useState(Math.min(3, target));
   const [busy, setBusy] = useState("");
+  // Logos and stamp images often come on a white background; on by default.
+  const [clearWhite, setClearWhite] = useState(true);
   const dirty = JSON.stringify(design) !== saved;
   const checks = useMemo(() => designChecks(design, images), [design, images]);
   const blocked = checks.some((c) => c.level === "bad");
@@ -96,7 +134,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
     if (!/^image\/(png|jpeg|webp)$/.test(file.type)) { notify(errorText(lang, "image_type"), true); return; }
     setBusy(kind);
     try {
-      const blob = await shrink(file, MAX_SIDE[kind], kind === "hero" ? "image/jpeg" : "image/webp");
+      const blob = await shrink(file, MAX_SIDE[kind], kind === "hero" ? "image/jpeg" : "image/webp", kind !== "hero" && clearWhite);
       const r = await fetch(`/api/asset?business=${encodeURIComponent(businessId)}&kind=${kind}`, {
         method: "POST", headers: { "Content-Type": blob.type }, body: blob, credentials: "same-origin",
       });
@@ -340,6 +378,12 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
               );
             })}
           </div>
+          {paid && (
+            <label className="check-row clear-white">
+              <input type="checkbox" checked={clearWhite} onChange={(e) => setClearWhite(e.target.checked)} />
+              <span>{t("edClearWhite")}<small className="form-hint">{t("edClearWhiteHint")}</small></span>
+            </label>
+          )}
         </section>
 
         <section className="panel">

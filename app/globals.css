@@ -329,3 +329,6 @@ fieldset.birthday{border:0;padding:0;margin:0 0 14px}fieldset.birthday legend{fo
 .social-field input{width:100%;text-align:left}
 @media(prefers-reduced-motion:reduce){.social-row a{transition:none}.social-row a:hover{transform:none}}
 .free-bar{background:#f0ecfc;color:#4b3aa8;border-bottom-color:#e2daf9}
+.clear-white{display:flex;gap:10px;align-items:flex-start;margin-top:12px;font-size:13.5px;cursor:pointer}
+.clear-white input{margin-top:3px;accent-color:var(--purple);width:16px;height:16px;flex:none}
+.clear-white span{display:grid;gap:2px}
