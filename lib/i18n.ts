@@ -321,6 +321,7 @@ Object.assign(words, {
   fSubtitle: ["שורת משנה", "سطر فرعي", "Subtitle"],
   fReward: ["תיאור ההטבה", "وصف المكافأة", "Reward description"],
   fGift: ["תווית המתנה", "ملصق الهدية", "Gift label"],
+  fPromo: ["הודעה ללקוחות (רשות)", "رسالة للعملاء (اختياري)", "Customer message (optional)"],
   edShowName: ["להציג את שם הלקוח על הכרטיס", "إظهار اسم الزبون على البطاقة", "Show the customer's name on the card"],
   edPreview: ["תצוגה מקדימה", "معاينة", "Preview"],
   pvWeb: ["בדפדפן", "في المتصفح", "Browser"],

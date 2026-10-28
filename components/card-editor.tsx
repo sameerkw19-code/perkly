@@ -472,7 +472,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
           </div>
           <p className="form-hint">{t("edTextsHint")}</p>
           <div className="stack-form" dir={isRtl(textLang) ? "rtl" : "ltr"}>
-            {(["title", "subtitle", "reward", "gift"] as (keyof Texts)[]).map((k) => (
+            {(["title", "subtitle", "reward", "gift", "promo"] as (keyof Texts)[]).map((k) => (
               <label key={k}>
                 <span className="label-row">{t("f" + k[0].toUpperCase() + k.slice(1))}<small><Num>{design.texts[textLang][k].length}/{LIMITS[k]}</Num></small></span>
                 <input value={design.texts[textLang][k]} maxLength={LIMITS[k]} onChange={(e) => setText(k, e.target.value)} />

@@ -232,6 +232,7 @@ export function GooglePreview({ design, lang, stamps, target, customerName }: Pr
       <div className="gw-body">
         <div className="gw-h"><Logo design={design} title={text.title} className="card-logo round" /><span>{text.title}</span></div>
         <div className="gw-title">{text.subtitle}</div>
+        {text.promo && <div className="gw-promo">{text.promo}</div>}
         <div className="gw-row">
           {design.showCustomerName && customerName && <div><small>{t("customerName")}</small><b>{customerName}</b></div>}
           <div><small>{t("stampsWord")}</small><b><Num>{stamps}/{target}</Num></b></div>
