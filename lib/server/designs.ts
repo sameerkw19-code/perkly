@@ -66,6 +66,7 @@ export async function passLook(db: D1Database, business: BusinessLike, origin: s
   return {
     title: (text.title || business.name).slice(0, 60),
     reward: (text.reward || business.reward).slice(0, 120),
+    promo: text.promo.slice(0, 120),
     heroUrl,
     language: GOOGLE_TAG[first],
     translations,

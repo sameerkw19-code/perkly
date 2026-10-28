@@ -37,7 +37,7 @@ export const STAMP_ICONS = [
 export type PresetIcon = (typeof STAMP_ICONS)[number];
 export type StampIcon = PresetIcon | "logo" | "image";
 export type Layout = "gradient" | "solid" | "photo";
-export type Texts = { title: string; subtitle: string; reward: string; gift: string };
+export type Texts = { title: string; subtitle: string; reward: string; gift: string; promo: string };
 
 /** Fonts a business can pick. All are free Google Fonts; "system" needs no download. */
 export const FONTS = {
@@ -119,7 +119,7 @@ export type Design = {
   look: CardLook;
 };
 
-export const LIMITS = { title: 40, subtitle: 40, reward: 80, gift: 14 };
+export const LIMITS = { title: 40, subtitle: 40, reward: 80, gift: 14, promo: 60 };
 export const WALLET_LIMITS = { title: 24, reward: 36 };
 export const IMAGE_MIN = { logo: 660, hero: 1032, stamp: 120, wallet: 1032 };
 
@@ -183,7 +183,7 @@ export function cardLang(d: Design, wanted?: string | null): Lang {
 }
 
 export function defaultDesign(b: { name: string; reward: string; color: string }): Design {
-  const t = (l: Lang): Texts => ({ title: b.name.slice(0, LIMITS.title), subtitle: SUB[l], reward: b.reward.slice(0, LIMITS.reward), gift: GIFT[l] });
+  const t = (l: Lang): Texts => ({ title: b.name.slice(0, LIMITS.title), subtitle: SUB[l], reward: b.reward.slice(0, LIMITS.reward), gift: GIFT[l], promo: "" });
   return {
     v: 1,
     layout: "gradient",
@@ -220,6 +220,7 @@ export function sanitizeDesign(input: unknown): Design | null {
       subtitle: cleanText(t.subtitle, LIMITS.subtitle),
       reward: cleanText(t.reward, LIMITS.reward),
       gift: cleanText(t.gift, LIMITS.gift),
+      promo: cleanText(t.promo, LIMITS.promo),
     };
   }
   return {
@@ -339,7 +340,8 @@ export function designChecks(d: Design, assets: AssetMeta[]): Check[] {
 export function textsFor(d: Design, lang: Lang): Texts {
   const l = cardLang(d, lang);
   const pick = (k: keyof Texts) => d.texts[l][k] || d.texts[d.langs[0]][k] || d.texts[d.langs[0]].title;
-  return { title: pick("title"), subtitle: pick("subtitle"), reward: pick("reward"), gift: pick("gift") };
+  // The optional message has no fallback: a language left empty shows nothing rather than another language.
+  return { title: pick("title"), subtitle: pick("subtitle"), reward: pick("reward"), gift: pick("gift"), promo: d.texts[l].promo ?? "" };
 }
 
 export function assetUrl(id: string | null): string | null {

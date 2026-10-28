@@ -17,7 +17,7 @@ export function exampleDesign(k: ExampleKey, lang: Lang, name: string, rewardLin
   const th = THEMES[k];
   // Light cards get a gentle gradient, dark ones a deeper one.
   const light = onColor(th.bg) !== "#FFFFFF";
-  const texts = { title: name, subtitle: SUB[lang], reward: rewardLine, gift: GIFT[lang] };
+  const texts = { title: name, subtitle: SUB[lang], reward: rewardLine, gift: GIFT[lang], promo: "" };
   return {
     v: 1,
     layout: "gradient",

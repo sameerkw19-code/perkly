@@ -7,6 +7,8 @@
 export type PassLook = {
   title: string;
   reward: string;
+  /** Optional message shown as a second text block on the pass (card language only). */
+  promo?: string;
   heroUrl: string | null;
   /** Google language tag of the first card language, and the same texts in the other languages the business picked. */
   language?: string;
@@ -29,7 +31,10 @@ export function lookFields(look: PassLook) {
     ...(look.heroUrl
       ? { heroImage: { sourceUri: { uri: look.heroUrl }, contentDescription: { defaultValue: { language: "en-US", value: look.title } } } }
       : {}),
-    textModulesData: [{ id: "business", header: look.title, body: look.reward, ...localized }],
+    textModulesData: [
+      { id: "business", header: look.title, body: look.reward, ...localized },
+      ...(look.promo ? [{ id: "promo", body: look.promo }] : []),
+    ],
     linksModuleData: { uris: [{ id: "perkly", uri: "https://perkly.shop", description: "Powered by Perkly" }] },
   };
 }

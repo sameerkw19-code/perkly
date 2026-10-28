@@ -251,3 +251,12 @@ test("wallet pass: other picked languages get localized header and body", () => 
   assert.equal(multi.textModulesData[0].localizedHeader.translatedValues[0].language, "ru");
   assert.equal(multi.textModulesData[0].localizedBody.translatedValues[0].value, "Кофе");
 });
+
+// Optional customer message: a second text block on the pass, only when set.
+test("pass: optional message adds a second text block only when set", () => {
+  const base = { title: "Cafe", reward: "Free coffee", heroUrl: null };
+  assert.equal(lookFields(base).textModulesData.length, 1);
+  const withMsg = lookFields({ ...base, promo: "Double stamps on Friday" }).textModulesData;
+  assert.equal(withMsg.length, 2);
+  assert.equal(withMsg[1].body, "Double stamps on Friday");
+});
