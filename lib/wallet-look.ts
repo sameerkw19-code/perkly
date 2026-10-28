@@ -12,7 +12,7 @@ export type PassLook = {
   heroUrl: string | null;
   /** Google language tag of the first card language, and the same texts in the other languages the business picked. */
   language?: string;
-  translations?: { language: string; title: string; reward: string }[];
+  translations?: { language: string; title: string; reward: string; promo?: string }[];
   /** The business's own class look, when its logo can be used (see passLook). */
   classLook?: ClassLook | null;
 };
@@ -20,6 +20,11 @@ export type PassLook = {
 export function lookFields(look: PassLook) {
   const tr = look.translations ?? [];
   const lang = look.language ?? "en-US";
+  // The optional message in the other languages the business wrote it in (an empty one is skipped).
+  const trPromo = tr.filter((x) => x.promo);
+  const promoLocalized = trPromo.length
+    ? { localizedBody: { defaultValue: { language: lang, value: look.promo ?? "" }, translatedValues: trPromo.map((x) => ({ language: x.language, value: x.promo! })) } }
+    : {};
   // Phones in another language show the business's text in that language; others show the first one.
   const localized = tr.length
     ? {
@@ -33,7 +38,7 @@ export function lookFields(look: PassLook) {
       : {}),
     textModulesData: [
       { id: "business", header: look.title, body: look.reward, ...localized },
-      ...(look.promo ? [{ id: "promo", body: look.promo }] : []),
+      ...(look.promo ? [{ id: "promo", body: look.promo, ...promoLocalized }] : []),
     ],
     linksModuleData: { uris: [{ id: "perkly", uri: "https://perkly.shop", description: "Powered by Perkly" }] },
   };

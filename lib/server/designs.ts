@@ -53,7 +53,7 @@ export async function passLook(db: D1Database, business: BusinessLike, origin: s
   // The other languages the business picked, for phones that use them.
   const translations = design.langs.filter((l) => l !== first).map((l) => {
     const t = textsFor(design, l);
-    return { language: GOOGLE_TAG[l], title: (t.title || business.name).slice(0, 60), reward: (t.reward || business.reward).slice(0, 120) };
+    return { language: GOOGLE_TAG[l], title: (t.title || business.name).slice(0, 60), reward: (t.reward || business.reward).slice(0, 120), promo: t.promo.slice(0, 120) };
   });
   // The business's own Wallet class needs its logo as PNG or JPEG (not WebP).
   let classLook: { name: string; color: string; logoUrl: string } | null = null;
