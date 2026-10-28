@@ -627,6 +627,14 @@ export async function POST(request: Request) {
         .bind(crypto.randomUUID(), business.id, JSON.stringify(design), now, user.id, business.id)
         .run();
       const live = await publishedDesign(db, business.id);
+      // Customers who saved the card to Google Wallet get the new look now, not only on their next stamp.
+      // Capped so one publish stays within the background-work limits; the rest refresh on their next stamp.
+      const saved = await db.prepare("SELECT * FROM customers WHERE business = ? AND google_wallet IS NOT NULL LIMIT 100").bind(business.id).all<Customer>();
+      const origin = new URL(request.url).origin;
+      for (const cust of saved.results ?? []) {
+        const card = await cardState(db, cust, business.reward_mode);
+        syncGoogleWallet(db, cust, card.rewards, origin);
+      }
       return json({ ok: true, version: live?.version });
     }
 
