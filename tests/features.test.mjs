@@ -3,7 +3,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { validMonthDay, parseBirthday, birthdayFromParts, formatBirthday, upcomingKeys } from "../lib/birthday.ts";
 import { sanitizeDesign, defaultDesign, designChecks, FONTS, cardLang, textsFor, sanitizeLangs } from "../lib/design.ts";
-import { businessAccess, freeLimitReached, hasPaidDesign } from "../lib/server/billing.ts";
+import { businessAccess, freeLimitReached, hasPaidDesign, TRIAL_DAYS } from "../lib/server/billing.ts";
+import { readFileSync } from "node:fs";
 import { lookFields } from "../lib/wallet-look.ts";
 
 // ---- Birthdays ----
@@ -260,3 +261,17 @@ test("pass: optional message adds a second text block only when set", () => {
   assert.equal(withMsg.length, 2);
   assert.equal(withMsg[1].body, "Double stamps on Friday");
 });
+
+// ---- Trial length: the checkout and every text say the same number of days ----
+
+test("trial: 14 days at checkout and in all site texts", () => {
+  assert.equal(TRIAL_DAYS, 14);
+  const files = ["app/landing/content.ts", "app/start/start-flow.tsx", "app/contact/contact-form.tsx", "app/terms/page.tsx", "lib/i18n.ts", "app/billing/billing-view.tsx"];
+  for (const f of files) {
+    const text = readFileSync(new URL("../" + f, import.meta.url), "utf8");
+    assert.doesNotMatch(text, /\b3 ימי ניסיון|3-day|3 days free|3 أيام تجربة|אחרי 3 ימים/, f);
+  }
+  const copy = readFileSync(new URL("../app/landing/content.ts", import.meta.url), "utf8");
+  for (const phrase of ["14 ימי ניסיון", "14-day free trial", "14 يوماً"]) assert.match(copy, new RegExp(phrase));
+});
+

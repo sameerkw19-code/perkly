@@ -8,7 +8,7 @@ export function isEntitled(status: string | null | undefined): boolean {
 
 export const MONTHLY_PRICE_ILS = 99;
 /** Free trial at checkout: the card is taken up front and first charged when the trial ends. */
-export const TRIAL_DAYS = 3;
+export const TRIAL_DAYS = 14;
 
 /** Customers a business may have before it subscribes (QR and stamps work up to this number). */
 export const FREE_CUSTOMERS = 10;
