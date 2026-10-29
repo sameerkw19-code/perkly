@@ -598,8 +598,8 @@ export async function POST(request: Request) {
       const design = sanitizeDesign(p.design);
       if (!design) return fail("bad_details", 400, "Invalid design");
       if (!(await ownsAssets(db, business.id, design))) return fail("not_found", 404, "Image not found");
-      // The bright stamp style and the stamp banner in the wallet are subscription features.
-      if ((design.look.stampStyle === "bright" || design.walletBanner === "stamps") && !hasPaidDesign(await businessAccess(db, business.id))) {
+      // The bright stamp style, the stamp banner in the wallet and the pizza progress are subscription features.
+      if ((design.look.stampStyle === "bright" || design.walletBanner === "stamps" || design.look.progress === "pizza") && !hasPaidDesign(await businessAccess(db, business.id))) {
         return fail("paid_feature", 402, "Available with a subscription");
       }
       // Without a subscription: no new logo, background image or stamp image (ones already on the card may stay).

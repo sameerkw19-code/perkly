@@ -4,6 +4,8 @@ import {
 } from "lucide-react";
 import { assetUrl, cardFont, cardLang, fontHref, onColor, textsFor, type Design, type PresetIcon } from "../lib/design";
 import { translate } from "../lib/i18n";
+import { usesPizza } from "../lib/pizza";
+import { PizzaProgress } from "./pizza-progress";
 import { isRtl, type Lang } from "../lib/i18n-types";
 
 export const ICONS: Record<PresetIcon, any> = {
@@ -40,6 +42,7 @@ export function StampGrid({ design, stamps, target, giftLabel, ready }: { design
   const total = target + 1;
   const columns = total <= 6 ? total : Math.ceil(total / 2);
   const productImage = design.stamp.icon === "image";
+  if (usesPizza(design, target)) return <div className="stamp-grid pizza"><PizzaProgress design={design} stamps={stamps} target={target} /></div>;
   return (
     <div className={"stamp-grid" + (productImage ? " product" : "")} style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
       {Array.from({ length: target }, (_, i) => (
@@ -163,15 +166,19 @@ export function LoyaltyCard({ design, lang, stamps, target, customerName, reward
 
       <div className="pcard-reward">{text.reward}</div>
 
-      <div className="pcard-stamps" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
-        {Array.from({ length: target }, (_, i) => (
-          <PassStamp key={i} design={design} filled={i < stamps} />
-        ))}
-        <span className={"pcard-stamp gift" + (ready ? " is-filled" : "")} aria-hidden="true">
-          <Gift size={20} />
-          {text.gift && <em>{text.gift}</em>}
-        </span>
-      </div>
+      {usesPizza(design, target) ? (
+        <div className="pcard-pizza"><PizzaProgress design={design} stamps={stamps} target={target} /></div>
+      ) : (
+        <div className="pcard-stamps" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+          {Array.from({ length: target }, (_, i) => (
+            <PassStamp key={i} design={design} filled={i < stamps} />
+          ))}
+          <span className={"pcard-stamp gift" + (ready ? " is-filled" : "")} aria-hidden="true">
+            <Gift size={20} />
+            {text.gift && <em>{text.gift}</em>}
+          </span>
+        </div>
+      )}
 
       <div className="pcard-fields">
         <div className="pcard-field">

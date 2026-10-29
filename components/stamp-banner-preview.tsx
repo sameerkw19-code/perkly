@@ -8,7 +8,7 @@ export function StampBannerPreview({ design, stamps, target, label }: { design: 
   const ref = useRef<HTMLCanvasElement>(null);
   const [pictures, setPictures] = useState<BannerPictures | null>(null);
   // Reload pictures and fonts only when something they depend on changes.
-  const key = JSON.stringify([design.stamp, design.logo, design.colors, design.look.font, design.look.stampStyle]);
+  const key = JSON.stringify([design.stamp, design.logo, design.colors, design.look.font, design.look.stampStyle, design.look.progress, design.progressImage]);
 
   useEffect(() => {
     let alive = true;

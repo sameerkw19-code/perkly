@@ -3,12 +3,13 @@
 // picture per stamp count (0…target) when publishing, and the server picks the right one for each pass.
 // Browser only (canvas). Drawn at the Google Wallet hero size.
 
-import { createElement } from "react";
+import { createElement, type ComponentType } from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { Gift } from "lucide-react";
 import { FONTS, isRtl, onColor, textsFor, type Design, type Lang } from "../lib/design";
 import { ICONS } from "./loyalty-card";
+import { PIZZA_COLORS, slicePath, slicesPath, toppings, usesPizza } from "../lib/pizza";
 
 export const BANNER_W = 1032;
 export const BANNER_H = 336;
@@ -26,6 +27,8 @@ export type BannerPictures = {
   iconOnCard: Picture | null;
   giftOnCard: Picture;
   giftOnFill: Picture;
+  /** The business's own pizza photo for the pizza progress. */
+  pizza: Picture | null;
 };
 
 function loadImage(src: string): Promise<Picture> {
@@ -38,7 +41,7 @@ function loadImage(src: string): Promise<Picture> {
 }
 
 /** A lucide icon as a picture in one color. Rendered off-screen, outside React's render phase. */
-function iconPicture(Icon: any, color: string): Promise<Picture> {
+function iconPicture(Icon: ComponentType<{ size?: number; color?: string; strokeWidth?: number }>, color: string): Promise<Picture> {
   const host = document.createElement("div");
   const root = createRoot(host);
   flushSync(() => root.render(createElement(Icon, { size: 96, color, strokeWidth: 1.8 })));
@@ -59,15 +62,16 @@ export async function loadBannerPictures(design: Design): Promise<BannerPictures
   const bright = design.look.stampStyle === "bright";
   const giftColor = bright ? GOLD : design.colors.stamp;
   const preset = !own && icon !== "image" && icon !== "logo" ? ICONS[icon as keyof typeof ICONS] : null;
-  const [filled, empty, iconOnStamp, iconOnCard, giftOnCard, giftOnFill] = await Promise.all([
+  const [filled, empty, iconOnStamp, iconOnCard, giftOnCard, giftOnFill, pizza] = await Promise.all([
     own ? loadImage(asset(own)) : Promise.resolve(null),
     own && icon === "image" && emptyImage ? loadImage(asset(emptyImage)) : Promise.resolve(null),
     preset ? iconPicture(preset, onColor(design.colors.stamp)) : Promise.resolve(null),
     preset ? iconPicture(preset, design.colors.fg) : Promise.resolve(null),
     iconPicture(Gift, giftColor),
     iconPicture(Gift, onColor(giftColor)),
+    design.look.progress === "pizza" && design.progressImage ? loadImage(asset(design.progressImage)) : Promise.resolve(null),
   ]);
-  return { filled, empty, round: icon === "logo", iconOnStamp, iconOnCard, giftOnCard, giftOnFill };
+  return { filled, empty, round: icon === "logo", iconOnStamp, iconOnCard, giftOnCard, giftOnFill, pizza };
 }
 
 function drawContain(ctx: CanvasRenderingContext2D, img: Picture, x: number, y: number, size: number, round: boolean) {
@@ -144,7 +148,7 @@ const latinOnly = (s: string) => !/[\u0590-\u06FF\u0750-\u077F\uFB1D-\uFEFC]/.te
 
 function setSpacing(ctx: CanvasRenderingContext2D, px: number) {
   // Letter spacing where the browser supports it on canvas; plain text elsewhere.
-  if ("letterSpacing" in ctx) (ctx as any).letterSpacing = `${px}px`;
+  if ("letterSpacing" in ctx) (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${px}px`;
 }
 
 /** Draws the banner for `stamps` out of `target` in the card's first language. */
@@ -158,6 +162,7 @@ export function drawStampBanner(ctx: CanvasRenderingContext2D, d: Design, p: Ban
   // Background: the card's color, plain (no gradient).
   ctx.fillStyle = d.colors.bg;
   ctx.fillRect(0, 0, W, H);
+  if (usesPizza(d, target)) return drawPizzaBanner(ctx, d, p, stamps, target);
 
   // Layout: one row up to 12 slots (stamps + gift), otherwise two rows with smaller stamps.
   const slots = target + 1;
@@ -222,6 +227,109 @@ export function drawStampBanner(ctx: CanvasRenderingContext2D, d: Design, p: Ban
   if (latinOnly(text.reward)) setSpacing(ctx, 3);
   ctx.globalAlpha = 0.9;
   ctx.fillText(text.reward, W / 2, y, W - 120);
+  ctx.restore();
+}
+
+/** Pizza progress: the pizza on the starting side, title, count and reward beside it. */
+function drawPizzaBanner(ctx: CanvasRenderingContext2D, d: Design, p: BannerPictures, stamps: number, target: number) {
+  const lang: Lang = d.langs[0];
+  const text = textsFor(d, lang);
+  const rtl = isRtl(lang);
+  const family = FONTS[d.look.font].family;
+  const W = BANNER_W, H = BANNER_H;
+  const k = Math.max(0, Math.min(target, stamps));
+  const full = k >= target;
+  const r = 124, cy = H / 2, cx = rtl ? W - 190 : 190;
+
+  // Tray.
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r + 14, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0,0,0,.28)";
+  ctx.fill();
+  ctx.lineWidth = full ? 5 : 2;
+  ctx.strokeStyle = full ? PIZZA_COLORS.gold : d.colors.fg;
+  ctx.globalAlpha = full ? 1 : 0.25;
+  ctx.stroke();
+  ctx.restore();
+
+  // Slices still to collect: dashed outlines.
+  ctx.save();
+  ctx.setLineDash([8, 8]);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = d.colors.fg;
+  ctx.globalAlpha = 0.4;
+  for (let i = k; i < target; i++) ctx.stroke(new Path2D(slicePath(cx, cy, r, i, target)));
+  ctx.restore();
+
+  // Collected slices: the business's photo, or a drawn pizza.
+  if (k > 0 && p.pizza) {
+    ctx.save();
+    ctx.clip(new Path2D(slicesPath(cx, cy, r, k, target)));
+    const s = Math.max((2 * r) / p.pizza.naturalWidth, (2 * r) / p.pizza.naturalHeight);
+    const w = p.pizza.naturalWidth * s, h = p.pizza.naturalHeight * s;
+    ctx.drawImage(p.pizza, cx - w / 2, cy - h / 2, w, h);
+    ctx.restore();
+    ctx.save();
+    ctx.strokeStyle = "rgba(0,0,0,.25)";
+    ctx.lineWidth = 2;
+    for (let i = 0; i < k; i++) ctx.stroke(new Path2D(slicePath(cx, cy, r, i, target)));
+    ctx.restore();
+  } else {
+    const cheese = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    cheese.addColorStop(0, PIZZA_COLORS.cheeseLight);
+    cheese.addColorStop(1, PIZZA_COLORS.cheese);
+    for (let i = 0; i < k; i++) {
+      const slice = new Path2D(slicePath(cx, cy, r, i, target));
+      ctx.save();
+      ctx.fillStyle = cheese;
+      ctx.fill(slice);
+      ctx.lineWidth = 4;
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = PIZZA_COLORS.crust;
+      ctx.stroke(slice);
+      ctx.fillStyle = PIZZA_COLORS.pepperoni;
+      for (const t of toppings(cx, cy, r, i, target)) {
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, t.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+
+  // Texts beside the pizza.
+  const tx = rtl ? (W - 380) / 2 : 380 + (W - 380) / 2;
+  const maxW = W - 440;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  ctx.save();
+  ctx.fillStyle = d.colors.fg;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.direction = rtl ? "rtl" : "ltr";
+  ctx.font = `600 40px ${family}`;
+  const title = text.title.toLocaleUpperCase();
+  if (latinOnly(title)) setSpacing(ctx, 5);
+  ctx.fillText(title, tx, 86, maxW);
+  ctx.restore();
+  ctx.save();
+  ctx.fillStyle = d.colors.fg;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.direction = "ltr";
+  ctx.font = `500 34px ${family}`;
+  setSpacing(ctx, 4);
+  ctx.fillText(`${pad(k)} / ${pad(target)}`, tx, 146);
+  ctx.restore();
+  ctx.save();
+  ctx.fillStyle = full ? PIZZA_COLORS.gold : d.colors.fg;
+  ctx.globalAlpha = full ? 1 : 0.9;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.direction = rtl ? "rtl" : "ltr";
+  ctx.font = `500 26px ${family}`;
+  if (latinOnly(text.reward)) setSpacing(ctx, 3);
+  ctx.fillText(text.reward, tx, 206, maxW);
   ctx.restore();
 }
 

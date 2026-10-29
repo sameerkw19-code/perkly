@@ -11,13 +11,14 @@ import { post } from "../lib/api";
 import { ApplePreview, GooglePreview, ICONS, LoyaltyCard, Num } from "./loyalty-card";
 import { PERKLY_SOCIAL } from "../lib/perkly-social";
 import { makeStampBanners } from "./stamp-banner";
+import { PIZZA_MAX } from "../lib/pizza";
 import { StampBannerPreview } from "./stamp-banner-preview";
 
 type Image = AssetMeta & { kind: string };
 type Editor = { draft: Design; publishedVersion: number; publishedAt: string | null; hasUnpublished: boolean; images: Image[] };
 type T = (key: string, vars?: Record<string, string | number>) => string;
 
-const MAX_SIDE = { logo: 660, hero: 1200, wallet: 1100, stamp: 400, stampEmpty: 400 } as const;
+const MAX_SIDE = { logo: 660, hero: 1200, wallet: 1100, stamp: 400, stampEmpty: 400, pizza: 700 } as const;
 // Keep in step with MAX_BYTES in app/api/asset/route.ts (800 KB), with a margin for the request.
 const UPLOAD_CAP = 780_000;
 const SIZES: Size[] = ["s", "m", "l"];
@@ -147,12 +148,12 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
   const setText = (k: keyof Texts, v: string) =>
     setDesign((d) => ({ ...d, texts: { ...d.texts, [textLang]: { ...d.texts[textLang], [k]: v.slice(0, LIMITS[k]) } } }));
 
-  async function upload(kind: "logo" | "hero" | "wallet" | "stamp" | "stampEmpty", file: File | undefined) {
+  async function upload(kind: "logo" | "hero" | "wallet" | "stamp" | "stampEmpty" | "pizza", file: File | undefined) {
     if (!file) return;
     if (!/^image\/(png|jpeg|webp)$/.test(file.type)) { notify(errorText(lang, "image_type"), true); return; }
     setBusy(kind);
     try {
-      const photo = kind === "hero" || kind === "wallet";
+      const photo = kind === "hero" || kind === "wallet" || kind === "pizza";
       // Logos are PNG: Google Wallet needs PNG or JPEG for a business's class logo, and PNG keeps the transparent background.
       const format = kind === "logo" ? "image/png" : photo ? "image/jpeg" : "image/webp";
       let blob = await shrink(file, MAX_SIDE[kind], format, !photo && clearWhite);
@@ -161,7 +162,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
         blob = await shrink(file, side, format, clearWhite);
       }
       if (blob.size > UPLOAD_CAP) { notify(errorText(lang, "image_too_big"), true); return; }
-      const r = await fetch(`/api/asset?business=${encodeURIComponent(businessId)}&kind=${kind === "stampEmpty" ? "stamp" : kind}`, {
+      const r = await fetch(`/api/asset?business=${encodeURIComponent(businessId)}&kind=${kind === "stampEmpty" || kind === "pizza" ? "stamp" : kind}`, {
         method: "POST", headers: { "Content-Type": blob.type }, body: blob, credentials: "same-origin",
       });
       const data: any = await r.json().catch(() => ({}));
@@ -172,6 +173,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
       if (kind === "wallet") set({ walletHero: data.id });
       if (kind === "stamp") set({ stamp: { icon: "image", image: data.id } });
       if (kind === "stampEmpty") setDesign((d) => ({ ...d, stamp: { ...d.stamp, emptyImage: data.id } }));
+      if (kind === "pizza") set({ progressImage: data.id });
     } catch {
       notify(t("err_network"), true);
     } finally {
@@ -454,6 +456,34 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
             </button>
           </div>
           <p className="form-hint">{t("stampStyleHint")}</p>
+          <h3 className="sub-head">{t("edProgress")}</h3>
+          <div className="seg">
+            <button type="button" aria-pressed={design.look.progress === "stamps"} onClick={() => setLook({ progress: "stamps" })}>{t("progress_stamps")}</button>
+            <button type="button" aria-pressed={design.look.progress === "pizza"} disabled={!paid || target > PIZZA_MAX} onClick={() => setLook({ progress: "pizza" })}>
+              {t("progress_pizza")}{!paid && <PaidTag t={t} />}
+            </button>
+          </div>
+          <p className="form-hint">{target > PIZZA_MAX ? t("pizzaTooMany", { n: PIZZA_MAX }) : t("pizzaHint")}</p>
+          {paid && design.look.progress === "pizza" && (
+            <div className="upload empty-stamp">
+              <span className="thumb">{design.progressImage ? <img src={`/api/asset/${design.progressImage}`} alt="" /> : <ImagePlus size={22} />}</span>
+              <div>
+                <b>{t("edPizzaPhoto")}</b>
+                <small className="form-hint">{t("edPizzaPhotoHint")}</small>
+                <div className="row-actions">
+                  <label className="btn soft small">
+                    <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => { upload("pizza", e.target.files?.[0]); e.target.value = ""; }} />
+                    <UploadCloud size={14} />{busy === "pizza" ? t("uploading") : t("upload")}
+                  </label>
+                  {design.progressImage && (
+                    <button type="button" className="btn soft small" onClick={() => set({ progressImage: null })}>
+                      <Trash2 size={14} />{t("remove")}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </section>
 
         <section className="panel">
