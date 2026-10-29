@@ -156,6 +156,14 @@ export async function POST(request: Request) {
       return json({ ok: true }, 200, { "Set-Cookie": clearSessionCookie(request) });
     }
 
+    // Ends every session of this account, including the one making the request (for a lost phone or device).
+    case "logout_everywhere": {
+      const who = await getUser(db, request.headers.get("cookie"));
+      if (!who) return fail("signin", 401, "Sign in required");
+      await db.prepare("DELETE FROM sessions WHERE user = ?").bind(who.id).run();
+      return json({ ok: true }, 200, { "Set-Cookie": clearSessionCookie(request) });
+    }
+
     case "accept_invite": {
       if (!(await allow(db, `invite:${ip}`, 20, 600))) return fail("rate_limited", 429, "Too many attempts");
       const tokenText = typeof body.token === "string" && body.token.length <= 100 ? body.token : "";
