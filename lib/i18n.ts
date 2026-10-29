@@ -186,6 +186,7 @@ const words: Record<string, Entry> = {
   i3_crown: ["כתר", "تاج", "Crown"],
   i3_gem: ["יהלום", "جوهرة", "Gem"],
   i3_paws: ["כפות", "أثر مخالب", "Paw prints"],
+  err_bad_code: ["הקוד לא נכון.", "الرمز غير صحيح.", "The code is not correct."],
   edProgress: ["איך מוצגת ההתקדמות", "كيف يظهر التقدّم", "How progress is shown"],
   progress_stamps: ["חותמות", "أختام", "Stamps"],
   progress_pizza: ["מגש פיצה", "صينية بيتزا", "Pizza tray"],

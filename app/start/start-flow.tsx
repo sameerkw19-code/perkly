@@ -34,6 +34,7 @@ const T = {
     agree: "בהמשך אני מאשר/ת את", terms: "תנאי השימוש", and: "ואת", privacy: "מדיניות הפרטיות",
     next: "המשך", working: "רגע…",
     bizTitle: "העסק", bizIntro: "בוחרים סוג עסק, ואנחנו מכינים כרטיס מתאים. בשלב הבא מעצבים אותו בדיוק כמו שאתם רוצים.",
+    freeCode: "קוד הטבה (אם קיבלתם)", freeCodeHint: "עם קוד בתוקף אין צורך במנוי.",
     kind: "סוג העסק", bizName: "שם העסק", reward: "ההטבה", target: "חותמות להטבה", other: "אחר",
     preview: "כך הלקוחות יראו את הכרטיס", createBiz: "שמירה והמשך לעיצוב",
     designTitle: "מעצבים את הכרטיס", designIntro: "צבעים, רקע, חותמת, גופן וטקסטים. כל שינוי מופיע מיד בתצוגה.",
@@ -63,6 +64,7 @@ const T = {
     agree: "بالمتابعة أوافق على", terms: "شروط الاستخدام", and: "و", privacy: "سياسة الخصوصية",
     next: "متابعة", working: "لحظة…",
     bizTitle: "المشروع", bizIntro: "اختاروا نوع المشروع ونجهّز لكم بطاقة مناسبة. في الخطوة التالية تصممونها كما تريدون تماماً.",
+    freeCode: "رمز الامتياز (إن وُجد)", freeCodeHint: "مع رمز صالح لا حاجة للاشتراك.",
     kind: "نوع المشروع", bizName: "اسم المشروع", reward: "المكافأة", target: "أختام للمكافأة", other: "آخر",
     preview: "هكذا يرى الزبائن البطاقة", createBiz: "حفظ ومتابعة للتصميم",
     designTitle: "تصميم البطاقة", designIntro: "الألوان، الخلفية، الختم، الخط والنصوص. كل تغيير يظهر فوراً في المعاينة.",
@@ -92,6 +94,7 @@ const T = {
     agree: "By continuing I accept the", terms: "terms of use", and: "and the", privacy: "privacy policy",
     next: "Continue", working: "One moment…",
     bizTitle: "Your business", bizIntro: "Pick your type of business and we'll prepare a matching card. Next, you design it exactly the way you want.",
+    freeCode: "Access code (if you got one)", freeCodeHint: "With a valid code no subscription is needed.",
     kind: "Type of business", bizName: "Business name", reward: "Reward", target: "Stamps for a reward", other: "Other",
     preview: "What your customers will see", createBiz: "Save and continue to design",
     designTitle: "Design your card", designIntro: "Colors, background, stamp, font and texts. Every change shows right away in the preview.",
@@ -249,6 +252,8 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
     setStep("business");
   }
 
+  const [freeCode, setFreeCode] = useState("");
+
   async function submitBusiness(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (busy) return;
@@ -257,14 +262,16 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
     if (!name || !rewardText) { setError(errorText(lang, "bad_details")); return; }
     setBusy(true);
     setError("");
-    const created = await post<{ id: string }>("/api/loyalty", { action: "create_business", name, reward: rewardText, target, color: design.colors.bg, rewardMode: "bank" });
+    const created = await post<{ id: string; freeUntil: string | null }>("/api/loyalty", { action: "create_business", name, reward: rewardText, target, color: design.colors.bg, rewardMode: "bank", freeCode: freeCode.trim() || undefined });
     if (!created.ok) { setBusy(false); setError(errorText(lang, created.code)); return; }
     const id = created.data.id;
     // The card look for this type of business. If saving it fails, the business still has the default card.
     const finalDesign = startDesign(kind, name, rewardText);
     const saved = await post("/api/loyalty", { business: id, action: "save_design", design: finalDesign });
     if (saved.ok) await post("/api/loyalty", { business: id, action: "publish_design" });
-    setBusiness({ id, name, joinCode: null, paid: false, canWork: false, status: "none" });
+    // With a valid access code the business needs no subscription, so the payment step is skipped.
+    const free = !!created.data.freeUntil;
+    setBusiness({ id, name, joinCode: null, paid: free, canWork: free, status: "none" });
     setBusy(false);
     setStep("design");
   }
@@ -353,6 +360,10 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
                   </select>
                 </label>
               </div>
+              <label className="su-field">{t.freeCode}
+                <input value={freeCode} onChange={(e) => setFreeCode(e.target.value)} maxLength={64} autoComplete="off" dir="ltr" />
+                <span className="su-opt">{t.freeCodeHint}</span>
+              </label>
               {error && <p className="su-summary" role="alert">{error}</p>}
               <button className="lp-btn lp-btn-primary lp-btn-lg lp-btn-wide" disabled={busy} aria-busy={busy}>{busy ? t.working : t.createBiz}</button>
             </form>

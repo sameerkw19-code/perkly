@@ -17,17 +17,18 @@ export default async function BillingPage() {
   const memberships = (await getMemberships(db, user.id)).filter((m) => m.role === "owner");
   const subs = await db
     .prepare(
-      `SELECT b.id, b.name, s.status, s.current_period_end AS periodEnd
+      `SELECT b.id, b.name, s.status, s.current_period_end AS periodEnd, b.comp_until AS compUntil
        FROM businesses b LEFT JOIN subscriptions s ON s.business = b.id
        WHERE b.id IN (${memberships.map(() => "?").join(",") || "''"})`,
     )
     .bind(...memberships.map((m) => m.business))
-    .all<{ id: string; name: string; status: string | null; periodEnd: string | null }>();
+    .all<{ id: string; name: string; status: string | null; periodEnd: string | null; compUntil: string | null }>();
   const businesses: BillingBusiness[] = subs.results.map((b) => ({
     id: b.id,
     name: b.name,
     status: b.status ?? "none",
     periodEnd: b.periodEnd,
-  }));
+    compUntil: b.compUntil && b.compUntil > new Date().toISOString() ? b.compUntil : null,
+}));
   return <BillingView businesses={businesses} configured={polarConfigured(env)} />;
 }
