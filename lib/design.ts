@@ -31,11 +31,41 @@ export const CARD_LOCALE: Record<Lang, string> = {
 
 
 export const STAMP_ICONS = [
-  "coffee", "pizza", "burger", "icecream", "mojito", "beer", "shot", "cocktail", "sandwich",
+  "coffee", "bean", "pizza", "burger", "icecream", "mojito", "beer", "shot", "cocktail", "sandwich",
   "croissant", "cake", "utensils", "scissors", "bag", "sparkle", "heart", "star",
 ] as const;
 export type PresetIcon = (typeof STAMP_ICONS)[number];
-export type StampIcon = PresetIcon | "logo" | "image";
+/**
+ * 3D stamp pictures, served from /stamps3d. A subscription feature.
+ * From Fluent Emoji 3D (MIT, see public/stamps3d/LICENSE-fluentui-emoji.txt), except "coffeebean", drawn for Perkly.
+ */
+export const STAMP_3D = [
+  "coffee", "coffeebean", "tea", "beer", "cocktail", "tropical", "bubbletea", "cup", "wine",
+  "pizza", "burger", "sandwich", "taco", "fries", "sushi", "hotdog", "plate", "falafel",
+  "croissant", "cake", "shortcake", "donut", "icecream", "cookie", "cupcake", "bagel",
+  "scissors", "nails", "lipstick", "barber", "sparkles", "bouquet",
+  "bags", "gift", "star", "heart", "glowstar", "crown", "gem", "paws",
+] as const;
+export type Stamp3D = `3d-${(typeof STAMP_3D)[number]}`;
+export type StampIcon = PresetIcon | Stamp3D | "logo" | "image";
+
+export function is3d(icon: string): icon is Stamp3D {
+  return icon.startsWith("3d-") && (STAMP_3D as readonly string[]).includes(icon.slice(3));
+}
+
+/** The 3D picture for a stamp, or its faded version for a stamp not collected yet. */
+export function stamp3dUrl(icon: Stamp3D, empty = false): string {
+  return `/stamps3d/${icon.slice(3)}${empty ? "-empty" : ""}.png`;
+}
+
+/** The icon table in the editor: categories, each with flat icons and 3D pictures. */
+export const ICON_GROUPS: { id: "drinks" | "food" | "sweets" | "beauty" | "general"; flat: PresetIcon[]; d3: Stamp3D[] }[] = [
+  { id: "drinks", flat: ["coffee", "bean", "mojito", "beer", "shot", "cocktail"], d3: ["3d-coffee", "3d-coffeebean", "3d-tea", "3d-beer", "3d-cocktail", "3d-tropical", "3d-bubbletea", "3d-cup", "3d-wine"] },
+  { id: "food", flat: ["pizza", "burger", "sandwich", "utensils"], d3: ["3d-pizza", "3d-burger", "3d-sandwich", "3d-taco", "3d-fries", "3d-sushi", "3d-hotdog", "3d-plate", "3d-falafel"] },
+  { id: "sweets", flat: ["croissant", "cake", "icecream"], d3: ["3d-croissant", "3d-cake", "3d-shortcake", "3d-donut", "3d-icecream", "3d-cookie", "3d-cupcake", "3d-bagel"] },
+  { id: "beauty", flat: ["scissors", "sparkle"], d3: ["3d-scissors", "3d-nails", "3d-lipstick", "3d-barber", "3d-sparkles", "3d-bouquet"] },
+  { id: "general", flat: ["bag", "heart", "star"], d3: ["3d-bags", "3d-gift", "3d-star", "3d-heart", "3d-glowstar", "3d-crown", "3d-gem", "3d-paws"] },
+];
 export type Layout = "gradient" | "solid" | "photo";
 export type Texts = { title: string; subtitle: string; reward: string; gift: string; promo: string };
 
@@ -66,6 +96,10 @@ export type CardLook = {
   font: FontId;
   text: Size;
   stamps: Size;
+  /** "classic": the usual look. "bright": filled stamps bright, empty ones dark (a subscription feature). */
+  stampStyle: "classic" | "bright";
+  /** How progress is shown: a row of stamps, or a pizza that gains a slice per stamp (subscription, up to 12 stamps). */
+  progress: "stamps" | "pizza";
   /** Logo height on the web card, 60–200 (% of the normal size). */
   logoSize: number;
   /** "none": the logo as it is; "circle" / "square": on a white badge (good for logos with a white background). */
@@ -107,11 +141,21 @@ export type Design = {
   v: 1;
   layout: Layout;
   colors: { bg: string; fg: string; stamp: string };
-  stamp: { icon: StampIcon; image: string | null };
+  /** emptyImage: optional second picture for a stamp not earned yet (for example an outline). */
+  stamp: { icon: StampIcon; image: string | null; emptyImage?: string | null };
   logo: string | null;
   hero: string | null;
   /** Wallet banner (Google Wallet hero image, Apple strip later). Falls back to the background image. */
   walletHero: string | null;
+  /**
+   * "image": the wallet banner is walletHero (or the background image).
+   * "stamps": a banner drawn with the stamps, one picture per stamp count (subscription feature).
+   */
+  walletBanner: "image" | "stamps";
+  /** Optional top-down photo of the business's own pizza for the pizza progress (otherwise a drawn pizza). */
+  progressImage: string | null;
+  /** For "stamps": picture ids for 0, 1, … target stamps, made by the editor when publishing. */
+  walletStamps: string[];
   /** Languages the card is shown in, in card order. Set by the business; a language not listed never appears. */
   langs: Lang[];
   texts: Record<Lang, Texts>;
@@ -156,14 +200,11 @@ export function darken(hex: string, amount = 0.35): string {
 }
 
 export function defaultLook(bg: string): CardLook {
-  return { bg2: darken(HEX.test(bg) ? bg : "#1E1B2E"), dir: "diag", overlay: 55, font: "system", text: "m", stamps: "m", logoSize: 100, logoFrame: "none", logoName: false };
+  return { bg2: darken(HEX.test(bg) ? bg : "#1E1B2E"), dir: "diag", overlay: 55, font: "system", text: "m", stamps: "m", stampStyle: "classic", progress: "stamps", logoSize: 100, logoFrame: "none", logoName: false };
 }
 const ASSET_ID = /^[0-9a-f-]{36}$/;
 
 const GIFT: Record<Lang, string> = { he: "מתנה", ar: "مجاناً", en: "FREE", ru: "Подарок", de: "GRATIS", fr: "OFFERT" };
-const SUB: Record<Lang, string> = {
-  he: "כרטיס נאמנות", ar: "بطاقة ولاء", en: "Loyalty card", ru: "Карта лояльности", de: "Treuekarte", fr: "Carte de fidélité",
-};
 
 /**
  * Card languages in card order, without duplicates, and only the ones offered for now (OFFERED_CARD_LANGS).
@@ -183,7 +224,7 @@ export function cardLang(d: Design, wanted?: string | null): Lang {
 }
 
 export function defaultDesign(b: { name: string; reward: string; color: string }): Design {
-  const t = (l: Lang): Texts => ({ title: b.name.slice(0, LIMITS.title), subtitle: SUB[l], reward: b.reward.slice(0, LIMITS.reward), gift: GIFT[l], promo: "" });
+  const t = (l: Lang): Texts => ({ title: b.name.slice(0, LIMITS.title), subtitle: "", reward: b.reward.slice(0, LIMITS.reward), gift: GIFT[l], promo: "" });
   return {
     v: 1,
     layout: "gradient",
@@ -192,6 +233,9 @@ export function defaultDesign(b: { name: string; reward: string; color: string }
     logo: null,
     hero: null,
     walletHero: null,
+    walletBanner: "image",
+    walletStamps: [],
+    progressImage: null,
     langs: ["he"],
     texts: Object.fromEntries(CARD_LANGS.map((l) => [l, t(l)])) as Record<Lang, Texts>,
     showCustomerName: true,
@@ -210,7 +254,7 @@ export function sanitizeDesign(input: unknown): Design | null {
   const colors = d.colors ?? {};
   if (![colors.bg, colors.fg, colors.stamp].every((c) => typeof c === "string" && HEX.test(c))) return null;
   const icon = d.stamp?.icon;
-  if (!(STAMP_ICONS as readonly string[]).includes(icon) && icon !== "logo" && icon !== "image") return null;
+  if (!(STAMP_ICONS as readonly string[]).includes(icon) && !(typeof icon === "string" && is3d(icon)) && icon !== "logo" && icon !== "image") return null;
   const asset = (v: unknown) => (typeof v === "string" && ASSET_ID.test(v) ? v : null);
   const texts = {} as Record<Lang, Texts>;
   for (const l of CARD_LANGS) {
@@ -227,10 +271,13 @@ export function sanitizeDesign(input: unknown): Design | null {
     v: 1,
     layout: ["gradient", "solid", "photo"].includes(d.layout) ? d.layout : "gradient",
     colors: { bg: colors.bg.toUpperCase(), fg: colors.fg.toUpperCase(), stamp: colors.stamp.toUpperCase() },
-    stamp: { icon, image: asset(d.stamp?.image) },
+    stamp: { icon, image: asset(d.stamp?.image), emptyImage: asset(d.stamp?.emptyImage) },
     logo: asset(d.logo),
     hero: asset(d.hero),
     walletHero: asset(d.walletHero),
+    walletBanner: d.walletBanner === "stamps" ? "stamps" : "image",
+    walletStamps: walletStampIds(d.walletStamps),
+    progressImage: asset(d.progressImage),
     langs: sanitizeLangs(d.langs),
     texts,
     showCustomerName: d.showCustomerName !== false,
@@ -253,6 +300,8 @@ function sanitizeLook(input: unknown, bg: string): CardLook {
     font: typeof l.font === "string" && Object.prototype.hasOwnProperty.call(FONTS, l.font) ? (l.font as FontId) : base.font,
     text: size(l.text, base.text),
     stamps: size(l.stamps, base.stamps),
+    stampStyle: l.stampStyle === "bright" ? "bright" : "classic",
+    progress: l.progress === "pizza" ? "pizza" : "stamps",
     logoSize: Number.isFinite(logoSize) ? Math.max(60, Math.min(200, Math.round(logoSize / 10) * 10)) : base.logoSize,
     logoFrame: (LOGO_FRAMES as readonly string[]).includes(l.logoFrame) ? l.logoFrame : base.logoFrame,
     logoName: l.logoName === true,
@@ -260,7 +309,23 @@ function sanitizeLook(input: unknown, bg: string): CardLook {
 }
 
 export function assetIds(d: Design): string[] {
-  return [d.logo, d.hero, d.walletHero, d.stamp.image].filter((x): x is string => !!x);
+  return [d.logo, d.hero, d.walletHero, d.stamp.image, d.stamp.emptyImage, d.progressImage, ...d.walletStamps].filter((x): x is string => !!x);
+}
+
+/** Most stamps a card can have (see validTarget), so at most 31 banner pictures (0 to 30 stamps). */
+export const MAX_WALLET_STAMPS = 31;
+
+/** The stamp banner pictures, all or nothing: one bad id drops the whole set (the index is the stamp count). */
+function walletStampIds(input: unknown): string[] {
+  if (!Array.isArray(input) || input.length > MAX_WALLET_STAMPS) return [];
+  const ok = input.every((v) => typeof v === "string" && ASSET_ID.test(v));
+  return ok ? (input as string[]) : [];
+}
+
+/** The banner picture for a pass with this many stamps, or null when the set does not match the target. */
+export function walletStampPicture(d: Design, stamps: number, target: number): string | null {
+  if (d.walletBanner !== "stamps" || d.walletStamps.length !== target + 1) return null;
+  return d.walletStamps[Math.max(0, Math.min(target, stamps))] ?? null;
 }
 
 // ---- Readability checks (WCAG contrast) ----
@@ -339,9 +404,17 @@ export function designChecks(d: Design, assets: AssetMeta[]): Check[] {
 
 export function textsFor(d: Design, lang: Lang): Texts {
   const l = cardLang(d, lang);
-  const pick = (k: keyof Texts) => d.texts[l][k] || d.texts[d.langs[0]][k] || d.texts[d.langs[0]].title;
-  // The optional message has no fallback: a language left empty shows nothing rather than another language.
-  return { title: pick("title"), subtitle: pick("subtitle"), reward: pick("reward"), gift: pick("gift"), promo: d.texts[l].promo ?? "" };
+  const first = d.texts[d.langs[0]];
+  const pick = (k: keyof Texts) => d.texts[l][k] || first[k];
+  // Title and reward always show something; the subtitle and the optional message may stay empty
+  // (an empty subtitle must not repeat the title). The message never falls back to another language.
+  return {
+    title: pick("title"),
+    subtitle: pick("subtitle"),
+    reward: pick("reward") || first.title,
+    gift: pick("gift"),
+    promo: d.texts[l].promo ?? "",
+  };
 }
 
 export function assetUrl(id: string | null): string | null {

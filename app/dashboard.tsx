@@ -16,6 +16,7 @@ import { LoyaltyCard, Num } from "../components/loyalty-card";
 import { QrImage } from "../components/qr";
 import { BirthdayFields } from "../components/birthday-fields";
 import { birthdayFromParts, formatBirthday } from "../lib/birthday";
+import { AWAY_DAYS, daysSince, isAway } from "../lib/visits";
 import { Brand } from "../components/brand";
 
 type Role = "owner" | "staff";
@@ -66,6 +67,8 @@ export default function Dashboard() {
   const [busy, setBusy] = useState(false);
   const [online, setOnline] = useState(true);
   const [query, setQuery] = useState("");
+  // Customer list: everyone, or only customers who have not come back in AWAY_DAYS.
+  const [awayOnly, setAwayOnly] = useState(false);
   const [stationPick, setStationPick] = useState<CardState | null>(null);
 
   const notify = (text: string, bad = false) => setToast({ text, bad });
@@ -179,13 +182,15 @@ export default function Dashboard() {
   }
 
   const customers = data.customers ?? [];
-  const filtered = customers.filter((c) => (c.name + " " + c.phone).toLowerCase().includes(query.toLowerCase()) || c.phone.replace(/\D/g, "").includes(query.replace(/\D/g, "") || "\u0000"));
+  const away = customers.filter((c) => isAway(c.last_visit, c.created));
+  const listed = awayOnly ? away : customers;
+  const filtered = listed.filter((c) => (c.name + " " + c.phone).toLowerCase().includes(query.toLowerCase()) || c.phone.replace(/\D/g, "").includes(query.replace(/\D/g, "") || "\u0000"));
 
   function exportCSV() {
     const safe = (s: unknown) => '"' + String(s ?? "").replace(/^[=+@\-\t\r]/, "'$&").replaceAll('"', '""') + '"';
     const withBirthday = b?.birthdays !== 0;
-    const rows = [["Name", "Phone", "Stamps", "Target", ...(withBirthday ? ["Birthday (DD/MM)"] : []), "Marketing consent", "Joined", "Source"],
-      ...customers.map((c) => [c.name, c.phone, c.stamps, c.target, ...(withBirthday ? [formatBirthday(c.birthday)] : []), c.consent_marketing ? "yes" : "no", c.created, c.source])];
+    const rows = [["Name", "Phone", "Stamps", "Target", ...(withBirthday ? ["Birthday (DD/MM)"] : []), "Marketing consent", "Joined", "Source", "Last visit"],
+      ...listed.map((c) => [c.name, c.phone, c.stamps, c.target, ...(withBirthday ? [formatBirthday(c.birthday)] : []), c.consent_marketing ? "yes" : "no", c.created, c.source, c.last_visit ?? ""])];
     const csv = "﻿" + rows.map((r) => r.map(safe).join(",")).join("\r\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
@@ -334,12 +339,17 @@ export default function Dashboard() {
                   <button className="btn primary small" onClick={() => setModal({ type: "customer" })}><Plus size={15} />{t("newCustomer")}</button>
                 </div>
               </div>
+              <div className="seg away-filter" role="group" aria-label={t("lastVisitCol")}>
+                <button type="button" aria-pressed={!awayOnly} onClick={() => setAwayOnly(false)}>{t("all")} <Num>{customers.length}</Num></button>
+                <button type="button" aria-pressed={awayOnly} onClick={() => setAwayOnly(true)}>{t("awayFilter", { n: AWAY_DAYS })} <Num>{away.length}</Num></button>
+              </div>
+              {awayOnly && <p className="form-hint">{t("awayHint", { n: AWAY_DAYS })}</p>}
               {!filtered.length ? (
-                <div className="empty compact">{t("noCustomer")}</div>
+                <div className="empty compact">{awayOnly ? t("awayNone", { n: AWAY_DAYS }) : t("noCustomer")}</div>
               ) : (
                 <div className="table-wrap">
                   <table>
-                    <thead><tr><th>{t("name")}</th><th>{t("phone")}</th><th>{t("balance")}</th>{b.birthdays !== 0 && <th>{t("birthdayCol")}</th>}<th>{t("marketingCol")}</th><th>{t("actions")}</th></tr></thead>
+                    <thead><tr><th>{t("name")}</th><th>{t("phone")}</th><th>{t("balance")}</th><th>{t("lastVisitCol")}</th>{b.birthdays !== 0 && <th>{t("birthdayCol")}</th>}<th>{t("marketingCol")}</th><th>{t("actions")}</th></tr></thead>
                     <tbody>
                       {filtered.map((c) => (
                         <tr key={c.id}>
@@ -352,6 +362,7 @@ export default function Dashboard() {
                               {c.rewards > 0 && <span className="pill ready-pill"><Gift size={11} /> <Num>{c.rewards}</Num></span>}
                             </div>
                           </td>
+                          <td><LastVisit iso={c.last_visit} t={t} /></td>
                           {b.birthdays !== 0 && <td><Num>{formatBirthday(c.birthday) || "—"}</Num></td>}
                           <td>{c.consent_marketing ? t("yes") : t("no")}</td>
                           <td>
@@ -1046,3 +1057,12 @@ function Stepper({ value, min, max, onChange, label }: { value: number; min: num
     </div>
   );
 }
+
+/** Time since the customer's last stamp or reward use. Over 30 days it is marked, so owners can bring them back. */
+function LastVisit({ iso, t }: { iso: string | null | undefined; t: (k: string, v?: Record<string, string | number>) => string }) {
+  if (!iso) return <span className="muted">{t("lvNever")}</span>;
+  const d = daysSince(iso);
+  const text = d === 0 ? t("lvToday") : d === 1 ? t("lvYesterday") : d < 60 ? t("lvDays", { n: d }) : t("lvMonths", { n: Math.floor(d / 30) });
+  return <span className={d > AWAY_DAYS ? "last-visit away" : "last-visit"} title={new Date(iso).toLocaleDateString()}>{text}</span>;
+}
+

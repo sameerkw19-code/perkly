@@ -2,10 +2,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { validMonthDay, parseBirthday, birthdayFromParts, formatBirthday, upcomingKeys } from "../lib/birthday.ts";
-import { sanitizeDesign, defaultDesign, designChecks, FONTS, cardLang, textsFor, sanitizeLangs } from "../lib/design.ts";
+import { sanitizeDesign, defaultDesign, designChecks, FONTS, cardLang, textsFor, sanitizeLangs, walletStampPicture, assetIds, is3d, ICON_GROUPS, STAMP_ICONS, STAMP_3D } from "../lib/design.ts";
 import { businessAccess, freeLimitReached, hasPaidDesign, TRIAL_DAYS } from "../lib/server/billing.ts";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { lookFields } from "../lib/wallet-look.ts";
+import { usesPizza, slicePath, slicesPath, PIZZA_MAX } from "../lib/pizza.ts";
 
 // ---- Birthdays ----
 
@@ -77,8 +78,14 @@ test("design: unknown or unsafe look values fall back, never pass through", () =
 
 test("design: valid look values are kept", () => {
   const d = sanitizeDesign({ ...base, look: { bg2: "#00aa11", dir: "radial", overlay: 33, font: "rubik", text: "l", stamps: "s" } });
-  assert.deepEqual(d.look, { bg2: "#00AA11", dir: "radial", overlay: 35, font: "rubik", text: "l", stamps: "s", logoSize: 100, logoFrame: "none", logoName: false });
+  assert.deepEqual(d.look, { bg2: "#00AA11", dir: "radial", overlay: 35, font: "rubik", text: "l", stamps: "s", stampStyle: "classic", progress: "stamps", logoSize: 100, logoFrame: "none", logoName: false });
   assert.ok(FONTS[d.look.font]);
+});
+
+test("design: stamp style is classic unless set to bright", () => {
+  const bright = sanitizeDesign({ ...base, look: { ...base.look, stampStyle: "bright" } });
+  assert.equal(bright.look.stampStyle, "bright");
+  assert.equal(sanitizeDesign({ ...base, look: { ...base.look, stampStyle: "neon" } }).look.stampStyle, "classic");
 });
 
 test("design: gradient readability checks the weaker of the two colors", () => {
@@ -275,3 +282,132 @@ test("trial: 14 days at checkout and in all site texts", () => {
   for (const phrase of ["14 ימי ניסיון", "14-day free trial", "14 يوماً"]) assert.match(copy, new RegExp(phrase));
 });
 
+// ---- Wallet stamp banner: one picture per stamp count ----
+
+const ids = (n) => Array.from({ length: n }, (_, i) => `00000000-0000-0000-0000-${String(i).padStart(12, "0")}`);
+
+test("wallet banner: stamp pictures are kept only as a full valid set", () => {
+  const d = sanitizeDesign({ ...base, walletBanner: "stamps", walletStamps: ids(11) });
+  assert.equal(d.walletBanner, "stamps");
+  assert.equal(d.walletStamps.length, 11);
+  assert.deepEqual(sanitizeDesign({ ...base, walletStamps: [...ids(3), "bad"] }).walletStamps, []);
+  assert.deepEqual(sanitizeDesign({ ...base, walletStamps: ids(32) }).walletStamps, []);
+  assert.equal(sanitizeDesign({ ...base, walletBanner: "video" }).walletBanner, "image");
+  assert.ok(assetIds(d).includes(ids(11)[10]));
+});
+
+test("wallet banner: the picture matches the stamp count, and only when the set fits the target", () => {
+  const d = sanitizeDesign({ ...base, walletBanner: "stamps", walletStamps: ids(11) });
+  assert.equal(walletStampPicture(d, 3, 10), ids(11)[3]);
+  assert.equal(walletStampPicture(d, 14, 10), ids(11)[10]);
+  assert.equal(walletStampPicture(d, 3, 12), null);
+  assert.equal(walletStampPicture({ ...d, walletBanner: "image" }, 3, 10), null);
+});
+
+// ---- Pizza progress ----
+
+test("pizza: only when chosen and the card has 2 to 12 stamps", () => {
+  const d = sanitizeDesign({ ...base, look: { ...base.look, progress: "pizza" } });
+  assert.equal(d.look.progress, "pizza");
+  assert.equal(usesPizza(d, 8), true);
+  assert.equal(usesPizza(d, PIZZA_MAX + 1), false);
+  assert.equal(usesPizza(sanitizeDesign({ ...base, look: { ...base.look, progress: "cake" } }), 8), false);
+});
+
+test("pizza: slices are wedges from the center, one per stamp", () => {
+  const first = slicePath(100, 100, 84, 0, 4);
+  assert.match(first, /^M100,100 L100\.00,16\.00 A84,84 0 0 1 184\.00,100\.00 Z$/);
+  assert.equal(slicesPath(100, 100, 84, 3, 8).split("Z").length - 1, 3);
+  assert.equal(slicesPath(100, 100, 84, 12, 8).split("Z").length - 1, 8);
+});
+
+// ---- Icon table and 3D stamps ----
+
+test("icons: 3D stamps are accepted only from the list", () => {
+  assert.equal(sanitizeDesign({ ...base, stamp: { icon: "3d-coffee", image: null } }).stamp.icon, "3d-coffee");
+  assert.equal(sanitizeDesign({ ...base, stamp: { icon: "3d-rocket", image: null } }), null);
+  assert.equal(is3d("3d-pizza"), true);
+  assert.equal(is3d("pizza"), false);
+});
+
+test("icons: every regular and 3D icon is in exactly one category", () => {
+  const flat = ICON_GROUPS.flatMap((g) => g.flat);
+  const d3 = ICON_GROUPS.flatMap((g) => g.d3);
+  assert.deepEqual([...flat].sort(), [...STAMP_ICONS].sort());
+  assert.deepEqual([...d3].sort(), STAMP_3D.map((k) => "3d-" + k).sort());
+});
+
+test("icons: every 3D icon has its picture and a faded one", () => {
+  for (const k of STAMP_3D) {
+    for (const f of [`${k}.png`, `${k}-empty.png`]) assert.ok(existsSync(new URL(`../public/stamps3d/${f}`, import.meta.url)), f);
+  }
+});
+
+test("texts: an empty subtitle stays empty and does not repeat the title", () => {
+  const d = sanitizeDesign({ ...base, texts: { ...base.texts, he: { ...base.texts.he, subtitle: "" } } });
+  assert.equal(textsFor(d, "he").subtitle, "");
+  assert.equal(textsFor(d, "he").title, d.texts.he.title);
+});
+
+// ---- Free-access code (set in the control center) ----
+
+import { freeCodeMatches, grantFreeAccess, FOREVER } from "../lib/server/free-code.ts";
+import { hashPassword } from "../lib/server/crypto.ts";
+import { settingsForAdmin } from "../lib/server/settings.ts";
+
+function settingsDb(rows) {
+  const calls = [];
+  return {
+    calls,
+    prepare: (sql) => ({
+      all: async () => ({ results: sql.includes("FROM settings") ? rows : [] }),
+      bind: (...args) => { calls.push({ sql, args }); return { sql, args }; },
+    }),
+    batch: async (stmts) => { calls.push(...stmts.map((x) => ({ batch: x.sql, args: x.args }))); return []; },
+  };
+}
+
+test("free code: matches only the code set in the control center", async () => {
+  const hash = await hashPassword("Secret-123");
+  const db = settingsDb([{ key: "freeCodeHash", value: JSON.stringify(hash) }]);
+  assert.equal(await freeCodeMatches(db, "Secret-123"), true);
+  assert.equal(await freeCodeMatches(db, "secret-123"), false);
+  assert.equal(await freeCodeMatches(db, ""), false);
+  assert.equal(await freeCodeMatches(settingsDb([]), "Secret-123"), false);
+});
+
+test("free code: no end date by default, or the number of days set", async () => {
+  const forever = settingsDb([]);
+  assert.equal(await grantFreeAccess(forever, "biz1", "a@b.c"), FOREVER);
+  const days = settingsDb([{ key: "freeCodeDays", value: "30" }]);
+  const until = await grantFreeAccess(days, "biz1", "a@b.c");
+  const diff = (new Date(until).getTime() - Date.now()) / 86_400_000;
+  assert.ok(diff > 29.9 && diff < 30.1);
+});
+
+test("free code: the control center never receives the hash", () => {
+  const s = settingsForAdmin({ ...DEFAULT_SETTINGS, freeCodeHash: "pbkdf2$1$x$y" });
+  assert.equal("freeCodeHash" in s, false);
+  assert.equal(s.freeCodeSet, true);
+});
+
+// ---- Last visit ----
+
+import { daysSince, isAway } from "../lib/visits.ts";
+
+test("last visit: counts calendar days, never negative", () => {
+  const now = new Date(2026, 9, 29, 21, 0);
+  assert.equal(daysSince(new Date(2026, 9, 29, 8, 0).toISOString(), now), 0);
+  assert.equal(daysSince(new Date(2026, 9, 28, 23, 30).toISOString(), now), 1);
+  assert.equal(daysSince(new Date(2026, 8, 29, 12, 0).toISOString(), now), 30);
+  assert.equal(daysSince(new Date(2026, 9, 30, 9, 0).toISOString(), now), 0);
+});
+
+test("away: over 30 days since the last visit, or since joining with no visits", () => {
+  const now = new Date(2026, 9, 29, 12, 0);
+  const ago = (d) => new Date(now.getTime() - d * 86_400_000).toISOString();
+  assert.equal(isAway(ago(31), ago(200), now), true);
+  assert.equal(isAway(ago(10), ago(200), now), false);
+  assert.equal(isAway(null, ago(45), now), true);
+  assert.equal(isAway(null, ago(5), now), false);
+});

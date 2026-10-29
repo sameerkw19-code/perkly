@@ -5,7 +5,7 @@ import { randomCode, randomToken, sha256 } from "../../../lib/server/crypto";
 import { fail, json, readJson, sameOrigin, str } from "../../../lib/server/http";
 import { allow } from "../../../lib/server/rate-limit";
 import { formatPhone, maskPhone, normalizePhone } from "../../../lib/phone";
-import { assetIds, defaultDesign, designChecks, sanitizeDesign } from "../../../lib/design";
+import { assetIds, defaultDesign, designChecks, is3d, sanitizeDesign } from "../../../lib/design";
 import { assetMeta, liveDesign, ownsAssets, publishedDesign } from "../../../lib/server/designs";
 import { releaseArchivedPhone } from "../../../lib/server/customers";
 import { businessAccess, freeLimitReached, hasPaidDesign } from "../../../lib/server/billing";
@@ -13,6 +13,7 @@ import { formatBirthday, parseBirthday, upcomingKeys } from "../../../lib/birthd
 import { syncGoogleWallet } from "../../../lib/server/wallet-sync";
 import { walletConfig } from "../../../lib/server/google-wallet";
 import { getSettings } from "../../../lib/server/settings";
+import { cleanCode, freeCodeMatches, grantFreeAccess } from "../../../lib/server/free-code";
 import { normalizeSocial, parseSocial, type Social } from "../../../lib/social";
 
 export const dynamic = "force-dynamic";
@@ -127,8 +128,13 @@ export async function GET(request: Request) {
     db.prepare(
       `SELECT c.id, c.name, c.phone, c.stamps, c.target, c.created, c.source, c.consent_marketing, c.birthday, c.card_hash IS NOT NULL AS has_link,
          (SELECT COUNT(*) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2))
-           + (CASE WHEN ?3 = 'block' AND c.stamps >= c.target THEN 1 ELSE 0 END) AS rewards
-       FROM customers c WHERE c.business = ?1 AND c.archived IS NULL ORDER BY c.created DESC LIMIT 5000`,
+           + (CASE WHEN ?3 = 'block' AND c.stamps >= c.target THEN 1 ELSE 0 END) AS rewards,
+         lv.last_visit
+       FROM customers c
+       -- Last visit: the latest stamp or reward use at this business (one pass over the business's events).
+       LEFT JOIN (SELECT customer, MAX(created) AS last_visit FROM events WHERE business = ?1 AND kind IN ('stamp', 'redeem') GROUP BY customer) lv
+         ON lv.customer = c.id
+       WHERE c.business = ?1 AND c.archived IS NULL ORDER BY c.created DESC LIMIT 5000`,
     ).bind(business!.id, new Date().toISOString(), business!.reward_mode),
     db.prepare(
       `SELECT e.id, e.kind, e.delta, e.created, e.actor_role, e.stamps_after, e.note, c.name AS customer, u.name AS actor_name, br.name AS branch_name,
@@ -179,7 +185,7 @@ export async function GET(request: Request) {
   const published = await publishedDesign(db, business!.id);
   const draftRow = await db.prepare("SELECT design_draft FROM businesses WHERE id = ?").bind(business!.id).first<{ design_draft: string | null }>();
   const draft = (draftRow?.design_draft && sanitizeDesign(JSON.parse(draftRow.design_draft))) || published?.design || defaultDesign(business!);
-  const images = await db.prepare("SELECT id, kind, width, height FROM assets WHERE business = ? ORDER BY created DESC LIMIT 60").bind(business!.id).all();
+  const images = await db.prepare("SELECT id, kind, width, height FROM assets WHERE business = ? AND kind != 'banner' ORDER BY created DESC LIMIT 60").bind(business!.id).all();
 
   return json({
     ...base,
@@ -229,6 +235,12 @@ export async function POST(request: Request) {
     if (!name || !reward || !validTarget(p.target) || typeof p.color !== "string" || !COLOR.test(p.color)) {
       return fail("bad_details", 400, "Invalid business details");
     }
+    // Optional free-access code (set in the control center): checked before anything is created.
+    const freeCode = cleanCode(p.freeCode);
+    if (freeCode) {
+      if (!(await allow(db, `free-code:${user.id}`, 10, 3600))) return fail("rate_limited", 429);
+      if (!(await freeCodeMatches(db, freeCode))) return fail("bad_code", 400, "Wrong code");
+    }
     // New businesses collect rewards by default (customers keep earning while a reward waits).
     const mode = p.rewardMode === "block" ? "block" : "bank";
     const id = crypto.randomUUID();
@@ -246,7 +258,8 @@ export async function POST(request: Request) {
           ]
         : []),
     ]);
-    return json({ id });
+    const freeUntil = freeCode ? await grantFreeAccess(db, id, user.email) : null;
+    return json({ id, freeUntil });
   }
 
   // Every other action: the server checks the user's role in this business.
@@ -598,6 +611,10 @@ export async function POST(request: Request) {
       const design = sanitizeDesign(p.design);
       if (!design) return fail("bad_details", 400, "Invalid design");
       if (!(await ownsAssets(db, business.id, design))) return fail("not_found", 404, "Image not found");
+      // The bright stamp style, the stamp banner in the wallet, the pizza progress and 3D stamps are subscription features.
+      if ((design.look.stampStyle === "bright" || design.walletBanner === "stamps" || design.look.progress === "pizza" || is3d(design.stamp.icon)) && !hasPaidDesign(await businessAccess(db, business.id))) {
+        return fail("paid_feature", 402, "Available with a subscription");
+      }
       // Without a subscription: no new logo, background image or stamp image (ones already on the card may stay).
       if (!hasPaidDesign(await businessAccess(db, business.id))) {
         const kept = new Set(assetIds((await publishedDesign(db, business.id))?.design ?? defaultDesign(business)));
@@ -636,6 +653,16 @@ export async function POST(request: Request) {
         syncGoogleWallet(db, cust, card.rewards, origin);
       }
       return json({ ok: true, version: live?.version });
+    }
+
+    // A free-access code for an existing business (owner only).
+    case "redeem_code": {
+      const denied = ownerOnly(); if (denied) return denied;
+      const code = cleanCode(p.code);
+      if (!code) return fail("bad_code", 400, "Wrong code");
+      if (!(await allow(db, `free-code:${user.id}`, 10, 3600))) return fail("rate_limited", 429);
+      if (!(await freeCodeMatches(db, code))) return fail("bad_code", 400, "Wrong code");
+      return json({ ok: true, freeUntil: await grantFreeAccess(db, business.id, user.email) });
     }
 
     case "new_join_code": {

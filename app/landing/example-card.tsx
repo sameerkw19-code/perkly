@@ -9,7 +9,6 @@ import type { ExampleKey, Lang } from "./content";
 import { THEMES } from "./visuals";
 
 const ICON: Record<ExampleKey, PresetIcon> = { cafe: "coffee", barber: "scissors", pizza: "pizza", icecream: "icecream", studio: "sparkle", bakery: "croissant" };
-const SUB: Record<Lang, string> = { he: "כרטיס נאמנות", ar: "بطاقة ولاء", en: "Loyalty card" };
 const GIFT: Record<Lang, string> = { he: "מתנה", ar: "مجاناً", en: "FREE" };
 const CUSTOMER: Record<Lang, string> = { he: "נועה", ar: "نور", en: "Noa" };
 
@@ -17,7 +16,7 @@ export function exampleDesign(k: ExampleKey, lang: Lang, name: string, rewardLin
   const th = THEMES[k];
   // Light cards get a gentle gradient, dark ones a deeper one.
   const light = onColor(th.bg) !== "#FFFFFF";
-  const texts = { title: name, subtitle: SUB[lang], reward: rewardLine, gift: GIFT[lang], promo: "" };
+  const texts = { title: name, subtitle: "", reward: rewardLine, gift: GIFT[lang], promo: "" };
   return {
     v: 1,
     layout: "gradient",
@@ -26,6 +25,9 @@ export function exampleDesign(k: ExampleKey, lang: Lang, name: string, rewardLin
     logo: null,
     hero: null,
     walletHero: null,
+    walletBanner: "image",
+    walletStamps: [],
+    progressImage: null,
     langs: [lang],
     texts: { he: texts, ar: texts, en: texts, ru: texts, de: texts, fr: texts },
     showCustomerName: true,

@@ -1,13 +1,15 @@
 import {
-  Beer, Cake, Coffee, Croissant, CupSoda, Gift, GlassWater, Hamburger, Heart, IceCreamCone, Martini,
+  Bean, Beer, Cake, Coffee, Croissant, CupSoda, Gift, GlassWater, Hamburger, Heart, IceCreamCone, Martini,
   Pizza, Sandwich, Scissors, ShoppingBag, Sparkles, Star, Utensils,
 } from "lucide-react";
-import { assetUrl, cardFont, cardLang, fontHref, onColor, textsFor, type Design, type PresetIcon } from "../lib/design";
+import { assetUrl, cardFont, cardLang, fontHref, is3d, onColor, stamp3dUrl, textsFor, type Design, type PresetIcon } from "../lib/design";
 import { translate } from "../lib/i18n";
+import { usesPizza } from "../lib/pizza";
+import { PizzaProgress } from "./pizza-progress";
 import { isRtl, type Lang } from "../lib/i18n-types";
 
 export const ICONS: Record<PresetIcon, any> = {
-  coffee: Coffee, pizza: Pizza, burger: Hamburger, icecream: IceCreamCone, mojito: CupSoda, beer: Beer,
+  coffee: Coffee, bean: Bean, pizza: Pizza, burger: Hamburger, icecream: IceCreamCone, mojito: CupSoda, beer: Beer,
   shot: GlassWater, cocktail: Martini, sandwich: Sandwich, croissant: Croissant, cake: Cake, utensils: Utensils,
   scissors: Scissors, bag: ShoppingBag, sparkle: Sparkles, heart: Heart, star: Star,
 };
@@ -23,6 +25,7 @@ export function StampMark({ design, size = 20 }: { design: Design; size?: number
   const { icon, image } = design.stamp;
   if (icon === "logo" && design.logo) return <img className="stamp-img round" src={assetUrl(design.logo)!} alt="" />;
   if (icon === "image" && image) return <img className="stamp-img" src={assetUrl(image)!} alt="" />;
+  if (is3d(icon)) return <img className="stamp-img three-d" src={stamp3dUrl(icon)} alt="" />;
   const Icon = ICONS[icon as PresetIcon] ?? Star;
   return <Icon size={size} />;
 }
@@ -39,7 +42,8 @@ export function Logo({ design, title, className = "card-logo" }: { design: Desig
 export function StampGrid({ design, stamps, target, giftLabel, ready }: { design: Design; stamps: number; target: number; giftLabel: string; ready?: boolean }) {
   const total = target + 1;
   const columns = total <= 6 ? total : Math.ceil(total / 2);
-  const productImage = design.stamp.icon === "image";
+  const productImage = design.stamp.icon === "image" || is3d(design.stamp.icon);
+  if (usesPizza(design, target)) return <div className="stamp-grid pizza"><PizzaProgress design={design} stamps={stamps} target={target} /></div>;
   return (
     <div className={"stamp-grid" + (productImage ? " product" : "")} style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
       {Array.from({ length: target }, (_, i) => (
@@ -112,10 +116,12 @@ function FontLink({ design, lang }: { design: Design; lang: Lang }) {
 
 /** One stamp slot. Empty slots show the same mark, dimmed. */
 function PassStamp({ design, filled }: { design: Design; filled: boolean }) {
-  const kind = design.stamp.icon === "image" && design.stamp.image ? "photo" : "mark";
+  const kind = (design.stamp.icon === "image" && design.stamp.image) || is3d(design.stamp.icon) ? "photo" : "mark";
+  // The business's own picture for an empty stamp, when it uploaded one.
+  const ownEmpty = !filled && kind === "photo" && design.stamp.emptyImage;
   return (
-    <span className={`pcard-stamp ${kind} ${filled ? "is-filled" : "is-empty"}`} aria-hidden="true">
-      <StampMark design={design} size={22} />
+    <span className={`pcard-stamp ${kind} ${filled ? "is-filled" : "is-empty"}${ownEmpty ? " own-empty" : ""}`} aria-hidden="true">
+      {ownEmpty ? <img className="stamp-img" src={assetUrl(design.stamp.emptyImage!)!} alt="" /> : <StampMark design={design} size={22} />}
     </span>
   );
 }
@@ -136,7 +142,7 @@ export function LoyaltyCard({ design, lang, stamps, target, customerName, reward
   const columns = total <= 6 ? total : Math.ceil(total / 2);
   const showName = design.showCustomerName && !!customerName;
   return (
-    <div className={`pcard layout-${design.layout} stamps-${design.look.stamps}${ready ? " is-ready" : ""}`} style={lookStyle(design, cl)} dir={isRtl(cl) ? "rtl" : "ltr"} lang={cl}>
+    <div className={`pcard layout-${design.layout} stamps-${design.look.stamps} stamp-${design.look.stampStyle}${ready ? " is-ready" : ""}`} style={lookStyle(design, cl)} dir={isRtl(cl) ? "rtl" : "ltr"} lang={cl}>
       <FontLink design={design} lang={cl} />
       <div className="pcard-head">
         <div className="pcard-brand">
@@ -161,15 +167,19 @@ export function LoyaltyCard({ design, lang, stamps, target, customerName, reward
 
       <div className="pcard-reward">{text.reward}</div>
 
-      <div className="pcard-stamps" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
-        {Array.from({ length: target }, (_, i) => (
-          <PassStamp key={i} design={design} filled={i < stamps} />
-        ))}
-        <span className={"pcard-stamp gift" + (ready ? " is-filled" : "")} aria-hidden="true">
-          <Gift size={20} />
-          {text.gift && <em>{text.gift}</em>}
-        </span>
-      </div>
+      {usesPizza(design, target) ? (
+        <div className="pcard-pizza"><PizzaProgress design={design} stamps={stamps} target={target} /></div>
+      ) : (
+        <div className="pcard-stamps" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+          {Array.from({ length: target }, (_, i) => (
+            <PassStamp key={i} design={design} filled={i < stamps} />
+          ))}
+          <span className={"pcard-stamp gift" + (ready ? " is-filled" : "")} aria-hidden="true">
+            <Gift size={20} />
+            {text.gift && <em>{text.gift}</em>}
+          </span>
+        </div>
+      )}
 
       <div className="pcard-fields">
         <div className="pcard-field">
