@@ -351,3 +351,7 @@ fieldset.birthday{border:0;padding:0;margin:0 0 14px}fieldset.birthday legend{fo
 .design-help svg{flex:none}
 .preview-langs{justify-content:center}
 .font-scripts{font-size:10px;color:var(--muted,#6b6880);letter-spacing:.02em;font-family:system-ui,sans-serif}
+/* Bright stamp style (subscription): filled stamps bright, empty ones dark. */
+.pcard.stamp-bright .pcard-stamp.is-filled{filter:brightness(1.18) saturate(1.1)}
+.pcard.stamp-bright .pcard-stamp.is-empty{background:#000 !important;border:1px solid #ffffff1f !important;box-shadow:none !important;filter:none}
+.pcard.stamp-bright .pcard-stamp.is-empty .stamp-img{filter:grayscale(1) brightness(.25);opacity:.6}
