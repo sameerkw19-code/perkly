@@ -187,7 +187,6 @@ const words: Record<string, Entry> = {
   i3_crown: ["כתר", "تاج", "Crown"],
   i3_gem: ["יהלום", "جوهرة", "Gem"],
   i3_paws: ["כפות", "أثر مخالب", "Paw prints"],
-  err_bad_code: ["הקוד לא נכון.", "الرمز غير صحيح.", "The code is not correct."],
   sumTitle: ["סיכום", "ملخص", "Summary"],
   sum_day: ["יומי", "يومي", "Daily"],
   sum_week: ["שבועי", "أسبوعي", "Weekly"],
