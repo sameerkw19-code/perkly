@@ -411,3 +411,14 @@ test("away: over 30 days since the last visit, or since joining with no visits",
   assert.equal(isAway(null, ago(45), now), true);
   assert.equal(isAway(null, ago(5), now), false);
 });
+
+// ---- Summary (day / week / month) ----
+
+import { weekChange } from "../lib/weekly.ts";
+
+test("summary: change against the period before", () => {
+  assert.deepEqual(weekChange(12, 10), { diff: 2, pct: 20, dir: "up" });
+  assert.deepEqual(weekChange(5, 10), { diff: -5, pct: -50, dir: "down" });
+  assert.deepEqual(weekChange(3, 0), { diff: 3, pct: null, dir: "up" });
+  assert.deepEqual(weekChange(0, 0), { diff: 0, pct: null, dir: "same" });
+});

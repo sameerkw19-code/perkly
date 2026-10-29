@@ -378,3 +378,14 @@ fieldset.birthday{border:0;padding:0;margin:0 0 14px}fieldset.birthday legend{fo
 .last-visit{white-space:nowrap}
 .last-visit.away{color:#b45309;font-weight:600}
 .away-filter{margin:4px 0 10px}
+/* Owner summary: day, week or month against the one before. */
+.summary-panel{margin-bottom:18px}
+.summary-panel .section-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:8px}
+.summary-item{border:1px solid var(--line);border-radius:14px;padding:14px;display:grid;gap:4px}
+.summary-item strong{font-size:26px}
+.summary-item small{color:var(--muted)}
+.change{font-weight:700}
+.change.up{color:#15803d}
+.change.down{color:#b91c1c}
+.change.same{color:var(--muted)}
