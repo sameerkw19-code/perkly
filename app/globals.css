@@ -358,3 +358,7 @@ fieldset.birthday{border:0;padding:0;margin:0 0 14px}fieldset.birthday legend{fo
 /* Reward slot in the bright style: gold, so it stands out from the stamps. */
 .pcard.stamp-bright .pcard-stamp.gift{border:2px dashed #f5c542;color:#f5c542}
 .pcard.stamp-bright .pcard-stamp.gift.is-filled{border-style:solid;background:#f5c542;color:#111;box-shadow:0 0 0 4px #f5c54240}
+/* The business's own empty-stamp picture is shown as it is, not faded. */
+.pcard-stamp.own-empty .stamp-img,.pcard.stamp-bright .pcard-stamp.own-empty .stamp-img{filter:none;opacity:1}
+.stamp-banner-preview{margin:12px 0 0}
+.empty-stamp{margin-top:12px}

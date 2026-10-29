@@ -26,6 +26,8 @@ export function exampleDesign(k: ExampleKey, lang: Lang, name: string, rewardLin
     logo: null,
     hero: null,
     walletHero: null,
+    walletBanner: "image",
+    walletStamps: [],
     langs: [lang],
     texts: { he: texts, ar: texts, en: texts, ru: texts, de: texts, fr: texts },
     showCustomerName: true,

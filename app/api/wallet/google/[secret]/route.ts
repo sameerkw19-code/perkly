@@ -38,7 +38,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ secr
   const origin = new URL(request.url).origin;
   const business = await db.prepare("SELECT id, name, reward, color FROM businesses WHERE id = ?").bind(row.business_id)
     .first<{ id: string; name: string; reward: string; color: string }>();
-  const look = business ? await passLook(db, business, origin).catch(() => undefined) : undefined;
+  const look = business ? await passLook(db, business, origin, { stamps: row.stamps, target: row.target }).catch(() => undefined) : undefined;
   // The business's own class (name, color, logo) when it has a PNG/JPEG logo; otherwise the shared class.
   const classId = await ensureBusinessClass(config, row.business_id, look?.classLook ?? null);
   const url = await saveUrl(

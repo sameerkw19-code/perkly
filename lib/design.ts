@@ -109,11 +109,19 @@ export type Design = {
   v: 1;
   layout: Layout;
   colors: { bg: string; fg: string; stamp: string };
-  stamp: { icon: StampIcon; image: string | null };
+  /** emptyImage: optional second picture for a stamp not earned yet (for example an outline). */
+  stamp: { icon: StampIcon; image: string | null; emptyImage?: string | null };
   logo: string | null;
   hero: string | null;
   /** Wallet banner (Google Wallet hero image, Apple strip later). Falls back to the background image. */
   walletHero: string | null;
+  /**
+   * "image": the wallet banner is walletHero (or the background image).
+   * "stamps": a banner drawn with the stamps, one picture per stamp count (subscription feature).
+   */
+  walletBanner: "image" | "stamps";
+  /** For "stamps": picture ids for 0, 1, … target stamps, made by the editor when publishing. */
+  walletStamps: string[];
   /** Languages the card is shown in, in card order. Set by the business; a language not listed never appears. */
   langs: Lang[];
   texts: Record<Lang, Texts>;
@@ -194,6 +202,8 @@ export function defaultDesign(b: { name: string; reward: string; color: string }
     logo: null,
     hero: null,
     walletHero: null,
+    walletBanner: "image",
+    walletStamps: [],
     langs: ["he"],
     texts: Object.fromEntries(CARD_LANGS.map((l) => [l, t(l)])) as Record<Lang, Texts>,
     showCustomerName: true,
@@ -229,10 +239,12 @@ export function sanitizeDesign(input: unknown): Design | null {
     v: 1,
     layout: ["gradient", "solid", "photo"].includes(d.layout) ? d.layout : "gradient",
     colors: { bg: colors.bg.toUpperCase(), fg: colors.fg.toUpperCase(), stamp: colors.stamp.toUpperCase() },
-    stamp: { icon, image: asset(d.stamp?.image) },
+    stamp: { icon, image: asset(d.stamp?.image), emptyImage: asset(d.stamp?.emptyImage) },
     logo: asset(d.logo),
     hero: asset(d.hero),
     walletHero: asset(d.walletHero),
+    walletBanner: d.walletBanner === "stamps" ? "stamps" : "image",
+    walletStamps: walletStampIds(d.walletStamps),
     langs: sanitizeLangs(d.langs),
     texts,
     showCustomerName: d.showCustomerName !== false,
@@ -263,7 +275,23 @@ function sanitizeLook(input: unknown, bg: string): CardLook {
 }
 
 export function assetIds(d: Design): string[] {
-  return [d.logo, d.hero, d.walletHero, d.stamp.image].filter((x): x is string => !!x);
+  return [d.logo, d.hero, d.walletHero, d.stamp.image, d.stamp.emptyImage, ...d.walletStamps].filter((x): x is string => !!x);
+}
+
+/** Most stamps a card can have (see validTarget), so at most 31 banner pictures (0 to 30 stamps). */
+export const MAX_WALLET_STAMPS = 31;
+
+/** The stamp banner pictures, all or nothing: one bad id drops the whole set (the index is the stamp count). */
+function walletStampIds(input: unknown): string[] {
+  if (!Array.isArray(input) || input.length > MAX_WALLET_STAMPS) return [];
+  const ok = input.every((v) => typeof v === "string" && ASSET_ID.test(v));
+  return ok ? (input as string[]) : [];
+}
+
+/** The banner picture for a pass with this many stamps, or null when the set does not match the target. */
+export function walletStampPicture(d: Design, stamps: number, target: number): string | null {
+  if (d.walletBanner !== "stamps" || d.walletStamps.length !== target + 1) return null;
+  return d.walletStamps[Math.max(0, Math.min(target, stamps))] ?? null;
 }
 
 // ---- Readability checks (WCAG contrast) ----

@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { validMonthDay, parseBirthday, birthdayFromParts, formatBirthday, upcomingKeys } from "../lib/birthday.ts";
-import { sanitizeDesign, defaultDesign, designChecks, FONTS, cardLang, textsFor, sanitizeLangs } from "../lib/design.ts";
+import { sanitizeDesign, defaultDesign, designChecks, FONTS, cardLang, textsFor, sanitizeLangs, walletStampPicture, assetIds } from "../lib/design.ts";
 import { businessAccess, freeLimitReached, hasPaidDesign, TRIAL_DAYS } from "../lib/server/billing.ts";
 import { readFileSync } from "node:fs";
 import { lookFields } from "../lib/wallet-look.ts";
@@ -281,3 +281,24 @@ test("trial: 14 days at checkout and in all site texts", () => {
   for (const phrase of ["14 ימי ניסיון", "14-day free trial", "14 يوماً"]) assert.match(copy, new RegExp(phrase));
 });
 
+// ---- Wallet stamp banner: one picture per stamp count ----
+
+const ids = (n) => Array.from({ length: n }, (_, i) => `00000000-0000-0000-0000-${String(i).padStart(12, "0")}`);
+
+test("wallet banner: stamp pictures are kept only as a full valid set", () => {
+  const d = sanitizeDesign({ ...base, walletBanner: "stamps", walletStamps: ids(11) });
+  assert.equal(d.walletBanner, "stamps");
+  assert.equal(d.walletStamps.length, 11);
+  assert.deepEqual(sanitizeDesign({ ...base, walletStamps: [...ids(3), "bad"] }).walletStamps, []);
+  assert.deepEqual(sanitizeDesign({ ...base, walletStamps: ids(32) }).walletStamps, []);
+  assert.equal(sanitizeDesign({ ...base, walletBanner: "video" }).walletBanner, "image");
+  assert.ok(assetIds(d).includes(ids(11)[10]));
+});
+
+test("wallet banner: the picture matches the stamp count, and only when the set fits the target", () => {
+  const d = sanitizeDesign({ ...base, walletBanner: "stamps", walletStamps: ids(11) });
+  assert.equal(walletStampPicture(d, 3, 10), ids(11)[3]);
+  assert.equal(walletStampPicture(d, 14, 10), ids(11)[10]);
+  assert.equal(walletStampPicture(d, 3, 12), null);
+  assert.equal(walletStampPicture({ ...d, walletBanner: "image" }, 3, 10), null);
+});

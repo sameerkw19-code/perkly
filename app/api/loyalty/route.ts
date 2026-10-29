@@ -179,7 +179,7 @@ export async function GET(request: Request) {
   const published = await publishedDesign(db, business!.id);
   const draftRow = await db.prepare("SELECT design_draft FROM businesses WHERE id = ?").bind(business!.id).first<{ design_draft: string | null }>();
   const draft = (draftRow?.design_draft && sanitizeDesign(JSON.parse(draftRow.design_draft))) || published?.design || defaultDesign(business!);
-  const images = await db.prepare("SELECT id, kind, width, height FROM assets WHERE business = ? ORDER BY created DESC LIMIT 60").bind(business!.id).all();
+  const images = await db.prepare("SELECT id, kind, width, height FROM assets WHERE business = ? AND kind != 'banner' ORDER BY created DESC LIMIT 60").bind(business!.id).all();
 
   return json({
     ...base,
@@ -598,8 +598,8 @@ export async function POST(request: Request) {
       const design = sanitizeDesign(p.design);
       if (!design) return fail("bad_details", 400, "Invalid design");
       if (!(await ownsAssets(db, business.id, design))) return fail("not_found", 404, "Image not found");
-      // The bright stamp style is a subscription feature.
-      if (design.look.stampStyle === "bright" && !hasPaidDesign(await businessAccess(db, business.id))) {
+      // The bright stamp style and the stamp banner in the wallet are subscription features.
+      if ((design.look.stampStyle === "bright" || design.walletBanner === "stamps") && !hasPaidDesign(await businessAccess(db, business.id))) {
         return fail("paid_feature", 402, "Available with a subscription");
       }
       // Without a subscription: no new logo, background image or stamp image (ones already on the card may stay).

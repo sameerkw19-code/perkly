@@ -10,12 +10,14 @@ import { errorText, translate } from "../lib/i18n";
 import { post } from "../lib/api";
 import { ApplePreview, GooglePreview, ICONS, LoyaltyCard, Num } from "./loyalty-card";
 import { PERKLY_SOCIAL } from "../lib/perkly-social";
+import { makeStampBanners } from "./stamp-banner";
+import { StampBannerPreview } from "./stamp-banner-preview";
 
 type Image = AssetMeta & { kind: string };
 type Editor = { draft: Design; publishedVersion: number; publishedAt: string | null; hasUnpublished: boolean; images: Image[] };
 type T = (key: string, vars?: Record<string, string | number>) => string;
 
-const MAX_SIDE = { logo: 660, hero: 1200, wallet: 1100, stamp: 400 } as const;
+const MAX_SIDE = { logo: 660, hero: 1200, wallet: 1100, stamp: 400, stampEmpty: 400 } as const;
 // Keep in step with MAX_BYTES in app/api/asset/route.ts (800 KB), with a margin for the request.
 const UPLOAD_CAP = 780_000;
 const SIZES: Size[] = ["s", "m", "l"];
@@ -145,7 +147,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
   const setText = (k: keyof Texts, v: string) =>
     setDesign((d) => ({ ...d, texts: { ...d.texts, [textLang]: { ...d.texts[textLang], [k]: v.slice(0, LIMITS[k]) } } }));
 
-  async function upload(kind: "logo" | "hero" | "wallet" | "stamp", file: File | undefined) {
+  async function upload(kind: "logo" | "hero" | "wallet" | "stamp" | "stampEmpty", file: File | undefined) {
     if (!file) return;
     if (!/^image\/(png|jpeg|webp)$/.test(file.type)) { notify(errorText(lang, "image_type"), true); return; }
     setBusy(kind);
@@ -159,7 +161,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
         blob = await shrink(file, side, format, clearWhite);
       }
       if (blob.size > UPLOAD_CAP) { notify(errorText(lang, "image_too_big"), true); return; }
-      const r = await fetch(`/api/asset?business=${encodeURIComponent(businessId)}&kind=${kind}`, {
+      const r = await fetch(`/api/asset?business=${encodeURIComponent(businessId)}&kind=${kind === "stampEmpty" ? "stamp" : kind}`, {
         method: "POST", headers: { "Content-Type": blob.type }, body: blob, credentials: "same-origin",
       });
       const data: any = await r.json().catch(() => ({}));
@@ -169,6 +171,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
       if (kind === "hero") set({ hero: data.id });
       if (kind === "wallet") set({ walletHero: data.id });
       if (kind === "stamp") set({ stamp: { icon: "image", image: data.id } });
+      if (kind === "stampEmpty") setDesign((d) => ({ ...d, stamp: { ...d.stamp, emptyImage: data.id } }));
     } catch {
       notify(t("err_network"), true);
     } finally {
@@ -176,18 +179,44 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
     }
   }
 
-  async function saveDraft(): Promise<boolean> {
+  async function saveDraft(d: Design = design): Promise<boolean> {
     setBusy("save");
-    const r = await post("/api/loyalty", { action: "save_design", business: businessId, design });
+    const r = await post("/api/loyalty", { action: "save_design", business: businessId, design: d });
     setBusy("");
     if (!r.ok) { notify(errorText(lang, r.code), true); return false; }
-    setSaved(JSON.stringify(design));
+    setSaved(JSON.stringify(d));
     return true;
+  }
+
+  /** Stamp banner: draws one picture per stamp count and uploads the set. Returns the design that uses them. */
+  async function withStampBanners(d: Design): Promise<Design | null> {
+    setBusy("banners");
+    try {
+      const blobs = await makeStampBanners(d, target);
+      const form = new FormData();
+      blobs.forEach((b, i) => form.append(`s${i}`, b, `s${i}.jpg`));
+      const r = await fetch(`/api/asset/banners?business=${encodeURIComponent(businessId)}`, { method: "POST", body: form, credentials: "same-origin" });
+      const data: any = await r.json().catch(() => ({}));
+      if (!r.ok) { notify(errorText(lang, data.code), true); return null; }
+      return { ...d, walletStamps: data.ids as string[] };
+    } catch {
+      notify(t("err_network"), true);
+      return null;
+    } finally {
+      setBusy("");
+    }
   }
 
   async function publish() {
     if (!setup && !confirm(t("publishConfirm"))) return;
-    if (dirty && !(await saveDraft())) return;
+    let next = design;
+    if (design.walletBanner === "stamps") {
+      const made = await withStampBanners(design);
+      if (!made) return;
+      next = made;
+      setDesign(made);
+    }
+    if (JSON.stringify(next) !== saved && !(await saveDraft(next))) return;
     setBusy("publish");
     const r = await post("/api/loyalty", { action: "publish_design", business: businessId });
     setBusy("");
@@ -223,6 +252,9 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
           {tab === "apple" && <ApplePreview {...preview} />}
           {tab === "google" && <GooglePreview {...preview} />}
         </div>
+        {tab !== "web" && design.walletBanner === "stamps" && (
+          <StampBannerPreview design={design} stamps={demo} target={target} label={t("wbPreview")} />
+        )}
         <p className="form-hint center">{t(tab === "web" ? "pvNoteWeb" : tab === "apple" ? "pvNoteApple" : "pvNoteGoogle")}</p>
         {tab !== "web" && (
           <button type="button" className="btn soft small wallet-jump" onClick={() => document.getElementById("ed-wallet")?.scrollIntoView({ behavior: "smooth", block: "center" })}>
@@ -243,7 +275,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
           {dirty ? <p className="dirty-note">{t("unsaved")}</p> : editor.hasUnpublished && <p className="dirty-note">{t("unpublishedDraft")}</p>}
           <div className="form-actions">
             <button className="btn soft" disabled={!!busy || !dirty} onClick={async () => { if (await saveDraft()) notify(t("draftSaved")); }}>{busy === "save" ? t("sending") : t("saveDraft")}</button>
-            <button className="btn primary" disabled={!!busy || blocked} onClick={publish}>{busy === "publish" ? t("sending") : setup ? setup.publishLabel : t("publish")}</button>
+            <button className="btn primary" disabled={!!busy || blocked} onClick={publish}>{busy === "banners" ? t("wbMaking") : busy === "publish" ? t("sending") : setup ? setup.publishLabel : t("publish")}</button>
           </div>
           {blocked && <p className="form-error">{t("err_design_checks")}</p>}
           <p className="form-hint">{t("designNoBalance")} {t("walletPublishNote")}</p>
@@ -301,6 +333,26 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
             )}
           </div>
           <p className="form-hint">{paid ? t("productHint") : t("paidStampHint")}</p>
+          {paid && design.stamp.icon === "image" && design.stamp.image && (
+            <div className="upload empty-stamp">
+              <span className="thumb">{design.stamp.emptyImage ? <img src={`/api/asset/${design.stamp.emptyImage}`} alt="" /> : <ImagePlus size={22} />}</span>
+              <div>
+                <b>{t("edEmptyStamp")}</b>
+                <small className="form-hint">{t("edEmptyStampHint")}</small>
+                <div className="row-actions">
+                  <label className="btn soft small">
+                    <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => { upload("stampEmpty", e.target.files?.[0]); e.target.value = ""; }} />
+                    <UploadCloud size={14} />{busy === "stampEmpty" ? t("uploading") : t("upload")}
+                  </label>
+                  {design.stamp.emptyImage && (
+                    <button type="button" className="btn soft small" onClick={() => set({ stamp: { ...design.stamp, emptyImage: null } })}>
+                      <Trash2 size={14} />{t("remove")}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </section>
 
         <section className="panel">
@@ -446,6 +498,16 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
                 </div>
               );
             })}
+          </div>
+          <div className="wallet-banner-mode">
+            <h3 className="sub-head">{t("edWalletBanner")}</h3>
+            <div className="seg">
+              <button type="button" aria-pressed={design.walletBanner === "image"} onClick={() => set({ walletBanner: "image" })}>{t("wb_image")}</button>
+              <button type="button" aria-pressed={design.walletBanner === "stamps"} disabled={!paid} onClick={() => { set({ walletBanner: "stamps" }); setTab("google"); }}>
+                {t("wb_stamps")}{!paid && <PaidTag t={t} />}
+              </button>
+            </div>
+            <p className="form-hint">{t("wbStampsHint")}</p>
           </div>
           {design.logo && (
             <div className="logo-controls">

@@ -113,9 +113,11 @@ function FontLink({ design, lang }: { design: Design; lang: Lang }) {
 /** One stamp slot. Empty slots show the same mark, dimmed. */
 function PassStamp({ design, filled }: { design: Design; filled: boolean }) {
   const kind = design.stamp.icon === "image" && design.stamp.image ? "photo" : "mark";
+  // The business's own picture for an empty stamp, when it uploaded one.
+  const ownEmpty = !filled && kind === "photo" && design.stamp.emptyImage;
   return (
-    <span className={`pcard-stamp ${kind} ${filled ? "is-filled" : "is-empty"}`} aria-hidden="true">
-      <StampMark design={design} size={22} />
+    <span className={`pcard-stamp ${kind} ${filled ? "is-filled" : "is-empty"}${ownEmpty ? " own-empty" : ""}`} aria-hidden="true">
+      {ownEmpty ? <img className="stamp-img" src={assetUrl(design.stamp.emptyImage!)!} alt="" /> : <StampMark design={design} size={22} />}
     </span>
   );
 }
