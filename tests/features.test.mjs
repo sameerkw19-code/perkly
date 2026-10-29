@@ -393,7 +393,7 @@ test("free code: the control center never receives the hash", () => {
 
 // ---- Last visit ----
 
-import { daysSince } from "../lib/visits.ts";
+import { daysSince, isAway } from "../lib/visits.ts";
 
 test("last visit: counts calendar days, never negative", () => {
   const now = new Date(2026, 9, 29, 21, 0);
@@ -401,4 +401,13 @@ test("last visit: counts calendar days, never negative", () => {
   assert.equal(daysSince(new Date(2026, 9, 28, 23, 30).toISOString(), now), 1);
   assert.equal(daysSince(new Date(2026, 8, 29, 12, 0).toISOString(), now), 30);
   assert.equal(daysSince(new Date(2026, 9, 30, 9, 0).toISOString(), now), 0);
+});
+
+test("away: over 30 days since the last visit, or since joining with no visits", () => {
+  const now = new Date(2026, 9, 29, 12, 0);
+  const ago = (d) => new Date(now.getTime() - d * 86_400_000).toISOString();
+  assert.equal(isAway(ago(31), ago(200), now), true);
+  assert.equal(isAway(ago(10), ago(200), now), false);
+  assert.equal(isAway(null, ago(45), now), true);
+  assert.equal(isAway(null, ago(5), now), false);
 });

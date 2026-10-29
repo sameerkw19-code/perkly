@@ -377,3 +377,4 @@ fieldset.birthday{border:0;padding:0;margin:0 0 14px}fieldset.birthday legend{fo
 /* Customer list: last visit; over 30 days is marked. */
 .last-visit{white-space:nowrap}
 .last-visit.away{color:#b45309;font-weight:600}
+.away-filter{margin:4px 0 10px}
