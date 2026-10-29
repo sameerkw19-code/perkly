@@ -389,3 +389,33 @@ fieldset.birthday{border:0;padding:0;margin:0 0 14px}fieldset.birthday legend{fo
 .change.up{color:#15803d}
 .change.down{color:#b91c1c}
 .change.same{color:var(--muted)}
+/* Overview reminder: customers away 30+ days. */
+.away-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 14px;padding:10px 14px;border-radius:12px;background:#fff7ed;color:#9a3412;border:1px solid #fed7aa}
+/* Printable join sign (A4) and sticker (10×10 cm). */
+.poster-page{min-height:100vh;background:#e9e8ef;padding:16px;display:flex;flex-direction:column;align-items:center;gap:16px}
+.poster-tools{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center}
+.poster-msg{max-width:520px;margin:60px auto;text-align:center}
+.poster{box-shadow:0 10px 40px #0002;display:flex;flex-direction:column;align-items:center;text-align:center;overflow:hidden}
+.poster.a4{width:210mm;height:297mm;padding:18mm 16mm;gap:6mm}
+.poster.sticker{width:100mm;height:100mm;padding:6mm;gap:2mm;justify-content:center;border-radius:4mm}
+.poster-logo{max-height:34mm;max-width:120mm;object-fit:contain}
+.poster.sticker .poster-logo{max-height:14mm;max-width:60mm}
+.poster-name{font-size:16mm;margin:0;font-weight:800}
+.poster.sticker .poster-name{font-size:7mm}
+.poster-head{font-size:14mm;line-height:1.1;margin:2mm 0 0;font-weight:800}
+.poster-sub{font-size:7mm;margin:0;opacity:.9;max-width:170mm}
+.poster-qr{background:#fff;padding:5mm;border-radius:5mm}
+.poster.a4 .poster-qr img{width:105mm;height:105mm}
+.poster.sticker .poster-qr{padding:2mm;border-radius:2mm}
+.poster.sticker .poster-qr img{width:56mm;height:56mm}
+.poster-steps{font-size:6.5mm;text-align:start;margin:0;padding-inline-start:9mm;display:grid;gap:2mm}
+.poster-note{font-size:5mm;opacity:.85;margin:0}
+.poster-by{margin-top:auto;font-size:4mm;opacity:.7}
+.poster-scan{font-size:6mm;font-weight:800;margin:0}
+@media print{
+  @page{size:A4;margin:0}
+  body{background:#fff}
+  .no-print{display:none!important}
+  .poster-page{padding:0;background:none;min-height:0}
+  .poster{box-shadow:none;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}

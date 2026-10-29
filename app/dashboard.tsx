@@ -272,6 +272,13 @@ export default function Dashboard() {
         )}
 
         <main>
+          {view === "overview" && isOwner && away.length > 0 && (
+            <div className="away-bar" role="status">
+              <Users size={16} />
+              <span>{t("awayBar", { n: away.length, d: AWAY_DAYS })}</span>
+              <button type="button" className="btn soft small" onClick={() => { setView("customers"); setQuery(""); setAwayOnly(true); }}>{t("awayShow")}</button>
+            </div>
+          )}
           {view === "overview" && isOwner && (
             <>
               <div className="page-head">
@@ -427,6 +434,7 @@ export default function Dashboard() {
                     <QrImage text={`${window.location.origin}/join/${b.join_code}`} size={200} label={t("joinQr")} />
                     <p className="muted">{t("joinQrHint")}</p>
                     <LinkBox url={`${window.location.origin}/join/${b.join_code}`} t={t} notify={notify} />
+                    <a className="btn soft small" href={`/poster?b=${encodeURIComponent(b.id)}`}><QrCode size={14} />{t("posterLink")}</a>
                     <button className="btn soft small" disabled={busy} onClick={async () => {
                       if (!confirm(t("newJoinConfirm"))) return;
                       if (await call({ action: "new_join_code" })) load();
