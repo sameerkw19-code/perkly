@@ -66,6 +66,8 @@ export type CardLook = {
   font: FontId;
   text: Size;
   stamps: Size;
+  /** "classic": the usual look. "bright": filled stamps bright, empty ones dark (a subscription feature). */
+  stampStyle: "classic" | "bright";
   /** Logo height on the web card, 60–200 (% of the normal size). */
   logoSize: number;
   /** "none": the logo as it is; "circle" / "square": on a white badge (good for logos with a white background). */
@@ -156,7 +158,7 @@ export function darken(hex: string, amount = 0.35): string {
 }
 
 export function defaultLook(bg: string): CardLook {
-  return { bg2: darken(HEX.test(bg) ? bg : "#1E1B2E"), dir: "diag", overlay: 55, font: "system", text: "m", stamps: "m", logoSize: 100, logoFrame: "none", logoName: false };
+  return { bg2: darken(HEX.test(bg) ? bg : "#1E1B2E"), dir: "diag", overlay: 55, font: "system", text: "m", stamps: "m", stampStyle: "classic", logoSize: 100, logoFrame: "none", logoName: false };
 }
 const ASSET_ID = /^[0-9a-f-]{36}$/;
 
@@ -253,6 +255,7 @@ function sanitizeLook(input: unknown, bg: string): CardLook {
     font: typeof l.font === "string" && Object.prototype.hasOwnProperty.call(FONTS, l.font) ? (l.font as FontId) : base.font,
     text: size(l.text, base.text),
     stamps: size(l.stamps, base.stamps),
+    stampStyle: l.stampStyle === "bright" ? "bright" : "classic",
     logoSize: Number.isFinite(logoSize) ? Math.max(60, Math.min(200, Math.round(logoSize / 10) * 10)) : base.logoSize,
     logoFrame: (LOGO_FRAMES as readonly string[]).includes(l.logoFrame) ? l.logoFrame : base.logoFrame,
     logoName: l.logoName === true,

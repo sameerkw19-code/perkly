@@ -136,7 +136,7 @@ export function LoyaltyCard({ design, lang, stamps, target, customerName, reward
   const columns = total <= 6 ? total : Math.ceil(total / 2);
   const showName = design.showCustomerName && !!customerName;
   return (
-    <div className={`pcard layout-${design.layout} stamps-${design.look.stamps}${ready ? " is-ready" : ""}`} style={lookStyle(design, cl)} dir={isRtl(cl) ? "rtl" : "ltr"} lang={cl}>
+    <div className={`pcard layout-${design.layout} stamps-${design.look.stamps} stamp-${design.look.stampStyle}${ready ? " is-ready" : ""}`} style={lookStyle(design, cl)} dir={isRtl(cl) ? "rtl" : "ltr"} lang={cl}>
       <FontLink design={design} lang={cl} />
       <div className="pcard-head">
         <div className="pcard-brand">

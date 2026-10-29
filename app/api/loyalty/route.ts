@@ -598,6 +598,10 @@ export async function POST(request: Request) {
       const design = sanitizeDesign(p.design);
       if (!design) return fail("bad_details", 400, "Invalid design");
       if (!(await ownsAssets(db, business.id, design))) return fail("not_found", 404, "Image not found");
+      // The bright stamp style is a subscription feature.
+      if (design.look.stampStyle === "bright" && !hasPaidDesign(await businessAccess(db, business.id))) {
+        return fail("paid_feature", 402, "Available with a subscription");
+      }
       // Without a subscription: no new logo, background image or stamp image (ones already on the card may stay).
       if (!hasPaidDesign(await businessAccess(db, business.id))) {
         const kept = new Set(assetIds((await publishedDesign(db, business.id))?.design ?? defaultDesign(business)));

@@ -77,8 +77,14 @@ test("design: unknown or unsafe look values fall back, never pass through", () =
 
 test("design: valid look values are kept", () => {
   const d = sanitizeDesign({ ...base, look: { bg2: "#00aa11", dir: "radial", overlay: 33, font: "rubik", text: "l", stamps: "s" } });
-  assert.deepEqual(d.look, { bg2: "#00AA11", dir: "radial", overlay: 35, font: "rubik", text: "l", stamps: "s", logoSize: 100, logoFrame: "none", logoName: false });
+  assert.deepEqual(d.look, { bg2: "#00AA11", dir: "radial", overlay: 35, font: "rubik", text: "l", stamps: "s", stampStyle: "classic", logoSize: 100, logoFrame: "none", logoName: false });
   assert.ok(FONTS[d.look.font]);
+});
+
+test("design: stamp style is classic unless set to bright", () => {
+  const bright = sanitizeDesign({ ...base, look: { ...base.look, stampStyle: "bright" } });
+  assert.equal(bright.look.stampStyle, "bright");
+  assert.equal(sanitizeDesign({ ...base, look: { ...base.look, stampStyle: "neon" } }).look.stampStyle, "classic");
 });
 
 test("design: gradient readability checks the weaker of the two colors", () => {

@@ -394,6 +394,14 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
           <div className="seg">
             {SIZES.map((z) => <button key={z} type="button" aria-pressed={design.look.stamps === z} onClick={() => setLook({ stamps: z })}>{t("size_" + z)}</button>)}
           </div>
+          <h3 className="sub-head">{t("edStampStyle")}</h3>
+          <div className="seg">
+            <button type="button" aria-pressed={design.look.stampStyle === "classic"} onClick={() => setLook({ stampStyle: "classic" })}>{t("stampStyle_classic")}</button>
+            <button type="button" aria-pressed={design.look.stampStyle === "bright"} disabled={!paid} onClick={() => setLook({ stampStyle: "bright" })}>
+              {t("stampStyle_bright")}{!paid && <PaidTag t={t} />}
+            </button>
+          </div>
+          <p className="form-hint">{t("stampStyleHint")}</p>
         </section>
 
         <section className="panel">
