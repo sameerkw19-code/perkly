@@ -390,3 +390,15 @@ test("free code: the control center never receives the hash", () => {
   assert.equal("freeCodeHash" in s, false);
   assert.equal(s.freeCodeSet, true);
 });
+
+// ---- Last visit ----
+
+import { daysSince } from "../lib/visits.ts";
+
+test("last visit: counts calendar days, never negative", () => {
+  const now = new Date(2026, 9, 29, 21, 0);
+  assert.equal(daysSince(new Date(2026, 9, 29, 8, 0).toISOString(), now), 0);
+  assert.equal(daysSince(new Date(2026, 9, 28, 23, 30).toISOString(), now), 1);
+  assert.equal(daysSince(new Date(2026, 8, 29, 12, 0).toISOString(), now), 30);
+  assert.equal(daysSince(new Date(2026, 9, 30, 9, 0).toISOString(), now), 0);
+});

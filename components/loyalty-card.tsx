@@ -1,5 +1,5 @@
 import {
-  Beer, Cake, Coffee, Croissant, CupSoda, Gift, GlassWater, Hamburger, Heart, IceCreamCone, Martini,
+  Bean, Beer, Cake, Coffee, Croissant, CupSoda, Gift, GlassWater, Hamburger, Heart, IceCreamCone, Martini,
   Pizza, Sandwich, Scissors, ShoppingBag, Sparkles, Star, Utensils,
 } from "lucide-react";
 import { assetUrl, cardFont, cardLang, fontHref, is3d, onColor, stamp3dUrl, textsFor, type Design, type PresetIcon } from "../lib/design";
@@ -9,7 +9,7 @@ import { PizzaProgress } from "./pizza-progress";
 import { isRtl, type Lang } from "../lib/i18n-types";
 
 export const ICONS: Record<PresetIcon, any> = {
-  coffee: Coffee, pizza: Pizza, burger: Hamburger, icecream: IceCreamCone, mojito: CupSoda, beer: Beer,
+  coffee: Coffee, bean: Bean, pizza: Pizza, burger: Hamburger, icecream: IceCreamCone, mojito: CupSoda, beer: Beer,
   shot: GlassWater, cocktail: Martini, sandwich: Sandwich, croissant: Croissant, cake: Cake, utensils: Utensils,
   scissors: Scissors, bag: ShoppingBag, sparkle: Sparkles, heart: Heart, star: Star,
 };
