@@ -375,6 +375,7 @@ Object.assign(words, {
   edStampIcon: ["סמל החותמת", "رمز الختم", "Stamp symbol"],
   ic_coffee: ["קפה", "قهوة", "Coffee"], ic_pizza: ["פיצה", "بيتزا", "Pizza"], ic_burger: ["המבורגר", "برغر", "Burger"],
   ic_bean: ["פולי קפה", "حبوب قهوة", "Coffee beans"],
+  ic_hotdog: ["נקניקייה", "هوت دوغ", "Hot dog"],
   ic_icecream: ["גלידה", "بوظة", "Ice cream"], ic_mojito: ["מוחיטו", "موهيتو", "Mojito"], ic_beer: ["בירה", "بيرة", "Beer"],
   ic_shot: ["צ׳ייסר", "شوت", "Shot"], ic_cocktail: ["קוקטייל", "كوكتيل", "Cocktail"], ic_sandwich: ["כריך", "ساندويش", "Sandwich"],
   ic_croissant: ["מאפה", "معجنات", "Pastry"], ic_cake: ["עוגה", "كعكة", "Cake"], ic_utensils: ["ארוחה", "وجبة", "Meal"],

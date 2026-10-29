@@ -31,7 +31,7 @@ export const CARD_LOCALE: Record<Lang, string> = {
 
 
 export const STAMP_ICONS = [
-  "coffee", "bean", "pizza", "burger", "icecream", "mojito", "beer", "shot", "cocktail", "sandwich",
+  "coffee", "bean", "pizza", "burger", "hotdog", "icecream", "mojito", "beer", "shot", "cocktail", "sandwich",
   "croissant", "cake", "utensils", "scissors", "bag", "sparkle", "heart", "star",
 ] as const;
 export type PresetIcon = (typeof STAMP_ICONS)[number];
@@ -61,7 +61,7 @@ export function stamp3dUrl(icon: Stamp3D, empty = false): string {
 /** The icon table in the editor: categories, each with flat icons and 3D pictures. */
 export const ICON_GROUPS: { id: "drinks" | "food" | "sweets" | "beauty" | "general"; flat: PresetIcon[]; d3: Stamp3D[] }[] = [
   { id: "drinks", flat: ["coffee", "bean", "mojito", "beer", "shot", "cocktail"], d3: ["3d-coffee", "3d-coffeebean", "3d-tea", "3d-beer", "3d-cocktail", "3d-tropical", "3d-bubbletea", "3d-cup", "3d-wine"] },
-  { id: "food", flat: ["pizza", "burger", "sandwich", "utensils"], d3: ["3d-pizza", "3d-burger", "3d-sandwich", "3d-taco", "3d-fries", "3d-sushi", "3d-hotdog", "3d-plate", "3d-falafel"] },
+  { id: "food", flat: ["pizza", "burger", "hotdog", "sandwich", "utensils"], d3: ["3d-pizza", "3d-burger", "3d-sandwich", "3d-taco", "3d-fries", "3d-sushi", "3d-hotdog", "3d-plate", "3d-falafel"] },
   { id: "sweets", flat: ["croissant", "cake", "icecream"], d3: ["3d-croissant", "3d-cake", "3d-shortcake", "3d-donut", "3d-icecream", "3d-cookie", "3d-cupcake", "3d-bagel"] },
   { id: "beauty", flat: ["scissors", "sparkle"], d3: ["3d-scissors", "3d-nails", "3d-lipstick", "3d-barber", "3d-sparkles", "3d-bouquet"] },
   { id: "general", flat: ["bag", "heart", "star"], d3: ["3d-bags", "3d-gift", "3d-star", "3d-heart", "3d-glowstar", "3d-crown", "3d-gem", "3d-paws"] },
