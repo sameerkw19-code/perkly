@@ -11,6 +11,8 @@ export default function AuthForm({ needsCode, next = "/", initialMode = "login" 
   const [mode, setMode] = useState<"login" | "signup">(initialMode);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Set when the password was right and a code was sent by SMS (second sign-in step).
+  const [challenge, setChallenge] = useState<string | null>(null);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -25,12 +27,52 @@ export default function AuthForm({ needsCode, next = "/", initialMode = "login" 
       password: form.get("password"),
       signupCode: form.get("signupCode") || undefined,
     });
+    if (result.ok && result.data?.otp) {
+      setChallenge(result.data.challenge);
+      setBusy(false);
+      return;
+    }
     if (result.ok) {
       window.location.href = next;
       return;
     }
     setError(errorText(lang, result.code));
     setBusy(false);
+  }
+
+  async function submitCode(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (busy || !challenge) return;
+    const form = new FormData(e.currentTarget);
+    setBusy(true);
+    setError("");
+    const result = await post("/api/auth", { action: "verify_otp", challenge, code: form.get("code") });
+    if (result.ok) {
+      window.location.href = next;
+      return;
+    }
+    setError(errorText(lang, result.code));
+    setBusy(false);
+  }
+
+  if (challenge) {
+    return (
+      <div className="auth-page" dir={dir}>
+        <div className="auth-top">
+          <Brand href="/" />
+          <LangSwitch lang={lang} setLang={setLang} />
+        </div>
+        <form className="modal-card auth-card" onSubmit={submitCode}>
+          <h1>{t("otpTitle")}</h1>
+          <p className="form-hint">{t("otpHint")}</p>
+          <label>{t("otpCode")}
+            <input name="code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required dir="ltr" autoFocus />
+          </label>
+          {error && <p className="form-error" role="alert">{error}</p>}
+          <button className="btn primary wide" disabled={busy}>{busy ? t("loading") : t("otpSubmit")}</button>
+        </form>
+      </div>
+    );
   }
 
   return (

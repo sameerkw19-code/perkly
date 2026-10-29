@@ -12,6 +12,8 @@ import { DUMMY_HASH, hashPassword, sha256, verifyPassword } from "../../../lib/s
 import { clientIp, fail, json, readJson, sameOrigin, str } from "../../../lib/server/http";
 import { allow } from "../../../lib/server/rate-limit";
 import { getSettings } from "../../../lib/server/settings";
+import { OTP_TTL_MS, OTP_MAX_ATTEMPTS, hashCode, newCode, otpEnforced, sendCodeSms } from "../../../lib/server/otp";
+import { normalizePhone } from "../../../lib/phone";
 
 export const dynamic = "force-dynamic";
 
@@ -61,14 +63,63 @@ export async function POST(request: Request) {
       if (!okIp || !okEmail) return fail("rate_limited", 429, "Too many attempts. Try again in 10 minutes.");
       const password = typeof body.password === "string" ? body.password.slice(0, 200) : "";
       const user = email
-        ? await db.prepare("SELECT id, pass_hash, blocked FROM users WHERE email = ?").bind(email).first<{ id: string; pass_hash: string; blocked: string | null }>()
+        ? await db.prepare("SELECT id, pass_hash, blocked, phone FROM users WHERE email = ?").bind(email).first<{ id: string; pass_hash: string; blocked: string | null; phone: string | null }>()
         : null;
       const valid = await verifyPassword(password, user?.pass_hash ?? DUMMY_HASH);
       if (!user || !valid) return fail("bad_login", 401, "Wrong email or password");
       // Only after a correct password, so the message does not reveal which emails exist.
       if (user.blocked) return fail("account_blocked", 403, "This account is blocked");
+      // With an SMS sender connected and a phone on the account: a code is sent first, and the session starts after it.
+      if (otpEnforced(env, user.phone)) {
+        const code = newCode();
+        const challenge = crypto.randomUUID();
+        const now = new Date();
+        await db
+          .prepare("INSERT INTO login_challenges(id, user, code_hash, created, expires) VALUES(?, ?, ?, ?, ?)")
+          .bind(challenge, user.id, await hashCode(code), now.toISOString(), new Date(now.getTime() + OTP_TTL_MS).toISOString())
+          .run();
+        if (!(await sendCodeSms(env, user.phone!, code))) {
+          await db.prepare("DELETE FROM login_challenges WHERE id = ?").bind(challenge).run();
+          return fail("sms_unavailable", 503, "Could not send the code. Try again later.");
+        }
+        return json({ ok: true, otp: true, challenge });
+      }
       const token = await createSession(db, user.id);
       return json({ ok: true }, 200, { "Set-Cookie": sessionCookie(token, request) });
+    }
+
+    case "verify_otp": {
+      const challenge = str(body.challenge, 64);
+      const code = typeof body.code === "string" ? body.code.replace(/\s/g, "").slice(0, 6) : "";
+      const okIp = await allow(db, `otp-ip:${ip}`, 30, 600);
+      if (!okIp || !challenge) return fail("rate_limited", 429, "Too many attempts. Try again in 10 minutes.");
+      const row = await db
+        .prepare(
+          `SELECT c.id, c.user, c.code_hash, c.attempts, c.expires, c.used, u.blocked
+           FROM login_challenges c JOIN users u ON u.id = c.user WHERE c.id = ?`,
+        )
+        .bind(challenge)
+        .first<{ id: string; user: string; code_hash: string; attempts: number; expires: string; used: string | null; blocked: string | null }>();
+      const now = new Date().toISOString();
+      if (!row || row.used || row.expires <= now || row.attempts >= OTP_MAX_ATTEMPTS || row.blocked) return fail("otp_invalid", 401, "The code is wrong or has expired");
+      if ((await hashCode(code)) !== row.code_hash) {
+        await db.prepare("UPDATE login_challenges SET attempts = attempts + 1 WHERE id = ?").bind(challenge).run();
+        return fail("otp_invalid", 401, "The code is wrong or has expired");
+      }
+      // Mark used before creating the session, so a code works once.
+      const claimed = await db.prepare("UPDATE login_challenges SET used = ? WHERE id = ? AND used IS NULL").bind(now, challenge).run();
+      if (!claimed.meta.changes) return fail("otp_invalid", 401, "The code is wrong or has expired");
+      const token = await createSession(db, row.user);
+      return json({ ok: true }, 200, { "Set-Cookie": sessionCookie(token, request) });
+    }
+
+    case "set_phone": {
+      const who = await getUser(db, request.headers.get("cookie"));
+      if (!who) return fail("signin", 401, "Sign in required");
+      const phone = normalizePhone(body.phone);
+      if (!phone) return fail("bad_details", 400, "Invalid phone");
+      await db.prepare("UPDATE users SET phone = ? WHERE id = ?").bind(phone, who.id).run();
+      return json({ ok: true });
     }
 
     case "reset_password": {
