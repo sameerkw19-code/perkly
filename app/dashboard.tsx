@@ -343,7 +343,12 @@ export default function Dashboard() {
                 <button type="button" aria-pressed={!awayOnly} onClick={() => setAwayOnly(false)}>{t("all")} <Num>{customers.length}</Num></button>
                 <button type="button" aria-pressed={awayOnly} onClick={() => setAwayOnly(true)}>{t("awayFilter", { n: AWAY_DAYS })} <Num>{away.length}</Num></button>
               </div>
-              {awayOnly && <p className="form-hint">{t("awayHint", { n: AWAY_DAYS })}</p>}
+              {awayOnly && (
+                <p className="form-hint">
+                  {t("awayHint", { n: AWAY_DAYS })}{" "}
+                  {away.length > 0 && <a href="/messages?audience=away">{t("awayMessage")}</a>}
+                </p>
+              )}
               {!filtered.length ? (
                 <div className="empty compact">{awayOnly ? t("awayNone", { n: AWAY_DAYS }) : t("noCustomer")}</div>
               ) : (
