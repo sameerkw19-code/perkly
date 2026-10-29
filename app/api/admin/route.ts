@@ -7,9 +7,11 @@ import { normalizeEmail } from "../../../lib/server/auth";
 export const dynamic = "force-dynamic";
 
 const MAX_COMP_DAYS = 366;
+/** Free access "without an end date": a date far in the future, so every check stays a date comparison. */
+const FOREVER = "9999-12-31T00:00:00.000Z";
 
 // Platform admin actions on one business. Every change is written to admin_log in the same batch.
-// Actions: suspend (with reason), unsuspend, grant_comp (free access for N days), clear_comp,
+// Actions: suspend (with reason), unsuspend, grant_comp (free access for N days, or forever: true), clear_comp,
 // update_business (name, reward, target), transfer_owner (to an existing user by email), archive, restore.
 export async function POST(request: Request) {
   const db = getD1();
@@ -50,6 +52,14 @@ export async function POST(request: Request) {
       return json({ ok: true });
     }
     case "grant_comp": {
+      // Free access without an end date (until the admin cancels it).
+      if (body.forever === true) {
+        await db.batch([
+          db.prepare("UPDATE businesses SET comp_until = ? WHERE id = ?").bind(FOREVER, businessId),
+          log("grant_comp", "no end date"),
+        ]);
+        return json({ ok: true, until: FOREVER });
+      }
       const days = Number(body.days);
       if (!Number.isInteger(days) || days < 1 || days > MAX_COMP_DAYS) return fail("bad_details", 400, "Days must be 1–366");
       // Extends from the current grant if it is still running, otherwise from now. One statement,

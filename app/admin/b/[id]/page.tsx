@@ -105,7 +105,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
               <dt>סוף תקופה</dt><dd>{shortDate(b.current_period_end)}</dd>
               <dt>מזהה מנוי</dt><dd dir="ltr"><code>{b.external_subscription ?? "—"}</code></dd>
               <dt>עדכון אחרון</dt><dd>{shortDateTime(b.sub_updated)}</dd>
-              <dt>גישה חינם</dt><dd>{b.comp_until && b.comp_until > nowIso ? `עד ${shortDate(b.comp_until)}` : "לא"}</dd>
+              <dt>גישה חינם</dt><dd>{b.comp_until && b.comp_until > nowIso ? (b.comp_until.startsWith("9999") ? "ללא הגבלת זמן" : `עד ${shortDate(b.comp_until)}`) : "לא"}</dd>
             </dl>
           </section>
 

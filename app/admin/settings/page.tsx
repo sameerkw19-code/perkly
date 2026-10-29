@@ -1,6 +1,6 @@
 import { getD1 } from "../../../db";
 import { requireAdminPage, shortDateTime } from "../../../lib/server/admin";
-import { getSettings, settingsForAdmin } from "../../../lib/server/settings";
+import { getSettings } from "../../../lib/server/settings";
 import { AdminHeader } from "../admin-header";
 import { SettingsForm } from "./settings-form";
 
@@ -22,7 +22,7 @@ export default async function AdminSettingsPage() {
         <h1>הגדרות מערכת</h1>
         <p className="muted">משפיעות על כל העסקים בפלטפורמה. כל שינוי נרשם ביומן.</p>
         <section className="panel">
-          <SettingsForm initial={settingsForAdmin(settings)} />
+          <SettingsForm initial={settings} />
         </section>
         <section className="panel">
           <h2>שינויים אחרונים</h2>

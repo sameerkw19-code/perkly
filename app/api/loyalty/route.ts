@@ -13,7 +13,6 @@ import { formatBirthday, parseBirthday, upcomingKeys } from "../../../lib/birthd
 import { syncGoogleWallet } from "../../../lib/server/wallet-sync";
 import { walletConfig } from "../../../lib/server/google-wallet";
 import { getSettings } from "../../../lib/server/settings";
-import { cleanCode, freeCodeMatches, grantFreeAccess } from "../../../lib/server/free-code";
 import { normalizeSocial, parseSocial, type Social } from "../../../lib/social";
 
 export const dynamic = "force-dynamic";
@@ -257,12 +256,6 @@ export async function POST(request: Request) {
     if (!name || !reward || !validTarget(p.target) || typeof p.color !== "string" || !COLOR.test(p.color)) {
       return fail("bad_details", 400, "Invalid business details");
     }
-    // Optional free-access code (set in the control center): checked before anything is created.
-    const freeCode = cleanCode(p.freeCode);
-    if (freeCode) {
-      if (!(await allow(db, `free-code:${user.id}`, 10, 3600))) return fail("rate_limited", 429);
-      if (!(await freeCodeMatches(db, freeCode))) return fail("bad_code", 400, "Wrong code");
-    }
     // New businesses collect rewards by default (customers keep earning while a reward waits).
     const mode = p.rewardMode === "block" ? "block" : "bank";
     const id = crypto.randomUUID();
@@ -280,8 +273,7 @@ export async function POST(request: Request) {
           ]
         : []),
     ]);
-    const freeUntil = freeCode ? await grantFreeAccess(db, id, user.email) : null;
-    return json({ id, freeUntil });
+    return json({ id });
   }
 
   // Every other action: the server checks the user's role in this business.
@@ -675,16 +667,6 @@ export async function POST(request: Request) {
         syncGoogleWallet(db, cust, card.rewards, origin);
       }
       return json({ ok: true, version: live?.version });
-    }
-
-    // A free-access code for an existing business (owner only).
-    case "redeem_code": {
-      const denied = ownerOnly(); if (denied) return denied;
-      const code = cleanCode(p.code);
-      if (!code) return fail("bad_code", 400, "Wrong code");
-      if (!(await allow(db, `free-code:${user.id}`, 10, 3600))) return fail("rate_limited", 429);
-      if (!(await freeCodeMatches(db, code))) return fail("bad_code", 400, "Wrong code");
-      return json({ ok: true, freeUntil: await grantFreeAccess(db, business.id, user.email) });
     }
 
     case "new_join_code": {
