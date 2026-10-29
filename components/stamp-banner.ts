@@ -155,18 +155,9 @@ export function drawStampBanner(ctx: CanvasRenderingContext2D, d: Design, p: Ban
   const family = FONTS[d.look.font].family;
   const W = BANNER_W, H = BANNER_H;
 
-  // Background: the card's gradient (or plain color).
-  ctx.save();
-  if (d.layout === "gradient") {
-    const g = ctx.createLinearGradient(0, 0, W, H);
-    g.addColorStop(0, d.colors.bg);
-    g.addColorStop(1, d.look.bg2);
-    ctx.fillStyle = g;
-  } else {
-    ctx.fillStyle = d.colors.bg;
-  }
+  // Background: the card's color, plain (no gradient).
+  ctx.fillStyle = d.colors.bg;
   ctx.fillRect(0, 0, W, H);
-  ctx.restore();
 
   // Layout: one row up to 12 slots (stamps + gift), otherwise two rows with smaller stamps.
   const slots = target + 1;
