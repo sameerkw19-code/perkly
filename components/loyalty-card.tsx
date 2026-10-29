@@ -2,7 +2,7 @@ import {
   Beer, Cake, Coffee, Croissant, CupSoda, Gift, GlassWater, Hamburger, Heart, IceCreamCone, Martini,
   Pizza, Sandwich, Scissors, ShoppingBag, Sparkles, Star, Utensils,
 } from "lucide-react";
-import { assetUrl, cardFont, cardLang, fontHref, onColor, textsFor, type Design, type PresetIcon } from "../lib/design";
+import { assetUrl, cardFont, cardLang, fontHref, is3d, onColor, stamp3dUrl, textsFor, type Design, type PresetIcon } from "../lib/design";
 import { translate } from "../lib/i18n";
 import { usesPizza } from "../lib/pizza";
 import { PizzaProgress } from "./pizza-progress";
@@ -25,6 +25,7 @@ export function StampMark({ design, size = 20 }: { design: Design; size?: number
   const { icon, image } = design.stamp;
   if (icon === "logo" && design.logo) return <img className="stamp-img round" src={assetUrl(design.logo)!} alt="" />;
   if (icon === "image" && image) return <img className="stamp-img" src={assetUrl(image)!} alt="" />;
+  if (is3d(icon)) return <img className="stamp-img three-d" src={stamp3dUrl(icon)} alt="" />;
   const Icon = ICONS[icon as PresetIcon] ?? Star;
   return <Icon size={size} />;
 }
@@ -41,7 +42,7 @@ export function Logo({ design, title, className = "card-logo" }: { design: Desig
 export function StampGrid({ design, stamps, target, giftLabel, ready }: { design: Design; stamps: number; target: number; giftLabel: string; ready?: boolean }) {
   const total = target + 1;
   const columns = total <= 6 ? total : Math.ceil(total / 2);
-  const productImage = design.stamp.icon === "image";
+  const productImage = design.stamp.icon === "image" || is3d(design.stamp.icon);
   if (usesPizza(design, target)) return <div className="stamp-grid pizza"><PizzaProgress design={design} stamps={stamps} target={target} /></div>;
   return (
     <div className={"stamp-grid" + (productImage ? " product" : "")} style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
@@ -115,7 +116,7 @@ function FontLink({ design, lang }: { design: Design; lang: Lang }) {
 
 /** One stamp slot. Empty slots show the same mark, dimmed. */
 function PassStamp({ design, filled }: { design: Design; filled: boolean }) {
-  const kind = design.stamp.icon === "image" && design.stamp.image ? "photo" : "mark";
+  const kind = (design.stamp.icon === "image" && design.stamp.image) || is3d(design.stamp.icon) ? "photo" : "mark";
   // The business's own picture for an empty stamp, when it uploaded one.
   const ownEmpty = !filled && kind === "photo" && design.stamp.emptyImage;
   return (

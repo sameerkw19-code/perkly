@@ -35,7 +35,34 @@ export const STAMP_ICONS = [
   "croissant", "cake", "utensils", "scissors", "bag", "sparkle", "heart", "star",
 ] as const;
 export type PresetIcon = (typeof STAMP_ICONS)[number];
-export type StampIcon = PresetIcon | "logo" | "image";
+/** 3D stamp pictures (Fluent Emoji 3D, MIT), served from /stamps3d. A subscription feature. */
+export const STAMP_3D = [
+  "coffee", "tea", "beer", "cocktail", "tropical", "bubbletea", "cup", "wine",
+  "pizza", "burger", "sandwich", "taco", "fries", "sushi", "hotdog", "plate", "falafel",
+  "croissant", "cake", "shortcake", "donut", "icecream", "cookie", "cupcake", "bagel",
+  "scissors", "nails", "lipstick", "barber", "sparkles", "bouquet",
+  "bags", "gift", "star", "heart", "glowstar", "crown", "gem", "paws",
+] as const;
+export type Stamp3D = `3d-${(typeof STAMP_3D)[number]}`;
+export type StampIcon = PresetIcon | Stamp3D | "logo" | "image";
+
+export function is3d(icon: string): icon is Stamp3D {
+  return icon.startsWith("3d-") && (STAMP_3D as readonly string[]).includes(icon.slice(3));
+}
+
+/** The 3D picture for a stamp, or its faded version for a stamp not collected yet. */
+export function stamp3dUrl(icon: Stamp3D, empty = false): string {
+  return `/stamps3d/${icon.slice(3)}${empty ? "-empty" : ""}.png`;
+}
+
+/** The icon table in the editor: categories, each with flat icons and 3D pictures. */
+export const ICON_GROUPS: { id: "drinks" | "food" | "sweets" | "beauty" | "general"; flat: PresetIcon[]; d3: Stamp3D[] }[] = [
+  { id: "drinks", flat: ["coffee", "mojito", "beer", "shot", "cocktail"], d3: ["3d-coffee", "3d-tea", "3d-beer", "3d-cocktail", "3d-tropical", "3d-bubbletea", "3d-cup", "3d-wine"] },
+  { id: "food", flat: ["pizza", "burger", "sandwich", "utensils"], d3: ["3d-pizza", "3d-burger", "3d-sandwich", "3d-taco", "3d-fries", "3d-sushi", "3d-hotdog", "3d-plate", "3d-falafel"] },
+  { id: "sweets", flat: ["croissant", "cake", "icecream"], d3: ["3d-croissant", "3d-cake", "3d-shortcake", "3d-donut", "3d-icecream", "3d-cookie", "3d-cupcake", "3d-bagel"] },
+  { id: "beauty", flat: ["scissors", "sparkle"], d3: ["3d-scissors", "3d-nails", "3d-lipstick", "3d-barber", "3d-sparkles", "3d-bouquet"] },
+  { id: "general", flat: ["bag", "heart", "star"], d3: ["3d-bags", "3d-gift", "3d-star", "3d-heart", "3d-glowstar", "3d-crown", "3d-gem", "3d-paws"] },
+];
 export type Layout = "gradient" | "solid" | "photo";
 export type Texts = { title: string; subtitle: string; reward: string; gift: string; promo: string };
 
@@ -224,7 +251,7 @@ export function sanitizeDesign(input: unknown): Design | null {
   const colors = d.colors ?? {};
   if (![colors.bg, colors.fg, colors.stamp].every((c) => typeof c === "string" && HEX.test(c))) return null;
   const icon = d.stamp?.icon;
-  if (!(STAMP_ICONS as readonly string[]).includes(icon) && icon !== "logo" && icon !== "image") return null;
+  if (!(STAMP_ICONS as readonly string[]).includes(icon) && !(typeof icon === "string" && is3d(icon)) && icon !== "logo" && icon !== "image") return null;
   const asset = (v: unknown) => (typeof v === "string" && ASSET_ID.test(v) ? v : null);
   const texts = {} as Record<Lang, Texts>;
   for (const l of CARD_LANGS) {
@@ -374,9 +401,17 @@ export function designChecks(d: Design, assets: AssetMeta[]): Check[] {
 
 export function textsFor(d: Design, lang: Lang): Texts {
   const l = cardLang(d, lang);
-  const pick = (k: keyof Texts) => d.texts[l][k] || d.texts[d.langs[0]][k] || d.texts[d.langs[0]].title;
-  // The optional message has no fallback: a language left empty shows nothing rather than another language.
-  return { title: pick("title"), subtitle: pick("subtitle"), reward: pick("reward"), gift: pick("gift"), promo: d.texts[l].promo ?? "" };
+  const first = d.texts[d.langs[0]];
+  const pick = (k: keyof Texts) => d.texts[l][k] || first[k];
+  // Title and reward always show something; the subtitle and the optional message may stay empty
+  // (an empty subtitle must not repeat the title). The message never falls back to another language.
+  return {
+    title: pick("title"),
+    subtitle: pick("subtitle"),
+    reward: pick("reward") || first.title,
+    gift: pick("gift"),
+    promo: d.texts[l].promo ?? "",
+  };
 }
 
 export function assetUrl(id: string | null): string | null {

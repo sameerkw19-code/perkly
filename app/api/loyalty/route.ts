@@ -5,7 +5,7 @@ import { randomCode, randomToken, sha256 } from "../../../lib/server/crypto";
 import { fail, json, readJson, sameOrigin, str } from "../../../lib/server/http";
 import { allow } from "../../../lib/server/rate-limit";
 import { formatPhone, maskPhone, normalizePhone } from "../../../lib/phone";
-import { assetIds, defaultDesign, designChecks, sanitizeDesign } from "../../../lib/design";
+import { assetIds, defaultDesign, designChecks, is3d, sanitizeDesign } from "../../../lib/design";
 import { assetMeta, liveDesign, ownsAssets, publishedDesign } from "../../../lib/server/designs";
 import { releaseArchivedPhone } from "../../../lib/server/customers";
 import { businessAccess, freeLimitReached, hasPaidDesign } from "../../../lib/server/billing";
@@ -598,8 +598,8 @@ export async function POST(request: Request) {
       const design = sanitizeDesign(p.design);
       if (!design) return fail("bad_details", 400, "Invalid design");
       if (!(await ownsAssets(db, business.id, design))) return fail("not_found", 404, "Image not found");
-      // The bright stamp style, the stamp banner in the wallet and the pizza progress are subscription features.
-      if ((design.look.stampStyle === "bright" || design.walletBanner === "stamps" || design.look.progress === "pizza") && !hasPaidDesign(await businessAccess(db, business.id))) {
+      // The bright stamp style, the stamp banner in the wallet, the pizza progress and 3D stamps are subscription features.
+      if ((design.look.stampStyle === "bright" || design.walletBanner === "stamps" || design.look.progress === "pizza" || is3d(design.stamp.icon)) && !hasPaidDesign(await businessAccess(db, business.id))) {
         return fail("paid_feature", 402, "Available with a subscription");
       }
       // Without a subscription: no new logo, background image or stamp image (ones already on the card may stay).

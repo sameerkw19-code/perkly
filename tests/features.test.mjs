@@ -2,9 +2,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { validMonthDay, parseBirthday, birthdayFromParts, formatBirthday, upcomingKeys } from "../lib/birthday.ts";
-import { sanitizeDesign, defaultDesign, designChecks, FONTS, cardLang, textsFor, sanitizeLangs, walletStampPicture, assetIds } from "../lib/design.ts";
+import { sanitizeDesign, defaultDesign, designChecks, FONTS, cardLang, textsFor, sanitizeLangs, walletStampPicture, assetIds, is3d, ICON_GROUPS, STAMP_ICONS, STAMP_3D } from "../lib/design.ts";
 import { businessAccess, freeLimitReached, hasPaidDesign, TRIAL_DAYS } from "../lib/server/billing.ts";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { lookFields } from "../lib/wallet-look.ts";
 import { usesPizza, slicePath, slicesPath, PIZZA_MAX } from "../lib/pizza.ts";
 
@@ -319,4 +319,32 @@ test("pizza: slices are wedges from the center, one per stamp", () => {
   assert.match(first, /^M100,100 L100\.00,16\.00 A84,84 0 0 1 184\.00,100\.00 Z$/);
   assert.equal(slicesPath(100, 100, 84, 3, 8).split("Z").length - 1, 3);
   assert.equal(slicesPath(100, 100, 84, 12, 8).split("Z").length - 1, 8);
+});
+
+// ---- Icon table and 3D stamps ----
+
+test("icons: 3D stamps are accepted only from the list", () => {
+  assert.equal(sanitizeDesign({ ...base, stamp: { icon: "3d-coffee", image: null } }).stamp.icon, "3d-coffee");
+  assert.equal(sanitizeDesign({ ...base, stamp: { icon: "3d-rocket", image: null } }), null);
+  assert.equal(is3d("3d-pizza"), true);
+  assert.equal(is3d("pizza"), false);
+});
+
+test("icons: every regular and 3D icon is in exactly one category", () => {
+  const flat = ICON_GROUPS.flatMap((g) => g.flat);
+  const d3 = ICON_GROUPS.flatMap((g) => g.d3);
+  assert.deepEqual([...flat].sort(), [...STAMP_ICONS].sort());
+  assert.deepEqual([...d3].sort(), STAMP_3D.map((k) => "3d-" + k).sort());
+});
+
+test("icons: every 3D icon has its picture and a faded one", () => {
+  for (const k of STAMP_3D) {
+    for (const f of [`${k}.png`, `${k}-empty.png`]) assert.ok(existsSync(new URL(`../public/stamps3d/${f}`, import.meta.url)), f);
+  }
+});
+
+test("texts: an empty subtitle stays empty and does not repeat the title", () => {
+  const d = sanitizeDesign({ ...base, texts: { ...base.texts, he: { ...base.texts.he, subtitle: "" } } });
+  assert.equal(textsFor(d, "he").subtitle, "");
+  assert.equal(textsFor(d, "he").title, d.texts.he.title);
 });
