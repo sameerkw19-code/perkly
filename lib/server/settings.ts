@@ -11,6 +11,10 @@ export type Settings = {
   /** New businesses need a subscription after a free trial. Existing businesses are not affected. */
   requireSubscription: boolean;
   trialDays: number;
+  /** Hash of the free-access code (set from the control center). Empty = no code. Never sent to the browser. */
+  freeCodeHash: string;
+  /** Days of free access a code gives; 0 = without an end date. */
+  freeCodeDays: number;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -20,6 +24,8 @@ export const DEFAULT_SETTINGS: Settings = {
   announcement: "",
   requireSubscription: false,
   trialDays: 14,
+  freeCodeHash: "",
+  freeCodeDays: 0,
 };
 
 const KEYS = Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[];
@@ -67,9 +73,16 @@ export async function saveSettings(db: D1Database, patch: Record<string, unknown
          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated = excluded.updated, updated_by = excluded.updated_by`,
       ).bind(k, JSON.stringify(v), now, adminEmail),
       db.prepare("INSERT INTO admin_log(id, admin, business, action, detail, created) VALUES(?, ?, NULL, 'setting', ?, ?)")
-        .bind(crypto.randomUUID(), adminEmail, `${k} = ${JSON.stringify(v).slice(0, 120)}`, now),
+        .bind(crypto.randomUUID(), adminEmail, k === "freeCodeHash" ? `freeCode ${v ? "changed" : "removed"}` : `${k} = ${JSON.stringify(v).slice(0, 120)}`, now),
     );
   }
   if (statements.length) await db.batch(statements);
   return [];
+}
+
+/** Settings as the control center sees them: the free-access code's hash never leaves the server. */
+export type AdminSettings = Omit<Settings, "freeCodeHash"> & { freeCodeSet: boolean };
+export function settingsForAdmin(s: Settings): AdminSettings {
+  const { freeCodeHash, ...rest } = s;
+  return { ...rest, freeCodeSet: !!freeCodeHash };
 }

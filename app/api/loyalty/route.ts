@@ -13,6 +13,7 @@ import { formatBirthday, parseBirthday, upcomingKeys } from "../../../lib/birthd
 import { syncGoogleWallet } from "../../../lib/server/wallet-sync";
 import { walletConfig } from "../../../lib/server/google-wallet";
 import { getSettings } from "../../../lib/server/settings";
+import { cleanCode, freeCodeMatches, grantFreeAccess } from "../../../lib/server/free-code";
 import { normalizeSocial, parseSocial, type Social } from "../../../lib/social";
 
 export const dynamic = "force-dynamic";
@@ -127,8 +128,13 @@ export async function GET(request: Request) {
     db.prepare(
       `SELECT c.id, c.name, c.phone, c.stamps, c.target, c.created, c.source, c.consent_marketing, c.birthday, c.card_hash IS NOT NULL AS has_link,
          (SELECT COUNT(*) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2))
-           + (CASE WHEN ?3 = 'block' AND c.stamps >= c.target THEN 1 ELSE 0 END) AS rewards
-       FROM customers c WHERE c.business = ?1 AND c.archived IS NULL ORDER BY c.created DESC LIMIT 5000`,
+           + (CASE WHEN ?3 = 'block' AND c.stamps >= c.target THEN 1 ELSE 0 END) AS rewards,
+         lv.last_visit
+       FROM customers c
+       -- Last visit: the latest stamp or reward use at this business (one pass over the business's events).
+       LEFT JOIN (SELECT customer, MAX(created) AS last_visit FROM events WHERE business = ?1 AND kind IN ('stamp', 'redeem') GROUP BY customer) lv
+         ON lv.customer = c.id
+       WHERE c.business = ?1 AND c.archived IS NULL ORDER BY c.created DESC LIMIT 5000`,
     ).bind(business!.id, new Date().toISOString(), business!.reward_mode),
     db.prepare(
       `SELECT e.id, e.kind, e.delta, e.created, e.actor_role, e.stamps_after, e.note, c.name AS customer, u.name AS actor_name, br.name AS branch_name,
@@ -229,6 +235,12 @@ export async function POST(request: Request) {
     if (!name || !reward || !validTarget(p.target) || typeof p.color !== "string" || !COLOR.test(p.color)) {
       return fail("bad_details", 400, "Invalid business details");
     }
+    // Optional free-access code (set in the control center): checked before anything is created.
+    const freeCode = cleanCode(p.freeCode);
+    if (freeCode) {
+      if (!(await allow(db, `free-code:${user.id}`, 10, 3600))) return fail("rate_limited", 429);
+      if (!(await freeCodeMatches(db, freeCode))) return fail("bad_code", 400, "Wrong code");
+    }
     // New businesses collect rewards by default (customers keep earning while a reward waits).
     const mode = p.rewardMode === "block" ? "block" : "bank";
     const id = crypto.randomUUID();
@@ -246,7 +258,8 @@ export async function POST(request: Request) {
           ]
         : []),
     ]);
-    return json({ id });
+    const freeUntil = freeCode ? await grantFreeAccess(db, id, user.email) : null;
+    return json({ id, freeUntil });
   }
 
   // Every other action: the server checks the user's role in this business.
@@ -640,6 +653,16 @@ export async function POST(request: Request) {
         syncGoogleWallet(db, cust, card.rewards, origin);
       }
       return json({ ok: true, version: live?.version });
+    }
+
+    // A free-access code for an existing business (owner only).
+    case "redeem_code": {
+      const denied = ownerOnly(); if (denied) return denied;
+      const code = cleanCode(p.code);
+      if (!code) return fail("bad_code", 400, "Wrong code");
+      if (!(await allow(db, `free-code:${user.id}`, 10, 3600))) return fail("rate_limited", 429);
+      if (!(await freeCodeMatches(db, code))) return fail("bad_code", 400, "Wrong code");
+      return json({ ok: true, freeUntil: await grantFreeAccess(db, business.id, user.email) });
     }
 
     case "new_join_code": {

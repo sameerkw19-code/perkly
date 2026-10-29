@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 
-export type BillingBusiness = { id: string; name: string; status: string; periodEnd: string | null };
+export type BillingBusiness = { id: string; name: string; status: string; periodEnd: string | null; compUntil?: string | null };
+
+const FOREVER_YEAR = "9999";
 
 const STATUS_LABEL: Record<string, string> = {
   none: "לא הופעל",
@@ -38,6 +40,25 @@ export default function BillingView({ businesses, configured }: { businesses: Bi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /** A free-access code from Perkly: the business then needs no subscription. */
+  async function redeem(businessId: string, code: string) {
+    setError("");
+    setBusy(businessId);
+    try {
+      const response = await fetch("/api/loyalty", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "redeem_code", business: businessId, code }),
+      });
+      if (response.ok) { window.location.reload(); return; }
+      const data = (await response.json().catch(() => null)) as { code?: string } | null;
+      setError(data?.code === "bad_code" ? "הקוד לא נכון." : data?.code === "rate_limited" ? "יותר מדי ניסיונות. נסה שוב בעוד שעה." : "לא הצלחנו להפעיל את הקוד. נסה שוב.");
+    } catch {
+      setError("לא הצלחנו להפעיל את הקוד. נסה שוב.");
+    }
+    setBusy(null);
+  }
+
   async function subscribe(businessId: string) {
     setError("");
     setBusy(businessId);
@@ -69,12 +90,26 @@ export default function BillingView({ businesses, configured }: { businesses: Bi
       {businesses.length === 0 && <p>אין לך עסקים שאתה בעלים שלהם.</p>}
       {businesses.map((b) => {
         const canSubscribe = configured && !["active", "trialing"].includes(b.status);
+        // Free access without an end date (from an access code): nothing to pay or enter.
+        const forever = !!b.compUntil?.startsWith(FOREVER_YEAR);
         return (
           <section key={b.id} style={{ borderTop: "1px solid #e5e5e5", padding: "16px 0" }}>
             <strong>{b.name}</strong>
             <div style={{ margin: "6px 0" }}>סטטוס: {STATUS_LABEL[b.status] ?? b.status}</div>
             {b.periodEnd && <div style={{ fontSize: 14, marginBottom: 6 }}>החיוב הבא: {new Date(b.periodEnd).toLocaleDateString("he-IL")}</div>}
-            {canSubscribe && (
+            {b.compUntil && (
+              <div style={{ fontSize: 14, marginBottom: 6 }}>
+                גישה ללא מנוי: {b.compUntil.startsWith(FOREVER_YEAR) ? "ללא הגבלת זמן" : `עד ${new Date(b.compUntil).toLocaleDateString("he-IL")}`}
+              </div>
+            )}
+            {!forever && !["active", "trialing"].includes(b.status) && (
+              <form style={{ display: "flex", gap: 8, margin: "8px 0" }}
+                onSubmit={(e) => { e.preventDefault(); const code = String(new FormData(e.currentTarget).get("code") ?? "").trim(); if (code) redeem(b.id, code); }}>
+                <input name="code" placeholder="יש לך קוד גישה?" aria-label="קוד גישה" maxLength={64} autoComplete="off" dir="ltr" style={{ flex: 1, padding: 8 }} />
+                <button className="btn soft" disabled={busy === b.id}>הפעלה</button>
+              </form>
+            )}
+            {canSubscribe && !forever && (
               <button className="btn soft" disabled={busy === b.id} onClick={() => subscribe(b.id)}>
                 {busy === b.id ? "פותח דף תשלום..." : "הפעל מנוי"}
               </button>

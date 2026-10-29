@@ -1,19 +1,25 @@
 "use client";
 import { useState } from "react";
 import { post } from "../../../lib/api";
-import type { Settings } from "../../../lib/server/settings";
+import type { AdminSettings as Settings } from "../../../lib/server/settings";
 
 export function SettingsForm({ initial }: { initial: Settings }) {
   const [s, setS] = useState<Settings>(initial);
   const [saved, setSaved] = useState<Settings>(initial);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
-  const dirty = JSON.stringify(s) !== JSON.stringify(saved);
+  // A new free-access code typed by the admin. Sent once and saved only as a hash.
+  const [newCode, setNewCode] = useState("");
+  const dirty = JSON.stringify(s) !== JSON.stringify(saved) || newCode.trim() !== "";
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => setS((x) => ({ ...x, [k]: v }));
 
   async function save() {
     const changed: Partial<Settings> = {};
-    for (const k of Object.keys(s) as (keyof Settings)[]) if (s[k] !== saved[k]) (changed as Record<string, unknown>)[k] = s[k];
+    for (const k of Object.keys(s) as (keyof Settings)[]) if (k !== "freeCodeSet" && s[k] !== saved[k]) (changed as Record<string, unknown>)[k] = s[k];
+    if (newCode.trim()) {
+      if (newCode.trim().length < 6) { setMsg("הקוד צריך לפחות 6 תווים."); return; }
+      (changed as Record<string, unknown>).freeCode = newCode.trim();
+    }
     if (changed.maintenance === true && !confirm("להפעיל מצב תחזוקה? כל העסקים לא יוכלו להוסיף חותמות עד שתכבה אותו.")) return;
     if (changed.signupsOpen === false && !confirm("לסגור פתיחת עסקים חדשים?")) return;
     setBusy(true);
@@ -23,7 +29,19 @@ export function SettingsForm({ initial }: { initial: Settings }) {
     if (!r.ok) { setMsg("השמירה נכשלה. בדוק את הערכים ונסה שוב."); return; }
     setS(r.data.settings);
     setSaved(r.data.settings);
+    setNewCode("");
     setMsg("נשמר.");
+  }
+
+  async function removeCode() {
+    if (!confirm("למחוק את קוד הגישה? עסקים שכבר הפעילו אותו לא מושפעים.")) return;
+    setBusy(true);
+    const r = await post<{ settings: Settings }>("/api/admin/settings", { settings: { freeCode: "" } });
+    setBusy(false);
+    if (!r.ok) { setMsg("המחיקה נכשלה."); return; }
+    setS(r.data.settings);
+    setSaved(r.data.settings);
+    setMsg("הקוד נמחק.");
   }
 
   return (
@@ -47,6 +65,22 @@ export function SettingsForm({ initial }: { initial: Settings }) {
             onChange={(e) => set("trialDays", Math.max(0, Math.min(365, Math.round(Number(e.target.value) || 0))))} />
           <small className="form-hint">גישה מלאה בחינם בלי אשראי, לפני מגבלת 10 הלקוחות. מומלץ 0, כי הניסיון מגיע מ־Polar.</small>
         </label>
+      </div>
+
+      <div>
+        <h3>קוד גישה ללא מנוי</h3>
+        <p className="form-hint">
+          {s.freeCodeSet ? "יש קוד פעיל. " : "אין קוד פעיל. "}
+          עסק שמזין את הקוד (בפתיחת העסק או בדף המנוי) מקבל גישה מלאה בלי מנוי. הקוד נשמר מוצפן ולא מוצג שוב.
+        </p>
+        <label>{s.freeCodeSet ? "קוד חדש (מחליף את הקיים)" : "קוד"}
+          <input type="password" autoComplete="new-password" dir="ltr" maxLength={64} value={newCode} onChange={(e) => setNewCode(e.target.value)} />
+        </label>
+        <label>ימי גישה לכל קוד (0 = ללא הגבלה)
+          <input type="number" min={0} max={365} value={s.freeCodeDays}
+            onChange={(e) => set("freeCodeDays", Math.max(0, Math.min(365, Math.round(Number(e.target.value) || 0))))} />
+        </label>
+        {s.freeCodeSet && <button type="button" className="btn soft small" disabled={busy} onClick={removeCode}>מחיקת הקוד</button>}
       </div>
 
       <div>

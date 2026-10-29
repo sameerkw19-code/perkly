@@ -31,13 +31,16 @@ export const CARD_LOCALE: Record<Lang, string> = {
 
 
 export const STAMP_ICONS = [
-  "coffee", "pizza", "burger", "icecream", "mojito", "beer", "shot", "cocktail", "sandwich",
+  "coffee", "bean", "pizza", "burger", "icecream", "mojito", "beer", "shot", "cocktail", "sandwich",
   "croissant", "cake", "utensils", "scissors", "bag", "sparkle", "heart", "star",
 ] as const;
 export type PresetIcon = (typeof STAMP_ICONS)[number];
-/** 3D stamp pictures (Fluent Emoji 3D, MIT), served from /stamps3d. A subscription feature. */
+/**
+ * 3D stamp pictures, served from /stamps3d. A subscription feature.
+ * From Fluent Emoji 3D (MIT, see public/stamps3d/LICENSE-fluentui-emoji.txt), except "coffeebean", drawn for Perkly.
+ */
 export const STAMP_3D = [
-  "coffee", "tea", "beer", "cocktail", "tropical", "bubbletea", "cup", "wine",
+  "coffee", "coffeebean", "tea", "beer", "cocktail", "tropical", "bubbletea", "cup", "wine",
   "pizza", "burger", "sandwich", "taco", "fries", "sushi", "hotdog", "plate", "falafel",
   "croissant", "cake", "shortcake", "donut", "icecream", "cookie", "cupcake", "bagel",
   "scissors", "nails", "lipstick", "barber", "sparkles", "bouquet",
@@ -57,7 +60,7 @@ export function stamp3dUrl(icon: Stamp3D, empty = false): string {
 
 /** The icon table in the editor: categories, each with flat icons and 3D pictures. */
 export const ICON_GROUPS: { id: "drinks" | "food" | "sweets" | "beauty" | "general"; flat: PresetIcon[]; d3: Stamp3D[] }[] = [
-  { id: "drinks", flat: ["coffee", "mojito", "beer", "shot", "cocktail"], d3: ["3d-coffee", "3d-tea", "3d-beer", "3d-cocktail", "3d-tropical", "3d-bubbletea", "3d-cup", "3d-wine"] },
+  { id: "drinks", flat: ["coffee", "bean", "mojito", "beer", "shot", "cocktail"], d3: ["3d-coffee", "3d-coffeebean", "3d-tea", "3d-beer", "3d-cocktail", "3d-tropical", "3d-bubbletea", "3d-cup", "3d-wine"] },
   { id: "food", flat: ["pizza", "burger", "sandwich", "utensils"], d3: ["3d-pizza", "3d-burger", "3d-sandwich", "3d-taco", "3d-fries", "3d-sushi", "3d-hotdog", "3d-plate", "3d-falafel"] },
   { id: "sweets", flat: ["croissant", "cake", "icecream"], d3: ["3d-croissant", "3d-cake", "3d-shortcake", "3d-donut", "3d-icecream", "3d-cookie", "3d-cupcake", "3d-bagel"] },
   { id: "beauty", flat: ["scissors", "sparkle"], d3: ["3d-scissors", "3d-nails", "3d-lipstick", "3d-barber", "3d-sparkles", "3d-bouquet"] },

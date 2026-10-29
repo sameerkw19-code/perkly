@@ -374,3 +374,6 @@ fieldset.birthday{border:0;padding:0;margin:0 0 14px}fieldset.birthday legend{fo
 .icon-choice .pizza-progress{width:30px;height:30px;color:var(--ink)}
 .stamp-img.three-d{width:78%;height:78%;object-fit:contain}
 .stamp.empty .stamp-img.three-d,.pcard-stamp.is-empty .stamp-img.three-d{filter:grayscale(1);opacity:.42}
+/* Customer list: last visit; over 30 days is marked. */
+.last-visit{white-space:nowrap}
+.last-visit.away{color:#b45309;font-weight:600}
