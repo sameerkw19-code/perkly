@@ -21,7 +21,7 @@ export function syncGoogleWallet(
     (async () => {
       const business = await db.prepare("SELECT id, name, reward, color FROM businesses WHERE id = ?").bind(c.business)
         .first<{ id: string; name: string; reward: string; color: string }>();
-      const look = business ? await passLook(db, business, origin).catch(() => undefined) : undefined;
+      const look = business ? await passLook(db, business, origin, { stamps: c.stamps, target: c.target }).catch(() => undefined) : undefined;
       const result = await updateLoyaltyObject(config, {
         customerId: c.id, businessId: c.business, stamps: c.stamps, target: c.target, scanCode: c.scan_code, rewards, look,
       });

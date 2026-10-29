@@ -1,4 +1,4 @@
-import { assetIds, cardLang, defaultDesign, sanitizeDesign, textsFor, type AssetMeta, type Design, type Lang } from "../design";
+import { assetIds, cardLang, defaultDesign, sanitizeDesign, textsFor, walletStampPicture, type AssetMeta, type Design, type Lang } from "../design";
 
 /** Google Wallet language tags for each card language. */
 export const GOOGLE_TAG: Record<Lang, string> = { he: "he", ar: "ar", en: "en-US", ru: "ru", de: "de", fr: "fr" };
@@ -39,14 +39,18 @@ export async function ownsAssets(db: D1Database, businessId: string, design: Des
  * The business's look on its Google Wallet pass: name, reward and banner image.
  * Google Wallet doesn't take WebP, so only a JPEG or PNG background image becomes the banner.
  */
-export async function passLook(db: D1Database, business: BusinessLike, origin: string) {
+/** `card`: the customer's stamps and target, for the stamp banner (one picture per stamp count). */
+export async function passLook(db: D1Database, business: BusinessLike, origin: string, card?: { stamps: number; target: number }) {
   const design = await liveDesign(db, business);
   const first = cardLang(design);
   const text = textsFor(design, first);
   let heroUrl: string | null = null;
   // The wallet banner if the business made one, otherwise its background image.
   const banner = design.walletHero ?? design.hero;
-  if (banner) {
+  // Stamp banner: the picture made for this many stamps (the editor makes them as JPEG when publishing).
+  const stampPicture = card ? walletStampPicture(design, card.stamps, card.target) : null;
+  if (stampPicture) heroUrl = `${origin}/api/asset/${stampPicture}`;
+  else if (banner) {
     const row = await db.prepare("SELECT mime FROM assets WHERE id = ? AND business = ?").bind(banner, business.id).first<{ mime: string }>();
     if (row && (row.mime === "image/jpeg" || row.mime === "image/png")) heroUrl = `${origin}/api/asset/${banner}`;
   }

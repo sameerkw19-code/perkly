@@ -2,10 +2,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { validMonthDay, parseBirthday, birthdayFromParts, formatBirthday, upcomingKeys } from "../lib/birthday.ts";
-import { sanitizeDesign, defaultDesign, designChecks, FONTS, cardLang, textsFor, sanitizeLangs } from "../lib/design.ts";
+import { sanitizeDesign, defaultDesign, designChecks, FONTS, cardLang, textsFor, sanitizeLangs, walletStampPicture, assetIds } from "../lib/design.ts";
 import { businessAccess, freeLimitReached, hasPaidDesign, TRIAL_DAYS } from "../lib/server/billing.ts";
 import { readFileSync } from "node:fs";
 import { lookFields } from "../lib/wallet-look.ts";
+import { usesPizza, slicePath, slicesPath, PIZZA_MAX } from "../lib/pizza.ts";
 
 // ---- Birthdays ----
 
@@ -77,7 +78,7 @@ test("design: unknown or unsafe look values fall back, never pass through", () =
 
 test("design: valid look values are kept", () => {
   const d = sanitizeDesign({ ...base, look: { bg2: "#00aa11", dir: "radial", overlay: 33, font: "rubik", text: "l", stamps: "s" } });
-  assert.deepEqual(d.look, { bg2: "#00AA11", dir: "radial", overlay: 35, font: "rubik", text: "l", stamps: "s", stampStyle: "classic", logoSize: 100, logoFrame: "none", logoName: false });
+  assert.deepEqual(d.look, { bg2: "#00AA11", dir: "radial", overlay: 35, font: "rubik", text: "l", stamps: "s", stampStyle: "classic", progress: "stamps", logoSize: 100, logoFrame: "none", logoName: false });
   assert.ok(FONTS[d.look.font]);
 });
 
@@ -281,3 +282,41 @@ test("trial: 14 days at checkout and in all site texts", () => {
   for (const phrase of ["14 ימי ניסיון", "14-day free trial", "14 يوماً"]) assert.match(copy, new RegExp(phrase));
 });
 
+// ---- Wallet stamp banner: one picture per stamp count ----
+
+const ids = (n) => Array.from({ length: n }, (_, i) => `00000000-0000-0000-0000-${String(i).padStart(12, "0")}`);
+
+test("wallet banner: stamp pictures are kept only as a full valid set", () => {
+  const d = sanitizeDesign({ ...base, walletBanner: "stamps", walletStamps: ids(11) });
+  assert.equal(d.walletBanner, "stamps");
+  assert.equal(d.walletStamps.length, 11);
+  assert.deepEqual(sanitizeDesign({ ...base, walletStamps: [...ids(3), "bad"] }).walletStamps, []);
+  assert.deepEqual(sanitizeDesign({ ...base, walletStamps: ids(32) }).walletStamps, []);
+  assert.equal(sanitizeDesign({ ...base, walletBanner: "video" }).walletBanner, "image");
+  assert.ok(assetIds(d).includes(ids(11)[10]));
+});
+
+test("wallet banner: the picture matches the stamp count, and only when the set fits the target", () => {
+  const d = sanitizeDesign({ ...base, walletBanner: "stamps", walletStamps: ids(11) });
+  assert.equal(walletStampPicture(d, 3, 10), ids(11)[3]);
+  assert.equal(walletStampPicture(d, 14, 10), ids(11)[10]);
+  assert.equal(walletStampPicture(d, 3, 12), null);
+  assert.equal(walletStampPicture({ ...d, walletBanner: "image" }, 3, 10), null);
+});
+
+// ---- Pizza progress ----
+
+test("pizza: only when chosen and the card has 2 to 12 stamps", () => {
+  const d = sanitizeDesign({ ...base, look: { ...base.look, progress: "pizza" } });
+  assert.equal(d.look.progress, "pizza");
+  assert.equal(usesPizza(d, 8), true);
+  assert.equal(usesPizza(d, PIZZA_MAX + 1), false);
+  assert.equal(usesPizza(sanitizeDesign({ ...base, look: { ...base.look, progress: "cake" } }), 8), false);
+});
+
+test("pizza: slices are wedges from the center, one per stamp", () => {
+  const first = slicePath(100, 100, 84, 0, 4);
+  assert.match(first, /^M100,100 L100\.00,16\.00 A84,84 0 0 1 184\.00,100\.00 Z$/);
+  assert.equal(slicesPath(100, 100, 84, 3, 8).split("Z").length - 1, 3);
+  assert.equal(slicesPath(100, 100, 84, 12, 8).split("Z").length - 1, 8);
+});

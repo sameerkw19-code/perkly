@@ -68,6 +68,8 @@ export type CardLook = {
   stamps: Size;
   /** "classic": the usual look. "bright": filled stamps bright, empty ones dark (a subscription feature). */
   stampStyle: "classic" | "bright";
+  /** How progress is shown: a row of stamps, or a pizza that gains a slice per stamp (subscription, up to 12 stamps). */
+  progress: "stamps" | "pizza";
   /** Logo height on the web card, 60–200 (% of the normal size). */
   logoSize: number;
   /** "none": the logo as it is; "circle" / "square": on a white badge (good for logos with a white background). */
@@ -109,11 +111,21 @@ export type Design = {
   v: 1;
   layout: Layout;
   colors: { bg: string; fg: string; stamp: string };
-  stamp: { icon: StampIcon; image: string | null };
+  /** emptyImage: optional second picture for a stamp not earned yet (for example an outline). */
+  stamp: { icon: StampIcon; image: string | null; emptyImage?: string | null };
   logo: string | null;
   hero: string | null;
   /** Wallet banner (Google Wallet hero image, Apple strip later). Falls back to the background image. */
   walletHero: string | null;
+  /**
+   * "image": the wallet banner is walletHero (or the background image).
+   * "stamps": a banner drawn with the stamps, one picture per stamp count (subscription feature).
+   */
+  walletBanner: "image" | "stamps";
+  /** Optional top-down photo of the business's own pizza for the pizza progress (otherwise a drawn pizza). */
+  progressImage: string | null;
+  /** For "stamps": picture ids for 0, 1, … target stamps, made by the editor when publishing. */
+  walletStamps: string[];
   /** Languages the card is shown in, in card order. Set by the business; a language not listed never appears. */
   langs: Lang[];
   texts: Record<Lang, Texts>;
@@ -158,14 +170,11 @@ export function darken(hex: string, amount = 0.35): string {
 }
 
 export function defaultLook(bg: string): CardLook {
-  return { bg2: darken(HEX.test(bg) ? bg : "#1E1B2E"), dir: "diag", overlay: 55, font: "system", text: "m", stamps: "m", stampStyle: "classic", logoSize: 100, logoFrame: "none", logoName: false };
+  return { bg2: darken(HEX.test(bg) ? bg : "#1E1B2E"), dir: "diag", overlay: 55, font: "system", text: "m", stamps: "m", stampStyle: "classic", progress: "stamps", logoSize: 100, logoFrame: "none", logoName: false };
 }
 const ASSET_ID = /^[0-9a-f-]{36}$/;
 
 const GIFT: Record<Lang, string> = { he: "מתנה", ar: "مجاناً", en: "FREE", ru: "Подарок", de: "GRATIS", fr: "OFFERT" };
-const SUB: Record<Lang, string> = {
-  he: "כרטיס נאמנות", ar: "بطاقة ولاء", en: "Loyalty card", ru: "Карта лояльности", de: "Treuekarte", fr: "Carte de fidélité",
-};
 
 /**
  * Card languages in card order, without duplicates, and only the ones offered for now (OFFERED_CARD_LANGS).
@@ -185,7 +194,7 @@ export function cardLang(d: Design, wanted?: string | null): Lang {
 }
 
 export function defaultDesign(b: { name: string; reward: string; color: string }): Design {
-  const t = (l: Lang): Texts => ({ title: b.name.slice(0, LIMITS.title), subtitle: SUB[l], reward: b.reward.slice(0, LIMITS.reward), gift: GIFT[l], promo: "" });
+  const t = (l: Lang): Texts => ({ title: b.name.slice(0, LIMITS.title), subtitle: "", reward: b.reward.slice(0, LIMITS.reward), gift: GIFT[l], promo: "" });
   return {
     v: 1,
     layout: "gradient",
@@ -194,6 +203,9 @@ export function defaultDesign(b: { name: string; reward: string; color: string }
     logo: null,
     hero: null,
     walletHero: null,
+    walletBanner: "image",
+    walletStamps: [],
+    progressImage: null,
     langs: ["he"],
     texts: Object.fromEntries(CARD_LANGS.map((l) => [l, t(l)])) as Record<Lang, Texts>,
     showCustomerName: true,
@@ -229,10 +241,13 @@ export function sanitizeDesign(input: unknown): Design | null {
     v: 1,
     layout: ["gradient", "solid", "photo"].includes(d.layout) ? d.layout : "gradient",
     colors: { bg: colors.bg.toUpperCase(), fg: colors.fg.toUpperCase(), stamp: colors.stamp.toUpperCase() },
-    stamp: { icon, image: asset(d.stamp?.image) },
+    stamp: { icon, image: asset(d.stamp?.image), emptyImage: asset(d.stamp?.emptyImage) },
     logo: asset(d.logo),
     hero: asset(d.hero),
     walletHero: asset(d.walletHero),
+    walletBanner: d.walletBanner === "stamps" ? "stamps" : "image",
+    walletStamps: walletStampIds(d.walletStamps),
+    progressImage: asset(d.progressImage),
     langs: sanitizeLangs(d.langs),
     texts,
     showCustomerName: d.showCustomerName !== false,
@@ -256,6 +271,7 @@ function sanitizeLook(input: unknown, bg: string): CardLook {
     text: size(l.text, base.text),
     stamps: size(l.stamps, base.stamps),
     stampStyle: l.stampStyle === "bright" ? "bright" : "classic",
+    progress: l.progress === "pizza" ? "pizza" : "stamps",
     logoSize: Number.isFinite(logoSize) ? Math.max(60, Math.min(200, Math.round(logoSize / 10) * 10)) : base.logoSize,
     logoFrame: (LOGO_FRAMES as readonly string[]).includes(l.logoFrame) ? l.logoFrame : base.logoFrame,
     logoName: l.logoName === true,
@@ -263,7 +279,23 @@ function sanitizeLook(input: unknown, bg: string): CardLook {
 }
 
 export function assetIds(d: Design): string[] {
-  return [d.logo, d.hero, d.walletHero, d.stamp.image].filter((x): x is string => !!x);
+  return [d.logo, d.hero, d.walletHero, d.stamp.image, d.stamp.emptyImage, d.progressImage, ...d.walletStamps].filter((x): x is string => !!x);
+}
+
+/** Most stamps a card can have (see validTarget), so at most 31 banner pictures (0 to 30 stamps). */
+export const MAX_WALLET_STAMPS = 31;
+
+/** The stamp banner pictures, all or nothing: one bad id drops the whole set (the index is the stamp count). */
+function walletStampIds(input: unknown): string[] {
+  if (!Array.isArray(input) || input.length > MAX_WALLET_STAMPS) return [];
+  const ok = input.every((v) => typeof v === "string" && ASSET_ID.test(v));
+  return ok ? (input as string[]) : [];
+}
+
+/** The banner picture for a pass with this many stamps, or null when the set does not match the target. */
+export function walletStampPicture(d: Design, stamps: number, target: number): string | null {
+  if (d.walletBanner !== "stamps" || d.walletStamps.length !== target + 1) return null;
+  return d.walletStamps[Math.max(0, Math.min(target, stamps))] ?? null;
 }
 
 // ---- Readability checks (WCAG contrast) ----
