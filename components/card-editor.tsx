@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import { ImagePlus, Lock, MessageCircle, Shuffle, Trash2, UploadCloud } from "lucide-react";
 import {
-  FONTS, FONT_SCRIPTS, GRADIENTS, GRADIENT_DIRS, IMAGE_MIN, LIMITS, OFFERED_CARD_LANGS, PALETTES, STAMP_ICONS, cardLang, darken, designChecks,
+  FONTS, FONT_SCRIPTS, GRADIENTS, GRADIENT_DIRS, ICON_GROUPS, IMAGE_MIN, LIMITS, OFFERED_CARD_LANGS, PALETTES, cardLang, darken, designChecks, is3d, stamp3dUrl,
   type AssetMeta, type CardLook, type Design, type FontId, type Layout, type LogoFrame, type Size, type StampIcon, type Texts,
 } from "../lib/design";
 import { CARD_LANGS, isRtl, type Lang } from "../lib/i18n-types";
@@ -12,6 +12,7 @@ import { ApplePreview, GooglePreview, ICONS, LoyaltyCard, Num } from "./loyalty-
 import { PERKLY_SOCIAL } from "../lib/perkly-social";
 import { makeStampBanners } from "./stamp-banner";
 import { PIZZA_MAX } from "../lib/pizza";
+import { PizzaProgress } from "./pizza-progress";
 import { StampBannerPreview } from "./stamp-banner-preview";
 
 type Image = AssetMeta & { kind: string };
@@ -113,6 +114,14 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
   const [tab, setTab] = useState<"web" | "apple" | "google">("web");
   const [demo, setDemo] = useState(Math.min(3, target));
   const [busy, setBusy] = useState("");
+  // Icon table: the category and style that hold the current stamp.
+  const [iconGroup, setIconGroup] = useState<(typeof ICON_GROUPS)[number]["id"] | "special">(() => {
+    const icon = editor.draft.stamp.icon;
+    if (editor.draft.look.progress === "pizza" || icon === "logo" || icon === "image") return "special";
+    return ICON_GROUPS.find((g) => (g.flat as string[]).includes(icon) || (g.d3 as string[]).includes(icon))?.id ?? "drinks";
+  });
+  const [iconStyle, setIconStyle] = useState<"flat" | "d3">(() => (is3d(editor.draft.stamp.icon) ? "d3" : "flat"));
+  const group = ICON_GROUPS.find((g) => g.id === iconGroup);
   // Logos and stamp images often come on a white background; on by default.
   const [clearWhite, setClearWhite] = useState(true);
   const dirty = JSON.stringify(design) !== saved;
@@ -134,6 +143,8 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
     if (!design.langs.includes(l)) setTextLang(l);
   }
   const setLook = (patch: Partial<CardLook>) => setDesign((d) => ({ ...d, look: { ...d.look, ...patch } }));
+  /** Picking a stamp icon also switches back from the pizza tray to stamps. */
+  const pickIcon = (icon: StampIcon) => setDesign((d) => ({ ...d, stamp: { icon, image: null }, look: { ...d.look, progress: "stamps" } }));
 
   /** Random gradient, direction and font. Logo, images, texts and stamps stay as they are. */
   function surprise() {
@@ -171,7 +182,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
       if (kind === "logo") set({ logo: data.id });
       if (kind === "hero") set({ hero: data.id });
       if (kind === "wallet") set({ walletHero: data.id });
-      if (kind === "stamp") set({ stamp: { icon: "image", image: data.id } });
+      if (kind === "stamp") setDesign((d) => ({ ...d, stamp: { icon: "image", image: data.id }, look: { ...d.look, progress: "stamps" } }));
       if (kind === "stampEmpty") setDesign((d) => ({ ...d, stamp: { ...d.stamp, emptyImage: data.id } }));
       if (kind === "pizza") set({ progressImage: data.id });
     } catch {
@@ -308,32 +319,58 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
 
         <section className="panel">
           <h2>{t("edStampIcon")}</h2>
+          {/* Icon table: categories, then a sub-table of regular icons or 3D pictures. */}
+          <div className="seg icon-groups" role="group" aria-label={t("edStampIcon")}>
+            {([...ICON_GROUPS.map((g) => g.id), "special"] as const).map((id) => (
+              <button key={id} type="button" aria-pressed={iconGroup === id} onClick={() => setIconGroup(id)}>{t("ig_" + id)}</button>
+            ))}
+          </div>
+          {group && (
+            <div className="seg icon-styles" role="group">
+              <button type="button" aria-pressed={iconStyle === "flat"} onClick={() => setIconStyle("flat")}>{t("is_flat")}</button>
+              <button type="button" aria-pressed={iconStyle === "d3"} onClick={() => setIconStyle("d3")}>{t("is_3d")}{!paid && <PaidTag t={t} />}</button>
+            </div>
+          )}
           <div className="icon-grid">
-            {STAMP_ICONS.map((k) => {
+            {group && iconStyle === "flat" && group.flat.map((k) => {
               const Icon = ICONS[k];
               return (
-                <button key={k} type="button" className="icon-choice" aria-pressed={design.stamp.icon === k} title={t("ic_" + k)} onClick={() => set({ stamp: { icon: k, image: null } })}>
+                <button key={k} type="button" className="icon-choice" aria-pressed={design.stamp.icon === k && design.look.progress !== "pizza"} title={t("ic_" + k)} onClick={() => pickIcon(k)}>
                   <Icon size={22} /><span>{t("ic_" + k)}</span>
                 </button>
               );
             })}
-            <button type="button" className="icon-choice" aria-pressed={design.stamp.icon === "logo"} disabled={!design.logo} title={t("ic_logo")} onClick={() => set({ stamp: { icon: "logo", image: null } })}>
-              {design.logo ? <img src={`/api/asset/${design.logo}`} alt="" /> : <ImagePlus size={22} />}<span>{t("ic_logo")}</span>
-            </button>
-            {paid ? (
-              <label className="icon-choice" aria-pressed={design.stamp.icon === "image"}>
-                <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => { upload("stamp", e.target.files?.[0]); e.target.value = ""; }} />
-                {design.stamp.icon === "image" && design.stamp.image ? <img src={`/api/asset/${design.stamp.image}`} alt="" /> : <UploadCloud size={22} />}
-                <span>{busy === "stamp" ? t("uploading") : t("ic_image")}</span>
-              </label>
-            ) : (
-              <button type="button" className="icon-choice locked" aria-pressed={design.stamp.icon === "image"} disabled={design.stamp.icon !== "image"}
-                onClick={() => design.stamp.image && set({ stamp: { icon: "image", image: design.stamp.image } })}>
-                {design.stamp.icon === "image" && design.stamp.image ? <img src={`/api/asset/${design.stamp.image}`} alt="" /> : <UploadCloud size={22} />}
-                <span>{t("ic_image")}</span><PaidTag t={t} />
+            {group && iconStyle === "d3" && group.d3.map((k) => (
+              <button key={k} type="button" className="icon-choice three-d" aria-pressed={design.stamp.icon === k && design.look.progress !== "pizza"} disabled={!paid} title={t("i3_" + k.slice(3))} onClick={() => pickIcon(k)}>
+                <img src={stamp3dUrl(k)} alt="" /><span>{t("i3_" + k.slice(3))}</span>
               </button>
+            ))}
+            {iconGroup === "special" && (
+              <>
+              <button type="button" className="icon-choice" aria-pressed={design.stamp.icon === "logo" && design.look.progress !== "pizza"} disabled={!design.logo} title={t("ic_logo")} onClick={() => pickIcon("logo")}>
+                {design.logo ? <img src={`/api/asset/${design.logo}`} alt="" /> : <ImagePlus size={22} />}<span>{t("ic_logo")}</span>
+              </button>
+              {paid ? (
+                <label className="icon-choice" aria-pressed={design.stamp.icon === "image" && design.look.progress !== "pizza"}>
+                  <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => { upload("stamp", e.target.files?.[0]); e.target.value = ""; }} />
+                  {design.stamp.icon === "image" && design.stamp.image ? <img src={`/api/asset/${design.stamp.image}`} alt="" /> : <UploadCloud size={22} />}
+                  <span>{busy === "stamp" ? t("uploading") : t("ic_image")}</span>
+                </label>
+              ) : (
+                <button type="button" className="icon-choice locked" aria-pressed={design.stamp.icon === "image" && design.look.progress !== "pizza"} disabled={design.stamp.icon !== "image"}
+                  onClick={() => design.stamp.image && setDesign((d) => ({ ...d, stamp: { icon: "image", image: d.stamp.image }, look: { ...d.look, progress: "stamps" } }))}>
+                  {design.stamp.icon === "image" && design.stamp.image ? <img src={`/api/asset/${design.stamp.image}`} alt="" /> : <UploadCloud size={22} />}
+                  <span>{t("ic_image")}</span><PaidTag t={t} />
+                </button>
+              )}
+                <button type="button" className="icon-choice" aria-pressed={design.look.progress === "pizza"} disabled={!paid || target > PIZZA_MAX} title={t("progress_pizza")} onClick={() => setLook({ progress: "pizza" })}>
+                  <PizzaProgress design={design} stamps={3} target={8} /><span>{t("progress_pizza")}</span>{!paid && <PaidTag t={t} />}
+                </button>
+              </>
             )}
           </div>
+          {iconGroup === "special" && <p className="form-hint">{target > PIZZA_MAX ? t("pizzaTooMany", { n: PIZZA_MAX }) : t("pizzaHint")}</p>}
+          {iconGroup !== "special" && iconStyle === "d3" && <p className="form-hint">{t("is_3dHint")}</p>}
           <p className="form-hint">{paid ? t("productHint") : t("paidStampHint")}</p>
           {paid && design.stamp.icon === "image" && design.stamp.image && (
             <div className="upload empty-stamp">
@@ -456,14 +493,6 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
             </button>
           </div>
           <p className="form-hint">{t("stampStyleHint")}</p>
-          <h3 className="sub-head">{t("edProgress")}</h3>
-          <div className="seg">
-            <button type="button" aria-pressed={design.look.progress === "stamps"} onClick={() => setLook({ progress: "stamps" })}>{t("progress_stamps")}</button>
-            <button type="button" aria-pressed={design.look.progress === "pizza"} disabled={!paid || target > PIZZA_MAX} onClick={() => setLook({ progress: "pizza" })}>
-              {t("progress_pizza")}{!paid && <PaidTag t={t} />}
-            </button>
-          </div>
-          <p className="form-hint">{target > PIZZA_MAX ? t("pizzaTooMany", { n: PIZZA_MAX }) : t("pizzaHint")}</p>
           {paid && design.look.progress === "pizza" && (
             <div className="upload empty-stamp">
               <span className="thumb">{design.progressImage ? <img src={`/api/asset/${design.progressImage}`} alt="" /> : <ImagePlus size={22} />}</span>

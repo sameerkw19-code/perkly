@@ -7,7 +7,7 @@ import { createElement, type ComponentType } from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { Gift } from "lucide-react";
-import { FONTS, isRtl, onColor, textsFor, type Design, type Lang } from "../lib/design";
+import { FONTS, is3d, isRtl, onColor, stamp3dUrl, textsFor, type Design, type Lang } from "../lib/design";
 import { ICONS } from "./loyalty-card";
 import { PIZZA_COLORS, slicePath, slicesPath, toppings, usesPizza } from "../lib/pizza";
 
@@ -58,13 +58,15 @@ export async function loadBannerPictures(design: Design): Promise<BannerPictures
   const family = FONTS[design.look.font].family;
   await Promise.all([document.fonts.load(`600 40px ${family}`), document.fonts.load(`500 24px ${family}`)]).catch(() => undefined);
   const { icon, image, emptyImage } = design.stamp;
-  const own = icon === "image" && image ? image : icon === "logo" && design.logo ? design.logo : null;
+  // A picture stamp: the business's own image, its logo, or one of the 3D pictures (with a faded version for empty stamps).
+  const own = icon === "image" && image ? asset(image) : icon === "logo" && design.logo ? asset(design.logo) : is3d(icon) ? stamp3dUrl(icon) : null;
+  const ownEmpty = icon === "image" && emptyImage ? asset(emptyImage) : is3d(icon) ? stamp3dUrl(icon, true) : null;
   const bright = design.look.stampStyle === "bright";
   const giftColor = bright ? GOLD : design.colors.stamp;
   const preset = !own && icon !== "image" && icon !== "logo" ? ICONS[icon as keyof typeof ICONS] : null;
   const [filled, empty, iconOnStamp, iconOnCard, giftOnCard, giftOnFill, pizza] = await Promise.all([
-    own ? loadImage(asset(own)) : Promise.resolve(null),
-    own && icon === "image" && emptyImage ? loadImage(asset(emptyImage)) : Promise.resolve(null),
+    own ? loadImage(own) : Promise.resolve(null),
+    own && ownEmpty ? loadImage(ownEmpty) : Promise.resolve(null),
     preset ? iconPicture(preset, onColor(design.colors.stamp)) : Promise.resolve(null),
     preset ? iconPicture(preset, design.colors.fg) : Promise.resolve(null),
     iconPicture(Gift, giftColor),
