@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { SOCIAL_KEYS, SOCIAL_LABEL, normalizeSocial, socialDisplay, type Social } from "../lib/social";
 import { SocialIcon } from "../lib/social-icon";
 import {
-  Activity, AlertTriangle, Cake, Check, Copy, CreditCard, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode,
+  Activity, AlertTriangle, Cake, Check, Copy, CreditCard, Download, Gift, LayoutDashboard, Link2, LogOut, MessageSquare, Minus, Plus, QrCode,
   Palette, RefreshCw, ScanLine, Search, Settings, Share2, Store, Users, Wallet, X,
 } from "lucide-react";
 import type { Design } from "../lib/design";
@@ -347,6 +347,7 @@ export default function Dashboard() {
                 <div className="table-tools">
                   <label className="search"><Search size={17} /><input value={query} placeholder={t("search")} onChange={(e) => setQuery(e.target.value)} /></label>
                   <button className="btn soft small" onClick={exportCSV} disabled={!customers.length}><Download size={15} />{t("export")}</button>
+                  <a className="btn soft small" href={`/messages?b=${encodeURIComponent(b.id)}`}><MessageSquare size={15} />{t("smsLink")}</a>
                   <button className="btn primary small" onClick={() => setModal({ type: "customer" })}><Plus size={15} />{t("newCustomer")}</button>
                 </div>
               </div>
@@ -357,7 +358,7 @@ export default function Dashboard() {
               {awayOnly && (
                 <p className="form-hint">
                   {t("awayHint", { n: AWAY_DAYS })}{" "}
-                  {away.length > 0 && <a href="/messages?audience=away">{t("awayMessage")}</a>}
+                  {away.length > 0 && <a href={`/messages?audience=away&b=${encodeURIComponent(b.id)}`}>{t("awayMessage")}</a>}
                 </p>
               )}
               {!filtered.length ? (

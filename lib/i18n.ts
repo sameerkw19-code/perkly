@@ -211,6 +211,7 @@ const words: Record<string, Entry> = {
   awayShow: ["הצגת הרשימה", "عرض القائمة", "Show the list"],
   awayFilter: ["לא ביקרו {n}+ יום", "لم يزوروا منذ {n}+ يوماً", "Away {n}+ days"],
   awayHint: ["לקוחות שהביקור האחרון שלהם, או ההצטרפות אם לא חזרו, היה לפני יותר מ-{n} יום. הייצוא כולל רק אותם.", "عملاء كانت آخر زيارة لهم، أو انضمامهم إن لم يعودوا، قبل أكثر من {n} يوماً. التصدير يشملهم فقط.", "Customers whose last visit, or joining if they never came back, was more than {n} days ago. The export includes only them."],
+  smsLink: ["הודעות SMS", "رسائل SMS", "Text messages"],
   awayMessage: ["הכנת הודעה ללקוחות האלה", "تحضير رسالة لهؤلاء العملاء", "Prepare a message for them"],
   awayNone: ["אין לקוחות שלא ביקרו מעל {n} יום.", "لا يوجد عملاء غائبون منذ أكثر من {n} يوماً.", "No customers away for over {n} days."],
   lastVisitCol: ["ביקור אחרון", "آخر زيارة", "Last visit"],

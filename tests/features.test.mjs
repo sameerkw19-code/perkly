@@ -381,3 +381,23 @@ test("summary: change against the period before", () => {
   assert.deepEqual(weekChange(3, 0), { diff: 3, pct: null, dir: "up" });
   assert.deepEqual(weekChange(0, 0), { diff: 0, pct: null, dir: "same" });
 });
+
+// ---- Text messages (Pulseem) ----
+
+import { messageFor } from "../lib/sms-text.ts";
+import { pulseemNumber, smsConfigured } from "../lib/server/pulseem.ts";
+
+test("sms: business name first, {name} filled everywhere", () => {
+  assert.equal(messageFor("קפה בונו", "היי {name}, {name}!", "דנה"), "קפה בונו: היי דנה, דנה!");
+});
+
+test("sms: Israeli numbers go to Pulseem in local form", () => {
+  assert.equal(pulseemNumber("+972501234567"), "0501234567");
+  assert.equal(pulseemNumber("+14155550123"), "14155550123");
+});
+
+test("sms: sending needs both the key and the sender", () => {
+  assert.equal(smsConfigured({}), false);
+  assert.equal(smsConfigured({ PULSEEM_API_KEY: "k" }), false);
+  assert.equal(smsConfigured({ PULSEEM_API_KEY: "k", PULSEEM_FROM: "Perkly" }), true);
+});

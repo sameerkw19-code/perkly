@@ -12,6 +12,9 @@ declare namespace Cloudflare {
     POLAR_PRODUCT_ID?: string;
     POLAR_WEBHOOK_SECRET?: string;
     POLAR_SANDBOX?: string;
+    /** Pulseem SMS: API key (secret) and the approved sender name or number. */
+    PULSEEM_API_KEY?: string;
+    PULSEEM_FROM?: string;
     /** Full Google Wallet loyalty class id, exactly as Google lists it. */
     GOOGLE_WALLET_CLASS_ID?: string;
     /** Google Wallet. Issuer id is a Variable; the service-account JSON key is a Secret. */
