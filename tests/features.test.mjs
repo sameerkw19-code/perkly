@@ -400,4 +400,7 @@ test("sms: sending needs both the key and the sender", () => {
   assert.equal(smsConfigured({}), false);
   assert.equal(smsConfigured({ PULSEEM_API_KEY: "k" }), false);
   assert.equal(smsConfigured({ PULSEEM_API_KEY: "k", PULSEEM_FROM: "Perkly" }), true);
+  // Pulseem senders are 3–11 letters or digits.
+  assert.equal(smsConfigured({ PULSEEM_API_KEY: "k", PULSEEM_FROM: "Perkly Shop" }), false);
+  assert.equal(smsConfigured({ PULSEEM_API_KEY: "k", PULSEEM_FROM: "PerklyLoyalty" }), false);
 });

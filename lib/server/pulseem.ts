@@ -9,26 +9,31 @@ const URL_SEND = "https://api.pulseem.com/api/v1/SmsApi/SendSms";
 export const SMS_BATCH = 100;
 
 export function smsConfigured(env: PulseemEnv): boolean {
-  return !!env.PULSEEM_API_KEY && !!env.PULSEEM_FROM;
+  return !!env.PULSEEM_API_KEY && validSender(env.PULSEEM_FROM);
 }
 
-/** Pulseem takes Israeli numbers in local form (0501234567); other numbers without the plus. */
+/** Pulseem takes Israeli numbers as 05XXXXXXXX (or 9725XXXXXXXX); other numbers without the plus. */
 export function pulseemNumber(phone: string): string {
   return phone.startsWith("+972") ? "0" + phone.slice(4) : phone.replace(/^\+/, "");
 }
 
 export type SmsItem = { to: string; text: string; ref: string };
-export type SmsResult = { ok: boolean; status: number; detail: string };
+export type SmsResult = { ok: boolean; status: number; detail: string; sent: number; failed: number };
+
+/** Pulseem's sender: 3–11 letters or digits (an approved name or a virtual number). */
+export function validSender(from: string | undefined): boolean {
+  return !!from && /^[A-Za-z0-9]{3,11}$/.test(from);
+}
 
 /**
  * Sends one batch. Marketing messages get Pulseem's automatic unsubscribe link (the law requires
- * a way to opt out). Never throws: a network error comes back as ok: false.
+ * a way to opt out). Pulseem answers {status, error, successCount, failCount}. Never throws.
  */
 export async function sendSmsBatch(env: PulseemEnv, items: SmsItem[], sendId: string, marketing: boolean): Promise<SmsResult> {
   try {
     const r = await fetch(URL_SEND, {
       method: "POST",
-      headers: { APIKey: env.PULSEEM_API_KEY!, "Content-Type": "application/json", Accept: "application/json" },
+      headers: { APIKEY: env.PULSEEM_API_KEY!, "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({
         sendId,
         isAsync: false,
@@ -41,11 +46,14 @@ export async function sendSmsBatch(env: PulseemEnv, items: SmsItem[], sendId: st
         },
       }),
     });
-    const body = (await r.text()).slice(0, 300);
-    // Pulseem may answer 200 with an error inside the body.
-    const bodyError = /"(status|Status)"\s*:\s*"?(error|Error|failed|Failed)/.test(body) || /"error"\s*:\s*"[^"]+"/i.test(body);
-    return { ok: r.ok && !bodyError, status: r.status, detail: body };
+    const text = await r.text();
+    let data: { status?: string; error?: string | null; successCount?: number; failCount?: number } = {};
+    try { data = JSON.parse(text); } catch { /* not JSON: treated as a failure below */ }
+    const accepted = r.ok && String(data.status ?? "").toLowerCase() === "success" && !data.error;
+    const sent = accepted ? (typeof data.successCount === "number" ? data.successCount : items.length) : 0;
+    const failed = accepted ? (typeof data.failCount === "number" ? data.failCount : 0) : items.length;
+    return { ok: accepted && sent > 0, status: r.status, detail: text.slice(0, 300), sent, failed };
   } catch (e) {
-    return { ok: false, status: 0, detail: (e as Error).message.slice(0, 300) };
+    return { ok: false, status: 0, detail: (e as Error).message.slice(0, 300), sent: 0, failed: items.length };
   }
 }

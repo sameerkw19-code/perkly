@@ -157,8 +157,11 @@ export async function POST(request: Request) {
   for (let i = 0; i < list.length; i += SMS_BATCH) {
     const chunk = list.slice(i, i + SMS_BATCH);
     const r = await sendSmsBatch(env, chunk.map((c) => ({ to: c.phone, text: messageFor(businessName, text, c.name), ref: c.id })), `${sendId}-${i / SMS_BATCH}`, true);
-    if (r.ok) sent += chunk.length; else failed += chunk.length;
-    await log(chunk.length, false, r.ok ? "sent" : "failed", `${r.status} ${r.detail}`);
+    sent += r.sent;
+    failed += r.failed;
+    // Only messages Pulseem accepted count toward the monthly limit.
+    if (r.sent) await log(r.sent, false, "sent", `${r.status} ${r.detail}`);
+    if (r.failed) await log(r.failed, false, "failed", `${r.status} ${r.detail}`);
   }
   if (!sent) return fail("sms_failed", 502, "The SMS service did not accept the messages");
   return json({ ok: true, sent, failed });
