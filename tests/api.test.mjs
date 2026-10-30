@@ -520,7 +520,8 @@ test("collect mode: parallel stamps from several devices roll over exactly", asy
   await signup(owner, "bankPar");
   const biz = (await owner.post("/api/loyalty", { action: "create_business", name: "Par", reward: "Free", target: 3, color: "#123456" })).body.id;
   const cust = (await owner.act(biz, "register_customer", { name: "Par", phone: "0551112244" })).body.id;
-  await Promise.all(Array.from({ length: 9 }, () => owner.act(biz, "stamp", { customer: cust, requestId: id() })));
+  const results = await Promise.all(Array.from({ length: 9 }, () => owner.act(biz, "stamp", { customer: cust, requestId: id() })));
+  assert.deepEqual(results.map((r) => r.status), Array(9).fill(200), "every parallel stamp is accepted (none comes back busy)");
   const c = (await owner.get(`/api/loyalty?business=${biz}&days=all`)).body.customers.find((x) => x.id === cust);
   assert.deepEqual([c.stamps, c.rewards], [0, 3]);
 });

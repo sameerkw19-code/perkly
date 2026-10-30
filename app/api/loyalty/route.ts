@@ -23,6 +23,9 @@ type Customer = { id: string; business: string; name: string; phone: string; sta
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const COLOR = /^#[0-9a-fA-F]{6}$/;
 
+/** Tries for one collect-mode stamp when other devices change the same card at the same time. */
+const STAMP_ATTEMPTS = 14;
+
 function validTarget(v: unknown): v is number {
   return Number.isInteger(v) && (v as number) >= 2 && (v as number) <= 30;
 }
@@ -449,7 +452,10 @@ export async function POST(request: Request) {
 
         // Collect mode: a full card saves a reward and the next round starts right away.
         // Optimistic update on the exact count we read; retried if another device changed the card meanwhile.
-        for (let attempt = 0; attempt < 8; attempt++) {
+        // Retries wait a short random time that grows each round, so stamps sent at the same moment
+        // from several devices all land instead of colliding again (without it some came back "busy").
+        for (let attempt = 0; attempt < STAMP_ATTEMPTS; attempt++) {
+          if (attempt > 0) await new Promise((r) => setTimeout(r, Math.random() * Math.min(250, 8 * 2 ** attempt)));
           let total = c.stamps + n;
           let target = c.target;
           let earned = 0;
