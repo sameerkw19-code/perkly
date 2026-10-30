@@ -13,7 +13,6 @@ import { formatBirthday, parseBirthday, upcomingKeys } from "../../../lib/birthd
 import { syncGoogleWallet } from "../../../lib/server/wallet-sync";
 import { walletConfig } from "../../../lib/server/google-wallet";
 import { getSettings } from "../../../lib/server/settings";
-import { cleanCode, freeCodeMatches, grantFreeAccess } from "../../../lib/server/free-code";
 import { normalizeSocial, parseSocial, type Social } from "../../../lib/social";
 
 export const dynamic = "force-dynamic";
@@ -124,7 +123,25 @@ export async function GET(request: Request) {
   const branchFilter = branches.some((b) => b.id === branchParam) ? branchParam : "";
 
   const dayAgo = new Date(Date.now() - 86_400_000).toISOString();
-  const [customers, events, stats, team, invites, busyCustomers, busyStaff, perBranch, staffFixes] = await db.batch([
+  // Summary: the last day, week and month, each against the same length before it
+  // (whole business, not the range or branch filter).
+  const periodSummary = (days: number) => {
+    const mid = new Date(Date.now() - days * 86_400_000).toISOString();
+    const start = new Date(Date.now() - 2 * days * 86_400_000).toISOString();
+    return db.prepare(
+      `SELECT
+         COALESCE(SUM(kind = 'stamp' AND created >= ?2), 0) AS stamps_now,
+         COALESCE(SUM(kind = 'stamp' AND created < ?2), 0) AS stamps_prev,
+         COALESCE(SUM(kind = 'redeem' AND created >= ?2), 0) AS redeemed_now,
+         COALESCE(SUM(kind = 'redeem' AND created < ?2), 0) AS redeemed_prev,
+         COUNT(DISTINCT CASE WHEN created >= ?2 THEN customer END) AS visitors_now,
+         COUNT(DISTINCT CASE WHEN created < ?2 THEN customer END) AS visitors_prev,
+         (SELECT COUNT(*) FROM customers WHERE business = ?1 AND created >= ?2) AS joined_now,
+         (SELECT COUNT(*) FROM customers WHERE business = ?1 AND created >= ?3 AND created < ?2) AS joined_prev
+       FROM events WHERE business = ?1 AND created >= ?3 AND kind IN ('stamp', 'redeem')`,
+    ).bind(business!.id, mid, start);
+  };
+  const [customers, events, stats, team, invites, busyCustomers, busyStaff, perBranch, staffFixes, sumDay, sumWeek, sumMonth] = await db.batch([
     db.prepare(
       `SELECT c.id, c.name, c.phone, c.stamps, c.target, c.created, c.source, c.consent_marketing, c.birthday, c.card_hash IS NOT NULL AS has_link,
          (SELECT COUNT(*) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2))
@@ -179,6 +196,9 @@ export async function GET(request: Request) {
       `SELECT u.name, COUNT(*) AS n FROM events e JOIN users u ON u.id = e.actor
        WHERE e.business = ? AND e.kind = 'adjust' AND e.actor_role = 'staff' AND e.created >= ? GROUP BY e.actor`,
     ).bind(business!.id, dayAgo),
+    periodSummary(1),
+    periodSummary(7),
+    periodSummary(30),
   ]);
 
   // Card editor data (owner only): draft, live version and uploaded images.
@@ -202,6 +222,7 @@ export async function GET(request: Request) {
     customers: (customers.results as { phone: string; has_link: unknown }[]).map((c) => ({ ...c, phone: formatPhone(c.phone), has_link: !!c.has_link })),
     events: events.results,
     stats: stats.results[0],
+    summary: { day: sumDay.results[0], week: sumWeek.results[0], month: sumMonth.results[0] },
     team: team.results,
     invites: invites.results,
     alerts: [
@@ -235,12 +256,6 @@ export async function POST(request: Request) {
     if (!name || !reward || !validTarget(p.target) || typeof p.color !== "string" || !COLOR.test(p.color)) {
       return fail("bad_details", 400, "Invalid business details");
     }
-    // Optional free-access code (set in the control center): checked before anything is created.
-    const freeCode = cleanCode(p.freeCode);
-    if (freeCode) {
-      if (!(await allow(db, `free-code:${user.id}`, 10, 3600))) return fail("rate_limited", 429);
-      if (!(await freeCodeMatches(db, freeCode))) return fail("bad_code", 400, "Wrong code");
-    }
     // New businesses collect rewards by default (customers keep earning while a reward waits).
     const mode = p.rewardMode === "block" ? "block" : "bank";
     const id = crypto.randomUUID();
@@ -258,8 +273,7 @@ export async function POST(request: Request) {
           ]
         : []),
     ]);
-    const freeUntil = freeCode ? await grantFreeAccess(db, id, user.email) : null;
-    return json({ id, freeUntil });
+    return json({ id });
   }
 
   // Every other action: the server checks the user's role in this business.
@@ -653,16 +667,6 @@ export async function POST(request: Request) {
         syncGoogleWallet(db, cust, card.rewards, origin);
       }
       return json({ ok: true, version: live?.version });
-    }
-
-    // A free-access code for an existing business (owner only).
-    case "redeem_code": {
-      const denied = ownerOnly(); if (denied) return denied;
-      const code = cleanCode(p.code);
-      if (!code) return fail("bad_code", 400, "Wrong code");
-      if (!(await allow(db, `free-code:${user.id}`, 10, 3600))) return fail("rate_limited", 429);
-      if (!(await freeCodeMatches(db, code))) return fail("bad_code", 400, "Wrong code");
-      return json({ ok: true, freeUntil: await grantFreeAccess(db, business.id, user.email) });
     }
 
     case "new_join_code": {

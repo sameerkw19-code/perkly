@@ -349,47 +349,6 @@ test("texts: an empty subtitle stays empty and does not repeat the title", () =>
   assert.equal(textsFor(d, "he").title, d.texts.he.title);
 });
 
-// ---- Free-access code (set in the control center) ----
-
-import { freeCodeMatches, grantFreeAccess, FOREVER } from "../lib/server/free-code.ts";
-import { hashPassword } from "../lib/server/crypto.ts";
-import { settingsForAdmin } from "../lib/server/settings.ts";
-
-function settingsDb(rows) {
-  const calls = [];
-  return {
-    calls,
-    prepare: (sql) => ({
-      all: async () => ({ results: sql.includes("FROM settings") ? rows : [] }),
-      bind: (...args) => { calls.push({ sql, args }); return { sql, args }; },
-    }),
-    batch: async (stmts) => { calls.push(...stmts.map((x) => ({ batch: x.sql, args: x.args }))); return []; },
-  };
-}
-
-test("free code: matches only the code set in the control center", async () => {
-  const hash = await hashPassword("Secret-123");
-  const db = settingsDb([{ key: "freeCodeHash", value: JSON.stringify(hash) }]);
-  assert.equal(await freeCodeMatches(db, "Secret-123"), true);
-  assert.equal(await freeCodeMatches(db, "secret-123"), false);
-  assert.equal(await freeCodeMatches(db, ""), false);
-  assert.equal(await freeCodeMatches(settingsDb([]), "Secret-123"), false);
-});
-
-test("free code: no end date by default, or the number of days set", async () => {
-  const forever = settingsDb([]);
-  assert.equal(await grantFreeAccess(forever, "biz1", "a@b.c"), FOREVER);
-  const days = settingsDb([{ key: "freeCodeDays", value: "30" }]);
-  const until = await grantFreeAccess(days, "biz1", "a@b.c");
-  const diff = (new Date(until).getTime() - Date.now()) / 86_400_000;
-  assert.ok(diff > 29.9 && diff < 30.1);
-});
-
-test("free code: the control center never receives the hash", () => {
-  const s = settingsForAdmin({ ...DEFAULT_SETTINGS, freeCodeHash: "pbkdf2$1$x$y" });
-  assert.equal("freeCodeHash" in s, false);
-  assert.equal(s.freeCodeSet, true);
-});
 
 // ---- Last visit ----
 
@@ -410,4 +369,15 @@ test("away: over 30 days since the last visit, or since joining with no visits",
   assert.equal(isAway(ago(10), ago(200), now), false);
   assert.equal(isAway(null, ago(45), now), true);
   assert.equal(isAway(null, ago(5), now), false);
+});
+
+// ---- Summary (day / week / month) ----
+
+import { weekChange } from "../lib/weekly.ts";
+
+test("summary: change against the period before", () => {
+  assert.deepEqual(weekChange(12, 10), { diff: 2, pct: 20, dir: "up" });
+  assert.deepEqual(weekChange(5, 10), { diff: -5, pct: -50, dir: "down" });
+  assert.deepEqual(weekChange(3, 0), { diff: 3, pct: null, dir: "up" });
+  assert.deepEqual(weekChange(0, 0), { diff: 0, pct: null, dir: "same" });
 });

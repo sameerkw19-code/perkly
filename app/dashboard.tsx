@@ -17,6 +17,7 @@ import { QrImage } from "../components/qr";
 import { BirthdayFields } from "../components/birthday-fields";
 import { birthdayFromParts, formatBirthday } from "../lib/birthday";
 import { AWAY_DAYS, daysSince, isAway } from "../lib/visits";
+import { weekChange } from "../lib/weekly";
 import { Brand } from "../components/brand";
 
 type Role = "owner" | "staff";
@@ -41,6 +42,8 @@ type Data = {
   customers?: any[];
   events?: any[];
   stats?: { customers: number; new_customers: number; rewards_ready: number; stamps: number; redemptions: number };
+  /** Last day, week and month against the same length before it. */
+  summary?: Record<Period, Record<string, number>>;
   team?: any[];
   invites?: any[];
   alerts?: { type: "customer" | "staff" | "staffFix"; name: string; count: number }[];
@@ -269,6 +272,13 @@ export default function Dashboard() {
         )}
 
         <main>
+          {view === "overview" && isOwner && away.length > 0 && (
+            <div className="away-bar" role="status">
+              <Users size={16} />
+              <span>{t("awayBar", { n: away.length, d: AWAY_DAYS })}</span>
+              <button type="button" className="btn soft small" onClick={() => { setView("customers"); setQuery(""); setAwayOnly(true); }}>{t("awayShow")}</button>
+            </div>
+          )}
           {view === "overview" && isOwner && (
             <>
               <div className="page-head">
@@ -300,6 +310,7 @@ export default function Dashboard() {
                 <Stat icon={Gift} color="green" label={t("statReady")} value={data.stats!.rewards_ready} note={t("rightNow")} />
                 <Stat icon={Check} color="blue" label={t("statRedeemed")} value={data.stats!.redemptions} note={t("inRange")} />
               </section>
+              {data.summary && <Summary summary={data.summary} t={t} />}
               <section className="overview-grid">
                 <div className="panel card-panel">
                   <div className="section-head"><h2>{t("card")}</h2></div>
@@ -428,6 +439,7 @@ export default function Dashboard() {
                     <QrImage text={`${window.location.origin}/join/${b.join_code}`} size={200} label={t("joinQr")} />
                     <p className="muted">{t("joinQrHint")}</p>
                     <LinkBox url={`${window.location.origin}/join/${b.join_code}`} t={t} notify={notify} />
+                    <a className="btn soft small" href={`/poster?b=${encodeURIComponent(b.id)}`}><QrCode size={14} />{t("posterLink")}</a>
                     <button className="btn soft small" disabled={busy} onClick={async () => {
                       if (!confirm(t("newJoinConfirm"))) return;
                       if (await call({ action: "new_join_code" })) load();
@@ -1071,3 +1083,48 @@ function LastVisit({ iso, t }: { iso: string | null | undefined; t: (k: string, 
   return <span className={d > AWAY_DAYS ? "last-visit away" : "last-visit"} title={new Date(iso).toLocaleDateString()}>{text}</span>;
 }
 
+type Period = "day" | "week" | "month";
+const SUMMARY_ROWS = [
+  ["stamps", "sumStamps"],
+  ["visitors", "sumVisitors"],
+  ["redeemed", "sumRedeemed"],
+  ["joined", "sumJoined"],
+] as const;
+
+/** Summary for the owner: this day, week or month against the one before. */
+function Summary({ summary, t }: { summary: Record<Period, Record<string, number>>; t: (k: string, v?: Record<string, string | number>) => string }) {
+  const [period, setPeriod] = useState<Period>("week");
+  const s = summary[period];
+  return (
+    <section className="panel summary-panel">
+      <div className="section-head">
+        <h2>{t("sumTitle")}</h2>
+        <div className="seg" role="group" aria-label={t("sumTitle")}>
+          {(["day", "week", "month"] as Period[]).map((p) => (
+            <button key={p} type="button" aria-pressed={period === p} onClick={() => setPeriod(p)}>{t("sum_" + p)}</button>
+          ))}
+        </div>
+      </div>
+      <p className="form-hint">{t("sumNote_" + period)}</p>
+      <div className="summary-grid">
+        {SUMMARY_ROWS.map(([key, label]) => {
+          const now = Number(s?.[key + "_now"] ?? 0), prev = Number(s?.[key + "_prev"] ?? 0);
+          const c = weekChange(now, prev);
+          return (
+            <article key={key} className="summary-item">
+              <span className="stat-label">{t(label)}</span>
+              <strong><Num>{now}</Num></strong>
+              <small>
+                <span className={"change " + c.dir}>
+                  {c.dir === "up" ? "▲" : c.dir === "down" ? "▼" : "•"}{" "}
+                  <Num>{c.pct !== null ? `${c.diff > 0 ? "+" : ""}${c.pct}%` : c.diff > 0 ? `+${c.diff}` : c.diff === 0 ? "0" : String(c.diff)}</Num>
+                </span>{" "}
+                {t("sumBefore", { n: prev })}
+              </small>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}

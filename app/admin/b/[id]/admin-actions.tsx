@@ -14,6 +14,7 @@ export function AdminActions({ business, suspended, compUntil, biz }: { business
   const [reason, setReason] = useState("");
   const [days, setDays] = useState(30);
   const compActive = !!compUntil && compUntil > new Date().toISOString();
+  const compForever = !!compUntil?.startsWith("9999");
 
   async function run(action: string, extra: Record<string, unknown> = {}, confirmText?: string) {
     if (confirmText && !confirm(confirmText)) return;
@@ -56,15 +57,20 @@ export function AdminActions({ business, suspended, compUntil, biz }: { business
       <div className="admin-action">
         <h3>גישה חינם</h3>
         <p className="muted">
-          {compActive
-            ? `פעילה עד ${new Date(compUntil!).toLocaleDateString("he-IL")}. הארכה מתווספת לתאריך הזה.`
-            : "נותן לעסק גישה מלאה בלי מנוי, למשך מספר ימים."}
+          {compForever
+            ? "פעילה ללא הגבלת זמן, עד שתבטל אותה."
+            : compActive
+              ? `פעילה עד ${new Date(compUntil!).toLocaleDateString("he-IL")}. הארכה מתווספת לתאריך הזה.`
+              : "נותן לעסק גישה מלאה בלי מנוי, למספר ימים או ללא הגבלת זמן. רק מנהל יכול לתת אותה."}
         </p>
         <div className="admin-row">
-          <select value={days} onChange={(e) => setDays(Number(e.target.value))} aria-label="מספר ימים">
+          {!compForever && (
+            <select value={days} onChange={(e) => setDays(Number(e.target.value))} aria-label="מספר ימים">
             {[7, 14, 30, 60, 90, 180, 365].map((d) => <option key={d} value={d}>{d} ימים</option>)}
           </select>
-          <button className="btn primary small" disabled={busy} onClick={() => run("grant_comp", { days })}>{compActive ? "הארכה" : "מתן גישה"}</button>
+          )}
+          {!compForever && <button className="btn primary small" disabled={busy} onClick={() => run("grant_comp", { days })}>{compActive ? "הארכה" : "מתן גישה"}</button>}
+          {!compForever && <button className="btn soft small" disabled={busy} onClick={() => run("grant_comp", { forever: true }, "לתת לעסק גישה חינם ללא הגבלת זמן?")}>ללא הגבלת זמן</button>}
           {compActive && <button className="btn soft small" disabled={busy} onClick={() => run("clear_comp", {}, "לבטל את הגישה החינמית?")}>ביטול</button>}
         </div>
       </div>
