@@ -421,10 +421,17 @@ export async function POST(request: Request) {
            SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT stamps FROM customers WHERE id = ?), ? WHERE changes() = 1`,
         ).bind(requestId, c!.id, user.id, kind, delta, now, business.id, branch, role, c!.id, note);
       const replayed = async () => !!(await db.prepare("SELECT id FROM events WHERE id = ? AND customer = ?").bind(requestId, c!.id).first());
-      const done = async (extra: Record<string, unknown> = {}) => {
+      /** `added`: stamps just given (not a replay), for the customer's phone notification. */
+      const done = async (extra: Record<string, unknown> = {}, added = 0, earned = 0) => {
         const fresh = (await db.prepare("SELECT * FROM customers WHERE id = ?").bind(c!.id).first<Customer>())!;
         const card = await cardState(db, fresh, business.reward_mode);
-        syncGoogleWallet(db, fresh, card.rewards, new URL(request.url).origin);
+        const reached = business.reward_mode === "block" ? fresh.stamps >= fresh.target : earned > 0;
+        const notice = added
+          ? reached
+            ? ({ kind: "reward", name: fresh.name } as const)
+            : ({ kind: "stamp", added, left: Math.max(0, fresh.target - fresh.stamps), name: fresh.name } as const)
+          : undefined;
+        syncGoogleWallet(db, fresh, card.rewards, new URL(request.url).origin, notice);
         return json({ ok: true, card, ...extra });
       };
       const refuse = async (code: string) => {
@@ -445,7 +452,7 @@ export async function POST(request: Request) {
             ).bind(n, c.id, business.id, n, requestId),
             event("stamp", n, null),
           ]);
-          if (result[0].meta.changes) return done();
+          if (result[0].meta.changes) return done({}, n);
           if (await replayed()) return done({ replayed: true });
           return refuse(c.stamps >= c.target ? "reward_ready" : "too_many");
         }
@@ -483,7 +490,7 @@ export async function POST(request: Request) {
             );
           }
           const result = await db.batch(statements);
-          if (result[0].meta.changes) return done({ earned });
+          if (result[0].meta.changes) return done({ earned }, n, earned);
           if (await replayed()) return done({ replayed: true });
           c = (await db.prepare("SELECT * FROM customers WHERE id = ?").bind(c.id).first<Customer>())!;
         }

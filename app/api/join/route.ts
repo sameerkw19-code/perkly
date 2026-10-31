@@ -52,5 +52,5 @@ export async function POST(request: Request) {
   const [, r] = await db.batch([releaseArchivedPhone(db, business.id, phone), insert]);
   // Never hand out an existing card to someone who only knows the phone number.
   if (!r.meta.changes) return fail("phone_exists", 409, "This phone is already registered here. Ask the staff for your card link.");
-  return json({ cardPath: `/c/${secret}` });
+  return json({ cardPath: `/c/${secret}?welcome=1` });
 }

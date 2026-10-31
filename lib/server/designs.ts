@@ -1,4 +1,4 @@
-import { assetIds, cardLang, defaultDesign, sanitizeDesign, textsFor, walletStampPicture, type AssetMeta, type Design, type Lang } from "../design";
+import { assetIds, cardLang, defaultDesign, noticeOn, noticeText, sanitizeDesign, textsFor, walletStampPicture, type AssetMeta, type Design, type Lang, type StampNotice } from "../design";
 
 /** Google Wallet language tags for each card language. */
 export const GOOGLE_TAG: Record<Lang, string> = { he: "he", ar: "ar", en: "en-US", ru: "ru", de: "de", fr: "fr" };
@@ -39,8 +39,14 @@ export async function ownsAssets(db: D1Database, businessId: string, design: Des
  * The business's look on its Google Wallet pass: name, reward and banner image.
  * Google Wallet doesn't take WebP, so only a JPEG or PNG background image becomes the banner.
  */
-/** `card`: the customer's stamps and target, for the stamp banner (one picture per stamp count). */
-export async function passLook(db: D1Database, business: BusinessLike, origin: string, card?: { stamps: number; target: number }) {
+/** A phone notification for the pass, in the card's first language and the business's other languages. */
+export type PassNotice = { header: string; body: string; language: string; translations: { language: string; header: string; body: string }[] };
+
+/**
+ * `card`: the customer's stamps and target, for the stamp banner (one picture per stamp count).
+ * `card.notice`: what just happened, when the business turned on wallet notifications.
+ */
+export async function passLook(db: D1Database, business: BusinessLike, origin: string, card?: { stamps: number; target: number; notice?: StampNotice }) {
   const design = await liveDesign(db, business);
   const first = cardLang(design);
   const text = textsFor(design, first);
@@ -67,10 +73,24 @@ export async function passLook(db: D1Database, business: BusinessLike, origin: s
       classLook = { name: (text.title || business.name).slice(0, 60), color: design.colors.bg, logoUrl: `${origin}/api/asset/${design.logo}` };
     }
   }
+  let notice: PassNotice | null = null;
+  if (card?.notice && noticeOn(design, card.notice.kind)) {
+    const forLang = (l: Lang) => {
+      const t = textsFor(design, l);
+      const title = (t.title || business.name).slice(0, 60);
+      return { header: title, body: noticeText({ ...t, title, reward: t.reward || business.reward }, l, card.notice!) };
+    };
+    notice = {
+      ...forLang(first),
+      language: GOOGLE_TAG[first],
+      translations: design.langs.filter((l) => l !== first).map((l) => ({ language: GOOGLE_TAG[l], ...forLang(l) })),
+    };
+  }
   return {
     title: (text.title || business.name).slice(0, 60),
     reward: (text.reward || business.reward).slice(0, 120),
     promo: text.promo.slice(0, 120),
+    notice,
     heroUrl,
     language: GOOGLE_TAG[first],
     translations,

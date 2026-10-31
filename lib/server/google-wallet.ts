@@ -156,24 +156,71 @@ async function accessToken(config: WalletConfig): Promise<string> {
 
 export type UpdateResult = "updated" | "not_saved" | "failed";
 
+/** A message that shows as a phone notification and stays on the back of the pass. */
+export type WalletNotice = { header: string; body: string; language: string; translations: { language: string; header: string; body: string }[] };
+
+/** The message body Google takes; `notify` false keeps it on the pass without a phone notification. */
+export function noticeMessage(notice: WalletNotice, notify: boolean, id = `notice-${Date.now()}`) {
+  const tr = notice.translations;
+  return {
+    message: {
+      id,
+      header: notice.header,
+      body: notice.body,
+      messageType: notify ? "TEXT_AND_NOTIFY" : "TEXT",
+      ...(tr.length
+        ? {
+            localizedHeader: { defaultValue: { language: notice.language, value: notice.header }, translatedValues: tr.map((x) => ({ language: x.language, value: x.header })) },
+            localizedBody: { defaultValue: { language: notice.language, value: notice.body }, translatedValues: tr.map((x) => ({ language: x.language, value: x.body })) },
+          }
+        : {}),
+    },
+  };
+}
+
+/**
+ * Google allows 3 notifications per pass per day. Past that it answers with a quota error,
+ * and the message is added again without the notification, so the pass still shows it.
+ */
+async function addNotice(token: string, objectUrl: string, notice: WalletNotice): Promise<void> {
+  const send = (notify: boolean) =>
+    fetch(`${objectUrl}/addMessage`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(noticeMessage(notice, notify)),
+    });
+  const r = await send(true);
+  if (r.ok) return;
+  const text = await r.text().catch(() => "");
+  if (r.status === 429 || /quota/i.test(text)) {
+    const again = await send(false);
+    console.log(`google wallet notice: daily limit, added silently (${again.status})`);
+    return;
+  }
+  console.warn(`google wallet notice failed: HTTP ${r.status}`);
+}
+
 /**
  * Pushes the current stamps and rewards to a pass the customer already saved.
  * "not_saved": Google has no such pass (the customer opened the link but never saved it).
  * Never throws, so a Google outage can't break stamping.
  */
-export async function updateLoyaltyObject(config: WalletConfig, card: LoyaltyCard): Promise<UpdateResult> {
+export async function updateLoyaltyObject(config: WalletConfig, card: LoyaltyCard, notice?: WalletNotice | null): Promise<UpdateResult> {
   try {
     const token = await accessToken(config);
-    const r = await fetch(`${API}/loyaltyObject/${encodeURIComponent(objectIdFor(config, card.customerId))}`, {
+    const objectUrl = `${API}/loyaltyObject/${encodeURIComponent(objectIdFor(config, card.customerId))}`;
+    const r = await fetch(objectUrl, {
       method: "PATCH",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ ...liveFields(card), ...(card.look ? lookFields(card.look) : {}) }),
+      // A new notification replaces the previous one on the back of the pass.
+      body: JSON.stringify({ ...liveFields(card), ...(card.look ? lookFields(card.look) : {}), ...(notice ? { messages: [] } : {}) }),
     });
     if (r.status === 404) return "not_saved";
     if (!r.ok) {
       console.warn(`google wallet update failed: HTTP ${r.status}`);
       return "failed";
     }
+    if (notice) await addNotice(token, objectUrl, notice);
     return "updated";
   } catch (e) {
     console.warn(`google wallet update failed: ${(e as Error).message}`);

@@ -381,3 +381,46 @@ test("summary: change against the period before", () => {
   assert.deepEqual(weekChange(3, 0), { diff: 3, pct: null, dir: "up" });
   assert.deepEqual(weekChange(0, 0), { diff: 0, pct: null, dir: "same" });
 });
+
+test("wallet notification: default and own wording, with the business and customer name", async () => {
+  const { noticeText, defaultDesign, sanitizeDesign } = await import("../lib/design.ts");
+  const d = defaultDesign({ name: "קפה רוני", reward: "קפה חינם", color: "#000000" });
+  assert.equal(d.walletNotify, false, "off unless the business turns it on");
+  const he = d.texts.he;
+  assert.equal(noticeText(he, "he", { kind: "stamp", added: 1, left: 8, name: "דנה כהן" }), "תודה שקנית בקפה רוני! נוספה לך חותמת, נשארו עוד 8 עד: קפה חינם");
+  assert.match(noticeText(he, "he", { kind: "stamp", added: 3, left: 6, name: "" }), /נוספו לך 3 חותמות/);
+  assert.match(noticeText(he, "he", { kind: "reward", name: "" }), /הגעת להטבה בקפה רוני: קפה חינם/);
+  const own = { ...he, notify: "{name}, תודה! עוד {left} ל{reward} ☕", notifyReward: "" };
+  assert.equal(noticeText(own, "he", { kind: "stamp", added: 1, left: 2, name: "דנה כהן" }), "דנה, תודה! עוד 2 לקפה חינם ☕");
+  const saved = sanitizeDesign({ ...d, walletNotify: true, texts: { ...d.texts, he: { ...he, notify: "x".repeat(500) } } });
+  assert.equal(saved.walletNotify, true);
+  assert.equal(saved.texts.he.notify.length, 120);
+  assert.equal(sanitizeDesign({ ...d, walletNotify: "yes" }).walletNotify, false);
+});
+
+test("welcome, birthday and special-day wording", async () => {
+  const { noticeText, defaultDesign, noticeOn } = await import("../lib/design.ts");
+  const d = defaultDesign({ name: "קפה רוני", reward: "קפה חינם", color: "#000000" });
+  const he = d.texts.he;
+  assert.equal(noticeText(he, "he", { kind: "welcome", name: "דנה כהן" }), "ברוכים הבאים לקפה רוני, דנה! כל קנייה מקרבת אותך ל: קפה חינם");
+  assert.equal(noticeText(he, "he", { kind: "welcome", name: "" }), "ברוכים הבאים לקפה רוני! כל קנייה מקרבת אותך ל: קפה חינם", "no dangling comma without a name");
+  assert.match(noticeText(he, "he", { kind: "birthday", name: "דנה", gift: false }), /^מזל טוב דנה! 🎂 כל הצוות של קפה רוני/);
+  assert.match(noticeText(he, "he", { kind: "birthday", name: "דנה", gift: true }), /מחכה לך מתנה בקפה רוני: קפה חינם/);
+  assert.equal(noticeText({ ...he, birthday: "{name} יום הולדת שמח מ{business}" }, "he", { kind: "birthday", name: "דנה", gift: true }), "דנה יום הולדת שמח מקפה רוני");
+  assert.equal(noticeText(he, "he", { kind: "special", name: "דנה", text: "חג שמח {name}! היום חותמת כפולה ב{business}" }), "חג שמח דנה! היום חותמת כפולה בקפה רוני");
+  assert.equal(noticeOn(d, "welcome"), false);
+  assert.equal(noticeOn({ ...d, walletBirthday: true }, "birthday"), true);
+  assert.equal(noticeOn(d, "special"), true, "scheduled by the business");
+});
+
+test("birthday dates in Israel time, Feb 29 in other years", async () => {
+  const { israelNow, birthdayKeys } = await import("../lib/birthday.ts");
+  // 22:30 UTC on Mar 14 is already Mar 15 in Israel (UTC+2).
+  const n = israelNow(new Date("2026-03-14T22:30:00Z"));
+  assert.equal(n.md, "03-15");
+  assert.equal(n.date, "2026-03-15");
+  assert.equal(n.hour, 0);
+  assert.deepEqual(birthdayKeys("02-28", 2026), ["02-28", "02-29"]);
+  assert.deepEqual(birthdayKeys("02-28", 2028), ["02-28"]);
+  assert.deepEqual(birthdayKeys("07-01", 2026), ["07-01"]);
+});

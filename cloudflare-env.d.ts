@@ -14,6 +14,8 @@ declare namespace Cloudflare {
     POLAR_SANDBOX?: string;
     /** Full Google Wallet loyalty class id, exactly as Google lists it. */
     GOOGLE_WALLET_CLASS_ID?: string;
+    /** Wallet messages sent per cron run (default 12). Raise on the Workers Paid plan. */
+    WALLET_BATCH?: string;
     /** Google Wallet. Issuer id is a Variable; the service-account JSON key is a Secret. */
     GOOGLE_WALLET_ISSUER_ID?: string;
     GOOGLE_WALLET_SA_KEY?: string;

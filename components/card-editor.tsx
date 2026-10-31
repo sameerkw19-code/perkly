@@ -2,8 +2,8 @@
 import { useMemo, useState } from "react";
 import { ImagePlus, Lock, MessageCircle, Shuffle, Trash2, UploadCloud } from "lucide-react";
 import {
-  FONTS, FONT_SCRIPTS, GRADIENTS, GRADIENT_DIRS, ICON_GROUPS, IMAGE_MIN, LIMITS, OFFERED_CARD_LANGS, PALETTES, cardLang, darken, designChecks, is3d, stamp3dUrl,
-  type AssetMeta, type CardLook, type Design, type FontId, type Layout, type LogoFrame, type Size, type StampIcon, type Texts,
+  FONTS, FONT_SCRIPTS, GRADIENTS, GRADIENT_DIRS, ICON_GROUPS, IMAGE_MIN, LIMITS, NOTICE_DEFAULTS, OFFERED_CARD_LANGS, noticeDefault, PALETTES, cardLang, darken, designChecks, is3d, noticeText, stamp3dUrl,
+  type AssetMeta, type CardLook, type Design, type FontId, type Layout, type LogoFrame, type Size, type StampIcon, type StampNotice, type Texts,
 } from "../lib/design";
 import { CARD_LANGS, isRtl, type Lang } from "../lib/i18n-types";
 import { errorText, translate } from "../lib/i18n";
@@ -158,6 +158,21 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
   }
   const setText = (k: keyof Texts, v: string) =>
     setDesign((d) => ({ ...d, texts: { ...d.texts, [textLang]: { ...d.texts[textLang], [k]: v.slice(0, LIMITS[k]) } } }));
+
+  /** One notification text: the business's wording (empty = the default shown greyed out) and how it will read. */
+  // Called as a function, not as <NoticeField/>: a component defined here would remount on every keystroke.
+  const noticeField = ({ k, label, notice, placeholder }: { k: "notify" | "notifyReward" | "welcome" | "birthday"; label: string; notice: StampNotice; placeholder: string }) => {
+    const tx = design.texts[textLang];
+    const first = design.texts[design.langs[0]];
+    const sample = noticeText({ ...tx, title: tx.title || first.title, reward: tx.reward || first.reward }, textLang, notice);
+    return (
+      <label key={k}>
+        <span className="label-row">{label}<small><Num>{tx[k].length}/{LIMITS[k]}</Num></small></span>
+        <textarea rows={2} value={tx[k]} maxLength={LIMITS[k]} placeholder={placeholder} onChange={(e) => setText(k, e.target.value)} />
+        <small className="form-hint">{t("edNotifyPreview")}: {sample}</small>
+      </label>
+    );
+  };
 
   async function upload(kind: "logo" | "hero" | "wallet" | "stamp" | "stampEmpty" | "pizza", file: File | undefined) {
     if (!file) return;
@@ -567,6 +582,59 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
               </button>
             </div>
             <p className="form-hint">{t("wbStampsHint")}</p>
+          </div>
+          <div className="wallet-notify">
+            <h3 className="sub-head">{t("edNotify")}</h3>
+            {design.langs.length > 1 && (design.walletNotify || design.walletWelcome || design.walletBirthday) && (
+              <div className="seg">
+                {design.langs.map((l) => <button key={l} type="button" aria-pressed={textLang === l} onClick={() => setTextLang(l)}>{t("langName_" + l)}</button>)}
+              </div>
+            )}
+
+            <h4 className="notify-head">{t("edMsgStamp")}</h4>
+            <label className="check-row clear-white">
+              <input type="checkbox" checked={design.walletNotify} onChange={(e) => set({ walletNotify: e.target.checked })} />
+              <span>{t("edNotifyOn")}<small className="form-hint">{t("edNotifyOnHint")}</small></span>
+            </label>
+            {design.walletNotify && (
+              <div className="stack-form" dir={isRtl(textLang) ? "rtl" : "ltr"}>
+                {(["notify", "notifyReward"] as const).map((k) =>
+                  noticeField({ k, label: t(k === "notify" ? "fNotify" : "fNotifyReward"), notice: k === "notify" ? { kind: "stamp", added: 1, left: Math.max(1, target - 2), name: t("edNotifySampleName") } : { kind: "reward", name: t("edNotifySampleName") }, placeholder: k === "notify" ? NOTICE_DEFAULTS[textLang].one : NOTICE_DEFAULTS[textLang].reward }),
+                )}
+              </div>
+            )}
+
+            <h4 className="notify-head">{t("edMsgWelcome")}</h4>
+            <label className="check-row clear-white">
+              <input type="checkbox" checked={design.walletWelcome} onChange={(e) => set({ walletWelcome: e.target.checked })} />
+              <span>{t("edMsgWelcomeOn")}<small className="form-hint">{t("edMsgWelcomeHint")}</small></span>
+            </label>
+            {design.walletWelcome && (
+              <div className="stack-form" dir={isRtl(textLang) ? "rtl" : "ltr"}>
+                {noticeField({ k: "welcome", label: t("fWelcome"), notice: { kind: "welcome", name: t("edNotifySampleName") }, placeholder: noticeDefault(textLang, "welcome") })}
+              </div>
+            )}
+
+            <h4 className="notify-head">{t("edMsgBirthday")}</h4>
+            <label className="check-row clear-white">
+              <input type="checkbox" checked={design.walletBirthday} onChange={(e) => set({ walletBirthday: e.target.checked })} />
+              <span>{t("edMsgBirthdayOn")}<small className="form-hint">{t("edMsgBirthdayHint")}</small></span>
+            </label>
+            <label className="check-row clear-white">
+              <input type="checkbox" checked={design.birthdayGift} onChange={(e) => set({ birthdayGift: e.target.checked })} />
+              <span>{t("edMsgGift", { reward: design.texts[design.langs[0]].reward })}<small className="form-hint">{t("edMsgGiftHint")}</small></span>
+            </label>
+            {design.walletBirthday && (
+              <div className="stack-form" dir={isRtl(textLang) ? "rtl" : "ltr"}>
+                {noticeField({ k: "birthday", label: t("fBirthday"), notice: { kind: "birthday", name: t("edNotifySampleName"), gift: design.birthdayGift }, placeholder: noticeDefault(textLang, "birthday", design.birthdayGift) })}
+              </div>
+            )}
+
+            {(design.walletNotify || design.walletWelcome || design.walletBirthday) && <p className="form-hint">{t("edNotifyVars")}</p>}
+
+            <h4 className="notify-head">{t("edMsgSpecial")}</h4>
+            <p className="form-hint">{t("edMsgSpecialHint")}</p>
+            <a className="btn soft small" href={`/special?b=${encodeURIComponent(businessId)}`}>{t("edMsgSpecialLink")}</a>
           </div>
           {design.logo && (
             <div className="logo-controls">
