@@ -13,6 +13,8 @@ const KINDS = new Set(["logo", "hero", "stamp", "wallet"]);
 
 // Upload one image (raw bytes in the body). Owner only. SVG is not accepted.
 export async function POST(request: Request) {
+  // A declared size over the cap is refused before anything is read into memory.
+  if (Number(request.headers.get("content-length") ?? 0) > MAX_BYTES + 4096) return fail("too_large", 413, "Image is too large");
   const bytes = new Uint8Array(await request.arrayBuffer()); // read first, always
   if (!sameOrigin(request)) return fail("bad_origin", 403);
   const db = getD1();

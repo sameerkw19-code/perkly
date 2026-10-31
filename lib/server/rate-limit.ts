@@ -20,3 +20,11 @@ export async function allow(db: D1Database, key: string, limit: number, windowSe
   }
   return (row?.count ?? 0) <= limit;
 }
+
+/** True when `key` already reached `limit` in the current window. Does not count this call. */
+export async function limited(db: D1Database, key: string, limit: number, windowSeconds: number): Promise<boolean> {
+  const now = Math.floor(Date.now() / 1000);
+  const windowStart = now - (now % windowSeconds);
+  const row = await db.prepare("SELECT window_start, count FROM rate_limits WHERE key = ?").bind(key).first<{ window_start: number; count: number }>();
+  return !!row && row.window_start === windowStart && row.count >= limit;
+}
