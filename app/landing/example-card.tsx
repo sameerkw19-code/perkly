@@ -28,9 +28,12 @@ export function exampleDesign(k: ExampleKey, lang: Lang, name: string, rewardLin
     walletBanner: "image",
     walletStamps: [],
     walletNotify: false,
+    walletWelcome: false,
+    walletBirthday: false,
+    birthdayGift: false,
     progressImage: null,
     langs: [lang],
-    texts: Object.fromEntries((["he", "ar", "en", "ru", "de", "fr"] as const).map((l) => [l, { ...texts, notify: "", notifyReward: "" }])) as Design["texts"],
+    texts: Object.fromEntries((["he", "ar", "en", "ru", "de", "fr"] as const).map((l) => [l, { ...texts, notify: "", notifyReward: "", welcome: "", birthday: "" }])) as Design["texts"],
     showCustomerName: true,
     look: { ...defaultLook(th.bg), bg2: light ? darken(th.bg, 0.1) : darken(th.bg, 0.32) },
   };

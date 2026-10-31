@@ -10,6 +10,8 @@
   "compatibility_date": "2026-05-15",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
+  // Every 2 minutes: welcome, birthday and special-day messages (lib/server/customer-messages.ts).
+  "triggers": { "crons": ["*/2 * * * *"] },
   // Videos go through the Worker so it can answer byte-range requests (needed by Safari on iPhone).
   "assets": { "binding": "ASSETS", "run_worker_first": ["/videos/*"] },
   "d1_databases": [
@@ -27,6 +29,7 @@
       // Without this, every deploy deletes them. Secrets are never affected.
       "keep_vars": true,
       "observability": { "enabled": true },
+      "triggers": { "crons": ["*/2 * * * *"] },
       // Not secret: the Google Wallet issuer id is visible in every "save to wallet" link.
       "vars": {
         "GOOGLE_WALLET_ISSUER_ID": "3388000000023227862",
@@ -46,6 +49,7 @@
       "name": "perkly",
       "keep_vars": true,
       "observability": { "enabled": true },
+      "triggers": { "crons": ["*/2 * * * *"] },
       // Same Google Wallet issuer and class as staging (one issuer account). Not secret.
       "vars": {
         "GOOGLE_WALLET_ISSUER_ID": "3388000000023227862",

@@ -1,11 +1,11 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { RefreshCw, Wallet } from "lucide-react";
 import { useLang, translate } from "../../../lib/i18n";
 import { LoyaltyCard } from "../../../components/loyalty-card";
 import { QrImage } from "../../../components/qr";
 
-import { cardLang, type Design } from "../../../lib/design";
+import { cardLang, noticeText, textsFor, type Design } from "../../../lib/design";
 import { CARD_LANG_NAME, CARD_LOCALE, isRtl, type Lang } from "../../../lib/i18n-types";
 import { SOCIAL_COLOR, type SocialKey } from "../../../lib/social";
 import { SocialIcon } from "../../../lib/social-icon";
@@ -21,6 +21,21 @@ export default function CardView({ card, secret, googleWallet, isIOS }: { card: 
   const t = (key: string, vars?: Record<string, string | number>) => translate(lang, key, vars);
   const dir = card ? (isRtl(lang) ? "rtl" : "ltr") : siteDir;
   const langs = card?.design.langs ?? [];
+  // Right after joining (?welcome=1): the business's welcome message, when it turned welcomes on.
+  const [welcome, setWelcome] = useState(false);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("welcome") !== "1") return;
+    setWelcome(true);
+    url.searchParams.delete("welcome");
+    window.history.replaceState(null, "", url.pathname + url.search);
+  }, []);
+  const welcomeText = card && welcome && card.design.walletWelcome
+    ? (() => {
+        const tx = textsFor(card.design, lang);
+        return noticeText({ ...tx, title: tx.title || card.business }, lang, { kind: "welcome", name: card.name });
+      })()
+    : "";
   return (
     <div className="card-page" dir={dir} lang={lang}>
       <div className="auth-top">
@@ -37,6 +52,7 @@ export default function CardView({ card, secret, googleWallet, isIOS }: { card: 
         <div className="auth-card panel"><h1>{t("cardNotFound")}</h1></div>
       ) : (
         <div className="card-stack">
+          {welcomeText && <p className="card-welcome" role="status">{welcomeText}</p>}
           <LoyaltyCard
             design={card.design}
             lang={lang}

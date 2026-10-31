@@ -55,3 +55,20 @@ export function upcomingKeys(now: Date, days = 7, timeZone = "Asia/Jerusalem"): 
   }
   return out;
 }
+
+/** Today's date and hour in Israel, where the businesses are. */
+export function israelNow(now = new Date()) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" })
+      .formatToParts(now)
+      .map((p) => [p.type, p.value]),
+  );
+  const year = Number(parts.year);
+  return { date: `${parts.year}-${parts.month}-${parts.day}`, md: `${parts.month}-${parts.day}`, hour: Number(parts.hour), year };
+}
+
+/** Birthdays to greet today: Feb 29 birthdays are greeted on Feb 28 in other years. */
+export function birthdayKeys(md: string, year: number): string[] {
+  const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  return md === "02-28" && !leap ? ["02-28", "02-29"] : [md];
+}

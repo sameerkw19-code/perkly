@@ -5,6 +5,7 @@ import { fail } from "../../../../../lib/server/http";
 import { getSettings } from "../../../../../lib/server/settings";
 import { ensureBusinessClass, saveUrl, walletConfig } from "../../../../../lib/server/google-wallet";
 import { passLook } from "../../../../../lib/server/designs";
+import { queueWelcome } from "../../../../../lib/server/customer-messages";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ secr
   // From now on, stamps for this customer are pushed to Google (see lib/server/wallet-sync.ts).
   if (!(await getSettings(db)).maintenance) {
     await db.prepare("UPDATE customers SET google_wallet = ? WHERE id = ?").bind(new Date().toISOString(), row.customer_id).run();
+    // The welcome goes out once the pass is saved (sent only if the business turned it on).
+    await queueWelcome(db, { id: row.customer_id, business: row.business_id });
   }
 
   // One shared class for now (GOOGLE_WALLET_CLASS_ID): Perkly's logo and color. Each pass adds the

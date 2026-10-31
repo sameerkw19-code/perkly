@@ -71,6 +71,8 @@ export type Texts = {
   title: string; subtitle: string; reward: string; gift: string; promo: string;
   /** Wallet notification after a stamp, and when a reward is reached. Empty: the default wording. */
   notify: string; notifyReward: string;
+  /** Welcome message after joining, and the birthday greeting. Empty: the default wording. */
+  welcome: string; birthday: string;
 };
 
 /** Fonts a business can pick. All are free Google Fonts; "system" needs no download. */
@@ -162,6 +164,12 @@ export type Design = {
   walletStamps: string[];
   /** A phone notification (Google Wallet) after each stamp and when a reward is reached. Off unless the business turns it on. */
   walletNotify: boolean;
+  /** A welcome notification right after the customer saves the card to Google Wallet. */
+  walletWelcome: boolean;
+  /** A birthday greeting on the customer's birthday (Google Wallet). */
+  walletBirthday: boolean;
+  /** On the customer's birthday, a reward is added to the card (valid BIRTHDAY_GIFT_DAYS days). */
+  birthdayGift: boolean;
   /** Languages the card is shown in, in card order. Set by the business; a language not listed never appears. */
   langs: Lang[];
   texts: Record<Lang, Texts>;
@@ -169,7 +177,10 @@ export type Design = {
   look: CardLook;
 };
 
-export const LIMITS = { title: 40, subtitle: 40, reward: 80, gift: 14, promo: 60, notify: 120, notifyReward: 120 };
+export const LIMITS = { title: 40, subtitle: 40, reward: 80, gift: 14, promo: 60, notify: 120, notifyReward: 120, welcome: 120, birthday: 120 };
+export const BIRTHDAY_GIFT_DAYS = 7;
+/** Longest special-day message a business can schedule. */
+export const SPECIAL_MAX_TEXT = 160;
 export const WALLET_LIMITS = { title: 24, reward: 36 };
 export const IMAGE_MIN = { logo: 660, hero: 1032, stamp: 120, wallet: 1032 };
 
@@ -230,7 +241,7 @@ export function cardLang(d: Design, wanted?: string | null): Lang {
 }
 
 export function defaultDesign(b: { name: string; reward: string; color: string }): Design {
-  const t = (l: Lang): Texts => ({ title: b.name.slice(0, LIMITS.title), subtitle: "", reward: b.reward.slice(0, LIMITS.reward), gift: GIFT[l], promo: "", notify: "", notifyReward: "" });
+  const t = (l: Lang): Texts => ({ title: b.name.slice(0, LIMITS.title), subtitle: "", reward: b.reward.slice(0, LIMITS.reward), gift: GIFT[l], promo: "", notify: "", notifyReward: "", welcome: "", birthday: "" });
   return {
     v: 1,
     layout: "gradient",
@@ -242,6 +253,9 @@ export function defaultDesign(b: { name: string; reward: string; color: string }
     walletBanner: "image",
     walletStamps: [],
     walletNotify: false,
+    walletWelcome: false,
+    walletBirthday: false,
+    birthdayGift: false,
     progressImage: null,
     langs: ["he"],
     texts: Object.fromEntries(CARD_LANGS.map((l) => [l, t(l)])) as Record<Lang, Texts>,
@@ -274,6 +288,8 @@ export function sanitizeDesign(input: unknown): Design | null {
       promo: cleanText(t.promo, LIMITS.promo),
       notify: cleanText(t.notify, LIMITS.notify),
       notifyReward: cleanText(t.notifyReward, LIMITS.notifyReward),
+      welcome: cleanText(t.welcome, LIMITS.welcome),
+      birthday: cleanText(t.birthday, LIMITS.birthday),
     };
   }
   return {
@@ -287,6 +303,9 @@ export function sanitizeDesign(input: unknown): Design | null {
     walletBanner: d.walletBanner === "stamps" ? "stamps" : "image",
     walletStamps: walletStampIds(d.walletStamps),
     walletNotify: d.walletNotify === true,
+    walletWelcome: d.walletWelcome === true,
+    walletBirthday: d.walletBirthday === true,
+    birthdayGift: d.birthdayGift === true,
     progressImage: asset(d.progressImage),
     langs: sanitizeLangs(d.langs),
     texts,
@@ -426,11 +445,49 @@ export function textsFor(d: Design, lang: Lang): Texts {
     promo: d.texts[l].promo ?? "",
     notify: d.texts[l].notify ?? "",
     notifyReward: d.texts[l].notifyReward ?? "",
+    welcome: d.texts[l].welcome ?? "",
+    birthday: d.texts[l].birthday ?? "",
   };
 }
 
-/** What just happened on the card, for the phone notification. */
-export type StampNotice = { kind: "stamp"; added: number; left: number; name: string } | { kind: "reward"; name: string };
+/** What happened on the card (or what day it is), for the phone notification. */
+export type StampNotice =
+  | { kind: "stamp"; added: number; left: number; name: string }
+  | { kind: "reward"; name: string }
+  | { kind: "welcome"; name: string }
+  | { kind: "birthday"; name: string; gift: boolean }
+  /** A message the business scheduled for a special day; `text` is its own wording. */
+  | { kind: "special"; name: string; text: string };
+
+/** Whether the business turned on this kind of notification. Special days are always sent: the business scheduled them. */
+export function noticeOn(d: Design, kind: StampNotice["kind"]): boolean {
+  if (kind === "stamp" || kind === "reward") return d.walletNotify;
+  if (kind === "welcome") return d.walletWelcome;
+  if (kind === "birthday") return d.walletBirthday;
+  return true;
+}
+
+const WELCOME_DEFAULTS: Record<Lang, string> = {
+  he: "ברוכים הבאים ל{business}, {name}! כל קנייה מקרבת אותך ל: {reward}",
+  ar: "أهلاً بك في {business}، {name}! كل شراء يقرّبك من: {reward}",
+  en: "Welcome to {business}, {name}! Every visit brings you closer to: {reward}",
+  ru: "Добро пожаловать в {business}, {name}! Каждая покупка приближает вас к: {reward}",
+  de: "Willkommen bei {business}, {name}! Jeder Einkauf bringt dich näher zu: {reward}",
+  fr: "Bienvenue chez {business}, {name} ! Chaque achat vous rapproche de : {reward}",
+};
+const BIRTHDAY_DEFAULTS: Record<Lang, { plain: string; gift: string }> = {
+  he: { plain: "מזל טוב {name}! 🎂 כל הצוות של {business} מאחל לך יום הולדת שמח", gift: "מזל טוב {name}! 🎂 לכבוד יום ההולדת מחכה לך מתנה ב{business}: {reward}" },
+  ar: { plain: "عيد ميلاد سعيد {name}! 🎂 فريق {business} يتمنى لك يوماً جميلاً", gift: "عيد ميلاد سعيد {name}! 🎂 بمناسبة عيد ميلادك تنتظرك هدية في {business}: {reward}" },
+  en: { plain: "Happy birthday {name}! 🎂 Everyone at {business} wishes you a great day", gift: "Happy birthday {name}! 🎂 A birthday gift is waiting for you at {business}: {reward}" },
+  ru: { plain: "С днём рождения, {name}! 🎂 Команда {business} поздравляет вас", gift: "С днём рождения, {name}! 🎂 Вас ждёт подарок в {business}: {reward}" },
+  de: { plain: "Alles Gute zum Geburtstag, {name}! 🎂 Dein Team von {business}", gift: "Alles Gute zum Geburtstag, {name}! 🎂 Bei {business} wartet ein Geschenk auf dich: {reward}" },
+  fr: { plain: "Joyeux anniversaire {name} ! 🎂 Toute l'équipe de {business} vous le souhaite", gift: "Joyeux anniversaire {name} ! 🎂 Un cadeau vous attend chez {business} : {reward}" },
+};
+
+/** The default wording for welcome and birthday messages (shown greyed out in the editor). */
+export function noticeDefault(lang: Lang, kind: "welcome" | "birthday", gift = false): string {
+  return kind === "welcome" ? (WELCOME_DEFAULTS[lang] ?? WELCOME_DEFAULTS.en) : (BIRTHDAY_DEFAULTS[lang] ?? BIRTHDAY_DEFAULTS.en)[gift ? "gift" : "plain"];
+}
 
 /** Default notification wording. {added}, {left}, {reward}, {business} and {name} are filled in. */
 export const NOTICE_DEFAULTS: Record<Lang, { one: string; many: string; reward: string }> = {
@@ -445,7 +502,12 @@ export const NOTICE_DEFAULTS: Record<Lang, { one: string; many: string; reward: 
 /** The notification text in one language: the business's own wording, or the default. */
 export function noticeText(texts: Texts, lang: Lang, notice: StampNotice): string {
   const d = NOTICE_DEFAULTS[lang] ?? NOTICE_DEFAULTS.en;
-  const template = notice.kind === "reward" ? texts.notifyReward || d.reward : texts.notify || (notice.added === 1 ? d.one : d.many);
+  const template =
+    notice.kind === "reward" ? texts.notifyReward || d.reward
+    : notice.kind === "welcome" ? texts.welcome || noticeDefault(lang, "welcome")
+    : notice.kind === "birthday" ? texts.birthday || noticeDefault(lang, "birthday", notice.gift)
+    : notice.kind === "special" ? notice.text
+    : texts.notify || (notice.added === 1 ? d.one : d.many);
   const name = notice.name.trim().split(/\s+/)[0] ?? "";
   const vars: Record<string, string> = {
     added: notice.kind === "stamp" ? String(notice.added) : "",
@@ -456,6 +518,9 @@ export function noticeText(texts: Texts, lang: Lang, notice: StampNotice): strin
   };
   return template
     .replace(/\{(added|left|reward|business|name)\}/g, (_, k: string) => vars[k])
+    .replace(/\s+([,،!.])/g, "$1")
+    .replace(/([,،])(?=[!.])/g, "")
+    .replace(/^[,،]\s*/, "")
     .replace(/\s{2,}/g, " ")
     .trim()
     .slice(0, 200);

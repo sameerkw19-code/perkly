@@ -1,4 +1,4 @@
-import { assetIds, cardLang, defaultDesign, noticeText, sanitizeDesign, textsFor, walletStampPicture, type AssetMeta, type Design, type Lang, type StampNotice } from "../design";
+import { assetIds, cardLang, defaultDesign, noticeOn, noticeText, sanitizeDesign, textsFor, walletStampPicture, type AssetMeta, type Design, type Lang, type StampNotice } from "../design";
 
 /** Google Wallet language tags for each card language. */
 export const GOOGLE_TAG: Record<Lang, string> = { he: "he", ar: "ar", en: "en-US", ru: "ru", de: "de", fr: "fr" };
@@ -74,7 +74,7 @@ export async function passLook(db: D1Database, business: BusinessLike, origin: s
     }
   }
   let notice: PassNotice | null = null;
-  if (card?.notice && design.walletNotify) {
+  if (card?.notice && noticeOn(design, card.notice.kind)) {
     const forLang = (l: Lang) => {
       const t = textsFor(design, l);
       const title = (t.title || business.name).slice(0, 60);
