@@ -8,7 +8,9 @@ const SECURITY_HEADERS: Record<string, string> = {
   // Camera is needed only on our own pages (staff scanner).
   "Permissions-Policy": "camera=(self), microphone=(), geolocation=()",
   // Baseline policy. Scripts are not restricted here, because the framework inlines its own.
-  "Content-Security-Policy": "frame-ancestors 'none'; base-uri 'self'; object-src 'none'",
+  "Content-Security-Policy": "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'",
+  // Pages opened from here (Polar, Google Wallet) get no handle back to this window.
+  "Cross-Origin-Opener-Policy": "same-origin",
 };
 
 /**

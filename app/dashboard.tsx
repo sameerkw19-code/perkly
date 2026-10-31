@@ -142,6 +142,13 @@ export default function Dashboard() {
     window.location.href = "/login";
   }
 
+  /** For a lost phone or a shared computer: ends the session on every device. */
+  async function signOutEverywhere() {
+    if (!window.confirm(t("signOutAllConfirm"))) return;
+    await post("/api/auth", { action: "logout_all" });
+    window.location.href = "/login";
+  }
+
   const role = data?.role;
   const b = data?.business;
   const isOwner = role === "owner";
@@ -222,6 +229,7 @@ export default function Dashboard() {
           <div className="profile"><span>{data.me.name.charAt(0)}</span><div><strong>{data.me.name}</strong><small dir="ltr">{data.me.email}</small></div></div>
           {isOwner && <a className="text-btn" href="/billing"><CreditCard size={15} />{t("billingLink")}</a>}
           <button className="text-btn" onClick={signOut}><LogOut size={15} />{t("signOut")}</button>
+          <button className="text-btn" onClick={signOutEverywhere}><LogOut size={15} />{t("signOutAll")}</button>
         </div>
       </aside>
 
