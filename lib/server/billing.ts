@@ -37,8 +37,12 @@ export async function businessAccess(db: D1Database, businessId: string, now = n
   if (row.comp_until && row.comp_until > now) return { ok: true };
   if (row.status === null || isEntitled(row.status)) return { ok: true };
   const count = await db
-    // Every customer ever added counts, so removing customers does not free up places.
-    .prepare("SELECT COUNT(*) AS n FROM customers WHERE business = ?")
+    // Every customer ever added counts, so removing customers does not free up places. The exception:
+    // someone who joined by the public QR and never got a stamp (otherwise strangers could fill the places).
+    .prepare(
+      `SELECT COUNT(*) AS n FROM customers c WHERE c.business = ?
+         AND NOT (c.source = 'self' AND c.stamps = 0 AND NOT EXISTS (SELECT 1 FROM events e WHERE e.customer = c.id))`,
+    )
     .bind(businessId)
     .first<{ n: number }>();
   const used = count?.n ?? 0;

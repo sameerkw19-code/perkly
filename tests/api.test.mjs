@@ -570,3 +570,34 @@ test("pilot request: validated per field, stored once, rate limited", async () =
   assert.equal(evil.status, 403);
 });
 
+
+test("common passwords are refused", async () => {
+  const c = new Client();
+  for (const password of ["12345678", "Password123", "qwerty123!"]) {
+    const r = await c.post("/api/auth", { action: "signup", name: "weak", email: `weak-${run}@test.perkly`, password });
+    assert.equal(r.status, 400, password);
+    assert.equal(r.body.code, "common_password", password);
+  }
+  const same = await c.post("/api/auth", { action: "signup", name: "same", email: `samepass${run}@test.perkly`, password: `samepass${run}` });
+  assert.equal(same.body.code, "common_password", "the email's name is not a password");
+});
+
+test("sign out everywhere ends every session of that user", async () => {
+  const phone = new Client();
+  const laptop = new Client();
+  const email = `everywhere-${run}@test.perkly`;
+  const r = await phone.post("/api/auth", { action: "signup", name: "both", email, password: "two devices 1" });
+  assert.equal(r.status, 200);
+  assert.equal((await laptop.post("/api/auth", { action: "login", email, password: "two devices 1" })).status, 200);
+  assert.equal((await laptop.get("/api/loyalty")).status, 200);
+  assert.equal((await phone.post("/api/auth", { action: "logout_all" })).status, 200);
+  assert.equal((await laptop.get("/api/loyalty")).status, 401, "the other device is signed out too");
+  assert.equal((await phone.get("/api/loyalty")).status, 401);
+});
+
+test("ids must be text", async () => {
+  const r = await ownerA.post("/api/loyalty", { action: "lookup", business: { $ne: 1 }, q: "aa" });
+  assert.equal(r.status, 400);
+  const r2 = await ownerA.post("/api/loyalty", { action: "archive_customer", business: "x", customer: ["a"] });
+  assert.equal(r2.status, 400);
+});
