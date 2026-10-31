@@ -474,3 +474,4 @@ fieldset.birthday{border:0;padding:0;margin:0 0 14px}fieldset.birthday legend{fo
 .account-card section{display:grid;gap:8px;padding-top:14px;border-top:1px solid var(--line)}.account-card h2{font-size:16px;margin:0}.btn.danger{color:#a32020}
 .skip-link{position:absolute;inset-inline-start:12px;top:-60px;z-index:300;background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-weight:700}.skip-link:focus{top:12px}main:focus{outline:none}
 .page-main{width:100%;display:flex;flex-direction:column;align-items:center;gap:20px}
+.card-offline{margin:0;padding:10px 14px;border-radius:12px;background:#fff4e5;color:#7a4b00;border:1px solid #fde4b0;font-size:14px;line-height:1.5;text-align:center}
