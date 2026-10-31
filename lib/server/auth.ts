@@ -20,13 +20,19 @@ function cookieAttributes(secure: boolean, maxAge: number): string {
   return `Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure ? "; Secure" : ""}`;
 }
 
+/** Secure everywhere except local development (http://localhost or 127.0.0.1). */
+function secureCookie(request: Request): boolean {
+  const { hostname } = new URL(request.url);
+  return !(hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]");
+}
+
 export function sessionCookie(token: string, request: Request): string {
-  const secure = new URL(request.url).protocol === "https:";
+  const secure = secureCookie(request);
   return `${SESSION_COOKIE}=${token}; ${cookieAttributes(secure, SESSION_DAYS * 86_400)}`;
 }
 
 export function clearSessionCookie(request: Request): string {
-  const secure = new URL(request.url).protocol === "https:";
+  const secure = secureCookie(request);
   return `${SESSION_COOKIE}=; ${cookieAttributes(secure, 0)}`;
 }
 

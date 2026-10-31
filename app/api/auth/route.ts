@@ -8,9 +8,9 @@ import {
   normalizeEmail,
   sessionCookie,
 } from "../../../lib/server/auth";
-import { DUMMY_HASH, hashPassword, sha256, verifyPassword } from "../../../lib/server/crypto";
+import { DUMMY_HASH, hashPassword, sameText, sha256, verifyPassword } from "../../../lib/server/crypto";
 import { clientIp, fail, json, readJson, sameOrigin, str } from "../../../lib/server/http";
-import { allow } from "../../../lib/server/rate-limit";
+import { allow, limited } from "../../../lib/server/rate-limit";
 import { getSettings } from "../../../lib/server/settings";
 
 export const dynamic = "force-dynamic";
@@ -39,13 +39,12 @@ export async function POST(request: Request) {
   switch (body.action) {
     case "signup": {
       if (!(await allow(db, `signup:${ip}`, 5, 3600))) return fail("rate_limited", 429, "Too many attempts");
-      if (env.SIGNUP_CODE && body.signupCode !== env.SIGNUP_CODE) return fail("signup_code", 403, "Signup code required");
+      if (env.SIGNUP_CODE && !(await sameText(typeof body.signupCode === "string" ? body.signupCode : "", env.SIGNUP_CODE))) return fail("signup_code", 403, "Signup code required");
       const sys = await getSettings(db);
       const name = str(body.name, 80);
       const email = normalizeEmail(body.email);
-      // Closed sign-ups never lock out a configured platform admin email.
-      const adminEmail = !!email && (env.PLATFORM_ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).includes(email);
-      if ((!sys.signupsOpen || sys.maintenance) && !adminEmail) return fail(sys.maintenance ? "maintenance" : "signups_closed", 403, "Sign-ups are closed");
+      // No exception for admin emails: emails are not verified, so anyone could sign up with one.
+      if (!sys.signupsOpen || sys.maintenance) return fail(sys.maintenance ? "maintenance" : "signups_closed", 403, "Sign-ups are closed");
       if (!name || !email) return fail("bad_details", 400, "Invalid name or email");
       if (!validPassword(body.password)) return fail("weak_password", 400, "Password must be 8+ characters");
       const userId = await newUser(db, name, email, body.password);
@@ -56,15 +55,23 @@ export async function POST(request: Request) {
 
     case "login": {
       const email = normalizeEmail(body.email);
+      // Only wrong passwords count toward the per-email limits, so nobody can lock an account by
+      // guessing on purpose from one place: 8 per email from one network, 50 per email in total.
+      const failKey = `login-fail:${email ?? "invalid"}`;
       const okIp = await allow(db, `login-ip:${ip}`, 30, 600);
-      const okEmail = await allow(db, `login-email:${email ?? "invalid"}`, 8, 600);
-      if (!okIp || !okEmail) return fail("rate_limited", 429, "Too many attempts. Try again in 10 minutes.");
+      if (!okIp || (await limited(db, `${failKey}:${ip}`, 8, 600)) || (await limited(db, failKey, 50, 600))) {
+        return fail("rate_limited", 429, "Too many attempts. Try again in 10 minutes.");
+      }
       const password = typeof body.password === "string" ? body.password.slice(0, 200) : "";
       const user = email
         ? await db.prepare("SELECT id, pass_hash, blocked FROM users WHERE email = ?").bind(email).first<{ id: string; pass_hash: string; blocked: string | null }>()
         : null;
       const valid = await verifyPassword(password, user?.pass_hash ?? DUMMY_HASH);
-      if (!user || !valid) return fail("bad_login", 401, "Wrong email or password");
+      if (!user || !valid) {
+        await allow(db, `${failKey}:${ip}`, 8, 600);
+        await allow(db, failKey, 50, 600);
+        return fail("bad_login", 401, "Wrong email or password");
+      }
       // Only after a correct password, so the message does not reveal which emails exist.
       if (user.blocked) return fail("account_blocked", 403, "This account is blocked");
       const token = await createSession(db, user.id);

@@ -62,3 +62,11 @@ export async function verifyPassword(password: string, stored: string): Promise<
 /** Used to spend the same time on unknown emails as on wrong passwords. */
 export const DUMMY_HASH =
   "pbkdf2$100000$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+
+/** Compares two secrets without revealing, through timing, how much of them matches. */
+export async function sameText(a: string, b: string): Promise<boolean> {
+  const [x, y] = await Promise.all([sha256(a), sha256(b)]);
+  let diff = 0;
+  for (let i = 0; i < x.length; i++) diff |= x.charCodeAt(i) ^ y.charCodeAt(i);
+  return diff === 0 && x.length === y.length;
+}

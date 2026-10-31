@@ -7,6 +7,8 @@ const SECURITY_HEADERS: Record<string, string> = {
   "Referrer-Policy": "strict-origin-when-cross-origin",
   // Camera is needed only on our own pages (staff scanner).
   "Permissions-Policy": "camera=(self), microphone=(), geolocation=()",
+  // Baseline policy. Scripts are not restricted here, because the framework inlines its own.
+  "Content-Security-Policy": "frame-ancestors 'none'; base-uri 'self'; object-src 'none'",
 };
 
 /**

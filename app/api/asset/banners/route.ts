@@ -18,6 +18,8 @@ const MAX_BYTES = 400_000; // One banner picture (JPEG, 1032×336).
  * Returns the new picture ids in stamp order.
  */
 export async function POST(request: Request) {
+  // At most MAX_WALLET_STAMPS + 1 pictures of MAX_BYTES each; anything declared larger is refused unread.
+  if (Number(request.headers.get("content-length") ?? 0) > (MAX_BYTES + 2048) * (MAX_WALLET_STAMPS + 1)) return fail("too_large", 413, "Upload is too large");
   const form = await request.formData().catch(() => null); // read first, always
   if (!sameOrigin(request)) return fail("bad_origin", 403);
   const db = getD1();

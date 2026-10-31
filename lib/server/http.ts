@@ -26,9 +26,22 @@ export async function readJson(request: Request, maxBytes = 20_000): Promise<Rec
   }
 }
 
-/** Client IP. On Cloudflare this header is set by the edge and cannot be forged by the visitor. */
+/**
+ * Client IP for rate limits. On Cloudflare this header is set by the edge and cannot be forged.
+ * An IPv6 visitor usually controls a whole /64, so IPv6 addresses are grouped by their first 64 bits.
+ */
 export function clientIp(request: Request): string {
-  return request.headers.get("cf-connecting-ip") || "local";
+  const ip = request.headers.get("cf-connecting-ip") || "local";
+  return ip.includes(":") ? ipv6Prefix(ip) : ip;
+}
+
+/** First four groups of an IPv6 address ("2001:db8:1:2::5" -> "2001:db8:1:2::/64"). */
+export function ipv6Prefix(ip: string): string {
+  const [head, tail = ""] = ip.toLowerCase().split("::");
+  const left = head ? head.split(":") : [];
+  const right = tail ? tail.split(":") : [];
+  const groups = ip.includes("::") ? [...left, ...Array(Math.max(0, 8 - left.length - right.length)).fill("0"), ...right] : left;
+  return groups.slice(0, 4).map((g) => g.replace(/^0+(?=.)/, "")).join(":") + "::/64";
 }
 
 export function str(value: unknown, max: number): string | null {

@@ -47,6 +47,8 @@ export async function POST(request: Request) {
     }
     case "reset_link": {
       if (target.blocked) return fail("user_blocked", 409, "Unblock the user first");
+      // A reset link takes over the account, so it is never issued for another platform admin.
+      if (target.id !== me.id && isPlatformAdmin(target, env)) return fail("cannot_reset_admin", 409, "Platform admins reset their own password");
       const token = randomToken(24);
       const expires = new Date(Date.now() + 24 * 3_600_000).toISOString();
       await db.batch([
