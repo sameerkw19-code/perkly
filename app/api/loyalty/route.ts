@@ -262,6 +262,9 @@ export async function POST(request: Request) {
     // New businesses collect rewards by default (customers keep earning while a reward waits).
     const mode = p.rewardMode === "block" ? "block" : "bank";
     const id = crypto.randomUUID();
+    // The free trial is for an owner's first business only (a second business would otherwise reset it).
+    const earlier = await db.prepare("SELECT COUNT(*) AS n FROM businesses WHERE owner = ?").bind(user.id).first<{ n: number }>();
+    const trialDays = earlier?.n ? 0 : sys.trialDays;
     await db.batch([
       db.prepare("INSERT INTO businesses(id, owner, name, reward, target, color, created, join_code, reward_mode) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .bind(id, user.id, name, reward, p.target, p.color, now, randomCode(10), mode),
@@ -272,11 +275,15 @@ export async function POST(request: Request) {
         ? [
             db.prepare("INSERT OR IGNORE INTO subscriptions(business, status, updated) VALUES(?, 'none', ?)").bind(id, now),
             db.prepare("UPDATE businesses SET comp_until = ? WHERE id = ?")
-              .bind(sys.trialDays > 0 ? new Date(Date.now() + sys.trialDays * 86_400_000).toISOString() : null, id),
+              .bind(trialDays > 0 ? new Date(Date.now() + trialDays * 86_400_000).toISOString() : null, id),
           ]
         : []),
     ]);
     return json({ id });
+  }
+
+  for (const key of ["business", "customer", "user", "invite", "branch", "requestId"]) {
+    if (p[key] !== undefined && p[key] !== null && typeof p[key] !== "string") return fail("bad_request", 400, "Invalid request");
   }
 
   // Every other action: the server checks the user's role in this business.

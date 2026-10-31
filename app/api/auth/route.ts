@@ -19,6 +19,21 @@ function validPassword(value: unknown): value is string {
   return typeof value === "string" && value.length >= 8 && value.length <= 200;
 }
 
+/** Passwords that are guessed first. Compared without case, spaces or a trailing "!". */
+const COMMON_PASSWORDS = new Set([
+  "12345678", "123456789", "1234567890", "11111111", "00000000", "12341234", "87654321", "123123123",
+  "password", "password1", "password123", "passw0rd", "qwertyui", "qwerty123", "qwertyuiop", "asdfghjk",
+  "iloveyou", "abcd1234", "abc12345", "a1234567", "1q2w3e4r", "1qaz2wsx", "zaq12wsx", "letmein1",
+  "welcome1", "admin123", "perkly123", "loyalty1", "shalom123", "israel123", "05050505", "0501234567",
+]);
+
+/** Not one of the most common passwords, not one repeated character, and not the email. */
+function strongEnough(password: string, email: string | null): boolean {
+  const p = password.toLowerCase().replace(/\s+/g, "").replace(/!+$/, "");
+  if (COMMON_PASSWORDS.has(p) || /^(.)\1+$/.test(p)) return false;
+  return !(email && (p === email || p === email.split("@")[0]));
+}
+
 async function newUser(db: D1Database, name: string, email: string, password: string) {
   const id = crypto.randomUUID();
   const result = await db
@@ -47,6 +62,7 @@ export async function POST(request: Request) {
       if (!sys.signupsOpen || sys.maintenance) return fail(sys.maintenance ? "maintenance" : "signups_closed", 403, "Sign-ups are closed");
       if (!name || !email) return fail("bad_details", 400, "Invalid name or email");
       if (!validPassword(body.password)) return fail("weak_password", 400, "Password must be 8+ characters");
+      if (!strongEnough(body.password, email)) return fail("common_password", 400, "This password is too easy to guess");
       const userId = await newUser(db, name, email, body.password);
       if (!userId) return fail("email_taken", 409, "Email already registered");
       const token = await createSession(db, userId);
@@ -82,6 +98,7 @@ export async function POST(request: Request) {
       if (!(await allow(db, `reset:${ip}`, 10, 600))) return fail("rate_limited", 429, "Too many attempts");
       const tokenText = typeof body.token === "string" && body.token.length <= 100 ? body.token : "";
       if (!validPassword(body.password)) return fail("weak_password", 400, "Password must be 8+ characters");
+      if (!strongEnough(body.password, null)) return fail("common_password", 400, "This password is too easy to guess");
       const now = new Date().toISOString();
       const reset = tokenText
         ? await db
@@ -112,6 +129,13 @@ export async function POST(request: Request) {
       return json({ ok: true }, 200, { "Set-Cookie": clearSessionCookie(request) });
     }
 
+    // Ends every session of this user (all phones and computers), including this one.
+    case "logout_all": {
+      const me = await getUser(db, request.headers.get("cookie"));
+      if (me) await db.prepare("DELETE FROM sessions WHERE user = ?").bind(me.id).run();
+      return json({ ok: true }, 200, { "Set-Cookie": clearSessionCookie(request) });
+    }
+
     case "accept_invite": {
       if (!(await allow(db, `invite:${ip}`, 20, 600))) return fail("rate_limited", 429, "Too many attempts");
       const tokenText = typeof body.token === "string" && body.token.length <= 100 ? body.token : "";
@@ -135,6 +159,7 @@ export async function POST(request: Request) {
         const email = normalizeEmail(body.email);
         if (!name || !email) return fail("bad_details", 400, "Invalid name or email");
         if (!validPassword(body.password)) return fail("weak_password", 400, "Password must be 8+ characters");
+      if (!strongEnough(body.password, email)) return fail("common_password", 400, "This password is too easy to guess");
         const userId = await newUser(db, name, email, body.password);
         if (!userId) return fail("email_taken_signin", 409, "Email already registered. Sign in first, then open the invite again.");
         user = { id: userId, email, name };
