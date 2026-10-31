@@ -4,7 +4,7 @@ import { SOCIAL_KEYS, SOCIAL_LABEL, normalizeSocial, socialDisplay, type Social 
 import { SocialIcon } from "../lib/social-icon";
 import {
   Activity, AlertTriangle, Cake, Check, Copy, CreditCard, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode,
-  Palette, RefreshCw, ScanLine, Search, Settings, Share2, Store, Users, Wallet, X,
+  Palette, RefreshCw, ScanLine, Search, Settings, Share2, Store, Users, UserRound, Wallet, X,
 } from "lucide-react";
 import type { Design } from "../lib/design";
 import { CardEditor } from "../components/card-editor";
@@ -69,6 +69,38 @@ export default function Dashboard() {
   const [toast, setToast] = useState<{ text: string; bad?: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
   const [online, setOnline] = useState(true);
+  // Pop-up windows work from the keyboard: focus moves in, Tab stays inside, Escape closes, focus returns.
+  const dialogRef = useRef<HTMLElement>(null);
+  const busyRef = useRef(false);
+  busyRef.current = busy;
+  const modalKey = modal ? modal.type : null;
+  useEffect(() => {
+    if (!modalKey) return;
+    const before = document.activeElement as HTMLElement | null;
+    const el = dialogRef.current;
+    const focusables = () =>
+      Array.from(el?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? [])
+        .filter((x) => x.offsetParent !== null);
+    if (el) {
+      const title = el.querySelector("h2")?.textContent;
+      if (title) el.setAttribute("aria-label", title);
+      if (!el.contains(document.activeElement)) (focusables().find((x) => !x.classList.contains("close")) ?? el).focus();
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        if (!busyRef.current) setModal(null);
+      } else if (e.key === "Tab") {
+        const list = focusables();
+        if (!list.length) return;
+        const first = list[0], last = list[list.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("keydown", onKey); before?.focus?.(); };
+  }, [modalKey]);
   const [query, setQuery] = useState("");
   // Customer list: everyone, or only customers who have not come back in AWAY_DAYS.
   const [awayOnly, setAwayOnly] = useState(false);
@@ -142,12 +174,6 @@ export default function Dashboard() {
     window.location.href = "/login";
   }
 
-  /** For a lost phone or a shared computer: ends the session on every device. */
-  async function signOutEverywhere() {
-    if (!window.confirm(t("signOutAllConfirm"))) return;
-    await post("/api/auth", { action: "logout_all" });
-    window.location.href = "/login";
-  }
 
   const role = data?.role;
   const b = data?.business;
@@ -212,6 +238,7 @@ export default function Dashboard() {
 
   return (
     <div className="app" dir={dir}>
+      <a className="skip-link" href="#main">{t("skipToContent")}</a>
       <aside className="sidebar">
         <Brand />
         <div className="workspace">
@@ -221,7 +248,7 @@ export default function Dashboard() {
         <nav style={{ "--nav-count": nav.length } as React.CSSProperties}>
           {nav.map(([Icon, key]) => (
             <button key={key} className={"nav-item" + (view === key ? " selected" : "")} onClick={() => { setView(key); setQuery(""); load(); }}>
-              <Icon size={18} />{t(key)}{view === key && <span className="nav-dot" />}
+              <Icon size={18} /><span className="nav-long">{t(key)}</span><span className="nav-short">{t("navShort_" + key)}</span>{view === key && <span className="nav-dot" />}
             </button>
           ))}
         </nav>
@@ -229,7 +256,7 @@ export default function Dashboard() {
           <div className="profile"><span>{data.me.name.charAt(0)}</span><div><strong>{data.me.name}</strong><small dir="ltr">{data.me.email}</small></div></div>
           {isOwner && <a className="text-btn" href="/billing"><CreditCard size={15} />{t("billingLink")}</a>}
           <button className="text-btn" onClick={signOut}><LogOut size={15} />{t("signOut")}</button>
-          <button className="text-btn" onClick={signOutEverywhere}><LogOut size={15} />{t("signOutAll")}</button>
+          <a className="text-btn" href="/account"><UserRound size={15} />{t("accountTitle")}</a>
         </div>
       </aside>
 
@@ -279,7 +306,8 @@ export default function Dashboard() {
           </div>
         )}
 
-        <main>
+        <main id="main" tabIndex={-1}>
+          {(view === "customers" || view === "team" || view === "settings") && <h1 className="sr-only">{t(view)}</h1>}
           {view === "overview" && isOwner && away.length > 0 && (
             <div className="away-bar" role="status">
               <Users size={16} />
@@ -292,10 +320,6 @@ export default function Dashboard() {
               <div className="page-head">
                 <div><h1>{t("hello")}</h1><p className="muted">{t("subtitle")}</p></div>
                 <div className="head-actions">
-                  <select aria-label="Range" value={days} onChange={(e) => setDays(e.target.value)}>
-                    <option value="7">{t("range7")}</option><option value="30">{t("range30")}</option>
-                    <option value="90">{t("range90")}</option><option value="all">{t("rangeAll")}</option>
-                  </select>
                   {!!data.branches?.length && (
                     <select aria-label={t("branch")} value={branchView} onChange={(e) => setBranchView(e.target.value)}>
                       <option value="">{t("allBranches")}</option>
@@ -306,19 +330,8 @@ export default function Dashboard() {
                   <button className="btn soft" onClick={() => { setView("station"); setQuery(""); }}><ScanLine size={18} />{t("station")}</button>
                 </div>
               </div>
-              {!!data.alerts?.length && (
-                <div className="alert-panel" role="status">
-                  <strong><AlertTriangle size={16} />{t("alerts")}</strong>
-                  <ul>{data.alerts.map((a, i) => <li key={i}>{t(a.type === "customer" ? "alertCustomer" : a.type === "staffFix" ? "alertStaffFix" : "alertStaff", { name: a.name, n: a.count })}</li>)}</ul>
-                </div>
-              )}
-              <section className="stats">
-                <Stat icon={Users} color="violet" label={t("statCustomers")} value={data.stats!.customers} note={t("statNew", { n: data.stats!.new_customers })} />
-                <Stat icon={Plus} color="peach" label={t("statStamps")} value={data.stats!.stamps} note={t("inRange")} />
-                <Stat icon={Gift} color="green" label={t("statReady")} value={data.stats!.rewards_ready} note={t("rightNow")} />
-                <Stat icon={Check} color="blue" label={t("statRedeemed")} value={data.stats!.redemptions} note={t("inRange")} />
-              </section>
-              {data.summary && <Summary summary={data.summary} t={t} />}
+              {!!data.alerts?.length && <Alerts alerts={data.alerts} t={t} />}
+              {data.summary && <Summary summary={data.summary} totals={{ customers: data.stats!.customers, ready: data.stats!.rewards_ready }} t={t} />}
               <section className="overview-grid">
                 <div className="panel card-panel">
                   <div className="section-head"><h2>{t("card")}</h2></div>
@@ -332,7 +345,13 @@ export default function Dashboard() {
               </section>
               {!!data.branches?.length && !!data.perBranch?.length && (
                 <section className="panel" style={{ marginBottom: 22 }}>
-                  <div className="section-head"><h2>{t("byBranch")}</h2><span className="pill">{t("inRange")}</span></div>
+                  <div className="section-head">
+                    <h2>{t("byBranch")}</h2>
+                    <select aria-label={t("inRange")} value={days} onChange={(e) => setDays(e.target.value)}>
+                      <option value="7">{t("range7")}</option><option value="30">{t("range30")}</option>
+                      <option value="90">{t("range90")}</option><option value="all">{t("rangeAll")}</option>
+                    </select>
+                  </div>
                   <div className="table-wrap">
                     <table>
                       <thead><tr><th>{t("branch")}</th><th>{t("statStamps")}</th><th>{t("statRedeemed")}</th></tr></thead>
@@ -468,7 +487,7 @@ export default function Dashboard() {
 
       {modal && (
         <div className="modal-overlay" onClick={() => !busy && setModal(null)}>
-          <section className="modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+          <section className="modal" role="dialog" aria-modal="true" ref={dialogRef} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
             <button className="close" aria-label={t("close")} onClick={() => setModal(null)}><X size={22} /></button>
 
             {modal.type === "customer" && (
@@ -563,12 +582,32 @@ function Stat({ icon: Icon, color, label, value, note }: { icon: any; color: str
   );
 }
 
+/**
+ * Consecutive actions of the same kind on the same customer (within 15 minutes) become one line,
+ * so three quick stamps read "+3" instead of three identical rows.
+ */
+function groupEvents(events: any[]): any[] {
+  const out: any[] = [];
+  for (const e of events) {
+    const last = out[out.length - 1];
+    const close = last && Math.abs(Date.parse(last.firstCreated) - Date.parse(e.created)) < 15 * 60_000;
+    if (last && close && last.kind === e.kind && last.customer === e.customer && e.kind === "stamp" && !e.note && !last.note && last.branch_name === e.branch_name) {
+      last.delta += e.delta;
+      last.rewards_earned = (last.rewards_earned ?? 0) + (e.rewards_earned ?? 0);
+      last.firstCreated = e.created;
+      continue;
+    }
+    out.push({ ...e, firstCreated: e.created });
+  }
+  return out;
+}
+
 function EventList({ events, t, lang }: { events: any[]; t: any; lang: string }) {
   if (!events.length) return <div className="activity-empty"><Activity /><p>{t("empty")}</p></div>;
   const locale = lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB";
   return (
     <div>
-      {events.slice(0, 12).map((e: any, i: number) => (
+      {groupEvents(events).slice(0, 8).map((e: any, i: number) => (
         <div className="activity-row" key={e.id ?? i}>
           <span className={"activity-icon" + (e.kind === "redeem" ? " reward-icon" : "")}>{e.kind === "redeem" ? <Gift size={16} /> : e.kind === "adjust" ? <Activity size={16} /> : <Plus size={16} />}</span>
           <div>
@@ -771,12 +810,13 @@ function Station({ business, design, branches, myBranch, canFix, owner, t, lang,
 
   useEffect(() => { setRedeemAsk(false); setArchiveAsk(false); }, [selected?.id]);
 
-  async function archiveCustomer() {
+  async function archiveCustomer(erase = false) {
     if (!selected || busy) return;
     if (!archiveAsk) { setArchiveAsk(true); return; }
+    if (erase && !window.confirm(t("eraseConfirm", { name: selected.name }))) return;
     setArchiveAsk(false);
     setBusy(true);
-    const r = await post("/api/loyalty", { action: "archive_customer", business: business.id, customer: selected.id });
+    const r = await post("/api/loyalty", { action: "archive_customer", business: business.id, customer: selected.id, erase });
     setBusy(false);
     if (r.ok) {
       notify(t("archivedOk"));
@@ -922,7 +962,8 @@ function Station({ business, design, branches, myBranch, canFix, owner, t, lang,
                 {canFix && !fixing && <button className="btn soft small" onClick={() => setFixing({ value: selected.stamps, note: "" })}><Activity size={14} />{t("fixCount")}</button>}
                 <button className="btn soft small" onClick={() => { setSelected(null); setPending(null); setFixing(null); start(); }}><ScanLine size={14} />{t("nextCustomer")}</button>
                 <button className="text-btn" onClick={() => { setSelected(null); setPending(null); setFixing(null); }}><X size={14} />{t("close")}</button>
-                {owner && <button className="text-btn" style={{ color: "#b4413a" }} disabled={busy} onClick={archiveCustomer}>{archiveAsk ? t("archiveAgain") : t("archiveCustomer")}</button>}
+                {owner && <button className="text-btn" style={{ color: "#b4413a" }} disabled={busy} onClick={() => archiveCustomer(false)}>{archiveAsk ? t("archiveAgain") : t("archiveCustomer")}</button>}
+                {owner && archiveAsk && <button className="text-btn" style={{ color: "#b4413a" }} disabled={busy} onClick={() => archiveCustomer(true)}>{t("eraseCustomer")}</button>}
               </div>
             </>
           )}
@@ -986,10 +1027,11 @@ function Team({ data, t, lang, busy, call, reload, showLink }: {
           e.preventDefault();
           const form = e.currentTarget;
           const f = new FormData(form);
-          const r = await call({ action: "invite_staff", label: f.get("label"), branch: f.get("branch") || null });
+          const r = await call({ action: "invite_staff", label: f.get("label"), email: f.get("email"), branch: f.get("branch") || null });
           if (r) { form.reset(); reload(); showLink(r.inviteUrl); }
         }}>
           <label>{t("inviteLabel")}<input name="label" required maxLength={60} /></label>
+          <label>{t("inviteEmail")}<input name="email" type="email" required maxLength={200} dir="ltr" autoComplete="off" /><small className="form-hint">{t("inviteEmailHint")}</small></label>
           {!!data.branches?.length && (
             <label>{t("staffBranch")}
               <select name="branch" defaultValue="">
@@ -1094,8 +1136,24 @@ const SUMMARY_ROWS = [
   ["joined", "sumJoined"],
 ] as const;
 
+/** Unusual activity, calm: the first three, the rest one click away. */
+function Alerts({ alerts, t }: { alerts: { type: "customer" | "staff" | "staffFix"; name: string; count: number }[]; t: (k: string, v?: Record<string, string | number>) => string }) {
+  const [all, setAll] = useState(false);
+  const text = (a: (typeof alerts)[number]) => t(a.type === "customer" ? "alertCustomer" : a.type === "staffFix" ? "alertStaffFix" : "alertStaff", { name: a.name, n: a.count });
+  const shown = all ? alerts : alerts.slice(0, 3);
+  return (
+    <section className="alert-panel" role="status">
+      <strong><AlertTriangle size={16} />{t("alerts")} <span className="count"><Num>{alerts.length}</Num></span></strong>
+      <ul>{shown.map((a, i) => <li key={i}>{text(a)}</li>)}</ul>
+      {alerts.length > 3 && (
+        <button type="button" className="text-btn" onClick={() => setAll(!all)}>{all ? t("showLess") : t("showAll", { n: alerts.length })}</button>
+      )}
+    </section>
+  );
+}
+
 /** Summary for the owner: this day, week or month against the one before. */
-function Summary({ summary, t }: { summary: Record<Period, Record<string, number>>; t: (k: string, v?: Record<string, string | number>) => string }) {
+function Summary({ summary, totals, t }: { summary: Record<Period, Record<string, number>>; totals: { customers: number; ready: number }; t: (k: string, v?: Record<string, string | number>) => string }) {
   const [period, setPeriod] = useState<Period>("week");
   const s = summary[period];
   return (
@@ -1108,6 +1166,10 @@ function Summary({ summary, t }: { summary: Record<Period, Record<string, number
           ))}
         </div>
       </div>
+      <p className="summary-totals">
+        <span><Users size={15} /><Num>{totals.customers}</Num> {t("statCustomers")}</span>
+        <span><Gift size={15} /><Num>{totals.ready}</Num> {t("statReady")}</span>
+      </p>
       <p className="form-hint">{t("sumNote_" + period)}</p>
       <div className="summary-grid">
         {SUMMARY_ROWS.map(([key, label]) => {

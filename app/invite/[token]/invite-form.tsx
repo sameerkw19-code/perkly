@@ -6,7 +6,7 @@ import { post } from "../../../lib/api";
 import { LangSwitch } from "../../../components/lang-switch";
 import { Brand } from "../../../components/brand";
 
-export default function InviteForm({ token, business, signedInEmail }: { token: string; business: string | null; signedInEmail: string | null }) {
+export default function InviteForm({ token, business, inviteEmail, signedInEmail }: { token: string; business: string | null; inviteEmail: string | null; signedInEmail: string | null }) {
   const { lang, setLang, t, dir } = useLang();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -34,10 +34,11 @@ export default function InviteForm({ token, business, signedInEmail }: { token: 
 
   return (
     <div className="auth-page" dir={dir}>
-      <div className="auth-top">
+      <header className="auth-top">
         <Brand href="/" />
         <LangSwitch lang={lang} setLang={setLang} />
-      </div>
+      </header>
+      <main id="main" className="page-main">
       <form className="auth-card panel" onSubmit={submit}>
         <span className="modal-icon"><Users /></span>
         {!business ? (
@@ -48,13 +49,16 @@ export default function InviteForm({ token, business, signedInEmail }: { token: 
         ) : (
           <>
             <h1>{t("inviteTitle", { b: business })}</h1>
-            {signedInEmail ? (
+            {inviteEmail && <p className="form-hint">{t("inviteForEmail", { email: "\u2066" + inviteEmail + "\u2069" })}</p>}
+            {signedInEmail && inviteEmail && signedInEmail !== inviteEmail ? (
+              <p className="form-error" role="alert">{t("err_invite_other_email")}</p>
+            ) : signedInEmail ? (
               <p>{t("inviteSignedIn", { email: signedInEmail })}</p>
             ) : (
               <>
                 <p className="muted">{t("inviteIntro")}</p>
                 <label>{t("yourName")}<input name="name" required maxLength={80} autoComplete="name" /></label>
-                <label>{t("email")}<input name="email" type="email" required maxLength={200} autoComplete="email" dir="ltr" /></label>
+                <label>{t("email")}<input name="email" type="email" required maxLength={200} autoComplete="email" dir="ltr" defaultValue={inviteEmail ?? ""} readOnly={!!inviteEmail} /></label>
                 <label>{t("password")}<input name="password" type="password" required minLength={8} maxLength={200} autoComplete="new-password" dir="ltr" /><small className="form-hint">{t("passwordHint")}</small></label>
               </>
             )}
@@ -64,6 +68,7 @@ export default function InviteForm({ token, business, signedInEmail }: { token: 
           </>
         )}
       </form>
+      </main>
     </div>
   );
 }

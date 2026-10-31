@@ -25,10 +25,11 @@ export default function ResetForm({ token }: { token: string }) {
 
   return (
     <div className="auth-page" dir={dir}>
-      <div className="auth-top">
+      <header className="auth-top">
         <Brand href="/" />
         <LangSwitch lang={lang} setLang={setLang} />
-      </div>
+      </header>
+      <main id="main" className="page-main">
       <form className="auth-card panel" onSubmit={submit}>
         <span className="modal-icon"><KeyRound /></span>
         <h1>{t("resetTitle")}</h1>
@@ -39,6 +40,7 @@ export default function ResetForm({ token }: { token: string }) {
         {error && <p className="form-error" role="alert">{error}</p>}
         <button className="btn primary wide" disabled={busy}>{busy ? t("loading") : t("resetSave")}</button>
       </form>
+      </main>
     </div>
   );
 }

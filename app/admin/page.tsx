@@ -114,7 +114,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     <div className="admin" dir="rtl">
       <AdminHeader active="/admin" />
 
-      <main>
+      <main id="main" tabIndex={-1}>
         <h1>סקירת מערכת</h1>
         <p className="muted">נכון ל־{shortDateTime(nowIso)}. פרטי לקוחות (שם, טלפון) לא מוצגים כאן.</p>
         <p className="form-hint">מזהה המשתמש שלך: <code dir="ltr">{me.id}</code></p>

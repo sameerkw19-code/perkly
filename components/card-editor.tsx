@@ -1,6 +1,6 @@
 "use client";
-import { useMemo, useState } from "react";
-import { ImagePlus, Lock, MessageCircle, Shuffle, Trash2, UploadCloud } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
+import { ChevronDown, ImagePlus, Lock, MessageCircle, Shuffle, Trash2, UploadCloud } from "lucide-react";
 import {
   FONTS, FONT_SCRIPTS, GRADIENTS, GRADIENT_DIRS, ICON_GROUPS, IMAGE_MIN, LIMITS, NOTICE_DEFAULTS, OFFERED_CARD_LANGS, noticeDefault, PALETTES, cardLang, darken, designChecks, is3d, noticeText, stamp3dUrl,
   type AssetMeta, type CardLook, type Design, type FontId, type Layout, type LogoFrame, type Size, type StampIcon, type StampNotice, type Texts,
@@ -249,7 +249,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
     const r = await post("/api/loyalty", { action: "publish_design", business: businessId });
     setBusy("");
     if (!r.ok) { notify(errorText(lang, r.code), true); return; }
-    if (!setup) notify(t("publishedOk"));
+    if (!setup) notify(r.data?.walletUpdates ? t("publishedWallet", { n: r.data.walletUpdates }) : t("publishedOk"));
     reload();
   }
 
@@ -285,7 +285,13 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
         )}
         <p className="form-hint center">{t(tab === "web" ? "pvNoteWeb" : tab === "apple" ? "pvNoteApple" : "pvNoteGoogle")}</p>
         {tab !== "web" && (
-          <button type="button" className="btn soft small wallet-jump" onClick={() => document.getElementById("ed-wallet")?.scrollIntoView({ behavior: "smooth", block: "center" })}>
+          <button type="button" className="btn soft small wallet-jump" onClick={() => {
+            // The images part may be closed: open it first, then scroll to the wallet picture.
+            const el = document.getElementById("ed-wallet");
+            const part = el?.closest("details");
+            if (part && !part.open) part.open = true;
+            el?.scrollIntoView({ behavior: "smooth", block: "center" });
+          }}>
             <ImagePlus size={14} />{t("edWalletJump")}
           </button>
         )}
@@ -317,8 +323,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
       </div>
 
       <div className="editor-controls">
-        <section className="panel">
-          <h2>{t("edLangs")}</h2>
+        <EdSection title={t("edLangs")}>
           <p className="form-hint">{t("edLangsHint")}</p>
           <div className="seg langs-pick" role="group" aria-label={t("edLangs")}>
             {CARD_LANGS.filter((l) => OFFERED_CARD_LANGS.includes(l) || design.langs.includes(l)).map((l) => {
@@ -330,10 +335,9 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
               );
             })}
           </div>
-        </section>
+        </EdSection>
 
-        <section className="panel">
-          <h2>{t("edStampIcon")}</h2>
+        <EdSection title={t("edStampIcon")} open>
           {/* Icon table: categories, then a sub-table of regular icons or 3D pictures. */}
           <div className="seg icon-groups" role="group" aria-label={t("edStampIcon")}>
             {([...ICON_GROUPS.map((g) => g.id), "special"] as const).map((id) => (
@@ -407,10 +411,9 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
               </div>
             </div>
           )}
-        </section>
+        </EdSection>
 
-        <section className="panel">
-          <h2>{t("edLayout")}</h2>
+        <EdSection title={t("edLayout")} open>
           <div className="seg">
             {(["gradient", "solid", "photo"] as Layout[]).map((l) => (
               <button key={l} type="button" aria-pressed={design.layout === l} disabled={l === "photo" && !paid && !design.hero}
@@ -474,12 +477,11 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
               <input type="range" min={0} max={90} step={5} value={design.look.overlay} onChange={(e) => setLook({ overlay: Number(e.target.value) })} />
             </label>
           )}
-        </section>
+        </EdSection>
 
-        <section className="panel">
+        <EdSection title={t("edType")}>
           <link rel="stylesheet" href={ALL_FONTS_HREF} />
-          <div className="section-head" style={{ marginBottom: 12 }}>
-            <h2>{t("edType")}</h2>
+          <div className="ed-tools">
             <button type="button" className="btn soft small" onClick={surprise}><Shuffle size={14} />{t("edSurprise")}</button>
           </div>
           <div className="icon-grid font-grid">
@@ -528,13 +530,9 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
               </div>
             </div>
           )}
-        </section>
+        </EdSection>
 
-        <section className="panel">
-          <div className="section-head" style={{ marginBottom: 8 }}>
-            <h2>{t("edImages")}</h2>
-            {!paid && <PaidTag t={t} />}
-          </div>
+        <EdSection title={t("edImages")} badge={!paid ? <PaidTag t={t} /> : null}>
           {!paid && (
             <p className="paid-note">
               {t("paidImagesNote")} {upgradeHref && <a href={upgradeHref}>{t("activateSub")}</a>}
@@ -583,8 +581,34 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
             </div>
             <p className="form-hint">{t("wbStampsHint")}</p>
           </div>
+          {design.logo && (
+            <div className="logo-controls">
+              <h3 className="sub-head">{t("edLogoLook")}</h3>
+              <label className="demo-row">
+                <span>{t("edLogoSize")} <Num>{design.look.logoSize}%</Num></span>
+                <input type="range" min={60} max={200} step={10} value={design.look.logoSize} onChange={(e) => setLook({ logoSize: Number(e.target.value) })} />
+              </label>
+              <div className="seg">
+                {(["none", "circle", "square"] as LogoFrame[]).map((f) => (
+                  <button key={f} type="button" aria-pressed={design.look.logoFrame === f} onClick={() => setLook({ logoFrame: f })}>{t("logoFrame_" + f)}</button>
+                ))}
+              </div>
+              <label className="check-row clear-white">
+                <input type="checkbox" checked={design.look.logoName} onChange={(e) => setLook({ logoName: e.target.checked })} />
+                <span>{t("edLogoName")}</span>
+              </label>
+            </div>
+          )}
+          {paid && (
+            <label className="check-row clear-white">
+              <input type="checkbox" checked={clearWhite} onChange={(e) => setClearWhite(e.target.checked)} />
+              <span>{t("edClearWhite")}<small className="form-hint">{t("edClearWhiteHint")}</small></span>
+            </label>
+          )}
+        </EdSection>
+
+        <EdSection title={t("edNotify")}>
           <div className="wallet-notify">
-            <h3 className="sub-head">{t("edNotify")}</h3>
             {design.langs.length > 1 && (design.walletNotify || design.walletWelcome || design.walletBirthday) && (
               <div className="seg">
                 {design.langs.map((l) => <button key={l} type="button" aria-pressed={textLang === l} onClick={() => setTextLang(l)}>{t("langName_" + l)}</button>)}
@@ -636,34 +660,9 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
             <p className="form-hint">{t("edMsgSpecialHint")}</p>
             <a className="btn soft small" href={`/special?b=${encodeURIComponent(businessId)}`}>{t("edMsgSpecialLink")}</a>
           </div>
-          {design.logo && (
-            <div className="logo-controls">
-              <h3 className="sub-head">{t("edLogoLook")}</h3>
-              <label className="demo-row">
-                <span>{t("edLogoSize")} <Num>{design.look.logoSize}%</Num></span>
-                <input type="range" min={60} max={200} step={10} value={design.look.logoSize} onChange={(e) => setLook({ logoSize: Number(e.target.value) })} />
-              </label>
-              <div className="seg">
-                {(["none", "circle", "square"] as LogoFrame[]).map((f) => (
-                  <button key={f} type="button" aria-pressed={design.look.logoFrame === f} onClick={() => setLook({ logoFrame: f })}>{t("logoFrame_" + f)}</button>
-                ))}
-              </div>
-              <label className="check-row clear-white">
-                <input type="checkbox" checked={design.look.logoName} onChange={(e) => setLook({ logoName: e.target.checked })} />
-                <span>{t("edLogoName")}</span>
-              </label>
-            </div>
-          )}
-          {paid && (
-            <label className="check-row clear-white">
-              <input type="checkbox" checked={clearWhite} onChange={(e) => setClearWhite(e.target.checked)} />
-              <span>{t("edClearWhite")}<small className="form-hint">{t("edClearWhiteHint")}</small></span>
-            </label>
-          )}
-        </section>
+        </EdSection>
 
-        <section className="panel">
-          <h2>{t("edTexts")}</h2>
+        <EdSection title={t("edTexts")} open>
           <div className="seg">
             {design.langs.map((l) => <button key={l} type="button" aria-pressed={textLang === l} onClick={() => setTextLang(l)}>{t("langName_" + l)}</button>)}
           </div>
@@ -680,10 +679,9 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
             <input type="checkbox" checked={design.showCustomerName} onChange={(e) => set({ showCustomerName: e.target.checked })} />
             <span>{t("edShowName")}</span>
           </label>
-        </section>
+        </EdSection>
 
-        <section className="panel">
-          <h2>{t("edChecks")}</h2>
+        <EdSection title={t("edChecks")} open>
           <ul className="checks">
             {checks.map((c, i) => (
               <li key={i}>
@@ -692,9 +690,23 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
               </li>
             ))}
           </ul>
-        </section>
+        </EdSection>
       </div>
     </div>
+  );
+}
+
+/** One part of the editor: a heading that opens and closes it, so the page stays short. */
+function EdSection({ title, open = false, badge, children }: { title: string; open?: boolean; badge?: ReactNode; children: ReactNode }) {
+  return (
+    <details className="panel ed-sec" open={open}>
+      <summary>
+        <h2>{title}</h2>
+        {badge}
+        <ChevronDown size={18} className="ed-chev" aria-hidden="true" />
+      </summary>
+      <div className="ed-body">{children}</div>
+    </details>
   );
 }
 

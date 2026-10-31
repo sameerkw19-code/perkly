@@ -33,6 +33,9 @@ export function AdminActions({ business, suspended, compUntil, biz }: { business
       );
       return;
     }
+    if (r.data?.billing === "not_stopped") {
+      window.alert("העסק אורכב, אבל לא הצלחנו לעצור את המנוי ב-Polar. בטל אותו ידנית ב-Polar כדי שהבעלים לא יחויב שוב.");
+    }
     window.location.reload();
   }
 
@@ -111,7 +114,7 @@ export function AdminActions({ business, suspended, compUntil, biz }: { business
           ) : (
             <button className="btn soft small danger" disabled={busy} onClick={() => {
               const reason = prompt("סיבת הארכוב (נשמרת ביומן):")?.trim();
-              const warn = biz.paying ? "\n\nשים לב: לעסק יש מנוי פעיל ב-Polar, והוא ימשיך להיות מחויב. בטל את המנוי ב-Polar בנפרד." : "";
+              const warn = biz.paying ? "\n\nלעסק יש מנוי פעיל ב-Polar: החידוש שלו ייעצר, והמנוי יסתיים בסוף התקופה ששולמה." : "";
               if (reason && confirm("לארכב את העסק? הבעלים והצוות לא יראו אותו, וההצטרפות תיסגר. הנתונים נשמרים ואפשר לשחזר." + warn)) run("archive", { reason });
             }}>ארכוב עסק</button>
           )}

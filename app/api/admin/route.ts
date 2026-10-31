@@ -3,6 +3,7 @@ import { getD1 } from "../../../db";
 import { getUser, isPlatformAdmin } from "../../../lib/server/auth";
 import { fail, json, readJson, sameOrigin, str } from "../../../lib/server/http";
 import { normalizeEmail } from "../../../lib/server/auth";
+import { cancelAtPeriodEnd } from "../../../lib/server/polar";
 
 export const dynamic = "force-dynamic";
 
@@ -114,11 +115,20 @@ export async function POST(request: Request) {
     case "archive": {
       const reason = str(body.reason, 200);
       if (!reason) return fail("reason_required", 400, "A reason is required");
+      // Closing a business also stops its subscription from renewing (it ends with the paid period),
+      // so the owner is not charged again for a business that is closed.
+      const sub = await db
+        .prepare("SELECT external_subscription, status FROM subscriptions WHERE business = ?")
+        .bind(businessId)
+        .first<{ external_subscription: string | null; status: string }>();
+      const live = !!sub?.external_subscription && ["active", "trialing", "past_due"].includes(sub.status);
+      const stopped = live ? await cancelAtPeriodEnd(env, sub!.external_subscription!) : null;
       await db.batch([
         db.prepare("UPDATE businesses SET archived = COALESCE(archived, ?) WHERE id = ?").bind(nowIso, businessId),
-        log("archive", reason),
+        log("archive", `${reason}${live ? (stopped ? " · subscription set to end" : " · SUBSCRIPTION NOT STOPPED") : ""}`),
       ]);
-      return json({ ok: true });
+      // billing: "stopped" | "not_stopped" | "none"; the admin page warns when the subscription could not be stopped.
+      return json({ ok: true, billing: live ? (stopped ? "stopped" : "not_stopped") : "none" });
     }
     case "restore": {
       await db.batch([

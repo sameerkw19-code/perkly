@@ -21,6 +21,16 @@ export default function CardView({ card, secret, googleWallet, isIOS }: { card: 
   const t = (key: string, vars?: Record<string, string | number>) => translate(lang, key, vars);
   const dir = card ? (isRtl(lang) ? "rtl" : "ltr") : siteDir;
   const langs = card?.design.langs ?? [];
+  // The card keeps working without a connection (public/sw.js keeps the last copy on the phone).
+  const [offline, setOffline] = useState(false);
+  useEffect(() => {
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js", { scope: "/c/" }).catch(() => {});
+    const update = () => setOffline(!navigator.onLine);
+    update();
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => { window.removeEventListener("online", update); window.removeEventListener("offline", update); };
+  }, []);
   // Right after joining (?welcome=1): the business's welcome message, when it turned welcomes on.
   const [welcome, setWelcome] = useState(false);
   useEffect(() => {
@@ -38,7 +48,7 @@ export default function CardView({ card, secret, googleWallet, isIOS }: { card: 
     : "";
   return (
     <div className="card-page" dir={dir} lang={lang}>
-      <div className="auth-top">
+      <header className="auth-top">
         <Brand />
         {langs.length > 1 ? (
           <div className="seg card-langs" role="group" aria-label="Language">
@@ -47,11 +57,14 @@ export default function CardView({ card, secret, googleWallet, isIOS }: { card: 
             ))}
           </div>
         ) : null}
-      </div>
+      </header>
+      <main id="main" className="page-main">
+        {card && <h1 className="sr-only">{card.business}</h1>}
       {!card ? (
         <div className="auth-card panel"><h1>{t("cardNotFound")}</h1></div>
       ) : (
         <div className="card-stack">
+          {offline && <p className="card-offline" role="status">{t("cardOffline")}</p>}
           {welcomeText && <p className="card-welcome" role="status">{welcomeText}</p>}
           <LoyaltyCard
             design={card.design}
@@ -98,6 +111,7 @@ export default function CardView({ card, secret, googleWallet, isIOS }: { card: 
           <p className="form-hint center legal-links"><a href="/privacy">{t("privacyLink")}</a></p>
         </div>
       )}
+      </main>
     </div>
   );
 }
