@@ -68,7 +68,7 @@ export default async function AdminBillingPage() {
   return (
     <div className="admin" dir="rtl">
       <AdminHeader active="/admin/billing" />
-      <main>
+      <main id="main" tabIndex={-1}>
         <h1>מנויים וכסף</h1>
         <p className="muted">מנויים לפי הנתונים שהגיעו מ-Polar, ותשלומים ישירות מ-Polar.</p>
 

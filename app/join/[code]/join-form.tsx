@@ -42,10 +42,11 @@ export default function JoinForm({ code, business }: { code: string; business: B
 
   return (
     <div className="auth-page" dir={dir}>
-      <div className="auth-top">
+      <header className="auth-top">
         <Brand />
         <LangSwitch lang={lang} setLang={setLang} />
-      </div>
+      </header>
+      <main id="main" className="page-main">
       {!business ? (
         <div className="auth-card panel"><h1>{t("err_join_invalid")}</h1></div>
       ) : (
@@ -65,6 +66,7 @@ export default function JoinForm({ code, business }: { code: string; business: B
           <p className="form-hint">{t("phoneNotVerified")}</p>
         </form>
       )}
+      </main>
     </div>
   );
 }

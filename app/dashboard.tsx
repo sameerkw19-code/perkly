@@ -4,7 +4,7 @@ import { SOCIAL_KEYS, SOCIAL_LABEL, normalizeSocial, socialDisplay, type Social 
 import { SocialIcon } from "../lib/social-icon";
 import {
   Activity, AlertTriangle, Cake, Check, Copy, CreditCard, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode,
-  Palette, RefreshCw, ScanLine, Search, Settings, Share2, Store, Users, Wallet, X,
+  Palette, RefreshCw, ScanLine, Search, Settings, Share2, Store, Users, UserRound, Wallet, X,
 } from "lucide-react";
 import type { Design } from "../lib/design";
 import { CardEditor } from "../components/card-editor";
@@ -69,6 +69,38 @@ export default function Dashboard() {
   const [toast, setToast] = useState<{ text: string; bad?: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
   const [online, setOnline] = useState(true);
+  // Pop-up windows work from the keyboard: focus moves in, Tab stays inside, Escape closes, focus returns.
+  const dialogRef = useRef<HTMLElement>(null);
+  const busyRef = useRef(false);
+  busyRef.current = busy;
+  const modalKey = modal ? modal.type : null;
+  useEffect(() => {
+    if (!modalKey) return;
+    const before = document.activeElement as HTMLElement | null;
+    const el = dialogRef.current;
+    const focusables = () =>
+      Array.from(el?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? [])
+        .filter((x) => x.offsetParent !== null);
+    if (el) {
+      const title = el.querySelector("h2")?.textContent;
+      if (title) el.setAttribute("aria-label", title);
+      if (!el.contains(document.activeElement)) (focusables().find((x) => !x.classList.contains("close")) ?? el).focus();
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        if (!busyRef.current) setModal(null);
+      } else if (e.key === "Tab") {
+        const list = focusables();
+        if (!list.length) return;
+        const first = list[0], last = list[list.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("keydown", onKey); before?.focus?.(); };
+  }, [modalKey]);
   const [query, setQuery] = useState("");
   // Customer list: everyone, or only customers who have not come back in AWAY_DAYS.
   const [awayOnly, setAwayOnly] = useState(false);
@@ -142,12 +174,6 @@ export default function Dashboard() {
     window.location.href = "/login";
   }
 
-  /** For a lost phone or a shared computer: ends the session on every device. */
-  async function signOutEverywhere() {
-    if (!window.confirm(t("signOutAllConfirm"))) return;
-    await post("/api/auth", { action: "logout_all" });
-    window.location.href = "/login";
-  }
 
   const role = data?.role;
   const b = data?.business;
@@ -212,6 +238,7 @@ export default function Dashboard() {
 
   return (
     <div className="app" dir={dir}>
+      <a className="skip-link" href="#main">{t("skipToContent")}</a>
       <aside className="sidebar">
         <Brand />
         <div className="workspace">
@@ -229,7 +256,7 @@ export default function Dashboard() {
           <div className="profile"><span>{data.me.name.charAt(0)}</span><div><strong>{data.me.name}</strong><small dir="ltr">{data.me.email}</small></div></div>
           {isOwner && <a className="text-btn" href="/billing"><CreditCard size={15} />{t("billingLink")}</a>}
           <button className="text-btn" onClick={signOut}><LogOut size={15} />{t("signOut")}</button>
-          <button className="text-btn" onClick={signOutEverywhere}><LogOut size={15} />{t("signOutAll")}</button>
+          <a className="text-btn" href="/account"><UserRound size={15} />{t("accountTitle")}</a>
         </div>
       </aside>
 
@@ -279,7 +306,8 @@ export default function Dashboard() {
           </div>
         )}
 
-        <main>
+        <main id="main" tabIndex={-1}>
+          {(view === "customers" || view === "team" || view === "settings") && <h1 className="sr-only">{t(view)}</h1>}
           {view === "overview" && isOwner && away.length > 0 && (
             <div className="away-bar" role="status">
               <Users size={16} />
@@ -459,7 +487,7 @@ export default function Dashboard() {
 
       {modal && (
         <div className="modal-overlay" onClick={() => !busy && setModal(null)}>
-          <section className="modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+          <section className="modal" role="dialog" aria-modal="true" ref={dialogRef} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
             <button className="close" aria-label={t("close")} onClick={() => setModal(null)}><X size={22} /></button>
 
             {modal.type === "customer" && (
@@ -782,12 +810,13 @@ function Station({ business, design, branches, myBranch, canFix, owner, t, lang,
 
   useEffect(() => { setRedeemAsk(false); setArchiveAsk(false); }, [selected?.id]);
 
-  async function archiveCustomer() {
+  async function archiveCustomer(erase = false) {
     if (!selected || busy) return;
     if (!archiveAsk) { setArchiveAsk(true); return; }
+    if (erase && !window.confirm(t("eraseConfirm", { name: selected.name }))) return;
     setArchiveAsk(false);
     setBusy(true);
-    const r = await post("/api/loyalty", { action: "archive_customer", business: business.id, customer: selected.id });
+    const r = await post("/api/loyalty", { action: "archive_customer", business: business.id, customer: selected.id, erase });
     setBusy(false);
     if (r.ok) {
       notify(t("archivedOk"));
@@ -933,7 +962,8 @@ function Station({ business, design, branches, myBranch, canFix, owner, t, lang,
                 {canFix && !fixing && <button className="btn soft small" onClick={() => setFixing({ value: selected.stamps, note: "" })}><Activity size={14} />{t("fixCount")}</button>}
                 <button className="btn soft small" onClick={() => { setSelected(null); setPending(null); setFixing(null); start(); }}><ScanLine size={14} />{t("nextCustomer")}</button>
                 <button className="text-btn" onClick={() => { setSelected(null); setPending(null); setFixing(null); }}><X size={14} />{t("close")}</button>
-                {owner && <button className="text-btn" style={{ color: "#b4413a" }} disabled={busy} onClick={archiveCustomer}>{archiveAsk ? t("archiveAgain") : t("archiveCustomer")}</button>}
+                {owner && <button className="text-btn" style={{ color: "#b4413a" }} disabled={busy} onClick={() => archiveCustomer(false)}>{archiveAsk ? t("archiveAgain") : t("archiveCustomer")}</button>}
+                {owner && archiveAsk && <button className="text-btn" style={{ color: "#b4413a" }} disabled={busy} onClick={() => archiveCustomer(true)}>{t("eraseCustomer")}</button>}
               </div>
             </>
           )}
@@ -997,10 +1027,11 @@ function Team({ data, t, lang, busy, call, reload, showLink }: {
           e.preventDefault();
           const form = e.currentTarget;
           const f = new FormData(form);
-          const r = await call({ action: "invite_staff", label: f.get("label"), branch: f.get("branch") || null });
+          const r = await call({ action: "invite_staff", label: f.get("label"), email: f.get("email"), branch: f.get("branch") || null });
           if (r) { form.reset(); reload(); showLink(r.inviteUrl); }
         }}>
           <label>{t("inviteLabel")}<input name="label" required maxLength={60} /></label>
+          <label>{t("inviteEmail")}<input name="email" type="email" required maxLength={200} dir="ltr" autoComplete="off" /><small className="form-hint">{t("inviteEmailHint")}</small></label>
           {!!data.branches?.length && (
             <label>{t("staffBranch")}
               <select name="branch" defaultValue="">

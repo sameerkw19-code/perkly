@@ -43,7 +43,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   return (
     <div className="admin" dir="rtl">
       <AdminHeader active="/admin/users" />
-      <main>
+      <main id="main" tabIndex={-1}>
         <h1>משתמשים</h1>
         <p className="muted">בעלי עסקים ועובדים. ללקוחות אין חשבון ולכן הם לא מופיעים כאן.</p>
         <section className="panel">

@@ -177,3 +177,18 @@ export async function listOrders(env: PolarEnv, pages = 3): Promise<PolarOrder[]
   }
   return out;
 }
+
+/**
+ * Stops a subscription from renewing: it stays active until the paid period ends, then ends.
+ * Needs the subscriptions:write scope on POLAR_ACCESS_TOKEN. Returns false when Polar refuses.
+ */
+export async function cancelAtPeriodEnd(env: PolarEnv, subscriptionId: string): Promise<boolean> {
+  if (!env.POLAR_ACCESS_TOKEN) return false;
+  const r = await fetch(`${apiBase(env)}/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${env.POLAR_ACCESS_TOKEN}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ cancel_at_period_end: true }),
+  }).catch(() => null);
+  if (!r?.ok) console.warn(`polar cancel failed: HTTP ${r?.status ?? "network"}`);
+  return !!r?.ok;
+}

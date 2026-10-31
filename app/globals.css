@@ -469,3 +469,8 @@ fieldset.birthday{border:0;padding:0;margin:0 0 14px}fieldset.birthday legend{fo
 .ed-sec .wallet-notify{margin-top:0}
 .ed-sec .wallet-notify .notify-head:first-of-type{margin-top:4px}
 @media(max-width:760px){.summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.summary-item strong{font-size:24px}}
+
+.code-input{font-size:26px;letter-spacing:8px;text-align:center;font-weight:700}
+.account-card section{display:grid;gap:8px;padding-top:14px;border-top:1px solid var(--line)}.account-card h2{font-size:16px;margin:0}.btn.danger{color:#a32020}
+.skip-link{position:absolute;inset-inline-start:12px;top:-60px;z-index:300;background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-weight:700}.skip-link:focus{top:12px}main:focus{outline:none}
+.page-main{width:100%;display:flex;flex-direction:column;align-items:center;gap:20px}

@@ -249,7 +249,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
     const r = await post("/api/loyalty", { action: "publish_design", business: businessId });
     setBusy("");
     if (!r.ok) { notify(errorText(lang, r.code), true); return; }
-    if (!setup) notify(t("publishedOk"));
+    if (!setup) notify(r.data?.walletUpdates ? t("publishedWallet", { n: r.data.walletUpdates }) : t("publishedOk"));
     reload();
   }
 

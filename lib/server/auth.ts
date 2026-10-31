@@ -16,12 +16,12 @@ export function readCookie(cookieHeader: string | null, name: string): string | 
   return null;
 }
 
-function cookieAttributes(secure: boolean, maxAge: number): string {
+export function cookieAttributes(secure: boolean, maxAge: number): string {
   return `Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure ? "; Secure" : ""}`;
 }
 
 /** Secure everywhere except local development (http://localhost or 127.0.0.1). */
-function secureCookie(request: Request): boolean {
+export function secureCookie(request: Request): boolean {
   const { hostname } = new URL(request.url);
   return !(hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]");
 }

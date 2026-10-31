@@ -71,7 +71,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
   return (
     <div className="admin" dir="rtl">
       <AdminHeader active="/admin" />
-      <main>
+      <main id="main" tabIndex={-1}>
         <div className="page-head">
           <div>
             <h1>{b.name}</h1>

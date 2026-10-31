@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { getD1 } from "../../../db";
-import { getMembership, getMemberships, getUser, isPlatformAdmin } from "../../../lib/server/auth";
+import { getMembership, getMemberships, getUser, isPlatformAdmin, normalizeEmail } from "../../../lib/server/auth";
 import { randomCode, randomToken, sha256 } from "../../../lib/server/crypto";
 import { fail, json, readJson, sameOrigin, str } from "../../../lib/server/http";
 import { allow } from "../../../lib/server/rate-limit";
@@ -133,8 +133,8 @@ export async function GET(request: Request) {
     const start = new Date(Date.now() - 2 * days * 86_400_000).toISOString();
     return db.prepare(
       `SELECT
-         COALESCE(SUM(kind = 'stamp' AND created >= ?2), 0) AS stamps_now,
-         COALESCE(SUM(kind = 'stamp' AND created < ?2), 0) AS stamps_prev,
+         COALESCE(SUM(CASE WHEN kind = 'stamp' AND created >= ?2 THEN delta ELSE 0 END), 0) AS stamps_now,
+         COALESCE(SUM(CASE WHEN kind = 'stamp' AND created < ?2 THEN delta ELSE 0 END), 0) AS stamps_prev,
          COALESCE(SUM(kind = 'redeem' AND created >= ?2), 0) AS redeemed_now,
          COALESCE(SUM(kind = 'redeem' AND created < ?2), 0) AS redeemed_prev,
          COUNT(DISTINCT CASE WHEN created >= ?2 THEN customer END) AS visitors_now,
@@ -168,7 +168,7 @@ export async function GET(request: Request) {
          (SELECT COUNT(*) FROM customers WHERE business = ?1 AND archived IS NULL AND created >= ?2) AS new_customers,
          (SELECT COUNT(*) FROM rewards WHERE business = ?1 AND redeemed IS NULL AND (expires IS NULL OR expires > ?4))
            + (CASE WHEN ?5 = 'block' THEN (SELECT COUNT(*) FROM customers WHERE business = ?1 AND stamps >= target) ELSE 0 END) AS rewards_ready,
-         (SELECT COUNT(*) FROM events WHERE business = ?1 AND kind = 'stamp' AND created >= ?2 AND (?3 = '' OR branch = ?3)) AS stamps,
+         (SELECT COALESCE(SUM(delta), 0) FROM events WHERE business = ?1 AND kind = 'stamp' AND created >= ?2 AND (?3 = '' OR branch = ?3)) AS stamps,
          (SELECT COUNT(*) FROM events WHERE business = ?1 AND kind = 'redeem' AND created >= ?2 AND (?3 = '' OR branch = ?3)) AS redemptions`,
     ).bind(business!.id, since, branchFilter, new Date().toISOString(), business!.reward_mode),
     db.prepare(
@@ -182,7 +182,8 @@ export async function GET(request: Request) {
        WHERE business = ? AND used IS NULL AND revoked IS NULL AND expires > ? ORDER BY created DESC`,
     ).bind(business!.id, new Date().toISOString()),
     db.prepare(
-      `SELECT c.name, COUNT(*) AS n FROM events e JOIN customers c ON c.id = e.customer
+      // Stamps given to one customer in the last hour (one action can give several, so the sum counts).
+      `SELECT c.name, SUM(e.delta) AS n FROM events e JOIN customers c ON c.id = e.customer
        WHERE e.business = ? AND e.kind = 'stamp' AND e.created >= ? GROUP BY e.customer HAVING n >= 4`,
     ).bind(business!.id, hourAgo),
     db.prepare(
@@ -191,7 +192,7 @@ export async function GET(request: Request) {
     ).bind(business!.id, hourAgo),
     db.prepare(
       `SELECT e.branch, br.name AS branch_name,
-         SUM(e.kind = 'stamp') AS stamps, SUM(e.kind = 'redeem') AS redemptions
+         SUM(CASE WHEN e.kind = 'stamp' THEN e.delta ELSE 0 END) AS stamps, SUM(e.kind = 'redeem') AS redemptions
        FROM events e LEFT JOIN branches br ON br.id = e.branch
        WHERE e.business = ? AND e.created >= ? GROUP BY e.branch ORDER BY stamps DESC`,
     ).bind(business!.id, since),
@@ -567,12 +568,15 @@ export async function POST(request: Request) {
       const denied = ownerOnly(); if (denied) return denied;
       if (!(await allow(db, `invite-create:${user.id}`, 30, 86_400))) return fail("rate_limited", 429);
       const label = str(p.label, 60);
+      // The invite works only for this email, so a forwarded or leaked link is useless to anyone else.
+      const email = normalizeEmail(p.email);
+      if (!email) return fail("invite_email", 400, "The staff member's email is required");
       const branch = typeof p.branch === "string" && p.branch ? p.branch : null;
       if (branch && !(await activeBranches(db, business.id)).some((b) => b.id === branch)) return fail("branch_invalid", 400);
       const token = randomToken(24);
-      const expires = new Date(Date.now() + 7 * 86_400_000).toISOString();
-      await db.prepare("INSERT INTO invites(id, business, role, label, created_by, created, expires, branch) VALUES(?, ?, 'staff', ?, ?, ?, ?, ?)")
-        .bind(await sha256(token), business.id, label, user.id, now, expires, branch).run();
+      const expires = new Date(Date.now() + 2 * 86_400_000).toISOString();
+      await db.prepare("INSERT INTO invites(id, business, role, label, created_by, created, expires, branch, email) VALUES(?, ?, 'staff', ?, ?, ?, ?, ?, ?)")
+        .bind(await sha256(token), business.id, label, user.id, now, expires, branch, email).run();
       return json({ inviteUrl: `${origin}/invite/${token}`, expires });
     }
 
@@ -584,10 +588,20 @@ export async function POST(request: Request) {
 
     case "archive_customer": {
       const denied = ownerOnly(); if (denied) return denied;
-      // Nothing is deleted: the history stays, but the customer disappears from lists and their card link stops working.
-      const r = await db
-        .prepare("UPDATE customers SET archived = ?, card_hash = NULL WHERE id = ? AND business = ? AND archived IS NULL")
-        .bind(now, p.customer ?? "", business.id).run();
+      // By default nothing is deleted: the history stays, but the customer disappears from lists and their card link stops working.
+      // With erase: the personal details are removed for good (a deletion request). The stamp history stays,
+      // without anything that identifies the person.
+      const r = p.erase === true
+        ? await db
+            .prepare(
+              `UPDATE customers SET archived = COALESCE(archived, ?1), erased = ?1, card_hash = NULL, google_wallet = NULL,
+                 name = '—', phone = 'erased:' || id, birthday = NULL, consent_marketing = 0
+               WHERE id = ?2 AND business = ?3 AND erased IS NULL`,
+            )
+            .bind(now, p.customer ?? "", business.id).run()
+        : await db
+            .prepare("UPDATE customers SET archived = ?, card_hash = NULL WHERE id = ? AND business = ? AND archived IS NULL")
+            .bind(now, p.customer ?? "", business.id).run();
       if (!r.meta.changes) return fail("unknown_card", 404, "Customer not found");
       return json({ ok: true });
     }
@@ -599,6 +613,10 @@ export async function POST(request: Request) {
         .prepare("UPDATE memberships SET revoked = ? WHERE business = ? AND user = ? AND role = 'staff' AND revoked IS NULL")
         .bind(now, business.id, p.user ?? "").run();
       if (!r.meta.changes) return fail("not_found", 404, "Staff member not found");
+      // Unused invites to the same email stop working too, so a removed person cannot come back with one.
+      await db
+        .prepare("UPDATE invites SET revoked = ? WHERE business = ? AND used IS NULL AND revoked IS NULL AND email = (SELECT email FROM users WHERE id = ?)")
+        .bind(now, business.id, p.user ?? "").run();
       // End that person's sessions too, so access stops immediately on every device.
       const others = await db.prepare("SELECT COUNT(*) AS n FROM memberships WHERE user = ? AND revoked IS NULL").bind(p.user ?? "").first<{ n: number }>();
       if (!others?.n) await db.prepare("DELETE FROM sessions WHERE user = ?").bind(p.user ?? "").run();
@@ -678,15 +696,18 @@ export async function POST(request: Request) {
         .bind(crypto.randomUUID(), business.id, JSON.stringify(design), now, user.id, business.id)
         .run();
       const live = await publishedDesign(db, business.id);
-      // Customers who saved the card to Google Wallet get the new look now, not only on their next stamp.
-      // Capped so one publish stays within the background-work limits; the rest refresh on their next stamp.
-      const saved = await db.prepare("SELECT * FROM customers WHERE business = ? AND google_wallet IS NOT NULL LIMIT 100").bind(business.id).all<Customer>();
+      // Every customer who saved the card to Google Wallet gets the new look: the background job
+      // refreshes the passes a batch at a time (see lib/server/customer-messages.ts).
       const origin = new URL(request.url).origin;
-      for (const cust of saved.results ?? []) {
-        const card = await cardState(db, cust, business.reward_mode);
-        syncGoogleWallet(db, cust, card.rewards, origin);
-      }
-      return json({ ok: true, version: live?.version });
+      const queued = await db
+        .prepare(
+          `INSERT INTO wallet_outbox(id, business, customer, kind, not_before, created, origin)
+           SELECT 'sync:' || id, business, id, 'sync', ?1, ?1, ?2 FROM customers WHERE business = ?3 AND google_wallet IS NOT NULL AND archived IS NULL
+           ON CONFLICT(id) DO UPDATE SET done = NULL, result = NULL, attempts = 0, not_before = excluded.not_before, origin = excluded.origin`,
+        )
+        .bind(now, origin, business.id)
+        .run();
+      return json({ ok: true, version: live?.version, walletUpdates: queued.meta.changes ?? 0 });
     }
 
     case "new_join_code": {

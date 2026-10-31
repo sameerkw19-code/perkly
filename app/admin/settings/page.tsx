@@ -18,7 +18,7 @@ export default async function AdminSettingsPage() {
   return (
     <div className="admin" dir="rtl">
       <AdminHeader active="/admin/settings" />
-      <main>
+      <main id="main" tabIndex={-1}>
         <h1>הגדרות מערכת</h1>
         <p className="muted">משפיעות על כל העסקים בפלטפורמה. כל שינוי נרשם ביומן.</p>
         <section className="panel">

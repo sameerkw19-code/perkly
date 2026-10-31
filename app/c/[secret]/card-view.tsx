@@ -38,7 +38,7 @@ export default function CardView({ card, secret, googleWallet, isIOS }: { card: 
     : "";
   return (
     <div className="card-page" dir={dir} lang={lang}>
-      <div className="auth-top">
+      <header className="auth-top">
         <Brand />
         {langs.length > 1 ? (
           <div className="seg card-langs" role="group" aria-label="Language">
@@ -47,7 +47,9 @@ export default function CardView({ card, secret, googleWallet, isIOS }: { card: 
             ))}
           </div>
         ) : null}
-      </div>
+      </header>
+      <main id="main" className="page-main">
+        {card && <h1 className="sr-only">{card.business}</h1>}
       {!card ? (
         <div className="auth-card panel"><h1>{t("cardNotFound")}</h1></div>
       ) : (
@@ -98,6 +100,7 @@ export default function CardView({ card, secret, googleWallet, isIOS }: { card: 
           <p className="form-hint center legal-links"><a href="/privacy">{t("privacyLink")}</a></p>
         </div>
       )}
+      </main>
     </div>
   );
 }

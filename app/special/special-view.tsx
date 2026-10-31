@@ -78,11 +78,11 @@ export default function SpecialView() {
 
   return (
     <div className="special-page" dir={dir} lang={lang}>
-      <div className="auth-top">
+      <header className="auth-top">
         <Brand href="/" />
         <a className="btn soft small" href="/"><ArrowRight size={14} />{t("spBack")}</a>
-      </div>
-      <main className="special-main">
+      </header>
+      <main id="main" className="special-main">
         <div className="page-head">
           <div>
             <p className="eyebrow">Google Wallet</p>

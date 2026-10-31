@@ -27,7 +27,7 @@ export default async function AdminLeadsPage() {
   return (
     <div className="admin" dir="rtl">
       <AdminHeader active="/admin/leads" />
-      <main>
+      <main id="main" tabIndex={-1}>
         <h1>פניות "דברו איתנו"</h1>
         <p className="muted">
           {rows.length} פניות מהטופס ב־perkly.shop/contact, {rows.filter((l) => l.created >= week).length} מהן בשבוע האחרון.

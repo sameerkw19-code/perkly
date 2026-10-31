@@ -21,6 +21,20 @@ const WELCOME_TRIES = 8;
 const RETRY_MS = 3 * 60_000;
 const FAIL_TRIES = 4;
 
+/**
+ * Queues a refresh of one customer's pass (after a failed update, or for a new card design).
+ * A refresh already waiting is moved to now instead of adding another.
+ */
+export function queueSync(db: D1Database, customer: { id: string; business: string }, origin: string, delayMs = 0, now = Date.now()) {
+  const at = new Date(now + delayMs).toISOString();
+  return db
+    .prepare(
+      `INSERT INTO wallet_outbox(id, business, customer, kind, not_before, created, origin) VALUES(?, ?, ?, 'sync', ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET done = NULL, result = NULL, attempts = 0, not_before = excluded.not_before, origin = excluded.origin`,
+    )
+    .bind(`sync:${customer.id}`, customer.business, customer.id, at, new Date(now).toISOString(), origin);
+}
+
 /** Queues the welcome for a customer who just opened "Add to Google Wallet" (once per customer). */
 export async function queueWelcome(db: D1Database, customer: { id: string; business: string }, now = Date.now()): Promise<void> {
   await db
@@ -102,7 +116,7 @@ export async function queueBirthdays(db: D1Database, today: { md: string; year: 
 }
 
 type OutboxRow = {
-  id: string; business: string; customer: string; kind: "welcome" | "birthday" | "special"; campaign: string | null; attempts: number;
+  id: string; business: string; customer: string; kind: "welcome" | "birthday" | "special" | "sync"; campaign: string | null; attempts: number; origin: string | null;
   name: string; stamps: number; target: number; scan_code: string; google_wallet: string | null; archived: string | null;
   b_name: string; b_reward: string; b_color: string; reward_mode: string; b_archived: string | null; suspended: string | null;
   special_text: string | null; special_canceled: string | null;
@@ -112,7 +126,7 @@ type OutboxRow = {
 export async function drainOutbox(db: D1Database, config: WalletConfig, nowIso: string, limit: number): Promise<number> {
   const due = await db
     .prepare(
-      `SELECT o.id, o.business, o.customer, o.kind, o.campaign, o.attempts,
+      `SELECT o.id, o.business, o.customer, o.kind, o.campaign, o.attempts, o.origin,
          c.name, c.stamps, c.target, c.scan_code, c.google_wallet, c.archived,
          b.name AS b_name, b.reward AS b_reward, b.color AS b_color, b.reward_mode, b.archived AS b_archived, b.suspended,
          s.text AS special_text, s.canceled AS special_canceled
@@ -131,6 +145,30 @@ export async function drainOutbox(db: D1Database, config: WalletConfig, nowIso: 
     const business = { id: o.business, name: o.b_name, reward: o.b_reward, color: o.b_color };
     let design = designs.get(o.business);
     if (!design) { design = await liveDesign(db, business); designs.set(o.business, design); }
+    const rewardsNow = async () => {
+      const saved = await db
+        .prepare("SELECT COUNT(*) AS n FROM rewards WHERE customer = ? AND redeemed IS NULL AND (expires IS NULL OR expires > ?)")
+        .bind(o.customer, nowIso)
+        .first<{ n: number }>();
+      return (saved?.n ?? 0) + (o.reward_mode === "block" && o.stamps >= o.target ? 1 : 0);
+    };
+    // A refresh: the current stamps, rewards and look, without a message (a retry, or a new design).
+    if (o.kind === "sync") {
+      const full = o.origin ? await passLook(db, business, o.origin, { stamps: o.stamps, target: o.target }).catch(() => null) : null;
+      const { notice: _none, ...look } = full ?? { notice: null };
+      const result = await updateLoyaltyObject(
+        config,
+        { customerId: o.customer, businessId: o.business, stamps: o.stamps, target: o.target, scanCode: o.scan_code, rewards: await rewardsNow(), look: full ? (look as typeof full) : undefined },
+        null,
+      );
+      if (result === "updated") await finish(o.id, "sent");
+      else if (result === "not_saved") {
+        await db.prepare("UPDATE customers SET google_wallet = NULL WHERE id = ?").bind(o.customer).run();
+        await finish(o.id, "not_saved");
+      } else if (o.attempts + 1 < FAIL_TRIES + 2) await later(o.id, Math.min(60, 5 * 2 ** o.attempts) * 60_000);
+      else await finish(o.id, "failed");
+      continue;
+    }
     const notice: StampNotice =
       o.kind === "special" ? { kind: "special", name: o.name, text: o.special_text ?? "" }
       : o.kind === "birthday" ? { kind: "birthday", name: o.name, gift: design.birthdayGift }
@@ -139,11 +177,7 @@ export async function drainOutbox(db: D1Database, config: WalletConfig, nowIso: 
     if (!noticeOn(design, notice.kind) || (notice.kind === "special" && !notice.text.trim())) { await finish(o.id, "off"); continue; }
     const look = await passLook(db, business, "", { stamps: o.stamps, target: o.target, notice });
     if (!look.notice) { await finish(o.id, "off"); continue; }
-    const saved = await db
-      .prepare("SELECT COUNT(*) AS n FROM rewards WHERE customer = ? AND redeemed IS NULL AND (expires IS NULL OR expires > ?)")
-      .bind(o.customer, nowIso)
-      .first<{ n: number }>();
-    const rewards = (saved?.n ?? 0) + (o.reward_mode === "block" && o.stamps >= o.target ? 1 : 0);
+    const rewards = await rewardsNow();
     // Only the stamps and rewards are refreshed with the message; the pass keeps its look.
     const result = await updateLoyaltyObject(
       config,
