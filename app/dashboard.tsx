@@ -214,7 +214,7 @@ export default function Dashboard() {
         <nav style={{ "--nav-count": nav.length } as React.CSSProperties}>
           {nav.map(([Icon, key]) => (
             <button key={key} className={"nav-item" + (view === key ? " selected" : "")} onClick={() => { setView(key); setQuery(""); load(); }}>
-              <Icon size={18} />{t(key)}{view === key && <span className="nav-dot" />}
+              <Icon size={18} /><span className="nav-long">{t(key)}</span><span className="nav-short">{t("navShort_" + key)}</span>{view === key && <span className="nav-dot" />}
             </button>
           ))}
         </nav>
@@ -284,10 +284,6 @@ export default function Dashboard() {
               <div className="page-head">
                 <div><h1>{t("hello")}</h1><p className="muted">{t("subtitle")}</p></div>
                 <div className="head-actions">
-                  <select aria-label="Range" value={days} onChange={(e) => setDays(e.target.value)}>
-                    <option value="7">{t("range7")}</option><option value="30">{t("range30")}</option>
-                    <option value="90">{t("range90")}</option><option value="all">{t("rangeAll")}</option>
-                  </select>
                   {!!data.branches?.length && (
                     <select aria-label={t("branch")} value={branchView} onChange={(e) => setBranchView(e.target.value)}>
                       <option value="">{t("allBranches")}</option>
@@ -298,19 +294,8 @@ export default function Dashboard() {
                   <button className="btn soft" onClick={() => { setView("station"); setQuery(""); }}><ScanLine size={18} />{t("station")}</button>
                 </div>
               </div>
-              {!!data.alerts?.length && (
-                <div className="alert-panel" role="status">
-                  <strong><AlertTriangle size={16} />{t("alerts")}</strong>
-                  <ul>{data.alerts.map((a, i) => <li key={i}>{t(a.type === "customer" ? "alertCustomer" : a.type === "staffFix" ? "alertStaffFix" : "alertStaff", { name: a.name, n: a.count })}</li>)}</ul>
-                </div>
-              )}
-              <section className="stats">
-                <Stat icon={Users} color="violet" label={t("statCustomers")} value={data.stats!.customers} note={t("statNew", { n: data.stats!.new_customers })} />
-                <Stat icon={Plus} color="peach" label={t("statStamps")} value={data.stats!.stamps} note={t("inRange")} />
-                <Stat icon={Gift} color="green" label={t("statReady")} value={data.stats!.rewards_ready} note={t("rightNow")} />
-                <Stat icon={Check} color="blue" label={t("statRedeemed")} value={data.stats!.redemptions} note={t("inRange")} />
-              </section>
-              {data.summary && <Summary summary={data.summary} t={t} />}
+              {!!data.alerts?.length && <Alerts alerts={data.alerts} t={t} />}
+              {data.summary && <Summary summary={data.summary} totals={{ customers: data.stats!.customers, ready: data.stats!.rewards_ready }} t={t} />}
               <section className="overview-grid">
                 <div className="panel card-panel">
                   <div className="section-head"><h2>{t("card")}</h2></div>
@@ -324,7 +309,13 @@ export default function Dashboard() {
               </section>
               {!!data.branches?.length && !!data.perBranch?.length && (
                 <section className="panel" style={{ marginBottom: 22 }}>
-                  <div className="section-head"><h2>{t("byBranch")}</h2><span className="pill">{t("inRange")}</span></div>
+                  <div className="section-head">
+                    <h2>{t("byBranch")}</h2>
+                    <select aria-label={t("inRange")} value={days} onChange={(e) => setDays(e.target.value)}>
+                      <option value="7">{t("range7")}</option><option value="30">{t("range30")}</option>
+                      <option value="90">{t("range90")}</option><option value="all">{t("rangeAll")}</option>
+                    </select>
+                  </div>
                   <div className="table-wrap">
                     <table>
                       <thead><tr><th>{t("branch")}</th><th>{t("statStamps")}</th><th>{t("statRedeemed")}</th></tr></thead>
@@ -555,12 +546,32 @@ function Stat({ icon: Icon, color, label, value, note }: { icon: any; color: str
   );
 }
 
+/**
+ * Consecutive actions of the same kind on the same customer (within 15 minutes) become one line,
+ * so three quick stamps read "+3" instead of three identical rows.
+ */
+function groupEvents(events: any[]): any[] {
+  const out: any[] = [];
+  for (const e of events) {
+    const last = out[out.length - 1];
+    const close = last && Math.abs(Date.parse(last.firstCreated) - Date.parse(e.created)) < 15 * 60_000;
+    if (last && close && last.kind === e.kind && last.customer === e.customer && e.kind === "stamp" && !e.note && !last.note && last.branch_name === e.branch_name) {
+      last.delta += e.delta;
+      last.rewards_earned = (last.rewards_earned ?? 0) + (e.rewards_earned ?? 0);
+      last.firstCreated = e.created;
+      continue;
+    }
+    out.push({ ...e, firstCreated: e.created });
+  }
+  return out;
+}
+
 function EventList({ events, t, lang }: { events: any[]; t: any; lang: string }) {
   if (!events.length) return <div className="activity-empty"><Activity /><p>{t("empty")}</p></div>;
   const locale = lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB";
   return (
     <div>
-      {events.slice(0, 12).map((e: any, i: number) => (
+      {groupEvents(events).slice(0, 8).map((e: any, i: number) => (
         <div className="activity-row" key={e.id ?? i}>
           <span className={"activity-icon" + (e.kind === "redeem" ? " reward-icon" : "")}>{e.kind === "redeem" ? <Gift size={16} /> : e.kind === "adjust" ? <Activity size={16} /> : <Plus size={16} />}</span>
           <div>
@@ -1086,8 +1097,24 @@ const SUMMARY_ROWS = [
   ["joined", "sumJoined"],
 ] as const;
 
+/** Unusual activity, calm: the first three, the rest one click away. */
+function Alerts({ alerts, t }: { alerts: { type: "customer" | "staff" | "staffFix"; name: string; count: number }[]; t: (k: string, v?: Record<string, string | number>) => string }) {
+  const [all, setAll] = useState(false);
+  const text = (a: (typeof alerts)[number]) => t(a.type === "customer" ? "alertCustomer" : a.type === "staffFix" ? "alertStaffFix" : "alertStaff", { name: a.name, n: a.count });
+  const shown = all ? alerts : alerts.slice(0, 3);
+  return (
+    <section className="alert-panel" role="status">
+      <strong><AlertTriangle size={16} />{t("alerts")} <span className="count"><Num>{alerts.length}</Num></span></strong>
+      <ul>{shown.map((a, i) => <li key={i}>{text(a)}</li>)}</ul>
+      {alerts.length > 3 && (
+        <button type="button" className="text-btn" onClick={() => setAll(!all)}>{all ? t("showLess") : t("showAll", { n: alerts.length })}</button>
+      )}
+    </section>
+  );
+}
+
 /** Summary for the owner: this day, week or month against the one before. */
-function Summary({ summary, t }: { summary: Record<Period, Record<string, number>>; t: (k: string, v?: Record<string, string | number>) => string }) {
+function Summary({ summary, totals, t }: { summary: Record<Period, Record<string, number>>; totals: { customers: number; ready: number }; t: (k: string, v?: Record<string, string | number>) => string }) {
   const [period, setPeriod] = useState<Period>("week");
   const s = summary[period];
   return (
@@ -1100,6 +1127,10 @@ function Summary({ summary, t }: { summary: Record<Period, Record<string, number
           ))}
         </div>
       </div>
+      <p className="summary-totals">
+        <span><Users size={15} /><Num>{totals.customers}</Num> {t("statCustomers")}</span>
+        <span><Gift size={15} /><Num>{totals.ready}</Num> {t("statReady")}</span>
+      </p>
       <p className="form-hint">{t("sumNote_" + period)}</p>
       <div className="summary-grid">
         {SUMMARY_ROWS.map(([key, label]) => {
