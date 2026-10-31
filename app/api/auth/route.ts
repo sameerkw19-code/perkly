@@ -8,10 +8,39 @@ import {
   normalizeEmail,
   sessionCookie,
 } from "../../../lib/server/auth";
-import { DUMMY_HASH, hashPassword, sameText, sha256, verifyPassword } from "../../../lib/server/crypto";
+import { DUMMY_HASH, hashPassword, randomToken, sameText, sha256, verifyPassword } from "../../../lib/server/crypto";
 import { clientIp, fail, json, readJson, sameOrigin, str } from "../../../lib/server/http";
 import { allow, limited } from "../../../lib/server/rate-limit";
 import { getSettings } from "../../../lib/server/settings";
+import { maskEmail, mailReady, sendMail, simpleMail } from "../../../lib/server/mailer";
+import { CODE_MAX_ATTEMPTS, CODE_MAX_SENDS, CODE_TTL_MS, deviceTrusted, hashCode, newCode, trustDevice } from "../../../lib/server/login-code";
+
+/** The sign-in code email. */
+function codeMail(to: string, code: string) {
+  return simpleMail(
+    to,
+    `קוד כניסה ל-Perkly: ${code}`,
+    ["זה קוד הכניסה שלך ל-Perkly. הוא בתוקף ל-10 דקות.", "לא ניסית להיכנס? אפשר להתעלם מההודעה. מומלץ להחליף סיסמה."],
+    ["Your Perkly sign-in code. It is valid for 10 minutes. If this wasn't you, ignore this email and change your password."],
+    { text: code },
+  );
+}
+
+/** Starts the email-code step: stores the hashed code and emails it. Null when the email could not be sent. */
+async function startCodeStep(db: D1Database, user: { id: string; email: string }) {
+  const challenge = randomToken(18);
+  const code = newCode();
+  const now = new Date();
+  await db
+    .prepare("INSERT INTO login_challenges(id, user, code_hash, created, expires, last_sent) VALUES(?, ?, ?, ?, ?, ?)")
+    .bind(challenge, user.id, await hashCode(challenge, code), now.toISOString(), new Date(now.getTime() + CODE_TTL_MS).toISOString(), now.toISOString())
+    .run();
+  if (!(await sendMail(env, codeMail(user.email, code)))) {
+    await db.prepare("DELETE FROM login_challenges WHERE id = ?").bind(challenge).run();
+    return null;
+  }
+  return challenge;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -80,7 +109,7 @@ export async function POST(request: Request) {
       }
       const password = typeof body.password === "string" ? body.password.slice(0, 200) : "";
       const user = email
-        ? await db.prepare("SELECT id, pass_hash, blocked FROM users WHERE email = ?").bind(email).first<{ id: string; pass_hash: string; blocked: string | null }>()
+        ? await db.prepare("SELECT id, email, pass_hash, blocked FROM users WHERE email = ?").bind(email).first<{ id: string; email: string; pass_hash: string; blocked: string | null }>()
         : null;
       const valid = await verifyPassword(password, user?.pass_hash ?? DUMMY_HASH);
       if (!user || !valid) {
@@ -90,8 +119,97 @@ export async function POST(request: Request) {
       }
       // Only after a correct password, so the message does not reveal which emails exist.
       if (user.blocked) return fail("account_blocked", 403, "This account is blocked");
+      // Second step on a device the user has not trusted yet: a code sent to the account's email.
+      // Applies once email sending is connected; until then sign-in works as before.
+      if (mailReady(env) && !(await deviceTrusted(db, request.headers.get("cookie"), user.id))) {
+        const challenge = await startCodeStep(db, user);
+        if (!challenge) return fail("mail_unavailable", 503, "Could not send the sign-in code. Try again in a few minutes.");
+        return json({ ok: true, code: true, challenge, sentTo: maskEmail(user.email) });
+      }
       const token = await createSession(db, user.id);
       return json({ ok: true }, 200, { "Set-Cookie": sessionCookie(token, request) });
+    }
+
+    case "verify_code": {
+      const challenge = typeof body.challenge === "string" && body.challenge.length <= 64 ? body.challenge : "";
+      const code = typeof body.code === "string" ? body.code.replace(/\D/g, "").slice(0, 6) : "";
+      if (!(await allow(db, `code-ip:${ip}`, 30, 600))) return fail("rate_limited", 429, "Too many attempts. Try again in 10 minutes.");
+      const now = new Date().toISOString();
+      const row = challenge
+        ? await db
+            .prepare(
+              `SELECT c.id, c.user, c.code_hash, c.attempts, c.expires, c.used, u.blocked
+               FROM login_challenges c JOIN users u ON u.id = c.user WHERE c.id = ?`,
+            )
+            .bind(challenge)
+            .first<{ id: string; user: string; code_hash: string; attempts: number; expires: string; used: string | null; blocked: string | null }>()
+        : null;
+      if (!row || row.used || row.expires <= now || row.attempts >= CODE_MAX_ATTEMPTS || row.blocked) {
+        return fail("code_invalid", 401, "The code is wrong or has expired");
+      }
+      if (code.length !== 6 || !(await sameText(await hashCode(challenge, code), row.code_hash))) {
+        await db.prepare("UPDATE login_challenges SET attempts = attempts + 1 WHERE id = ?").bind(challenge).run();
+        return fail("code_invalid", 401, "The code is wrong or has expired");
+      }
+      // Used before the session starts, so a code works once.
+      const claimed = await db.prepare("UPDATE login_challenges SET used = ? WHERE id = ? AND used IS NULL").bind(now, challenge).run();
+      if (!claimed.meta.changes) return fail("code_invalid", 401, "The code is wrong or has expired");
+      await db.prepare("UPDATE users SET email_verified = COALESCE(email_verified, ?) WHERE id = ?").bind(now, row.user).run();
+      const cookies: [string, string][] = [["Set-Cookie", sessionCookie(await createSession(db, row.user), request)]];
+      if (body.remember !== false) cookies.push(["Set-Cookie", await trustDevice(db, row.user, request)]);
+      return json({ ok: true }, 200, cookies);
+    }
+
+    case "resend_code": {
+      const challenge = typeof body.challenge === "string" && body.challenge.length <= 64 ? body.challenge : "";
+      if (!(await allow(db, `code-send-ip:${ip}`, 10, 600))) return fail("rate_limited", 429, "Too many attempts. Try again in 10 minutes.");
+      const now = new Date();
+      const row = challenge
+        ? await db
+            .prepare("SELECT c.user, c.sends, c.last_sent, c.used, u.email FROM login_challenges c JOIN users u ON u.id = c.user WHERE c.id = ?")
+            .bind(challenge)
+            .first<{ user: string; sends: number; last_sent: string | null; used: string | null; email: string }>()
+        : null;
+      if (!row || row.used) return fail("code_invalid", 401, "Sign in again");
+      // Up to 3 emails per sign-in, at least 30 seconds apart.
+      if (row.sends >= CODE_MAX_SENDS || (row.last_sent && now.getTime() - Date.parse(row.last_sent) < 30_000)) {
+        return fail("rate_limited", 429, "Wait a little before asking for another code");
+      }
+      const code = newCode();
+      await db
+        .prepare("UPDATE login_challenges SET code_hash = ?, attempts = 0, sends = sends + 1, last_sent = ?, expires = ? WHERE id = ? AND used IS NULL")
+        .bind(await hashCode(challenge, code), now.toISOString(), new Date(now.getTime() + CODE_TTL_MS).toISOString(), challenge)
+        .run();
+      if (!(await sendMail(env, codeMail(row.email, code)))) return fail("mail_unavailable", 503, "Could not send the code");
+      return json({ ok: true });
+    }
+
+    // "Forgot password": emails a reset link. The answer is the same whether or not the email has an account.
+    case "forgot_password": {
+      if (!mailReady(env)) return fail("mail_unavailable", 503, "Password reset by email is not available yet");
+      const email = normalizeEmail(body.email);
+      if (!email) return fail("bad_details", 400, "Invalid email");
+      if (!(await allow(db, `forgot-ip:${ip}`, 5, 3600))) return fail("rate_limited", 429, "Too many attempts");
+      if (!(await allow(db, `forgot-email:${email}`, 3, 3600))) return json({ ok: true });
+      const user = await db.prepare("SELECT id, email FROM users WHERE email = ? AND blocked IS NULL").bind(email).first<{ id: string; email: string }>();
+      if (user) {
+        const token = randomToken(24);
+        const now = new Date();
+        await db.batch([
+          db.prepare("UPDATE password_resets SET used = ? WHERE user = ? AND used IS NULL").bind(now.toISOString(), user.id),
+          db.prepare("INSERT INTO password_resets(id, user, created, created_by, expires) VALUES(?, ?, ?, 'email', ?)")
+            .bind(await sha256(token), user.id, now.toISOString(), new Date(now.getTime() + 3_600_000).toISOString()),
+        ]);
+        const link = `${new URL(request.url).origin}/reset/${token}`;
+        await sendMail(env, simpleMail(
+          user.email,
+          "איפוס סיסמה ל-Perkly",
+          ["ביקשת לאפס את הסיסמה שלך ל-Perkly. הקישור בתוקף לשעה אחת.", "לא ביקשת? אפשר להתעלם מההודעה, הסיסמה לא תשתנה."],
+          ["You asked to reset your Perkly password. The link is valid for one hour. If this wasn't you, ignore this email."],
+          { text: "בחירת סיסמה חדשה", href: link },
+        ));
+      }
+      return json({ ok: true });
     }
 
     case "reset_password": {
@@ -117,8 +235,9 @@ export async function POST(request: Request) {
       if (!used.meta.changes) return fail("reset_invalid", 404, "This reset link expired or was already used");
       await db.batch([
         db.prepare("UPDATE users SET pass_hash = ? WHERE id = ?").bind(await hashPassword(body.password), reset.user),
-        // Signs out every device that used the old password.
+        // Signs out every device that used the old password, and forgets trusted devices.
         db.prepare("DELETE FROM sessions WHERE user = ?").bind(reset.user),
+        db.prepare("DELETE FROM trusted_devices WHERE user = ?").bind(reset.user),
       ]);
       const token = await createSession(db, reset.user);
       return json({ ok: true }, 200, { "Set-Cookie": sessionCookie(token, request) });
@@ -132,7 +251,13 @@ export async function POST(request: Request) {
     // Ends every session of this user (all phones and computers), including this one.
     case "logout_all": {
       const me = await getUser(db, request.headers.get("cookie"));
-      if (me) await db.prepare("DELETE FROM sessions WHERE user = ?").bind(me.id).run();
+      if (me) {
+        await db.batch([
+          db.prepare("DELETE FROM sessions WHERE user = ?").bind(me.id),
+          // A lost phone must ask for a code again.
+          db.prepare("DELETE FROM trusted_devices WHERE user = ?").bind(me.id),
+        ]);
+      }
       return json({ ok: true }, 200, { "Set-Cookie": clearSessionCookie(request) });
     }
 

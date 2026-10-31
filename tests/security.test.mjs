@@ -47,3 +47,12 @@ test("subscription events carry when they changed", () => {
   const row = subscriptionRow({ type: "subscription.updated", data: { id: "sub_1", status: "active", metadata: { business: "b1" }, modified_at: "2026-10-01T10:00:00Z" } });
   assert.equal(row.changedAt, "2026-10-01T10:00:00Z");
 });
+
+test("emails are masked on the code screen", async () => {
+  const { maskEmail, simpleMail } = await import("../lib/server/mailer.ts");
+  assert.equal(maskEmail("ronit@gmail.com"), "r***t@gmail.com");
+  assert.equal(maskEmail("ab@x.co"), "a*@x.co");
+  const m = simpleMail("a@b.c", "s", ["<b>שלום</b>"], ["hi"], { text: "123456" });
+  assert.ok(!m.html.includes("<b>שלום</b>"), "text is escaped");
+  assert.ok(m.text.includes("123456"));
+});

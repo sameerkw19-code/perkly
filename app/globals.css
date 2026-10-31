@@ -469,3 +469,5 @@ fieldset.birthday{border:0;padding:0;margin:0 0 14px}fieldset.birthday legend{fo
 .ed-sec .wallet-notify{margin-top:0}
 .ed-sec .wallet-notify .notify-head:first-of-type{margin-top:4px}
 @media(max-width:760px){.summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.summary-item strong{font-size:24px}}
+
+.code-input{font-size:26px;letter-spacing:8px;text-align:center;font-weight:700}

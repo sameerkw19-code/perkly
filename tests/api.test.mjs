@@ -601,3 +601,11 @@ test("ids must be text", async () => {
   const r2 = await ownerA.post("/api/loyalty", { action: "archive_customer", business: "x", customer: ["a"] });
   assert.equal(r2.status, 400);
 });
+
+test("without email sending connected, sign-in has no code step and reset says it is unavailable", async () => {
+  const r = await new Client().post("/api/auth", { action: "forgot_password", email: `ownerA-${run}@test.perkly` });
+  assert.equal(r.status, 503);
+  assert.equal(r.body.code, "mail_unavailable");
+  const bad = await new Client().post("/api/auth", { action: "verify_code", challenge: "nope", code: "123456" });
+  assert.equal(bad.status, 401);
+});

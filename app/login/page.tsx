@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { env } from "cloudflare:workers";
 import { currentUser } from "../../lib/server/page-session";
 import AuthForm from "./auth-form";
+import { mailReady } from "../../lib/server/mailer";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Perkly | כניסה", robots: { index: false } };
@@ -18,5 +19,5 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   if (await currentUser()) redirect(next);
   // New accounts are opened in the guided setup.
   if (params.mode === "signup" || params.signup === "1") redirect(typeof params.lang === "string" && ["en"].includes(params.lang) ? `/start?lang=${params.lang}` : "/start");
-  return <AuthForm needsCode={!!env.SIGNUP_CODE} next={next} initialMode="login" />;
+  return <AuthForm needsCode={!!env.SIGNUP_CODE} mailReady={mailReady(env)} next={next} initialMode="login" />;
 }

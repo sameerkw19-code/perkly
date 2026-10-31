@@ -14,6 +14,13 @@ declare namespace Cloudflare {
     POLAR_SANDBOX?: string;
     /** Full Google Wallet loyalty class id, exactly as Google lists it. */
     GOOGLE_WALLET_CLASS_ID?: string;
+    /** Email sending (lib/server/mailer.ts): Cloudflare Email Service binding, or a Resend key. */
+    EMAIL?: { send(message: Record<string, unknown>): Promise<unknown> };
+    RESEND_API_KEY?: string;
+    /** Sender, e.g. "Perkly <no-reply@perkly.shop>". */
+    MAIL_FROM?: string;
+    /** "1" only in local development: emails are printed to the log instead of sent. */
+    MAIL_DEV_LOG?: string;
     /** Wallet messages sent per cron run (default 12). Raise on the Workers Paid plan. */
     WALLET_BATCH?: string;
     /** Google Wallet. Issuer id is a Variable; the service-account JSON key is a Secret. */
