@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import { ImagePlus, Lock, MessageCircle, Shuffle, Trash2, UploadCloud } from "lucide-react";
 import {
-  FONTS, FONT_SCRIPTS, GRADIENTS, GRADIENT_DIRS, ICON_GROUPS, IMAGE_MIN, LIMITS, OFFERED_CARD_LANGS, PALETTES, cardLang, darken, designChecks, is3d, stamp3dUrl,
+  FONTS, FONT_SCRIPTS, GRADIENTS, GRADIENT_DIRS, ICON_GROUPS, IMAGE_MIN, LIMITS, NOTICE_DEFAULTS, OFFERED_CARD_LANGS, PALETTES, cardLang, darken, designChecks, is3d, noticeText, stamp3dUrl,
   type AssetMeta, type CardLook, type Design, type FontId, type Layout, type LogoFrame, type Size, type StampIcon, type Texts,
 } from "../lib/design";
 import { CARD_LANGS, isRtl, type Lang } from "../lib/i18n-types";
@@ -567,6 +567,40 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
               </button>
             </div>
             <p className="form-hint">{t("wbStampsHint")}</p>
+          </div>
+          <div className="wallet-notify">
+            <h3 className="sub-head">{t("edNotify")}</h3>
+            <label className="check-row clear-white">
+              <input type="checkbox" checked={design.walletNotify} onChange={(e) => set({ walletNotify: e.target.checked })} />
+              <span>{t("edNotifyOn")}<small className="form-hint">{t("edNotifyOnHint")}</small></span>
+            </label>
+            {design.walletNotify && (
+              <>
+                {design.langs.length > 1 && (
+                  <div className="seg">
+                    {design.langs.map((l) => <button key={l} type="button" aria-pressed={textLang === l} onClick={() => setTextLang(l)}>{t("langName_" + l)}</button>)}
+                  </div>
+                )}
+                <div className="stack-form" dir={isRtl(textLang) ? "rtl" : "ltr"}>
+                  {(["notify", "notifyReward"] as const).map((k) => {
+                    const fallback = k === "notify" ? NOTICE_DEFAULTS[textLang].one : NOTICE_DEFAULTS[textLang].reward;
+                    const sample = noticeText(
+                      { ...design.texts[textLang], title: design.texts[textLang].title || design.texts[design.langs[0]].title, reward: design.texts[textLang].reward || design.texts[design.langs[0]].reward },
+                      textLang,
+                      k === "notify" ? { kind: "stamp", added: 1, left: Math.max(1, target - 2), name: t("edNotifySampleName") } : { kind: "reward", name: t("edNotifySampleName") },
+                    );
+                    return (
+                      <label key={k}>
+                        <span className="label-row">{t(k === "notify" ? "fNotify" : "fNotifyReward")}<small><Num>{design.texts[textLang][k].length}/{LIMITS[k]}</Num></small></span>
+                        <textarea rows={2} value={design.texts[textLang][k]} maxLength={LIMITS[k]} placeholder={fallback} onChange={(e) => setText(k, e.target.value)} />
+                        <small className="form-hint">{t("edNotifyPreview")}: {sample}</small>
+                      </label>
+                    );
+                  })}
+                </div>
+                <p className="form-hint">{t("edNotifyVars")}</p>
+              </>
+            )}
           </div>
           {design.logo && (
             <div className="logo-controls">
