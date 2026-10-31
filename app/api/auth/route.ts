@@ -1,4 +1,4 @@
-import { env } from "cloudflare:workers";
+import { env, waitUntil } from "cloudflare:workers";
 import { getD1 } from "../../../db";
 import {
   clearSessionCookie,
@@ -248,6 +248,34 @@ export async function POST(request: Request) {
       return json({ ok: true }, 200, { "Set-Cookie": clearSessionCookie(request) });
     }
 
+    // Deletes the signed-in person's own account (after the password). A business owner closes or hands over
+    // the business first, so a business never loses its owner by accident.
+    case "delete_account": {
+      const me = await getUser(db, request.headers.get("cookie"));
+      if (!me) return fail("signin", 401, "Sign in required");
+      if (!(await allow(db, `delete-account:${me.id}`, 5, 3600))) return fail("rate_limited", 429, "Too many attempts");
+      const row = await db.prepare("SELECT pass_hash FROM users WHERE id = ?").bind(me.id).first<{ pass_hash: string }>();
+      const password = typeof body.password === "string" ? body.password.slice(0, 200) : "";
+      if (!row || !(await verifyPassword(password, row.pass_hash))) return fail("bad_login", 401, "Wrong password");
+      const owns = await db
+        .prepare("SELECT COUNT(*) AS n FROM memberships m JOIN businesses b ON b.id = m.business WHERE m.user = ? AND m.role = 'owner' AND m.revoked IS NULL AND b.archived IS NULL")
+        .bind(me.id)
+        .first<{ n: number }>();
+      if (owns?.n) return fail("account_owns_business", 409, "Close or hand over your business first");
+      const now = new Date().toISOString();
+      // The account stops existing for sign-in; its name and email are removed. Past actions in a
+      // business's history keep pointing at the (now anonymous) account.
+      await db.batch([
+        db.prepare("UPDATE memberships SET revoked = COALESCE(revoked, ?) WHERE user = ?").bind(now, me.id),
+        db.prepare("DELETE FROM sessions WHERE user = ?").bind(me.id),
+        db.prepare("DELETE FROM trusted_devices WHERE user = ?").bind(me.id),
+        db.prepare("UPDATE password_resets SET used = COALESCE(used, ?) WHERE user = ?").bind(now, me.id),
+        db.prepare("UPDATE users SET name = '—', email = 'deleted-' || id || '@deleted.invalid', pass_hash = ?, blocked = COALESCE(blocked, ?) WHERE id = ?")
+          .bind(await hashPassword(randomToken(24)), now, me.id),
+      ]);
+      return json({ ok: true }, 200, { "Set-Cookie": clearSessionCookie(request) });
+    }
+
     // Ends every session of this user (all phones and computers), including this one.
     case "logout_all": {
       const me = await getUser(db, request.headers.get("cookie"));
@@ -270,19 +298,22 @@ export async function POST(request: Request) {
       // Invites to archived businesses do not work.
       const invite = await db
         .prepare(
-          `SELECT i.business, i.role, i.branch FROM invites i JOIN businesses b ON b.id = i.business
+          `SELECT i.business, i.role, i.branch, i.email, b.name AS business_name FROM invites i JOIN businesses b ON b.id = i.business
            WHERE i.id = ? AND i.used IS NULL AND i.revoked IS NULL AND i.expires > ? AND b.archived IS NULL`,
         )
         .bind(inviteId, now)
-        .first<{ business: string; role: string; branch: string | null }>();
+        .first<{ business: string; role: string; branch: string | null; email: string | null; business_name: string }>();
       if (!tokenText || !invite) return fail("invite_invalid", 404, "Invite expired or already used");
 
       let user = await getUser(db, request.headers.get("cookie"));
       let setCookie: string | undefined;
+      // An invite made for an email works only for an account with that email.
+      if (user && invite.email && user.email !== invite.email) return fail("invite_other_email", 403, "This invite is for another email");
       if (!user) {
         const name = str(body.name, 80);
         const email = normalizeEmail(body.email);
         if (!name || !email) return fail("bad_details", 400, "Invalid name or email");
+        if (invite.email && email !== invite.email) return fail("invite_other_email", 403, "This invite is for another email");
         if (!validPassword(body.password)) return fail("weak_password", 400, "Password must be 8+ characters");
       if (!strongEnough(body.password, email)) return fail("common_password", 400, "This password is too easy to guess");
         const userId = await newUser(db, name, email, body.password);
@@ -304,6 +335,22 @@ export async function POST(request: Request) {
         ).bind(crypto.randomUUID(), invite.business, user.id, invite.role, now, invite.branch),
       ]);
       if (!result[0].meta.changes) return fail("invite_invalid", 404, "Invite expired or already used");
+      // The owners hear about it, so a join they did not expect does not go unnoticed.
+      if (mailReady(env)) {
+        const owners = await db
+          .prepare("SELECT u.email FROM memberships m JOIN users u ON u.id = m.user WHERE m.business = ? AND m.role = 'owner' AND m.revoked IS NULL")
+          .bind(invite.business)
+          .all<{ email: string }>();
+        const who = `${user.name} (${user.email})`;
+        const origin = new URL(request.url).origin;
+        waitUntil(Promise.all((owners.results ?? []).map((o) => sendMail(env, simpleMail(
+          o.email,
+          `עובד חדש הצטרף ל-${invite.business_name}`,
+          [`${who} הצטרף/ה לצוות של ${invite.business_name} ב-Perkly.`, "לא הזמנת? אפשר להסיר אותו/ה בלשונית \"צוות\" בלוח הבקרה."],
+          [`${who} joined the ${invite.business_name} team on Perkly. Didn't invite them? Remove them under "Team" in the dashboard.`],
+          { text: "ללוח הבקרה", href: `${origin}/?business=${invite.business}` },
+        )))));
+      }
       return json({ ok: true, business: invite.business }, 200, setCookie ? { "Set-Cookie": setCookie } : undefined);
     }
 

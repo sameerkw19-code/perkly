@@ -14,7 +14,7 @@ function rememberLang(lang: Lang) {
 
 export function Logo({ label }: { label: string }) {
   return (
-    <span className="lp-logo" aria-label={label}>
+    <span className="lp-logo" role="img" aria-label={label}>
       <span className="lp-logo-mark" aria-hidden="true"><Icon name="gift" size={21} stroke={2.2} /></span>
       <span className="lp-logo-word" aria-hidden="true">Perkly</span>
     </span>

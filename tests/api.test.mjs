@@ -190,7 +190,7 @@ test("10. another business owner cannot see or change this business", async () =
 });
 
 test("11. staff: invited, limited permissions, then revoked", async () => {
-  const inv = await ownerA.act(bizA, "invite_staff", { label: "Barista" });
+  const inv = await ownerA.act(bizA, "invite_staff", { label: "Barista", email: `noa-${run}@test.perkly` });
   assert.equal(inv.status, 200);
   const token = new URL(inv.body.inviteUrl).pathname.split("/").pop();
   const join = await staff.post("/api/auth", { action: "accept_invite", token, name: "Barista Noa", email: `noa-${run}@test.perkly`, password: "staff pass 1" });
@@ -358,7 +358,7 @@ test("design: upload, draft, publish checks, live card uses the published design
 
 test("design: staff and other businesses cannot edit or borrow images", async () => {
   const s2 = new Client();
-  const inv = await ownerA.act(bizA, "invite_staff", { label: "Cashier" });
+  const inv = await ownerA.act(bizA, "invite_staff", { label: "Cashier", email: `cash-${run}@test.perkly` });
   await s2.post("/api/auth", { action: "accept_invite", token: new URL(inv.body.inviteUrl).pathname.split("/").pop(), name: "Cashier", email: `cash-${run}@test.perkly`, password: "cashier pass" });
   const view = await s2.get(`/api/loyalty?business=${bizA}`);
   assert.equal(view.body.editor, undefined, "staff get no editor data");
@@ -395,7 +395,7 @@ test("branches: required once they exist, staff locked to their branch, reports 
   assert.equal((await owner.act(biz, "stamp", { customer: cust, branch: south, requestId: id() })).status, 200);
 
   // Staff invited to North: whatever branch they send, North is recorded.
-  const inv = await owner.act(biz, "invite_staff", { label: "N", branch: north });
+  const inv = await owner.act(biz, "invite_staff", { label: "N", branch: north, email: `north-${run}@test.perkly` });
   const st = new Client();
   await st.post("/api/auth", { action: "accept_invite", token: new URL(inv.body.inviteUrl).pathname.split("/").pop(), name: "North Staff", email: `north-${run}@test.perkly`, password: "north pass 1" });
   const me = (await st.get(`/api/loyalty?business=${biz}`)).body;
@@ -437,7 +437,7 @@ test("station: several purchases in one action; staff can fix the count with a r
   await signup(owner, "stationOwner");
   const biz = (await owner.post("/api/loyalty", { action: "create_business", name: "Cafe2", reward: "Free", target: 9, color: "#123456", rewardMode: "block" })).body.id;
   const cust = (await owner.act(biz, "register_customer", { name: "Omer", phone: "0549876543" })).body.id;
-  const inv = await owner.act(biz, "invite_staff", { label: "S" });
+  const inv = await owner.act(biz, "invite_staff", { label: "S", email: `station-${run}@test.perkly` });
   const st = new Client();
   await st.post("/api/auth", { action: "accept_invite", token: new URL(inv.body.inviteUrl).pathname.split("/").pop(), name: "Station Staff", email: `station-${run}@test.perkly`, password: "station pass" });
 
@@ -547,7 +547,7 @@ test("collect mode: expiry applies to new rewards only; switching modes converts
   assert.equal((await owner.act(biz, "update_business", { name: "Exp", reward: "Free", target: 2, color: "#123456", rewardExpiryDays: 7 })).status, 400, "only listed expiry values");
 
   // Staff can use saved rewards too.
-  const inv = await owner.act(biz, "invite_staff", { label: "S" });
+  const inv = await owner.act(biz, "invite_staff", { label: "S", email: `exp-${run}@test.perkly` });
   const st = new Client();
   await st.post("/api/auth", { action: "accept_invite", token: new URL(inv.body.inviteUrl).pathname.split("/").pop(), name: "Exp Staff", email: `exp-${run}@test.perkly`, password: "exp staff 1" });
   const used = await st.act(biz, "redeem", { customer: cust, requestId: id() });
@@ -608,4 +608,70 @@ test("without email sending connected, sign-in has no code step and reset says i
   assert.equal(r.body.code, "mail_unavailable");
   const bad = await new Client().post("/api/auth", { action: "verify_code", challenge: "nope", code: "123456" });
   assert.equal(bad.status, 401);
+});
+
+test("invites work only for their email; removing staff cancels their unused invites", async () => {
+  const owner = new Client();
+  await signup(owner, "invowner");
+  const biz = (await owner.post("/api/loyalty", { action: "create_business", name: "Inv Cafe", reward: "Coffee", target: 5, color: "#123456" })).body.id;
+  const target = `kim-${run}@test.perkly`;
+  assert.equal((await owner.act(biz, "invite_staff", { label: "Kim" })).body.code, "invite_email", "an email is required");
+  const first = await owner.act(biz, "invite_staff", { label: "Kim", email: target });
+  const second = await owner.act(biz, "invite_staff", { label: "Kim again", email: target });
+  const tok = (r) => new URL(r.body.inviteUrl).pathname.split("/").pop();
+
+  const stranger = await new Client().post("/api/auth", { action: "accept_invite", token: tok(first), name: "Mallory", email: `mallory-${run}@test.perkly`, password: "mallory pass 1" });
+  assert.equal(stranger.status, 403, "a forwarded link does not work for another email");
+  assert.equal(stranger.body.code, "invite_other_email");
+
+  const kim = new Client();
+  assert.equal((await kim.post("/api/auth", { action: "accept_invite", token: tok(first), name: "Kim", email: target, password: "kim pass 12" })).status, 200);
+  const kimId = (await owner.get(`/api/loyalty?business=${biz}`)).body.team.find((m) => m.role === "staff").id;
+  assert.equal((await owner.act(biz, "revoke_member", { user: kimId })).status, 200);
+  const back = await new Client().post("/api/auth", { action: "login", email: target, password: "kim pass 12" });
+  const kim2 = new Client();
+  await kim2.post("/api/auth", { action: "login", email: target, password: "kim pass 12" });
+  const again = await kim2.post("/api/auth", { action: "accept_invite", token: tok(second) });
+  assert.equal(again.status, 404, "the unused invite was cancelled with the removal");
+  assert.equal(back.status, 200);
+});
+
+test("staff cannot act on another business, and owners only on their own", async () => {
+  const other = new Client();
+  await signup(other, "otherowner");
+  const otherBiz = (await other.post("/api/loyalty", { action: "create_business", name: "Other", reward: "Tea", target: 5, color: "#654321" })).body.id;
+  for (const action of ["stamp", "lookup", "register_customer", "update_business", "invite_staff"]) {
+    const r = await ownerA.act(otherBiz, action, { customer: dana, q: "da", name: "x", phone: "0501234567", requestId: crypto.randomUUID() });
+    assert.equal(r.status, 404, action);
+  }
+  const view = await ownerA.get(`/api/loyalty?business=${otherBiz}`);
+  assert.notEqual(view.body?.business?.id, otherBiz, "no data from another business");
+});
+
+test("erasing a customer removes their personal details for good", async () => {
+  const owner = new Client();
+  await signup(owner, "eraseowner");
+  const biz = (await owner.post("/api/loyalty", { action: "create_business", name: "Erase Cafe", reward: "Coffee", target: 5, color: "#123456" })).body.id;
+  const c = await owner.act(biz, "register_customer", { name: "Ruth Private", phone: "0507654321" });
+  assert.equal((await owner.act(biz, "archive_customer", { customer: c.body.id, erase: true })).status, 200);
+  const list = (await owner.get(`/api/loyalty?business=${biz}&days=all`)).body.customers ?? [];
+  assert.ok(!list.some((x) => x.name === "Ruth Private"));
+  const again = await owner.act(biz, "register_customer", { name: "Ruth again", phone: "0507654321" });
+  assert.equal(again.status, 200, "the phone is free again");
+});
+
+test("deleting an account: staff can, an owner of an active business is told to close it first", async () => {
+  const owner = new Client();
+  await signup(owner, "delowner");
+  await owner.post("/api/loyalty", { action: "create_business", name: "Del Cafe", reward: "Coffee", target: 5, color: "#123456" });
+  const blocked = await owner.post("/api/auth", { action: "delete_account", password: "correct horse 1" });
+  assert.equal(blocked.body.code, "account_owns_business");
+
+  const solo = new Client();
+  const email = `solo-${run}@test.perkly`;
+  await solo.post("/api/auth", { action: "signup", name: "Solo", email, password: "solo pass 12" });
+  assert.equal((await solo.post("/api/auth", { action: "delete_account", password: "wrong one 1" })).status, 401);
+  assert.equal((await solo.post("/api/auth", { action: "delete_account", password: "solo pass 12" })).status, 200);
+  assert.equal((await solo.get("/api/loyalty")).status, 401, "signed out");
+  assert.equal((await new Client().post("/api/auth", { action: "login", email, password: "solo pass 12" })).status, 401, "cannot sign in again");
 });

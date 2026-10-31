@@ -13,6 +13,7 @@ const TABS = [
 export function AdminHeader({ active }: { active: string }) {
   return (
     <header className="admin-top">
+      <a className="skip-link" href="#main">דילוג לתוכן</a>
       <Brand />
       <span className="pill">מרכז שליטה</span>
       <nav className="admin-nav" aria-label="מרכז שליטה">

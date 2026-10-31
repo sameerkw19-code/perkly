@@ -82,10 +82,11 @@ export default function AuthForm({ needsCode, mailReady = false, next = "/", ini
   if (step) {
     return (
       <div className="auth-page" dir={dir}>
-        <div className="auth-top">
+        <header className="auth-top">
           <Brand href="/" />
           <LangSwitch lang={lang} setLang={setLang} />
-        </div>
+        </header>
+        <main id="main" className="page-main">
         <form key="code-step" className="auth-card panel" onSubmit={submitCode}>
           <span className="modal-icon"><MailCheck /></span>
           <h1>{t("codeTitle")}</h1>
@@ -100,6 +101,7 @@ export default function AuthForm({ needsCode, mailReady = false, next = "/", ini
           <button type="button" className="text-btn" onClick={resend} disabled={busy}>{t("codeResend")}</button>
           <button type="button" className="text-btn" onClick={() => { setStep(null); setError(""); setInfo(""); }}>{t("codeBack")}</button>
         </form>
+        </main>
       </div>
     );
   }
@@ -107,10 +109,11 @@ export default function AuthForm({ needsCode, mailReady = false, next = "/", ini
   if (mode === "forgot") {
     return (
       <div className="auth-page" dir={dir}>
-        <div className="auth-top">
+        <header className="auth-top">
           <Brand href="/" />
           <LangSwitch lang={lang} setLang={setLang} />
-        </div>
+        </header>
+        <main id="main" className="page-main">
         <form key="forgot-step" className="auth-card panel" onSubmit={submitForgot}>
           <span className="modal-icon"><KeyRound /></span>
           <h1>{t("forgotTitle")}</h1>
@@ -121,16 +124,18 @@ export default function AuthForm({ needsCode, mailReady = false, next = "/", ini
           <button className="btn primary wide" disabled={busy || !!info}>{busy ? t("loading") : t("forgotSubmit")}</button>
           <button type="button" className="text-btn" onClick={() => { setMode("login"); setError(""); setInfo(""); }}>{t("codeBack")}</button>
         </form>
+        </main>
       </div>
     );
   }
 
   return (
     <div className="auth-page" dir={dir}>
-      <div className="auth-top">
+      <header className="auth-top">
         <Brand href="/" />
         <LangSwitch lang={lang} setLang={setLang} />
-      </div>
+      </header>
+      <main id="main" className="page-main">
       <form className="auth-card panel" onSubmit={submit}>
         <span className="modal-icon">{mode === "login" ? <LogIn /> : <UserPlus />}</span>
         <h1>{mode === "login" ? t("signIn") : t("signUp")}</h1>
@@ -161,6 +166,7 @@ export default function AuthForm({ needsCode, mailReady = false, next = "/", ini
           ? <button type="button" className="text-btn" onClick={() => { setMode("forgot"); setError(""); }}>{t("forgotLink")}</button>
           : <p className="form-hint">{t("noPasswordReset")}</p>)}
       </form>
+      </main>
     </div>
   );
 }
