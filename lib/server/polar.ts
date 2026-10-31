@@ -62,8 +62,10 @@ function bytesToBase64(bytes: ArrayBuffer): string {
 }
 
 /**
- * Verifies a Standard Webhooks signature: HMAC-SHA256 over `id.timestamp.body`, keyed with the
- * base64 part of the `whsec_` secret. The `webhook-signature` header may hold several `v1,<sig>` entries.
+ * Verifies a Standard Webhooks signature: HMAC-SHA256 over `id.timestamp.body`.
+ * Polar keys the HMAC with the secret's own bytes (its SDK base64-encodes the secret before handing
+ * it to Standard Webhooks, which decodes it again). A `whsec_<base64>` secret is also accepted, keyed
+ * with its decoded bytes. The `webhook-signature` header may hold several `v1,<sig>` entries.
  */
 export async function verifyWebhook(
   secret: string,
@@ -75,21 +77,28 @@ export async function verifyWebhook(
   if (!id || !timestamp || !signature) return false;
   const ts = Number(timestamp);
   if (!ts || Math.abs(now - ts) > TOLERANCE_SECONDS) return false;
-  const key = await crypto.subtle.importKey(
-    "raw",
-    base64ToBytes(secret.replace(/^whsec_/, "")),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const expected = bytesToBase64(await crypto.subtle.sign("HMAC", key, encoder.encode(`${id}.${timestamp}.${body}`)));
-  return signature.split(" ").some((part) => {
-    const [version, value] = part.split(",", 2);
-    if (version !== "v1" || !value || value.length !== expected.length) return false;
-    let diff = 0;
-    for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ value.charCodeAt(i);
-    return diff === 0;
-  });
+  const keys: Uint8Array<ArrayBuffer>[] = [encoder.encode(secret) as Uint8Array<ArrayBuffer>];
+  if (secret.startsWith("whsec_")) {
+    try {
+      keys.push(base64ToBytes(secret.slice(6)));
+    } catch {
+      // Not base64 after all: only the plain form applies.
+    }
+  }
+  const signed = encoder.encode(`${id}.${timestamp}.${body}`);
+  for (const raw of keys) {
+    const key = await crypto.subtle.importKey("raw", raw, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const expected = bytesToBase64(await crypto.subtle.sign("HMAC", key, signed));
+    const match = signature.split(" ").some((part) => {
+      const [version, value] = part.split(",", 2);
+      if (version !== "v1" || !value || value.length !== expected.length) return false;
+      let diff = 0;
+      for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ value.charCodeAt(i);
+      return diff === 0;
+    });
+    if (match) return true;
+  }
+  return false;
 }
 
 export type SubscriptionRow = {
@@ -99,6 +108,8 @@ export type SubscriptionRow = {
   externalCustomer: string | null;
   externalSubscription: string;
   currentPeriodEnd: string | null;
+  /** When Polar last changed this subscription; older events never overwrite newer ones. */
+  changedAt: string | null;
 };
 
 type PolarEvent = { type: string; data: Record<string, unknown> };
@@ -120,6 +131,7 @@ export function subscriptionRow(event: PolarEvent): SubscriptionRow | null {
     externalCustomer: typeof d.customer_id === "string" ? d.customer_id : typeof customer?.id === "string" ? customer.id : null,
     externalSubscription: id,
     currentPeriodEnd: typeof periodEnd === "string" ? periodEnd : null,
+    changedAt: typeof d.modified_at === "string" ? d.modified_at : typeof d.created_at === "string" ? d.created_at : null,
   };
 }
 

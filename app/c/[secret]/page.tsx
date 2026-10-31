@@ -31,7 +31,7 @@ export default async function CardPage({ params }: { params: Promise<{ secret: s
             `SELECT c.name, c.stamps, c.target, c.scan_code, b.id AS business_id, b.name AS business, b.reward, b.color, b.reward_mode, b.social,
                (SELECT COUNT(*) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2)) AS saved,
                (SELECT MIN(expires) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2)) AS next_expiry
-             FROM customers c JOIN businesses b ON b.id = c.business WHERE c.card_hash = ?1 AND c.archived IS NULL`,
+             FROM customers c JOIN businesses b ON b.id = c.business WHERE c.card_hash = ?1 AND c.archived IS NULL AND b.archived IS NULL`,
           )
           .bind(await sha256(secret), new Date().toISOString())
           .first<{ name: string; stamps: number; target: number; scan_code: string; business_id: string; business: string; reward: string; color: string; reward_mode: string; social: string | null; saved: number; next_expiry: string | null }>()

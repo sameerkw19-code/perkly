@@ -1,7 +1,8 @@
 import { env } from "cloudflare:workers";
 import { getD1 } from "../../../../../db";
 import { sha256 } from "../../../../../lib/server/crypto";
-import { fail } from "../../../../../lib/server/http";
+import { clientIp, fail } from "../../../../../lib/server/http";
+import { allow } from "../../../../../lib/server/rate-limit";
 import { getSettings } from "../../../../../lib/server/settings";
 import { ensureBusinessClass, saveUrl, walletConfig } from "../../../../../lib/server/google-wallet";
 import { passLook } from "../../../../../lib/server/designs";
@@ -19,6 +20,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ secr
   if (secret.length > 100) return fail("unknown_card", 404, "Card not found");
 
   const db = getD1();
+  // Each visit calls Google's API, so repeated visits are capped per network and per card.
+  const okIp = await allow(db, `gwallet-ip:${clientIp(request)}`, 30, 600);
+  if (!okIp || !(await allow(db, `gwallet-card:${(await sha256(secret)).slice(0, 32)}`, 10, 600))) {
+    return fail("rate_limited", 429, "Too many attempts. Try again in a few minutes.");
+  }
   const row = await db
     .prepare(
       `SELECT c.id AS customer_id, c.business AS business_id, c.stamps, c.target, c.scan_code,
