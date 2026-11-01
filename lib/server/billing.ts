@@ -7,6 +7,20 @@ export function isEntitled(status: string | null | undefined): boolean {
 }
 
 export const MONTHLY_PRICE_ILS = 99;
+/** Yearly plan: one payment a year, and the counter kit is included (shipped after the first payment). */
+export const YEARLY_PRICE_ILS = 999;
+
+export type Plan = "monthly" | "yearly";
+
+/** Which plan a stored Polar product id is. Unknown or missing ids count as monthly. */
+export function planOf(productId: string | null | undefined, env: { POLAR_PRODUCT_ID_YEARLY?: string }): Plan {
+  return !!productId && !!env.POLAR_PRODUCT_ID_YEARLY && productId === env.POLAR_PRODUCT_ID_YEARLY ? "yearly" : "monthly";
+}
+
+/** What one active subscription brings in per month, for the admin estimate. */
+export function monthlyValue(plan: Plan): number {
+  return plan === "yearly" ? YEARLY_PRICE_ILS / 12 : MONTHLY_PRICE_ILS;
+}
 /** Free trial at checkout: the card is taken up front and first charged when the trial ends. */
 export const TRIAL_DAYS = 14;
 

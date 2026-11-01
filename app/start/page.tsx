@@ -4,7 +4,7 @@ import { getD1 } from "../../db";
 import { getMemberships } from "../../lib/server/auth";
 import { businessAccess, isEntitled } from "../../lib/server/billing";
 import { currentUser } from "../../lib/server/page-session";
-import { polarConfigured } from "../../lib/server/polar";
+import { polarConfigured, yearlyConfigured } from "../../lib/server/polar";
 import StartFlow, { type StartBusiness } from "./start-flow";
 import SiteAnalytics from "../../components/site-analytics";
 
@@ -73,6 +73,7 @@ export default async function StartPage({
         business={business}
         isStaffOnly={isStaffOnly}
         billingOn={polarConfigured(env)}
+        yearlyOn={yearlyConfigured(env)}
         paidReturn={one(params.paid) === "1"}
       />
     </>

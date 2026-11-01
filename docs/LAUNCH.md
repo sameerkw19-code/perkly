@@ -27,6 +27,7 @@
 5. **[אתה → Claude] מיזוג ל-main.** פתחתי Pull Request עם כל השינויים. אחרי שתאשר, אמזג.
 6. **[אתה] Secrets בייצור** (Cloudflare → Workers → `perkly` → Settings → Variables and Secrets, כולם כ-**Secret**):
    - `POLAR_ACCESS_TOKEN`, `POLAR_PRODUCT_ID` (אותו מוצר של 99 ₪), `POLAR_WEBHOOK_SECRET` (של ה-Webhook מיום 1)
+   - `POLAR_PRODUCT_ID_YEARLY` (לא חובה): מוצר שנתי של 999 ₪ לשנה, ערכת קופה כלולה. בלעדיו מוצג רק המסלול החודשי.
    - `GOOGLE_WALLET_SA_KEY` (כל תוכן קובץ ה-JSON מיום 1)
    - `PLATFORM_ADMIN_EMAILS` = `sameerkw19@gmail.com` (זמני, עד שלב 8)
    - `SIGNUP_CODE` אם החלטת להשאיר

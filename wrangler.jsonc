@@ -53,7 +53,11 @@
       // Same Google Wallet issuer and class as staging (one issuer account). Not secret.
       "vars": {
         "GOOGLE_WALLET_ISSUER_ID": "3388000000023227862",
-        "GOOGLE_WALLET_CLASS_ID": "3388000000023227862.3388000000023227862.perkly_loyalty"
+        "GOOGLE_WALLET_CLASS_ID": "3388000000023227862.3388000000023227862.perkly_loyalty",
+        // Polar yearly product (999 ILS a year, counter kit included). Not secret.
+        "POLAR_PRODUCT_ID_YEARLY": "5d23ccad-acfa-4617-9ee9-cb8059260c80",
+        // Sender for emails sent through Resend (domain verified at resend.com).
+        "MAIL_FROM": "Perkly <no-reply@mail.perkly.shop>"
       },
       // Your own domain. Works once perkly.shop is active in the same Cloudflare account.
       "routes": [

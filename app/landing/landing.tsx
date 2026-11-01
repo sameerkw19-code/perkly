@@ -246,6 +246,11 @@ export default function Landing({ lang }: { lang: Lang }) {
                 <h3 id="plan-sub" className="lp-price-name">{c.pricing.sub.name}</h3>
                 <p className="lp-price"><strong>{c.pricing.sub.price}</strong><span>{c.pricing.sub.per}</span></p>
                 <p className="lp-price-note">{c.pricing.sub.note}</p>
+                <div className="lp-price-alt">
+                  <span className="lp-chip lp-chip-yellow">{c.pricing.yearly.tag}</span>
+                  <p className="lp-price"><strong>{c.pricing.yearly.price}</strong><span>{c.pricing.yearly.per}</span></p>
+                  <p className="lp-price-note">{c.pricing.yearly.note}</p>
+                </div>
                 <ul className="lp-list">
                   {c.pricing.sub.features.map((f) => (
                     <li key={f}><Check />{f}</li>

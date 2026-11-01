@@ -4,6 +4,7 @@
 // - One stamp rule everywhere: the business sets how many stamps fill a card; a full card
 //   means the reward is ready; redeeming the reward is not itself counted as a stamp.
 // - Prices: 99 ILS a month, no setup fee, 14-day free trial (TRIAL_DAYS in lib/server/billing.ts). Counter kit: optional, 99 ILS one-time, also without a subscription.
+// - Yearly plan: 999 ILS a year (YEARLY_PRICE_ILS), same trial, counter kit included and shipped after the first payment.
 // - No testimonials, customer counts or results until real, approved ones exist.
 
 export type Lang = "he" | "ar" | "en";
@@ -141,13 +142,14 @@ const he = {
       features: ["לקוחות ללא הגבלה", "עיצוב מלא: לוגו, תמונת רקע וחותמת משלכם", "באנר בעיצוב שלכם ב־Google Wallet", "עמדת עובד והזמנת עובדים", "לוח בקרה, היסטוריה והתראות", "עברית ואנגלית"],
       cta: "התחילו עכשיו",
     },
+    yearly: { tag: "משתלם יותר", name: "מנוי שנתי", price: "999 ₪", per: "לשנה", note: "כ־83 ₪ לחודש, וערכת הקופה כלולה" },
     kit: {
       tag: "תוספת לבחירה",
       name: "ערכת קופה",
       price: "99 ₪",
       per: "חד־פעמי",
       items: ["2 פוסטרים עם הלוגו וה־QR של העסק", "סטנד QR לדלפק"],
-      noSub: "אפשר להזמין גם בלי מנוי.",
+      noSub: "אפשר להזמין גם בלי מנוי. במנוי השנתי היא כלולה.",
       cta: "הזמנת ערכה בוואטסאפ",
       waText: "היי, אשמח להזמין ערכת קופה של Perkly (99 ₪)",
       sceneLabel: "המחשה של ערכת הקופה: שני פוסטרים וסטנד QR על דלפק",
@@ -165,7 +167,7 @@ const he = {
       { q: "צריך לקנות ציוד?", a: "לא. עמדת העובד עובדת בדפדפן של טלפון או טאבלט עם מצלמה. את ה־QR אפשר להדפיס בעצמכם או להזמין ערכת קופה." },
       { q: "איך מונעים חותמות לא מוצדקות?", a: "לכל עובד כניסה אישית, וכל פעולה נרשמת עם שמו. המערכת מתריעה על פעילות חריגה, ובעל העסק יכול לבטל גישה של עובד מיד." },
       { q: "מה קורה כשהכרטיס מתמלא?", a: "ההטבה מוכנה. אתם בוחרים אם לממש אותה מיד, או לשמור אותה ולתת ללקוח להמשיך לצבור בכרטיס חדש. אפשר גם לקבוע תוקף להטבה." },
-      { q: "כמה זה עולה?", a: "99 ₪ לחודש, בלי דמי הקמה, עם 14 ימי ניסיון חינם. אפשר גם להתחיל בלי מנוי: עד 10 לקוחות, עם העיצובים, הצבעים והאייקונים המוכנים. לוגו, תמונת רקע וחותמת מתמונה משלכם נפתחים במנוי. ערכת קופה היא תוספת לבחירה ב־99 ₪ חד־פעמי." },
+      { q: "כמה זה עולה?", a: "99 ₪ לחודש, בלי דמי הקמה, עם 14 ימי ניסיון חינם. אפשר גם להתחיל בלי מנוי: עד 10 לקוחות, עם העיצובים, הצבעים והאייקונים המוכנים. לוגו, תמונת רקע וחותמת מתמונה משלכם נפתחים במנוי. ערכת קופה היא תוספת לבחירה ב־99 ₪ חד־פעמי. יש גם מנוי שנתי: 999 ₪ לשנה, וערכת הקופה כלולה." },
       { q: "יש חיבור ל־Apple Wallet ול־Google Wallet?", a: "Google Wallet כן: לקוחות עם אנדרואיד מוסיפים את הכרטיס לארנק, והוא מתעדכן לבד בכל חותמת. Apple Wallet בפיתוח. באייפון הכרטיס נפתח מהקישור האישי או מקיצור במסך הבית." },
       { q: "איך מתחילים?", a: "פותחים חשבון, מעצבים את הכרטיס ומזינים פרטי אשראי. מקבלים QR להדפסה ומתחילים מיד. 14 הימים הראשונים חינם, ואז 99 ₪ לחודש. אפשר לבטל בכל עת." },
     ],
@@ -319,13 +321,14 @@ const ar: Copy = {
       features: ["زبائن بلا حدود", "تصميم كامل: الشعار وصورة خلفية وختم خاص بكم", "بانر بتصميمكم في Google Wallet", "واجهة موظف ودعوة موظفين", "لوحة تحكم، سجل وتنبيهات", "العبرية والعربية والإنجليزية"],
       cta: "ابدأوا الآن",
     },
+    yearly: { tag: "أوفر", name: "اشتراك سنوي", price: "999 ₪", per: "سنوياً", note: "حوالي 83 ₪ شهرياً، وطقم الصندوق مشمول" },
     kit: {
       tag: "إضافة اختيارية",
       name: "طقم الصندوق",
       price: "99 ₪",
       per: "لمرة واحدة",
       items: ["ملصقان (بوستر) بشعار ورمز QR المشروع", "حامل QR للكاونتر"],
-      noSub: "يمكن طلبه أيضاً بدون اشتراك.",
+      noSub: "يمكن طلبه أيضاً بدون اشتراك. وهو مشمول في الاشتراك السنوي.",
       cta: "اطلبوا الطقم عبر واتساب",
       waText: "مرحباً، أود طلب طقم الصندوق من Perkly (99 ₪)",
       sceneLabel: "توضيح لطقم الصندوق: ملصقان وحامل QR على الكاونتر",
@@ -343,7 +346,7 @@ const ar: Copy = {
       { q: "هل يجب شراء معدات؟", a: "لا. واجهة الموظف تعمل في متصفح هاتف أو جهاز لوحي فيه كاميرا. يمكن طباعة رمز QR بأنفسكم أو طلب طقم الصندوق." },
       { q: "كيف نمنع أختاماً غير مبررة؟", a: "لكل موظف دخول شخصي، وكل عملية تُسجّل باسمه. النظام ينبّه عند نشاط غير اعتيادي، وصاحب المشروع يستطيع إلغاء صلاحية موظف فوراً." },
       { q: "ماذا يحدث عندما تمتلئ البطاقة؟", a: "تكون المكافأة جاهزة. تختارون استبدالها فوراً، أو حفظها والسماح للزبون بالاستمرار في الجمع على بطاقة جديدة. يمكن أيضاً تحديد صلاحية للمكافأة." },
-      { q: "كم يكلّف؟", a: "99 ₪ شهرياً، بدون رسوم تأسيس، مع تجربة مجانية لمدة 14 يوماً. يمكن أيضاً البدء بدون اشتراك: حتى 10 زبائن، مع التصاميم والألوان والأيقونات الجاهزة. الشعار وصورة الخلفية والختم من صورتكم تُفتح بالاشتراك. طقم الصندوق إضافة اختيارية بسعر 99 ₪ لمرة واحدة." },
+      { q: "كم يكلّف؟", a: "99 ₪ شهرياً، بدون رسوم تأسيس، مع تجربة مجانية لمدة 14 يوماً. يمكن أيضاً البدء بدون اشتراك: حتى 10 زبائن، مع التصاميم والألوان والأيقونات الجاهزة. الشعار وصورة الخلفية والختم من صورتكم تُفتح بالاشتراك. طقم الصندوق إضافة اختيارية بسعر 99 ₪ لمرة واحدة. ويوجد أيضاً اشتراك سنوي: 999 ₪ سنوياً مع طقم الصندوق مشمولاً." },
       { q: "هل يوجد ربط مع Apple Wallet وGoogle Wallet؟", a: "Google Wallet نعم: زبائن أندرويد يضيفون البطاقة إلى المحفظة وتتحدث تلقائياً مع كل ختم. Apple Wallet قيد التطوير، وفي الآيفون تُفتح البطاقة من الرابط الشخصي أو من اختصار في الشاشة الرئيسية." },
       { q: "كيف نبدأ؟", a: "تفتحون حساباً، تصممون البطاقة وتدخلون تفاصيل البطاقة الائتمانية. تحصلون على رمز QR للطباعة وتبدؤون فوراً. أول 14 يوماً مجانية، ثم 99 ₪ شهرياً. يمكن الإلغاء في أي وقت." },
     ],
@@ -495,13 +498,14 @@ const en: Copy = {
       features: ["Unlimited customers", "Full design: your logo, background image and stamp", "Your own banner in Google Wallet", "Staff station and staff invites", "Dashboard, history and alerts", "Hebrew and English"],
       cta: "Get started",
     },
+    yearly: { tag: "Better value", name: "Yearly plan", price: "₪999", per: "a year", note: "About ₪83 a month, with the counter kit included" },
     kit: {
       tag: "Optional add-on",
       name: "Counter kit",
       price: "₪99",
       per: "one-time",
       items: ["2 posters with your logo and QR code", "A QR stand for the counter"],
-      noSub: "You can order it without a subscription.",
+      noSub: "You can order it without a subscription too. It's included in the yearly plan.",
       cta: "Order a kit on WhatsApp",
       waText: "Hi, I'd like to order a Perkly counter kit (₪99)",
       sceneLabel: "Illustration of the counter kit: two posters and a QR stand on a counter",
@@ -519,7 +523,7 @@ const en: Copy = {
       { q: "Do I need to buy equipment?", a: "No. The staff station runs in the browser of any phone or tablet with a camera. You can print the QR code yourself or order a counter kit." },
       { q: "How do you prevent unearned stamps?", a: "Each staff member has a personal login, and every action is logged with their name. The system flags unusual activity, and the owner can remove a staff member's access immediately." },
       { q: "What happens when the card is full?", a: "The reward is ready. You choose whether it's redeemed right away, or saved while the customer keeps collecting on a new card. You can also set an expiry for rewards." },
-      { q: "How much does it cost?", a: "₪99 a month, no setup fee, with a 14-day free trial. You can also start without a subscription: up to 10 customers, with the ready designs, colors and icons. Your logo, a background image and a stamp from your own image come with a subscription. The counter kit is an optional one-time add-on for ₪99." },
+      { q: "How much does it cost?", a: "₪99 a month, no setup fee, with a 14-day free trial. You can also start without a subscription: up to 10 customers, with the ready designs, colors and icons. Your logo, a background image and a stamp from your own image come with a subscription. The counter kit is an optional one-time add-on for ₪99. There's also a yearly plan: ₪999 a year, with the counter kit included." },
       { q: "Does it work with Apple Wallet and Google Wallet?", a: "Google Wallet, yes: Android customers add the card to their wallet and it updates by itself with every stamp. Apple Wallet is in development; on iPhone the card opens from its personal link or a home screen shortcut." },
       { q: "How do I get started?", a: "Open an account, design your card and add a payment card. You get a QR code to print and start right away. The first 14 days are free, then ₪99 a month. Cancel anytime." },
     ],
