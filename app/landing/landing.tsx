@@ -1,7 +1,7 @@
 // Public marketing page (Hebrew at "/", Arabic at "/ar"). Copy lives in content.ts.
 import "./landing.css";
 import { COPY, hrefs, waLink, WHATSAPP_DISPLAY, type Lang } from "./content";
-import { DemoPanel, ExamplesPicker, Logo, SiteNav, TiltStage } from "./landing-client";
+import { DemoPanel, ExamplesPicker, Logo, PricingPlans, SiteNav, TiltStage } from "./landing-client";
 import { SocialRow, Testimonials } from "./landing-parts";
 import { CafeLogo, Icon, QrArt } from "./visuals";
 import { ExampleCard } from "./example-card";
@@ -241,27 +241,12 @@ export default function Landing({ lang }: { lang: Lang }) {
           <div className="lp-wrap">
             <span className="lp-eyebrow">{c.pricing.eyebrow}</span>
             <h2 id="pricing-title" className="lp-h2">{c.pricing.title}</h2>
-            <div className="lp-pricing">
-              <article className="lp-price-card lp-price-main" aria-labelledby="plan-sub">
-                <h3 id="plan-sub" className="lp-price-name">{c.pricing.sub.name}</h3>
-                <p className="lp-price"><strong>{c.pricing.sub.price}</strong><span>{c.pricing.sub.per}</span></p>
-                <p className="lp-price-note">{c.pricing.sub.note}</p>
-                <div className="lp-price-alt">
-                  <span className="lp-chip lp-chip-yellow">{c.pricing.yearly.tag}</span>
-                  <p className="lp-price"><strong>{c.pricing.yearly.price}</strong><span>{c.pricing.yearly.per}</span></p>
-                  <p className="lp-price-note">{c.pricing.yearly.note}</p>
-                </div>
-                <ul className="lp-list">
-                  {c.pricing.sub.features.map((f) => (
-                    <li key={f}><Check />{f}</li>
-                  ))}
-                </ul>
-                <a href={h.signup} className="lp-btn lp-btn-primary lp-btn-wide">{c.pricing.sub.cta}</a>
-              </article>
+            <PricingPlans lang={lang}>
               <article className="lp-price-card lp-price-kit" aria-labelledby="plan-kit">
                 <KitScene lang={lang} />
                 <div className="lp-kit-body">
-                  <span className="lp-chip lp-chip-yellow">{c.pricing.kit.tag}</span>
+                  <span className="lp-chip lp-chip-yellow lp-kit-tag">{c.pricing.kit.tag}</span>
+                  <span className="lp-chip lp-kit-included">{c.pricing.kit.included}</span>
                   <h3 id="plan-kit" className="lp-price-name">{c.pricing.kit.name}</h3>
                   <p className="lp-price"><strong>{c.pricing.kit.price}</strong><span>{c.pricing.kit.per}</span></p>
                   <ul className="lp-list">
@@ -275,7 +260,7 @@ export default function Landing({ lang }: { lang: Lang }) {
                   </a>
                 </div>
               </article>
-            </div>
+            </PricingPlans>
           </div>
         </section>
 

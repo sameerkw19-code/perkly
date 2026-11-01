@@ -302,7 +302,11 @@ test("yearly plan: a twelfth of the price per month in the admin estimate", () =
 test("yearly plan: the same price and the kit in every text that sells it", () => {
   const read = (f) => readFileSync(new URL("../" + f, import.meta.url), "utf8");
   const copy = read("app/landing/content.ts");
-  for (const phrase of ["999 ₪", "₪999", "מנוי שנתי", "اشتراك سنوي", "Yearly plan"]) assert.ok(copy.includes(phrase), phrase);
+  for (const phrase of ["999 ₪", "₪999", "מנוי שנתי", "اشتراك سنوي", "yearly plan"]) assert.ok(copy.includes(phrase), phrase);
+  // The pricing switch: both sides in every language, and 16% matches the prices (999 against 12 × 99).
+  assert.equal(Math.round((1 - 999 / (12 * 99)) * 100), 16);
+  for (const phrase of ["חוסכים 16%", "وفّروا 16%", "Save 16%"]) assert.ok(copy.includes(phrase), phrase);
+  assert.match(read("app/landing/landing-client.tsx"), /plan=yearly/);
   assert.match(read("app/terms/page.tsx"), /מנוי שנתי: 999 ₪ לשנה.*ערכת קופה/);
   assert.match(read("app/start/start-flow.tsx"), /yearlyPrice: "999 ₪"/);
   assert.match(read("app/billing/billing-view.tsx"), /999 ₪ לשנה/);

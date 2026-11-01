@@ -156,6 +156,10 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
   signedIn: boolean; userName: string; needsCode: boolean; business: StartBusiness | null; isStaffOnly: boolean; billingOn: boolean; yearlyOn?: boolean; paidReturn: boolean;
 }) {
   const [plan, setPlan] = useState<"monthly" | "yearly">("monthly");
+  // Coming from the yearly side of the pricing switch on the home page: start on the yearly plan.
+  useEffect(() => {
+    if (yearlyOn && new URLSearchParams(window.location.search).get("plan") === "yearly") setPlan("yearly");
+  }, [yearlyOn]);
   const lang = useSyncExternalStore(noSubscribe, readLang, () => "he" as Lang);
   const t = T[lang];
   const tr = (key: string, vars?: Record<string, string | number>) => translate(lang, key, vars);
