@@ -73,7 +73,7 @@ export default function LinksPage() {
               <Arrow />
             </a>
             <a className="pl-btn" href="/#pricing" style={light}>
-              <span style={{ ...iconBox, background: "#FFF1D1", color: "#9A6400", fontWeight: 800, fontSize: 17 }}>₪</span>
+              <span style={{ ...iconBox, background: "#FFF1D1", color: "#9A6400", fontWeight: 800, fontSize: 17 }}>$</span>
               מחיר
               <Arrow />
             </a>

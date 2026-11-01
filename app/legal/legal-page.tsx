@@ -10,8 +10,8 @@ export default function LegalPage({ title, updated, children }: { title: string;
     <div className="lp lg" lang="he" dir="rtl">
       <header className="lp-header">
         <div className="lp-wrap lp-header-row">
-          <a href="/" className="lp-home-link lg-home">Perkly</a>
-          <a href="/" className="lp-login">חזרה לדף הבית</a>
+          <a href="/he" className="lp-home-link lg-home">Perkly</a>
+          <a href="/he" className="lp-login">חזרה לדף הבית</a>
         </div>
       </header>
       <main className="lp-main lp-wrap lg-main">

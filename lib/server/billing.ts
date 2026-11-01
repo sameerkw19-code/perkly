@@ -6,9 +6,11 @@ export function isEntitled(status: string | null | undefined): boolean {
   return status === "active" || status === "trialing";
 }
 
-export const MONTHLY_PRICE_ILS = 99;
+/** Prices are in US dollars. */
+export const MONTHLY_PRICE_USD = 29;
 /** Yearly plan: one payment a year, and the counter kit is included (shipped after the first payment). */
-export const YEARLY_PRICE_ILS = 999;
+export const YEARLY_PRICE_USD = 290;
+export const PRICE_CURRENCY = "USD";
 
 export type Plan = "monthly" | "yearly";
 
@@ -19,7 +21,7 @@ export function planOf(productId: string | null | undefined, env: { POLAR_PRODUC
 
 /** What one active subscription brings in per month, for the admin estimate. */
 export function monthlyValue(plan: Plan): number {
-  return plan === "yearly" ? YEARLY_PRICE_ILS / 12 : MONTHLY_PRICE_ILS;
+  return plan === "yearly" ? YEARLY_PRICE_USD / 12 : MONTHLY_PRICE_USD;
 }
 /** Free trial at checkout: the card is taken up front and first charged when the trial ends. */
 export const TRIAL_DAYS = 14;

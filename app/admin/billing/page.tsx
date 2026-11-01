@@ -20,7 +20,7 @@ const POLAR_STATUS: Record<string, string> = {
 
 function money(n: number, currency: string): string {
   try {
-    return n.toLocaleString("he-IL", { style: "currency", currency: currency || "ILS", maximumFractionDigits: 2 });
+    return n.toLocaleString("he-IL", { style: "currency", currency: currency || "USD", maximumFractionDigits: 2 });
   } catch {
     return `${n.toFixed(2)} ${currency}`;
   }
@@ -78,7 +78,7 @@ export default async function AdminBillingPage() {
         <p className="muted">מנויים לפי הנתונים שהגיעו מ-Polar, ותשלומים ישירות מ-Polar.</p>
 
         <section className="stats admin-stats">
-          <div className="stat"><span className="stat-label">הכנסה חודשית משוערת</span><strong>{money(mrr, "ILS")}</strong><small>{active} מנויים פעילים, מהם {yearlyActive} שנתיים (שנתי נספר כ־1/12)</small></div>
+          <div className="stat"><span className="stat-label">הכנסה חודשית משוערת</span><strong>{money(mrr, "USD")}</strong><small>{active} מנויים פעילים, מהם {yearlyActive} שנתיים (שנתי נספר כ־1/12)</small></div>
           <div className="stat"><span className="stat-label">תשלומים שנכשלו</span><strong>{pastDue.length}</strong><small>עסקים במצב "תשלום נכשל"</small></div>
           <div className="stat"><span className="stat-label">תשלומים שהתקבלו</span><strong>{orders.length}</strong><small>מתוך Polar (עד 300 אחרונים)</small></div>
           <div className="stat"><span className="stat-label">סה"כ עסקים</span><strong>{subs.results.length}</strong><small>כולל בלי מנוי</small></div>

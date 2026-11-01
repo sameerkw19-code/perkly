@@ -39,12 +39,12 @@ const T = {
     designTitle: "מעצבים את הכרטיס", designIntro: "צבעים, רקע, חותמת, גופן וטקסטים. כל שינוי מופיע מיד בתצוגה.",
     designPaid: "לוגו, תמונת רקע מעוצבת וחותמת מתמונה משלכם נפתחים עם המנוי, כבר בימי הניסיון.", designSave: "שמירה והמשך", designSkip: "להמשיך בלי שינויים",
     payTitle: "מפעילים את המנוי", payIntro: "הכרטיס שלכם מוכן. מזינים פרטי אשראי, מקבלים את ה־QR ומתחילים מיד.",
-    plan: "מנוי Perkly", price: "99 ₪", per: "לחודש", noSetup: "14 ימי ניסיון חינם. החיוב הראשון רק אחרי 14 ימים, ואם מבטלים לפני כן לא משלמים כלום. בלי דמי הקמה.",
-    planPick: "בחירת מסלול", planMonthly: "חודשי", planYearly: "שנתי", yearlyPrice: "999 ₪", yearlyPer: "לשנה",
-    yearlyNote: "כ־83 ₪ לחודש, וערכת הקופה כלולה: 2 פוסטרים וסטנד QR, שנשלחים אחרי החיוב הראשון.", thenYearly: ["Then ₪999/year", "אחר כך 999 ₪ לשנה"] as [string, string],
+    plan: "מנוי Perkly", price: "$29", per: "לחודש", noSetup: "14 ימי ניסיון חינם. החיוב הראשון רק אחרי 14 ימים, ואם מבטלים לפני כן לא משלמים כלום. בלי דמי הקמה.",
+    planPick: "בחירת מסלול", planMonthly: "חודשי", planYearly: "שנתי", yearlyPrice: "$290", yearlyPer: "לשנה",
+    yearlyNote: "כ־$24 לחודש, וערכת הקופה כלולה: 2 פוסטרים וסטנד QR, שנשלחים אחרי החיוב הראשון.", thenYearly: ["Then $290/year", "אחר כך $290 לשנה"] as [string, string],
     features: ["לקוחות ללא הגבלה", "לוגו ותמונת רקע מעוצבת", "חותמת מתמונה משלכם", "באנר בעיצוב שלכם ב־Google Wallet", "עמדת עובד והזמנת עובדים", "לוח בקרה והתראות"],
     planMore: "במנוי מקבלים הרבה יותר:", freeCompare: "בלי מנוי: עד 10 לקוחות ועיצוב מהתבניות, הצבעים והאייקונים המוכנים.",
-    englishNote: { title: "דף התשלום של Polar באנגלית. מה כתוב שם:", rows: [["14 days free", "14 ימים חינם"], ["Due today ₪0", "היום משלמים 0 ₪"], ["Then ₪99/month", "אחר כך 99 ₪ לחודש"], ["Start trial", "התחלת הניסיון (הכפתור בסוף)"]] },
+    englishNote: { title: "דף התשלום של Polar באנגלית. מה כתוב שם:", rows: [["14 days free", "14 ימים חינם"], ["Due today $0", "היום משלמים $0"], ["Then $29/month", "אחר כך $29 לחודש"], ["Start trial", "התחלת הניסיון (הכפתור בסוף)"]] },
     pay: "התחלת 14 ימי ניסיון", paying: "פותחים את דף התשלום…", secure: "התשלום מתבצע אצל Polar, ספק תשלומים מאובטח. פרטי האשראי לא מגיעים אלינו.",
     later: "להתחיל בלי מנוי (עד 10 לקוחות)",
     freeNote: "בלי מנוי אפשר לצרף עד 10 לקוחות. כדי להמשיך מעבר לזה, מפעילים מנוי עם 14 ימי ניסיון חינם.", activate: "הפעלת מנוי", billingOff: "התשלום באתר עדיין לא מופעל. כתבו לנו ל־support@perkly.shop ונפעיל לכם את החשבון.",
@@ -70,12 +70,12 @@ const T = {
     designTitle: "تصميم البطاقة", designIntro: "الألوان، الخلفية، الختم، الخط والنصوص. كل تغيير يظهر فوراً في المعاينة.",
     designPaid: "الشعار وصورة الخلفية المصممة والختم من صورتكم تُفتح مع الاشتراك، حتى خلال أيام التجربة.", designSave: "حفظ ومتابعة", designSkip: "المتابعة بدون تغيير",
     payTitle: "تفعيل الاشتراك", payIntro: "بطاقتكم جاهزة. أدخلوا تفاصيل البطاقة الائتمانية، احصلوا على رمز QR وابدؤوا فوراً.",
-    plan: "اشتراك Perkly", price: "99 ₪", per: "شهرياً", noSetup: "تجربة مجانية لمدة 14 يوماً. أول دفعة بعد 14 يوماً فقط، وإن ألغيتم قبل ذلك لا تدفعون شيئاً. بدون رسوم تأسيس.",
-    planPick: "اختيار الخطة", planMonthly: "شهري", planYearly: "سنوي", yearlyPrice: "999 ₪", yearlyPer: "سنوياً",
-    yearlyNote: "حوالي 83 ₪ شهرياً، وطقم الصندوق مشمول: ملصقان وحامل QR، يُرسلان بعد أول دفعة.", thenYearly: ["Then ₪999/year", "بعدها 999 ₪ سنوياً"] as [string, string],
+    plan: "اشتراك Perkly", price: "$29", per: "شهرياً", noSetup: "تجربة مجانية لمدة 14 يوماً. أول دفعة بعد 14 يوماً فقط، وإن ألغيتم قبل ذلك لا تدفعون شيئاً. بدون رسوم تأسيس.",
+    planPick: "اختيار الخطة", planMonthly: "شهري", planYearly: "سنوي", yearlyPrice: "$290", yearlyPer: "سنوياً",
+    yearlyNote: "حوالي $24 شهرياً، وطقم الصندوق مشمول: ملصقان وحامل QR، يُرسلان بعد أول دفعة.", thenYearly: ["Then $290/year", "بعدها $290 سنوياً"] as [string, string],
     features: ["زبائن بلا حدود", "الشعار وصورة خلفية مصممة", "ختم من صورتكم الخاصة", "بانر بتصميمكم في Google Wallet", "محطة موظف ودعوة موظفين", "لوحة تحكم وتنبيهات"],
     planMore: "مع الاشتراك تحصلون على الكثير:", freeCompare: "بدون اشتراك: حتى 10 زبائن وتصميم من القوالب والألوان والأيقونات الجاهزة.",
-    englishNote: { title: "صفحة الدفع في Polar بالإنجليزية. ماذا يعني المكتوب:", rows: [["14 days free", "14 يوماً مجاناً"], ["Due today ₪0", "تدفعون اليوم 0 ₪"], ["Then ₪99/month", "بعدها 99 ₪ شهرياً"], ["Start trial", "بدء التجربة (الزر في الأسفل)"]] },
+    englishNote: { title: "صفحة الدفع في Polar بالإنجليزية. ماذا يعني المكتوب:", rows: [["14 days free", "14 يوماً مجاناً"], ["Due today $0", "تدفعون اليوم $0"], ["Then $29/month", "بعدها $29 شهرياً"], ["Start trial", "بدء التجربة (الزر في الأسفل)"]] },
     pay: "ابدأوا تجربة 14 يوماً", paying: "نفتح صفحة الدفع…", secure: "الدفع يتم عبر Polar، مزود دفع آمن. تفاصيل البطاقة لا تصل إلينا.",
     later: "البدء بدون اشتراك (حتى 10 زبائن)",
     freeNote: "بدون اشتراك يمكن إضافة حتى 10 زبائن. للمتابعة بعد ذلك فعّلوا الاشتراك مع تجربة مجانية لمدة 14 يوماً.", activate: "تفعيل الاشتراك", billingOff: "الدفع في الموقع غير مفعّل بعد. راسلونا على support@perkly.shop وسنفعّل حسابكم.",
@@ -101,9 +101,9 @@ const T = {
     designTitle: "Design your card", designIntro: "Colors, background, stamp, font and texts. Every change shows right away in the preview.",
     designPaid: "Your logo, a designed background image and a stamp from your own image unlock with a subscription, already during the trial.", designSave: "Save and continue", designSkip: "Continue without changes",
     payTitle: "Activate your subscription", payIntro: "Your card is ready. Add your payment card, get your QR code and start right away.",
-    plan: "Perkly subscription", price: "₪99", per: "a month", noSetup: "14-day free trial. You're first charged after 14 days, and if you cancel before then you pay nothing. No setup fee.",
-    planPick: "Choose a plan", planMonthly: "Monthly", planYearly: "Yearly", yearlyPrice: "₪999", yearlyPer: "a year",
-    yearlyNote: "About ₪83 a month, with the counter kit included: 2 posters and a QR stand, shipped after the first payment.", thenYearly: ["Then ₪999/year", "Then ₪999 a year"] as [string, string],
+    plan: "Perkly subscription", price: "$29", per: "a month", noSetup: "14-day free trial. You're first charged after 14 days, and if you cancel before then you pay nothing. No setup fee.",
+    planPick: "Choose a plan", planMonthly: "Monthly", planYearly: "Yearly", yearlyPrice: "$290", yearlyPer: "a year",
+    yearlyNote: "About $24 a month, with the counter kit included: 2 posters and a QR stand, shipped after the first payment.", thenYearly: ["Then $290/year", "Then $290 a year"] as [string, string],
     features: ["Unlimited customers", "Your logo and a designed background image", "A stamp from your own image", "Your own banner in Google Wallet", "Staff station and team invites", "Dashboard and alerts"],
     planMore: "A subscription gives you much more:", freeCompare: "Without a subscription: up to 10 customers, with the ready designs, colors and icons.",
     englishNote: null,
@@ -124,11 +124,11 @@ const noSubscribe = () => () => {};
 function readLang(): Lang {
   try {
     const q = new URLSearchParams(window.location.search).get("lang");
-    if (q === "he" || q === "en") return q;
-    const saved = localStorage.getItem("perkly-language");
-    if (saved === "en") return saved;
+    if (q === "he" || q === "en" || q === "ar") return q;
+    const saved = localStorage.getItem("perkly-lang");
+    if (saved === "he" || saved === "en") return saved;
   } catch {}
-  return "he";
+  return "en";
 }
 
 /** The card a new business starts with: the example look for its type, with the owner's own texts. */
@@ -160,7 +160,7 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
   useEffect(() => {
     if (yearlyOn && new URLSearchParams(window.location.search).get("plan") === "yearly") setPlan("yearly");
   }, [yearlyOn]);
-  const lang = useSyncExternalStore(noSubscribe, readLang, () => "he" as Lang);
+  const lang = useSyncExternalStore(noSubscribe, readLang, () => "en" as Lang);
   const t = T[lang];
   const tr = (key: string, vars?: Record<string, string | number>) => translate(lang, key, vars);
   const dir = lang === "en" ? "ltr" : "rtl";
@@ -298,7 +298,7 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
     <div className="lp su st" lang={lang} dir={dir}>
       <header className="lp-header st-noprint">
         <div className="lp-wrap lp-header-row">
-          <a href={lang === "he" ? "/" : `/${lang}`} className="lp-home-link"><Logo label="Perkly" /></a>
+          <a href={lang === "en" ? "/" : `/${lang}`} className="lp-home-link"><Logo label="Perkly" /></a>
           {!authed ? <a href={`/login?next=/start`} className="lp-login">{t.login}</a> : <a href="/" className="lp-login">{t.dashboard}</a>}
         </div>
       </header>

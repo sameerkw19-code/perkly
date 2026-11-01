@@ -232,7 +232,7 @@ const words: Record<string, Entry> = {
   paidImagesNote: ["לוגו ותמונת רקע מעוצבת (שמופיעה גם כבאנר ב־Google Wallet) זמינים במנוי.", "الشعار وصورة الخلفية المصممة (تظهر أيضاً كبانر في Google Wallet) متاحة بالاشتراك.", "Your logo and a designed background image (also shown as the Google Wallet banner) come with a subscription."],
   paidStampHint: ["חותמת מתמונה משלכם (למשל הכוס שלכם) זמינה במנוי.", "ختم من صورتكم الخاصة (مثل كوبكم) متاح بالاشتراك.", "A stamp from your own image (like your cup) comes with a subscription."],
   err_paid_feature: ["האפשרות הזו זמינה במנוי. הפעילו מנוי (14 ימי ניסיון חינם) כדי להעלות לוגו ותמונות.", "هذا الخيار متاح بالاشتراك. فعّلوا الاشتراك (تجربة مجانية لمدة 14 يوماً) لرفع الشعار والصور.", "This option comes with a subscription. Activate one (14-day free trial) to upload your logo and images."],
-  activateSub: ["הפעלת מנוי · 99 ₪ לחודש", "تفعيل الاشتراك · 99 ₪ شهرياً", "Activate subscription · ₪99/month"],
+  activateSub: ["הפעלת מנוי · $29 לחודש", "تفعيل الاشتراك · $29 شهرياً", "Activate subscription · $29/month"],
   walletOwnerNote: ["לקוחות עם אנדרואיד יכולים להוסיף את הכרטיס ל־Google Wallet, והוא מתעדכן לבד. Apple Wallet עדיין לא זמין.", "يمكن لزبائن أندرويد إضافة البطاقة إلى Google Wallet وهي تتحدث تلقائياً. Apple Wallet غير متاح بعد.", "Android customers can add the card to Google Wallet, and it updates by itself. Apple Wallet isn't available yet."],
   walletHintIOS: ["הוספה ל־Apple Wallet עדיין לא זמינה.", "الإضافة إلى Apple Wallet غير متاحة بعد.", "Adding to Apple Wallet isn't available yet."],
   birthday: ["יום הולדת (לא חובה)", "عيد الميلاد (اختياري)", "Birthday (optional)"],
@@ -685,23 +685,30 @@ export function errorText(lang: Lang, code: string | undefined): string {
 }
 
 /** Language choice, remembered on this device, with page direction (RTL/LTR) kept in sync. */
+export const LANG_KEY = "perkly-lang";
+
 export function useLang() {
-  const [lang, setLang] = useState<SiteLang>("he");
+  // English unless the person chose another language (or followed a ?lang= link).
+  const [lang, setLangState] = useState<SiteLang>("en");
   useEffect(() => {
     try {
-      // A ?lang= link (for example from the Arabic marketing page) wins over the saved choice.
+      // A ?lang= link (for example from the Hebrew marketing page) wins over the saved choice.
       const fromUrl = new URLSearchParams(window.location.search).get("lang");
-      const saved = fromUrl && LANGS.includes(fromUrl as SiteLang) ? fromUrl : localStorage.getItem("perkly-language");
-      if (saved && LANGS.includes(saved as SiteLang)) setLang(saved as SiteLang);
+      const saved = fromUrl && LANGS.includes(fromUrl as SiteLang) ? fromUrl : localStorage.getItem(LANG_KEY);
+      if (saved && LANGS.includes(saved as SiteLang)) setLangState(saved as SiteLang);
     } catch {}
   }, []);
   useEffect(() => {
     document.documentElement.dir = lang === "en" ? "ltr" : "rtl";
     document.documentElement.lang = lang;
-    try {
-      localStorage.setItem("perkly-language", lang);
-    } catch {}
   }, [lang]);
+  // Only an explicit choice is remembered, so the default stays English for everyone else.
+  const setLang = (l: SiteLang) => {
+    setLangState(l);
+    try {
+      localStorage.setItem(LANG_KEY, l);
+    } catch {}
+  };
   const t = (key: string, vars?: Record<string, string | number>) => translate(lang, key, vars);
   return { lang, setLang, t, dir: lang === "en" ? "ltr" : "rtl" } as const;
 }

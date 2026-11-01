@@ -59,7 +59,7 @@ test("forged identity headers are ignored; pages require sign-in", async () => {
   const page = await fetch(BASE + "/", { redirect: "manual" });
   assert.equal(page.status, 200);
   const html = await page.text();
-  assert.match(html, /הכרטיס שגורם ללקוחות לחזור/);
+  assert.match(html, /The card that brings customers back/);
   assert.doesNotMatch(html, /oai-authenticated|join_code/);
   // Sign-up is the guided setup; the old address forwards there. "Talk to us" is a separate form.
   const signup = await fetch(BASE + "/signup", { redirect: "manual" });
@@ -73,9 +73,14 @@ test("forged identity headers are ignored; pages require sign-in", async () => {
   const arabic = await fetch(BASE + "/ar", { redirect: "manual" });
   assert.equal(arabic.status, 200);
   assert.match(await arabic.text(), /البطاقة التي تجعل الزبائن يعودون/);
-  const english = await fetch(BASE + "/en", { redirect: "manual" });
+  const english = await fetch(BASE + "/", { redirect: "manual" });
   assert.equal(english.status, 200);
   assert.match(await english.text(), /The card that brings customers back/);
+  const hebrew = await fetch(BASE + "/he", { redirect: "manual" });
+  assert.equal(hebrew.status, 200);
+  assert.match(await hebrew.text(), /הכרטיס שגורם ללקוחות לחזור/);
+  const oldEnglish = await fetch(BASE + "/en", { redirect: "manual" });
+  assert.ok([301, 307, 308].includes(oldEnglish.status), `/en status ${oldEnglish.status}`);
   // The admin control center sends visitors to sign in and back.
   const admin = await anon.get("/admin");
   assert.ok([302, 303, 307, 308].includes(admin.status), `admin status ${admin.status}`);

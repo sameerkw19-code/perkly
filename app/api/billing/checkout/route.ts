@@ -8,7 +8,7 @@ import { TRIAL_DAYS } from "../../../../lib/server/billing";
 export const dynamic = "force-dynamic";
 
 // Owner only: starts a Polar checkout for one business and returns its URL.
-// `plan`: "monthly" (default) or "yearly" (999 ILS a year, counter kit included).
+// `plan`: "monthly" (default) or "yearly" ($290 a year, counter kit included).
 export async function POST(request: Request) {
   if (!sameOrigin(request)) return fail("bad_origin", 403, "Invalid origin");
   const body = await readJson(request);

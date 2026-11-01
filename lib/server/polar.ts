@@ -7,7 +7,7 @@ const TOLERANCE_SECONDS = 300;
 export type PolarEnv = {
   POLAR_ACCESS_TOKEN?: string;
   POLAR_PRODUCT_ID?: string;
-  /** Optional: the yearly product (999 ILS a year, counter kit included). Without it only the monthly plan is offered. */
+  /** Optional: the yearly product ($290 a year, counter kit included). Without it only the monthly plan is offered. */
   POLAR_PRODUCT_ID_YEARLY?: string;
   POLAR_WEBHOOK_SECRET?: string;
   POLAR_SANDBOX?: string;

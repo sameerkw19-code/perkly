@@ -124,7 +124,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         <p className="form-hint">מזהה המשתמש שלך: <code dir="ltr">{me.id}</code></p>
 
         <section className="stats admin-stats">
-          <Stat label="הכנסה חודשית משוערת" value={`${mrr.toLocaleString("he-IL")} ₪`} hint={`${counts.active} משלמים, מהם ${yearlyCount} שנתיים`} />
+          <Stat label="הכנסה חודשית משוערת" value={`$${mrr.toLocaleString("en-US")}`} hint={`${counts.active} משלמים, מהם ${yearlyCount} שנתיים`} />
           <Stat label="עסקים" value={t.businesses} hint={`${t.businesses7} חדשים השבוע · ${t.activeBiz7} פעילים השבוע`} />
           <Stat label="לקוחות פעילים" value={t.customers} hint={`${t.customers30} הצטרפו ב־30 יום (כולל שהוסרו)`} />
           <Stat label="חותמות ב־30 יום" value={t.stamps30} hint={`${t.redeems30} הטבות מומשו`} />
