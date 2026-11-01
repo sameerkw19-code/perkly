@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import { getD1 } from "../../../../db";
 import { liveDesign } from "../../../../lib/server/designs";
 import { STATUS_LABEL, adminStatus, requireAdminPage, shortDate, shortDateTime } from "../../../../lib/server/admin";
-import { AdminActions, AdminCardPreview } from "./admin-actions";
+import { AdminActions, AdminCardPreview, KitSentButton } from "./admin-actions";
+import { env } from "cloudflare:workers";
+import { planOf } from "../../../../lib/server/billing";
 
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false }, title: "Perkly · ניהול עסק" };
@@ -28,8 +30,8 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
 
   const b = await db
     .prepare(
-      `SELECT b.id, b.name, b.reward, b.target, b.color, b.created, b.reward_mode, b.suspended, b.suspend_reason, b.comp_until, b.archived,
-         s.status, s.current_period_end, s.external_subscription, s.updated AS sub_updated, u.email AS owner_email
+      `SELECT b.id, b.name, b.reward, b.target, b.color, b.created, b.reward_mode, b.suspended, b.suspend_reason, b.comp_until, b.archived, b.kit_due, b.kit_sent,
+         s.status, s.plan, s.current_period_end, s.external_subscription, s.updated AS sub_updated, u.email AS owner_email
        FROM businesses b LEFT JOIN subscriptions s ON s.business = b.id LEFT JOIN users u ON u.id = b.owner WHERE b.id = ?`,
     )
     .bind(id)
@@ -37,6 +39,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
       id: string; name: string; reward: string; target: number; color: string; created: string; reward_mode: string;
       suspended: string | null; suspend_reason: string | null; comp_until: string | null; archived: string | null; owner_email: string | null;
       status: string | null; current_period_end: string | null; external_subscription: string | null; sub_updated: string | null;
+      plan: string | null; kit_due: string | null; kit_sent: string | null;
     }>();
   if (!b) notFound();
 
@@ -102,6 +105,8 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
             <h2>מנוי</h2>
             <dl className="admin-dl">
               <dt>סטטוס ב-Polar</dt><dd>{b.status ?? "אין מנוי"}</dd>
+              <dt>מסלול</dt><dd>{b.status ? (planOf(b.plan, env) === "yearly" ? "שנתי (ערכת קופה כלולה)" : "חודשי") : "—"}</dd>
+              <dt>ערכת קופה</dt><dd>{b.kit_sent ? `נשלחה ${shortDate(b.kit_sent)}` : b.kit_due ? <>מגיעה מאז {shortDate(b.kit_due)} <KitSentButton business={b.id} /></> : "—"}</dd>
               <dt>סוף תקופה</dt><dd>{shortDate(b.current_period_end)}</dd>
               <dt>מזהה מנוי</dt><dd dir="ltr"><code>{b.external_subscription ?? "—"}</code></dd>
               <dt>עדכון אחרון</dt><dd>{shortDateTime(b.sub_updated)}</dd>

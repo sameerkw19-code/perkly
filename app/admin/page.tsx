@@ -1,6 +1,7 @@
+import { env } from "cloudflare:workers";
 import { AdminHeader } from "./admin-header";
 import { getD1 } from "../../db";
-import { MONTHLY_PRICE_ILS } from "../../lib/server/billing";
+import { monthlyValue, planOf } from "../../lib/server/billing";
 import { WalletPanel } from "./wallet-panel";
 import { STATUS_LABEL, adminStatus, requireAdminPage, shortDate, shortDateTime, type AdminStatus } from "../../lib/server/admin";
 
@@ -82,8 +83,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     ).bind(nowIso, sinceWeeks).all<{ w: number; n: number }>(),
     // Status counts and revenue always cover every business, whatever the search or filter.
     db.prepare(
-      `SELECT b.suspended, b.comp_until, s.status FROM businesses b LEFT JOIN subscriptions s ON s.business = b.id`,
-    ).all<{ suspended: string | null; comp_until: string | null; status: string | null }>(),
+      `SELECT b.suspended, b.comp_until, s.status, s.plan FROM businesses b LEFT JOIN subscriptions s ON s.business = b.id`,
+    ).all<{ suspended: string | null; comp_until: string | null; status: string | null; plan: string | null }>(),
   ]);
 
   const all = list.results.map((r) => ({ ...r, st: adminStatus(r, nowIso) }));
@@ -92,7 +93,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     { suspended: 0, comp: 0, active: 0, trialing: 0, past_due: 0, canceled: 0, none: 0 },
   );
   const rows = statusFilter ? all.filter((r) => r.st === statusFilter) : all;
-  const mrr = counts.active * MONTHLY_PRICE_ILS;
+  // Yearly subscriptions count as a twelfth of their price.
+  const paying = statusRows.results.filter((r) => adminStatus(r, nowIso) === "active");
+  const yearlyCount = paying.filter((r) => planOf(r.plan, env) === "yearly").length;
+  const mrr = Math.round(paying.reduce((sum, r) => sum + monthlyValue(planOf(r.plan, env)), 0));
   const t = totals!;
 
   // Oldest week first, so the chart reads in time order.
@@ -120,7 +124,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         <p className="form-hint">מזהה המשתמש שלך: <code dir="ltr">{me.id}</code></p>
 
         <section className="stats admin-stats">
-          <Stat label="הכנסה חודשית משוערת" value={`${mrr.toLocaleString("he-IL")} ₪`} hint={`${counts.active} משלמים × ${MONTHLY_PRICE_ILS} ₪`} />
+          <Stat label="הכנסה חודשית משוערת" value={`${mrr.toLocaleString("he-IL")} ₪`} hint={`${counts.active} משלמים, מהם ${yearlyCount} שנתיים`} />
           <Stat label="עסקים" value={t.businesses} hint={`${t.businesses7} חדשים השבוע · ${t.activeBiz7} פעילים השבוע`} />
           <Stat label="לקוחות פעילים" value={t.customers} hint={`${t.customers30} הצטרפו ב־30 יום (כולל שהוסרו)`} />
           <Stat label="חותמות ב־30 יום" value={t.stamps30} hint={`${t.redeems30} הטבות מומשו`} />

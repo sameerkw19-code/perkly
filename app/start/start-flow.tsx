@@ -40,6 +40,8 @@ const T = {
     designPaid: "לוגו, תמונת רקע מעוצבת וחותמת מתמונה משלכם נפתחים עם המנוי, כבר בימי הניסיון.", designSave: "שמירה והמשך", designSkip: "להמשיך בלי שינויים",
     payTitle: "מפעילים את המנוי", payIntro: "הכרטיס שלכם מוכן. מזינים פרטי אשראי, מקבלים את ה־QR ומתחילים מיד.",
     plan: "מנוי Perkly", price: "99 ₪", per: "לחודש", noSetup: "14 ימי ניסיון חינם. החיוב הראשון רק אחרי 14 ימים, ואם מבטלים לפני כן לא משלמים כלום. בלי דמי הקמה.",
+    planPick: "בחירת מסלול", planMonthly: "חודשי", planYearly: "שנתי", yearlyPrice: "999 ₪", yearlyPer: "לשנה",
+    yearlyNote: "כ־83 ₪ לחודש, וערכת הקופה כלולה: 2 פוסטרים וסטנד QR, שנשלחים אחרי החיוב הראשון.", thenYearly: ["Then ₪999/year", "אחר כך 999 ₪ לשנה"] as [string, string],
     features: ["לקוחות ללא הגבלה", "לוגו ותמונת רקע מעוצבת", "חותמת מתמונה משלכם", "באנר בעיצוב שלכם ב־Google Wallet", "עמדת עובד והזמנת עובדים", "לוח בקרה והתראות"],
     planMore: "במנוי מקבלים הרבה יותר:", freeCompare: "בלי מנוי: עד 10 לקוחות ועיצוב מהתבניות, הצבעים והאייקונים המוכנים.",
     englishNote: { title: "דף התשלום של Polar באנגלית. מה כתוב שם:", rows: [["14 days free", "14 ימים חינם"], ["Due today ₪0", "היום משלמים 0 ₪"], ["Then ₪99/month", "אחר כך 99 ₪ לחודש"], ["Start trial", "התחלת הניסיון (הכפתור בסוף)"]] },
@@ -69,6 +71,8 @@ const T = {
     designPaid: "الشعار وصورة الخلفية المصممة والختم من صورتكم تُفتح مع الاشتراك، حتى خلال أيام التجربة.", designSave: "حفظ ومتابعة", designSkip: "المتابعة بدون تغيير",
     payTitle: "تفعيل الاشتراك", payIntro: "بطاقتكم جاهزة. أدخلوا تفاصيل البطاقة الائتمانية، احصلوا على رمز QR وابدؤوا فوراً.",
     plan: "اشتراك Perkly", price: "99 ₪", per: "شهرياً", noSetup: "تجربة مجانية لمدة 14 يوماً. أول دفعة بعد 14 يوماً فقط، وإن ألغيتم قبل ذلك لا تدفعون شيئاً. بدون رسوم تأسيس.",
+    planPick: "اختيار الخطة", planMonthly: "شهري", planYearly: "سنوي", yearlyPrice: "999 ₪", yearlyPer: "سنوياً",
+    yearlyNote: "حوالي 83 ₪ شهرياً، وطقم الصندوق مشمول: ملصقان وحامل QR، يُرسلان بعد أول دفعة.", thenYearly: ["Then ₪999/year", "بعدها 999 ₪ سنوياً"] as [string, string],
     features: ["زبائن بلا حدود", "الشعار وصورة خلفية مصممة", "ختم من صورتكم الخاصة", "بانر بتصميمكم في Google Wallet", "محطة موظف ودعوة موظفين", "لوحة تحكم وتنبيهات"],
     planMore: "مع الاشتراك تحصلون على الكثير:", freeCompare: "بدون اشتراك: حتى 10 زبائن وتصميم من القوالب والألوان والأيقونات الجاهزة.",
     englishNote: { title: "صفحة الدفع في Polar بالإنجليزية. ماذا يعني المكتوب:", rows: [["14 days free", "14 يوماً مجاناً"], ["Due today ₪0", "تدفعون اليوم 0 ₪"], ["Then ₪99/month", "بعدها 99 ₪ شهرياً"], ["Start trial", "بدء التجربة (الزر في الأسفل)"]] },
@@ -98,6 +102,8 @@ const T = {
     designPaid: "Your logo, a designed background image and a stamp from your own image unlock with a subscription, already during the trial.", designSave: "Save and continue", designSkip: "Continue without changes",
     payTitle: "Activate your subscription", payIntro: "Your card is ready. Add your payment card, get your QR code and start right away.",
     plan: "Perkly subscription", price: "₪99", per: "a month", noSetup: "14-day free trial. You're first charged after 14 days, and if you cancel before then you pay nothing. No setup fee.",
+    planPick: "Choose a plan", planMonthly: "Monthly", planYearly: "Yearly", yearlyPrice: "₪999", yearlyPer: "a year",
+    yearlyNote: "About ₪83 a month, with the counter kit included: 2 posters and a QR stand, shipped after the first payment.", thenYearly: ["Then ₪999/year", "Then ₪999 a year"] as [string, string],
     features: ["Unlimited customers", "Your logo and a designed background image", "A stamp from your own image", "Your own banner in Google Wallet", "Staff station and team invites", "Dashboard and alerts"],
     planMore: "A subscription gives you much more:", freeCompare: "Without a subscription: up to 10 customers, with the ready designs, colors and icons.",
     englishNote: null,
@@ -146,9 +152,10 @@ function firstStep(signedIn: boolean, business: StartBusiness | null, billingOn:
   return billingOn || !business.canWork ? "pay" : "done";
 }
 
-export default function StartFlow({ signedIn, userName, needsCode, business: initialBusiness, isStaffOnly, billingOn, paidReturn }: {
-  signedIn: boolean; userName: string; needsCode: boolean; business: StartBusiness | null; isStaffOnly: boolean; billingOn: boolean; paidReturn: boolean;
+export default function StartFlow({ signedIn, userName, needsCode, business: initialBusiness, isStaffOnly, billingOn, yearlyOn = false, paidReturn }: {
+  signedIn: boolean; userName: string; needsCode: boolean; business: StartBusiness | null; isStaffOnly: boolean; billingOn: boolean; yearlyOn?: boolean; paidReturn: boolean;
 }) {
+  const [plan, setPlan] = useState<"monthly" | "yearly">("monthly");
   const lang = useSyncExternalStore(noSubscribe, readLang, () => "he" as Lang);
   const t = T[lang];
   const tr = (key: string, vars?: Record<string, string | number>) => translate(lang, key, vars);
@@ -273,7 +280,7 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
     if (!business || busy) return;
     setBusy(true);
     setError("");
-    const r = await post<{ url: string }>("/api/billing/checkout", { business: business.id, from: "start" });
+    const r = await post<{ url: string }>("/api/billing/checkout", { business: business.id, from: "start", plan: yearlyOn ? plan : "monthly" });
     if (r.ok && r.data.url) { window.location.assign(r.data.url); return; }
     setBusy(false);
     setError(r.ok ? t.payFail : r.code === "billing_off" ? t.billingOff : t.payFail);
@@ -400,8 +407,19 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
               ) : (
                 <>
                   <p className="lp-body">{t.payIntro}</p>
+                  {yearlyOn && (
+                    <div className="st-plan-pick" role="group" aria-label={t.planPick}>
+                      {(["monthly", "yearly"] as const).map((p) => (
+                        <button key={p} type="button" aria-pressed={plan === p} className={plan === p ? "is-on" : ""} onClick={() => setPlan(p)}>
+                          <strong>{p === "yearly" ? t.planYearly : t.planMonthly}</strong>
+                          <span className="lp-num">{p === "yearly" ? t.yearlyPrice : t.price}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <div className="st-plan">
-                    <div className="st-plan-head"><strong>{t.plan}</strong><span><b className="lp-num">{t.price}</b> {t.per}</span></div>
+                    <div className="st-plan-head"><strong>{t.plan}</strong><span><b className="lp-num">{plan === "yearly" ? t.yearlyPrice : t.price}</b> {plan === "yearly" ? t.yearlyPer : t.per}</span></div>
+                    {plan === "yearly" && <p className="su-opt st-yearly-note">{t.yearlyNote}</p>}
                     <p className="st-plan-more">{t.planMore}</p>
                     <ul>{t.features.map((f) => <li key={f}><Icon name="check" size={17} stroke={2.6} />{f}</li>)}</ul>
                     <p className="su-opt">{t.noSetup}</p>
@@ -411,7 +429,7 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
                     <div className="st-glossary">
                       <p>{t.englishNote.title}</p>
                       <dl>
-                        {t.englishNote.rows.map(([en, local]) => (
+                        {t.englishNote.rows.map(([en, local]) => (plan === "yearly" && en.startsWith("Then ") ? t.thenYearly : [en, local])).map(([en, local]) => (
                           <div key={en}><dt dir="ltr">{en}</dt><dd>{local}</dd></div>
                         ))}
                       </dl>

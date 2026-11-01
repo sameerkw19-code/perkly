@@ -2,7 +2,13 @@
 
 import { useEffect, useState } from "react";
 
-export type BillingBusiness = { id: string; name: string; status: string; periodEnd: string | null; compUntil?: string | null };
+export type BillingBusiness = {
+  id: string; name: string; status: string; periodEnd: string | null; compUntil?: string | null;
+  /** The current subscription's plan, when there is one. */
+  plan?: "monthly" | "yearly" | null;
+  /** Yearly plan's counter kit: owed ("due") or shipped ("sent"). */
+  kit?: "due" | "sent" | null;
+};
 
 const FOREVER_YEAR = "9999";
 
@@ -16,10 +22,16 @@ const STATUS_LABEL: Record<string, string> = {
   incomplete: "לא הושלם",
 };
 
-const PRICE_TEXT = "99 ₪ לחודש, בלי דמי הקמה. למנוי חדש 14 ימי ניסיון חינם.";
+const PRICE_TEXT = "בלי דמי הקמה. למנוי חדש 14 ימי ניסיון חינם, והחיוב הראשון רק אחרי 14 ימים.";
+const PLANS = {
+  monthly: { name: "חודשי", price: "99 ₪ לחודש", note: "מבטלים מתי שרוצים" },
+  yearly: { name: "שנתי", price: "999 ₪ לשנה", note: "כ־83 ₪ לחודש, וערכת הקופה כלולה (2 פוסטרים וסטנד QR)" },
+} as const;
+const WHATSAPP = "972526028291";
 
-export default function BillingView({ businesses, configured }: { businesses: BillingBusiness[]; configured: boolean }) {
+export default function BillingView({ businesses, configured, yearly = false }: { businesses: BillingBusiness[]; configured: boolean; yearly?: boolean }) {
   const [busy, setBusy] = useState<string | null>(null);
+  const [plan, setPlan] = useState<"monthly" | "yearly">("monthly");
   const [error, setError] = useState("");
   const [returned, setReturned] = useState(false);
   const [waiting, setWaiting] = useState(false);
@@ -41,13 +53,14 @@ export default function BillingView({ businesses, configured }: { businesses: Bi
   }, []);
 
   async function subscribe(businessId: string) {
+    const chosen = yearly ? plan : "monthly";
     setError("");
     setBusy(businessId);
     try {
       const response = await fetch("/api/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ business: businessId }),
+        body: JSON.stringify({ business: businessId, plan: chosen }),
       });
       const data = (await response.json().catch(() => null)) as { url?: string } | null;
       if (response.ok && data?.url) {
@@ -65,7 +78,18 @@ export default function BillingView({ businesses, configured }: { businesses: Bi
     <main className="card" style={{ maxWidth: 560, margin: "32px auto", padding: 24 }}>
       <a href="/" style={{ fontSize: 14, display: "inline-block", marginBottom: 12 }}>← חזרה ללוח הבקרה</a>
       <h1 style={{ fontSize: 22, marginBottom: 8 }}>מנוי ותשלום</h1>
-      <p style={{ marginBottom: 16 }}>{PRICE_TEXT}</p>
+      <p style={{ marginBottom: 12 }}>{PRICE_TEXT}</p>
+      {configured && (
+        <fieldset className="plan-pick" style={{ border: 0, padding: 0, margin: "0 0 16px", display: "grid", gap: 8 }}>
+          <legend className="sr-only">בחירת מסלול</legend>
+          {(yearly ? (["monthly", "yearly"] as const) : (["monthly"] as const)).map((p) => (
+            <label key={p} className="check" style={{ alignItems: "flex-start", border: "1px solid #e5e5e5", borderRadius: 12, padding: 12, borderColor: plan === p ? "#7558E8" : "#e5e5e5" }}>
+              <input type="radio" name="plan" value={p} checked={plan === p} onChange={() => setPlan(p)} />
+              <span><strong>{PLANS[p].name} · {PLANS[p].price}</strong><br /><small className="muted">{PLANS[p].note}</small></span>
+            </label>
+          ))}
+        </fieldset>
+      )}
       {returned && <p role="status" style={{ marginBottom: 16 }}>{waiting ? "התשלום התקבל. מעדכנים את סטטוס המנוי..." : "התשלום התקבל. אם הסטטוס עדיין לא עודכן, רענן את העמוד או פנה לתמיכה."}</p>}
       {!configured && <p style={{ marginBottom: 16 }}>התשלומים עדיין לא מופעלים. נסה שוב מאוחר יותר, או פנה אלינו ב-support@perkly.shop.</p>}
       {businesses.length === 0 && <p>אין לך עסקים שאתה בעלים שלהם.</p>}
@@ -76,7 +100,15 @@ export default function BillingView({ businesses, configured }: { businesses: Bi
         return (
           <section key={b.id} style={{ borderTop: "1px solid #e5e5e5", padding: "16px 0" }}>
             <strong>{b.name}</strong>
-            <div style={{ margin: "6px 0" }}>סטטוס: {STATUS_LABEL[b.status] ?? b.status}</div>
+            <div style={{ margin: "6px 0" }}>סטטוס: {STATUS_LABEL[b.status] ?? b.status}{b.plan && ["active", "trialing", "past_due"].includes(b.status) ? ` · מסלול ${PLANS[b.plan].name}` : ""}</div>
+            {b.plan === "yearly" && b.status === "trialing" && <div style={{ fontSize: 14, marginBottom: 6 }}>ערכת הקופה תישלח אחרי החיוב הראשון.</div>}
+            {b.kit === "due" && (
+              <div style={{ fontSize: 14, marginBottom: 6 }}>
+                ערכת הקופה כלולה במנוי.{" "}
+                <a href={`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(`היי, זו כתובת המשלוח לערכת הקופה של ${b.name}:`)}`} target="_blank" rel="noreferrer">שלחו לנו כתובת למשלוח בוואטסאפ</a>
+              </div>
+            )}
+            {b.kit === "sent" && <div style={{ fontSize: 14, marginBottom: 6 }}>ערכת הקופה נשלחה.</div>}
             {b.periodEnd && <div style={{ fontSize: 14, marginBottom: 6 }}>החיוב הבא: {new Date(b.periodEnd).toLocaleDateString("he-IL")}</div>}
             {b.compUntil && (
               <div style={{ fontSize: 14, marginBottom: 6 }}>
@@ -85,7 +117,7 @@ export default function BillingView({ businesses, configured }: { businesses: Bi
             )}
             {canSubscribe && !forever && (
               <button className="btn soft" disabled={busy === b.id} onClick={() => subscribe(b.id)}>
-                {busy === b.id ? "פותח דף תשלום..." : "הפעל מנוי"}
+                {busy === b.id ? "פותח דף תשלום..." : `הפעלת מנוי ${PLANS[yearly ? plan : "monthly"].name}`}
               </button>
             )}
           </section>

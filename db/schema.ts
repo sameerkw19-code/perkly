@@ -32,6 +32,9 @@ export const businesses = sqliteTable(
     archived: text("archived"),
     // Social links shown on customer cards (JSON). See lib/social.tsx.
     social: text("social"),
+    // Yearly plan: the counter kit is owed from the first yearly payment (kitDue) until an admin marks it shipped (kitSent).
+    kitDue: text("kit_due"),
+    kitSent: text("kit_sent"),
   },
   (t) => [uniqueIndex("businesses_join_code").on(t.joinCode)],
 );

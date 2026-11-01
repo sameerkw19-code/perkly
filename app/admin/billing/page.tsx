@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { getD1 } from "../../../db";
-import { MONTHLY_PRICE_ILS } from "../../../lib/server/billing";
+import { monthlyValue, planOf } from "../../../lib/server/billing";
 import { listOrders, polarConfigured, type PolarOrder } from "../../../lib/server/polar";
 import { STATUS_LABEL, adminStatus, requireAdminPage, shortDate, shortDateTime } from "../../../lib/server/admin";
 import { AdminHeader } from "../admin-header";
@@ -11,6 +11,7 @@ export const metadata = { robots: { index: false }, title: "Perkly · מנויי
 type SubRow = {
   business: string; name: string; owner_email: string | null; status: string | null; current_period_end: string | null;
   updated: string | null; external_subscription: string | null; suspended: string | null; comp_until: string | null;
+  plan: string | null; kit_due: string | null; kit_sent: string | null;
 };
 
 const POLAR_STATUS: Record<string, string> = {
@@ -32,7 +33,7 @@ export default async function AdminBillingPage() {
   const subs = await db
     .prepare(
       `SELECT b.id AS business, b.name, u.email AS owner_email, s.status, s.current_period_end, s.updated, s.external_subscription,
-         b.suspended, b.comp_until
+         b.suspended, b.comp_until, s.plan, b.kit_due, b.kit_sent
        FROM businesses b LEFT JOIN subscriptions s ON s.business = b.id LEFT JOIN users u ON u.id = b.owner
        ORDER BY (s.status = 'past_due') DESC, s.updated DESC NULLS LAST, b.created DESC LIMIT 500`,
     )
@@ -52,7 +53,11 @@ export default async function AdminBillingPage() {
     }
   }
 
-  const active = subs.results.filter((r) => r.status === "active").length;
+  const activeRows = subs.results.filter((r) => r.status === "active");
+  const active = activeRows.length;
+  const yearlyActive = activeRows.filter((r) => planOf(r.plan, env) === "yearly").length;
+  const mrr = activeRows.reduce((sum, r) => sum + monthlyValue(planOf(r.plan, env)), 0);
+  const kitsDue = subs.results.filter((r) => r.kit_due && !r.kit_sent);
   const pastDue = subs.results.filter((r) => r.status === "past_due");
   const byMonth = new Map<string, Map<string, number>>();
   for (const o of orders) {
@@ -73,11 +78,32 @@ export default async function AdminBillingPage() {
         <p className="muted">מנויים לפי הנתונים שהגיעו מ-Polar, ותשלומים ישירות מ-Polar.</p>
 
         <section className="stats admin-stats">
-          <div className="stat"><span className="stat-label">הכנסה חודשית משוערת</span><strong>{money(active * MONTHLY_PRICE_ILS, "ILS")}</strong><small>{active} מנויים פעילים × {MONTHLY_PRICE_ILS} ₪</small></div>
+          <div className="stat"><span className="stat-label">הכנסה חודשית משוערת</span><strong>{money(mrr, "ILS")}</strong><small>{active} מנויים פעילים, מהם {yearlyActive} שנתיים (שנתי נספר כ־1/12)</small></div>
           <div className="stat"><span className="stat-label">תשלומים שנכשלו</span><strong>{pastDue.length}</strong><small>עסקים במצב "תשלום נכשל"</small></div>
           <div className="stat"><span className="stat-label">תשלומים שהתקבלו</span><strong>{orders.length}</strong><small>מתוך Polar (עד 300 אחרונים)</small></div>
           <div className="stat"><span className="stat-label">סה"כ עסקים</span><strong>{subs.results.length}</strong><small>כולל בלי מנוי</small></div>
         </section>
+
+        {kitsDue.length > 0 && (
+          <section className="panel">
+            <h2>ערכות קופה למשלוח</h2>
+            <p className="muted">עסקים במנוי שנתי ששילמו ועוד לא קיבלו ערכה. אחרי המשלוח מסמנים "נשלחה" בדף העסק.</p>
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>עסק</th><th>בעלים</th><th>מגיעה מאז</th></tr></thead>
+                <tbody>
+                  {kitsDue.map((r) => (
+                    <tr key={r.business}>
+                      <td><a href={`/admin/b/${r.business}`}><strong>{r.name}</strong></a></td>
+                      <td dir="ltr" className="admin-email">{r.owner_email ?? "—"}</td>
+                      <td>{shortDate(r.kit_due)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
 
         <section className="panel">
           <h2>הכנסה לפי חודש</h2>
@@ -99,7 +125,7 @@ export default async function AdminBillingPage() {
           <h2>מנויים</h2>
           <div className="table-wrap">
             <table>
-              <thead><tr><th>עסק</th><th>בעלים</th><th>מצב ב-Polar</th><th>גישה בפועל</th><th>סוף תקופה</th><th>עדכון אחרון</th></tr></thead>
+              <thead><tr><th>עסק</th><th>בעלים</th><th>מצב ב-Polar</th><th>מסלול</th><th>גישה בפועל</th><th>סוף תקופה</th><th>עדכון אחרון</th></tr></thead>
               <tbody>
                 {subs.results.map((r) => {
                   const st = adminStatus(r, nowIso);
@@ -108,6 +134,7 @@ export default async function AdminBillingPage() {
                       <td><a href={`/admin/b/${r.business}`}><strong>{r.name}</strong></a></td>
                       <td dir="ltr" className="admin-email">{r.owner_email ?? "—"}</td>
                       <td>{r.status ? POLAR_STATUS[r.status] ?? r.status : "ללא מנוי"}</td>
+                      <td>{r.status ? (planOf(r.plan, env) === "yearly" ? "שנתי" : "חודשי") : "—"}</td>
                       <td><span className={"admin-chip small st-" + st}>{STATUS_LABEL[st]}</span></td>
                       <td>{shortDate(r.current_period_end)}</td>
                       <td>{shortDateTime(r.updated)}</td>

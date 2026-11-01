@@ -7,12 +7,19 @@ const TOLERANCE_SECONDS = 300;
 export type PolarEnv = {
   POLAR_ACCESS_TOKEN?: string;
   POLAR_PRODUCT_ID?: string;
+  /** Optional: the yearly product (999 ILS a year, counter kit included). Without it only the monthly plan is offered. */
+  POLAR_PRODUCT_ID_YEARLY?: string;
   POLAR_WEBHOOK_SECRET?: string;
   POLAR_SANDBOX?: string;
 };
 
 export function polarConfigured(env: PolarEnv): boolean {
   return !!(env.POLAR_ACCESS_TOKEN && env.POLAR_PRODUCT_ID && env.POLAR_WEBHOOK_SECRET);
+}
+
+/** Whether the yearly plan can be sold: billing works and a yearly product is set. */
+export function yearlyConfigured(env: PolarEnv): boolean {
+  return polarConfigured(env) && !!env.POLAR_PRODUCT_ID_YEARLY;
 }
 
 function apiBase(env: PolarEnv): string {
@@ -23,7 +30,7 @@ function apiBase(env: PolarEnv): string {
  * Creates a hosted Polar checkout for one business. Returns the URL to redirect the owner to.
  * `from: "start"` returns the owner to the guided setup (/start) instead of the billing page.
  */
-export async function createCheckoutUrl(env: PolarEnv, businessId: string, origin: string, customerEmail: string, from: "billing" | "start" = "billing", trialDays = 0): Promise<string> {
+export async function createCheckoutUrl(env: PolarEnv, businessId: string, origin: string, customerEmail: string, from: "billing" | "start" = "billing", trialDays = 0, plan: "monthly" | "yearly" = "monthly"): Promise<string> {
   const b = encodeURIComponent(businessId);
   const success = from === "start" ? `${origin}/start?paid=1&b=${b}` : `${origin}/billing?ok=1`;
   const back = from === "start" ? `${origin}/start?b=${b}` : `${origin}/billing`;
@@ -35,7 +42,7 @@ export async function createCheckoutUrl(env: PolarEnv, businessId: string, origi
       Accept: "application/json",
     },
     body: JSON.stringify({
-      products: [env.POLAR_PRODUCT_ID],
+      products: [plan === "yearly" && env.POLAR_PRODUCT_ID_YEARLY ? env.POLAR_PRODUCT_ID_YEARLY : env.POLAR_PRODUCT_ID],
       // Free trial: the card is collected now and first charged when the trial ends.
       ...(trialDays > 0 ? { allow_trial: true, trial_interval: "day", trial_interval_count: trialDays } : {}),
       success_url: success,

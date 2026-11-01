@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { validMonthDay, parseBirthday, birthdayFromParts, formatBirthday, upcomingKeys } from "../lib/birthday.ts";
 import { sanitizeDesign, defaultDesign, designChecks, FONTS, cardLang, textsFor, sanitizeLangs, walletStampPicture, assetIds, is3d, ICON_GROUPS, STAMP_ICONS, STAMP_3D } from "../lib/design.ts";
-import { businessAccess, freeLimitReached, hasPaidDesign, TRIAL_DAYS } from "../lib/server/billing.ts";
+import { businessAccess, freeLimitReached, hasPaidDesign, TRIAL_DAYS, YEARLY_PRICE_ILS, MONTHLY_PRICE_ILS, planOf, monthlyValue } from "../lib/server/billing.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { lookFields } from "../lib/wallet-look.ts";
 import { usesPizza, slicePath, slicesPath, PIZZA_MAX } from "../lib/pizza.ts";
@@ -276,10 +276,37 @@ test("trial: 14 days at checkout and in all site texts", () => {
   const files = ["app/landing/content.ts", "app/start/start-flow.tsx", "app/contact/contact-form.tsx", "app/terms/page.tsx", "lib/i18n.ts", "app/billing/billing-view.tsx"];
   for (const f of files) {
     const text = readFileSync(new URL("../" + f, import.meta.url), "utf8");
-    assert.doesNotMatch(text, /\b3 ימי ניסיון|3-day|3 days free|3 أيام تجربة|אחרי 3 ימים/, f);
+    assert.doesNotMatch(text, /\b3 ימי ניסיון|3-day|3 days free|3 أيام تجربة|אחרי 3 ימים|الأيام الثلاثة/, f);
   }
   const copy = readFileSync(new URL("../app/landing/content.ts", import.meta.url), "utf8");
   for (const phrase of ["14 ימי ניסיון", "14-day free trial", "14 يوماً"]) assert.match(copy, new RegExp(phrase));
+});
+
+// ---- Yearly plan: 999 ILS a year, counter kit included ----
+
+test("yearly plan: only the configured yearly product counts as yearly", () => {
+  const env = { POLAR_PRODUCT_ID_YEARLY: "prod_year" };
+  assert.equal(planOf("prod_year", env), "yearly");
+  assert.equal(planOf("prod_month", env), "monthly");
+  assert.equal(planOf(null, env), "monthly");
+  assert.equal(planOf("prod_year", {}), "monthly", "no yearly product set");
+  assert.equal(planOf("", { POLAR_PRODUCT_ID_YEARLY: "" }), "monthly");
+});
+
+test("yearly plan: a twelfth of the price per month in the admin estimate", () => {
+  assert.equal(YEARLY_PRICE_ILS, 999);
+  assert.equal(monthlyValue("monthly"), MONTHLY_PRICE_ILS);
+  assert.equal(monthlyValue("yearly"), 999 / 12);
+});
+
+test("yearly plan: the same price and the kit in every text that sells it", () => {
+  const read = (f) => readFileSync(new URL("../" + f, import.meta.url), "utf8");
+  const copy = read("app/landing/content.ts");
+  for (const phrase of ["999 ₪", "₪999", "מנוי שנתי", "اشتراك سنوي", "Yearly plan"]) assert.ok(copy.includes(phrase), phrase);
+  assert.match(read("app/terms/page.tsx"), /מנוי שנתי: 999 ₪ לשנה.*ערכת קופה/);
+  assert.match(read("app/start/start-flow.tsx"), /yearlyPrice: "999 ₪"/);
+  assert.match(read("app/billing/billing-view.tsx"), /999 ₪ לשנה/);
+  assert.ok(existsSync(new URL("../drizzle/0023_counter_kit.sql", import.meta.url)));
 });
 
 // ---- Wallet stamp banner: one picture per stamp count ----

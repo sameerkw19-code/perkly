@@ -5,6 +5,21 @@ import { LoyaltyCard } from "../../../../components/loyalty-card";
 import { useLang } from "../../../../lib/i18n";
 import type { Design } from "../../../../lib/design";
 
+/** Yearly plan: marks the included counter kit as shipped. */
+export function KitSentButton({ business }: { business: string }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <button className="btn soft small" disabled={busy} onClick={async () => {
+      if (!confirm("לסמן שערכת הקופה נשלחה?")) return;
+      setBusy(true);
+      const r = await post("/api/admin", { action: "kit_sent", business });
+      setBusy(false);
+      if (r.ok) window.location.reload();
+      else window.alert("הפעולה נכשלה. נסה שוב.");
+    }}>נשלחה</button>
+  );
+}
+
 /** Suspend / unsuspend and free-access controls for one business. Reloads the page after each change. */
 type Biz = { id: string; name: string; reward: string; target: number; archived: string | null; ownerEmail: string | null; paying: boolean };
 

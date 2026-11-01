@@ -262,6 +262,9 @@
 .lp-price-card { background: #fff; border: 1px solid var(--line); border-radius: 28px; padding: clamp(22px, 3.5vw, 32px); display: flex; flex-direction: column; gap: 14px; box-shadow: var(--shadow); }
 .lp-price-main { border: 2px solid var(--p); }
 .lp-price-main .lp-btn { margin-top: auto; }
+.lp-price-alt { border: 1px dashed var(--p); border-radius: 18px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; background: #FCFBFF; }
+.lp-price-alt .lp-price strong { font-size: 28px; }
+.lp-price-alt .lp-price-note { margin: 0; }
 .lp-price-name { font-size: 22px; font-weight: 700; }
 .lp-price { display: flex; align-items: baseline; gap: 8px; }
 .lp-price strong { font-family: var(--font-display); font-size: 52px; font-weight: 800; line-height: 1; }
@@ -483,6 +486,12 @@
 .st h1:focus { outline: none; }
 .st-later { background: none; border: 0; font: inherit; cursor: pointer; }
 .st-plan-more { margin: 0; font-weight: 700; color: var(--ink); }
+.st-plan-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.st-plan-pick button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px; border: 1.5px solid var(--line); border-radius: 16px; background: #fff; color: var(--ink); font: inherit; cursor: pointer; }
+.st-plan-pick button span { font-family: var(--font-display); font-size: 20px; font-weight: 800; }
+.st-plan-pick button.is-on { border-color: var(--p); background: #FCFBFF; box-shadow: 0 0 0 3px rgba(117, 88, 232, .15); }
+.st-plan-pick button:focus-visible { outline: 3px solid var(--p); outline-offset: 2px; }
+.st-yearly-note { margin: 0; color: var(--ink); font-weight: 600; }
 .st-free-compare { margin: 0; padding-top: 10px; border-top: 1px dashed var(--line, #E4E0EE); }
 .st-design { display: flex; flex-direction: column; gap: 18px; }
 .st-design-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }

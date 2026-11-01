@@ -10,6 +10,7 @@ declare namespace Cloudflare {
     /** Polar billing. Set with `wrangler secret put`. POLAR_SANDBOX=1 uses the sandbox API. */
     POLAR_ACCESS_TOKEN?: string;
     POLAR_PRODUCT_ID?: string;
+    POLAR_PRODUCT_ID_YEARLY?: string;
     POLAR_WEBHOOK_SECRET?: string;
     POLAR_SANDBOX?: string;
     /** Full Google Wallet loyalty class id, exactly as Google lists it. */
