@@ -24,8 +24,8 @@ const STATUS_LABEL: Record<string, string> = {
 
 const PRICE_TEXT = "בלי דמי הקמה. למנוי חדש 14 ימי ניסיון חינם, והחיוב הראשון רק אחרי 14 ימים.";
 const PLANS = {
-  monthly: { name: "חודשי", price: "99 ₪ לחודש", note: "מבטלים מתי שרוצים" },
-  yearly: { name: "שנתי", price: "999 ₪ לשנה", note: "כ־83 ₪ לחודש, וערכת הקופה כלולה (2 פוסטרים וסטנד QR)" },
+  monthly: { name: "חודשי", price: "$29 לחודש", note: "מבטלים מתי שרוצים" },
+  yearly: { name: "שנתי", price: "$290 לשנה", note: "כ־$24 לחודש, וערכת הקופה כלולה (2 פוסטרים וסטנד QR)" },
 } as const;
 const WHATSAPP = "972526028291";
 

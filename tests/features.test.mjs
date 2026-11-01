@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { validMonthDay, parseBirthday, birthdayFromParts, formatBirthday, upcomingKeys } from "../lib/birthday.ts";
 import { sanitizeDesign, defaultDesign, designChecks, FONTS, cardLang, textsFor, sanitizeLangs, walletStampPicture, assetIds, is3d, ICON_GROUPS, STAMP_ICONS, STAMP_3D } from "../lib/design.ts";
-import { businessAccess, freeLimitReached, hasPaidDesign, TRIAL_DAYS, YEARLY_PRICE_ILS, MONTHLY_PRICE_ILS, planOf, monthlyValue } from "../lib/server/billing.ts";
+import { businessAccess, freeLimitReached, hasPaidDesign, TRIAL_DAYS, YEARLY_PRICE_USD, MONTHLY_PRICE_USD, planOf, monthlyValue } from "../lib/server/billing.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { lookFields } from "../lib/wallet-look.ts";
 import { usesPizza, slicePath, slicesPath, PIZZA_MAX } from "../lib/pizza.ts";
@@ -294,23 +294,32 @@ test("yearly plan: only the configured yearly product counts as yearly", () => {
 });
 
 test("yearly plan: a twelfth of the price per month in the admin estimate", () => {
-  assert.equal(YEARLY_PRICE_ILS, 999);
-  assert.equal(monthlyValue("monthly"), MONTHLY_PRICE_ILS);
-  assert.equal(monthlyValue("yearly"), 999 / 12);
+  assert.equal(MONTHLY_PRICE_USD, 29);
+  assert.equal(YEARLY_PRICE_USD, 290);
+  assert.equal(monthlyValue("monthly"), MONTHLY_PRICE_USD);
+  assert.equal(monthlyValue("yearly"), 290 / 12);
 });
 
 test("yearly plan: the same price and the kit in every text that sells it", () => {
   const read = (f) => readFileSync(new URL("../" + f, import.meta.url), "utf8");
   const copy = read("app/landing/content.ts");
-  for (const phrase of ["999 ₪", "₪999", "מנוי שנתי", "اشتراك سنوي", "yearly plan"]) assert.ok(copy.includes(phrase), phrase);
-  // The pricing switch: both sides in every language, and 16% matches the prices (999 against 12 × 99).
-  assert.equal(Math.round((1 - 999 / (12 * 99)) * 100), 16);
-  for (const phrase of ["חוסכים 16%", "وفّروا 16%", "Save 16%"]) assert.ok(copy.includes(phrase), phrase);
+  for (const phrase of ["$290", "$24", "מנוי שנתי", "اشتراك سنوي", "yearly plan"]) assert.ok(copy.includes(phrase), phrase);
+  // The pricing switch: both sides in every language, and 17% matches the prices ($290 against 12 × $29).
+  assert.equal(Math.round((1 - 290 / (12 * 29)) * 100), 17);
+  assert.equal(Math.round(290 / 12), 24);
+  for (const phrase of ["חוסכים 17%", "وفّروا 17%", "Save 17%"]) assert.ok(copy.includes(phrase), phrase);
   assert.match(read("app/landing/landing-client.tsx"), /plan=yearly/);
-  assert.match(read("app/terms/page.tsx"), /מנוי שנתי: 999 ₪ לשנה.*ערכת קופה/);
-  assert.match(read("app/start/start-flow.tsx"), /yearlyPrice: "999 ₪"/);
-  assert.match(read("app/billing/billing-view.tsx"), /999 ₪ לשנה/);
+  assert.match(read("app/terms/page.tsx"), /מנוי שנתי: \$290 לשנה.*ערכת קופה/);
+  assert.match(read("app/start/start-flow.tsx"), /yearlyPrice: "\$290"/);
+  assert.match(read("app/billing/billing-view.tsx"), /\$290 לשנה/);
   assert.ok(existsSync(new URL("../drizzle/0023_counter_kit.sql", import.meta.url)));
+});
+
+test("prices: dollars everywhere, no shekel prices left", () => {
+  for (const f of ["app/landing/content.ts", "app/start/start-flow.tsx", "app/start/page.tsx", "app/billing/billing-view.tsx", "app/contact/contact-form.tsx", "app/terms/page.tsx", "lib/i18n.ts", "app/admin/page.tsx"]) {
+    const text = readFileSync(new URL("../" + f, import.meta.url), "utf8");
+    assert.doesNotMatch(text, /₪/, f);
+  }
 });
 
 // ---- Wallet stamp banner: one picture per stamp count ----

@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   const kind = typeof body.kind === "string" && KINDS.has(body.kind) ? body.kind : null;
   const city = typeof body.city === "string" ? str(body.city, 60) : null;
   const note = typeof body.note === "string" ? str(body.note, 500) : null;
-  const lang = body.lang === "ar" ? "ar" : "he";
+  const lang = body.lang === "ar" ? "ar" : body.lang === "he" ? "he" : "en";
 
   const fields: Record<string, string> = {};
   if (!business) fields.business = "required";

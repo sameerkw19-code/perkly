@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Perkly | פתיחת חשבון",
   description:
-    "פותחים חשבון, מעצבים כרטיס נאמנות ומתחילים לעבוד. 14 ימי ניסיון חינם, ואחר כך 99 ₪ לחודש, בלי התחייבות.",
+    "פותחים חשבון, מעצבים כרטיס נאמנות ומתחילים לעבוד. 14 ימי ניסיון חינם, ואחר כך $29 לחודש, בלי התחייבות.",
   alternates: { canonical: "/start" },
 };
 

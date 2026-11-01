@@ -3,8 +3,8 @@
 // - Only claims the product really supports today (see README "מה עובד בגרסה הזו").
 // - One stamp rule everywhere: the business sets how many stamps fill a card; a full card
 //   means the reward is ready; redeeming the reward is not itself counted as a stamp.
-// - Prices: 99 ILS a month, no setup fee, 14-day free trial (TRIAL_DAYS in lib/server/billing.ts). Counter kit: optional, 99 ILS one-time, also without a subscription.
-// - Yearly plan: 999 ILS a year (YEARLY_PRICE_ILS), same trial, counter kit included and shipped after the first payment.
+// - Prices (USD): $29 a month, no setup fee, 14-day free trial (TRIAL_DAYS in lib/server/billing.ts). Counter kit: optional, $29 one-time, also without a subscription.
+// - Yearly plan: $290 a year (YEARLY_PRICE_USD, about $24 a month, 17% less than 12 months), same trial, counter kit included and shipped after the first payment.
 // - No testimonials, customer counts or results until real, approved ones exist.
 
 export type Lang = "he" | "ar" | "en";
@@ -29,7 +29,7 @@ const he = {
     text: "כרטיס נאמנות דיגיטלי בעיצוב העסק שלכם. הלקוחות אוספים חותמות בטלפון, העובדים מנהלים אותן בקלות, ואתם רואים מי חוזר.",
     cta: "התחילו עכשיו",
     demo: "נסו הדגמה",
-    price: "99 ₪ לחודש",
+    price: "$29 לחודש",
     priceNote: "14 ימי ניסיון חינם · בלי דמי הקמה",
     points: ["הלקוח לא מוריד אפליקציה", "מספיק טלפון או טאבלט בקופה", "עברית ואנגלית"],
     sceneLabel: "המחשה: כרטיס נאמנות של בית קפה בטלפון, ומאחוריו כרטיסים של מספרה ושל גלידרייה",
@@ -136,7 +136,7 @@ const he = {
     title: "מחיר פשוט, בלי הפתעות.",
     sub: {
       name: "מנוי Perkly",
-      price: "99 ₪",
+      price: "$29",
       per: "לחודש",
       note: "14 ימי ניסיון חינם · בלי דמי הקמה",
       desc: "לעסק שרוצה שהלקוחות יחזרו",
@@ -144,19 +144,19 @@ const he = {
       features: ["לקוחות ללא הגבלה", "עיצוב מלא: לוגו, תמונת רקע וחותמת משלכם", "באנר בעיצוב שלכם ב־Google Wallet", "עמדת עובד והזמנת עובדים", "לוח בקרה, היסטוריה והתראות", "עברית ואנגלית"],
       cta: "התחילו עכשיו",
     },
-    cycle: { label: "תקופת חיוב", monthly: "חודשי", yearly: "שנתי", save: "חוסכים 16% וערכת קופה במתנה" },
-    free: { name: "חינם", desc: "להתחלה קטנה", price: "0 ₪", sub: "בלי כרטיס אשראי", features: ["עד 10 לקוחות", "עיצובים, צבעים ואייקונים מוכנים", "QR להצטרפות וחותמות בקופה"], cta: "מתחילים בחינם" },
-    yearly: { badge: "מומלץ", price: "83 ₪", per: "לחודש", sub: "999 ₪ בחיוב שנתי", gift: "ערכת קופה במתנה: 2 פוסטרים וסטנד QR" },
+    cycle: { label: "תקופת חיוב", monthly: "חודשי", yearly: "שנתי", save: "חוסכים 17% וערכת קופה במתנה" },
+    free: { name: "חינם", desc: "להתחלה קטנה", price: "$0", sub: "בלי כרטיס אשראי", features: ["עד 10 לקוחות", "עיצובים, צבעים ואייקונים מוכנים", "QR להצטרפות וחותמות בקופה"], cta: "מתחילים בחינם" },
+    yearly: { badge: "מומלץ", price: "$24", per: "לחודש", sub: "$290 בחיוב שנתי", gift: "ערכת קופה במתנה: 2 פוסטרים וסטנד QR" },
     kit: {
       tag: "תוספת לבחירה",
       name: "ערכת קופה",
-      price: "99 ₪",
+      price: "$29",
       per: "חד־פעמי",
       items: ["2 פוסטרים עם הלוגו וה־QR של העסק", "סטנד QR לדלפק"],
       noSub: "אפשר להזמין גם בלי מנוי. במנוי השנתי היא כלולה.",
       included: "כלולה במנוי השנתי",
       cta: "הזמנת ערכה בוואטסאפ",
-      waText: "היי, אשמח להזמין ערכת קופה של Perkly (99 ₪)",
+      waText: "היי, אשמח להזמין ערכת קופה של Perkly ($29)",
       sceneLabel: "המחשה של ערכת הקופה: שני פוסטרים וסטנד QR על דלפק",
       poster1: "אוספים חותמות. מקבלים הטבה.",
       poster2: "10 חותמות = קפה חינם",
@@ -172,9 +172,9 @@ const he = {
       { q: "צריך לקנות ציוד?", a: "לא. עמדת העובד עובדת בדפדפן של טלפון או טאבלט עם מצלמה. את ה־QR אפשר להדפיס בעצמכם או להזמין ערכת קופה." },
       { q: "איך מונעים חותמות לא מוצדקות?", a: "לכל עובד כניסה אישית, וכל פעולה נרשמת עם שמו. המערכת מתריעה על פעילות חריגה, ובעל העסק יכול לבטל גישה של עובד מיד." },
       { q: "מה קורה כשהכרטיס מתמלא?", a: "ההטבה מוכנה. אתם בוחרים אם לממש אותה מיד, או לשמור אותה ולתת ללקוח להמשיך לצבור בכרטיס חדש. אפשר גם לקבוע תוקף להטבה." },
-      { q: "כמה זה עולה?", a: "99 ₪ לחודש, בלי דמי הקמה, עם 14 ימי ניסיון חינם. אפשר גם להתחיל בלי מנוי: עד 10 לקוחות, עם העיצובים, הצבעים והאייקונים המוכנים. לוגו, תמונת רקע וחותמת מתמונה משלכם נפתחים במנוי. ערכת קופה היא תוספת לבחירה ב־99 ₪ חד־פעמי. יש גם מנוי שנתי: 999 ₪ לשנה, וערכת הקופה כלולה." },
+      { q: "כמה זה עולה?", a: "$29 לחודש, בלי דמי הקמה, עם 14 ימי ניסיון חינם. אפשר גם להתחיל בלי מנוי: עד 10 לקוחות, עם העיצובים, הצבעים והאייקונים המוכנים. לוגו, תמונת רקע וחותמת מתמונה משלכם נפתחים במנוי. ערכת קופה היא תוספת לבחירה ב־$29 חד־פעמי. יש גם מנוי שנתי: $290 לשנה, וערכת הקופה כלולה." },
       { q: "יש חיבור ל־Apple Wallet ול־Google Wallet?", a: "Google Wallet כן: לקוחות עם אנדרואיד מוסיפים את הכרטיס לארנק, והוא מתעדכן לבד בכל חותמת. Apple Wallet בפיתוח. באייפון הכרטיס נפתח מהקישור האישי או מקיצור במסך הבית." },
-      { q: "איך מתחילים?", a: "פותחים חשבון, מעצבים את הכרטיס ומזינים פרטי אשראי. מקבלים QR להדפסה ומתחילים מיד. 14 הימים הראשונים חינם, ואז 99 ₪ לחודש. אפשר לבטל בכל עת." },
+      { q: "איך מתחילים?", a: "פותחים חשבון, מעצבים את הכרטיס ומזינים פרטי אשראי. מקבלים QR להדפסה ומתחילים מיד. 14 הימים הראשונים חינם, ואז $29 לחודש. אפשר לבטל בכל עת." },
     ],
   },
   final: {
@@ -213,7 +213,7 @@ const ar: Copy = {
     text: "بطاقة ولاء رقمية بتصميم مشروعك. الزبائن يجمعون الأختام في الهاتف، الموظفون يديرونها بسهولة، وأنت ترى من يعود.",
     cta: "ابدأوا الآن",
     demo: "جرّبوا العرض",
-    price: "99 ₪ شهرياً",
+    price: "$29 شهرياً",
     priceNote: "تجربة مجانية لمدة 14 يوماً · بدون رسوم تأسيس",
     points: ["الزبون لا يحتاج إلى تطبيق", "يكفي هاتف أو جهاز لوحي عند الصندوق", "العبرية والعربية والإنجليزية"],
     sceneLabel: "توضيح: بطاقة ولاء لمقهى في الهاتف، وخلفها بطاقتان لصالون حلاقة ولمحل بوظة",
@@ -320,7 +320,7 @@ const ar: Copy = {
     title: "سعر بسيط، بلا مفاجآت.",
     sub: {
       name: "اشتراك Perkly",
-      price: "99 ₪",
+      price: "$29",
       per: "شهرياً",
       note: "تجربة مجانية لمدة 14 يوماً · بدون رسوم تأسيس",
       desc: "لمحل يريد أن يعود زبائنه",
@@ -328,19 +328,19 @@ const ar: Copy = {
       features: ["زبائن بلا حدود", "تصميم كامل: الشعار وصورة خلفية وختم خاص بكم", "بانر بتصميمكم في Google Wallet", "واجهة موظف ودعوة موظفين", "لوحة تحكم، سجل وتنبيهات", "العبرية والعربية والإنجليزية"],
       cta: "ابدأوا الآن",
     },
-    cycle: { label: "فترة الدفع", monthly: "شهري", yearly: "سنوي", save: "وفّروا 16% وطقم الصندوق هدية" },
-    free: { name: "مجاني", desc: "لبداية صغيرة", price: "0 ₪", sub: "بدون بطاقة ائتمان", features: ["حتى 10 زبائن", "تصاميم وألوان وأيقونات جاهزة", "رمز QR للانضمام وأختام عند الصندوق"], cta: "ابدؤوا مجاناً" },
-    yearly: { badge: "موصى به", price: "83 ₪", per: "شهرياً", sub: "999 ₪ بدفعة سنوية", gift: "طقم الصندوق هدية: ملصقان وحامل QR" },
+    cycle: { label: "فترة الدفع", monthly: "شهري", yearly: "سنوي", save: "وفّروا 17% وطقم الصندوق هدية" },
+    free: { name: "مجاني", desc: "لبداية صغيرة", price: "$0", sub: "بدون بطاقة ائتمان", features: ["حتى 10 زبائن", "تصاميم وألوان وأيقونات جاهزة", "رمز QR للانضمام وأختام عند الصندوق"], cta: "ابدؤوا مجاناً" },
+    yearly: { badge: "موصى به", price: "$24", per: "شهرياً", sub: "$290 بدفعة سنوية", gift: "طقم الصندوق هدية: ملصقان وحامل QR" },
     kit: {
       tag: "إضافة اختيارية",
       name: "طقم الصندوق",
-      price: "99 ₪",
+      price: "$29",
       per: "لمرة واحدة",
       items: ["ملصقان (بوستر) بشعار ورمز QR المشروع", "حامل QR للكاونتر"],
       noSub: "يمكن طلبه أيضاً بدون اشتراك. وهو مشمول في الاشتراك السنوي.",
       included: "مشمول في الاشتراك السنوي",
       cta: "اطلبوا الطقم عبر واتساب",
-      waText: "مرحباً، أود طلب طقم الصندوق من Perkly (99 ₪)",
+      waText: "مرحباً، أود طلب طقم الصندوق من Perkly ($29)",
       sceneLabel: "توضيح لطقم الصندوق: ملصقان وحامل QR على الكاونتر",
       poster1: "اجمعوا الأختام. احصلوا على مكافأة.",
       poster2: "10 أختام = قهوة مجانية",
@@ -356,9 +356,9 @@ const ar: Copy = {
       { q: "هل يجب شراء معدات؟", a: "لا. واجهة الموظف تعمل في متصفح هاتف أو جهاز لوحي فيه كاميرا. يمكن طباعة رمز QR بأنفسكم أو طلب طقم الصندوق." },
       { q: "كيف نمنع أختاماً غير مبررة؟", a: "لكل موظف دخول شخصي، وكل عملية تُسجّل باسمه. النظام ينبّه عند نشاط غير اعتيادي، وصاحب المشروع يستطيع إلغاء صلاحية موظف فوراً." },
       { q: "ماذا يحدث عندما تمتلئ البطاقة؟", a: "تكون المكافأة جاهزة. تختارون استبدالها فوراً، أو حفظها والسماح للزبون بالاستمرار في الجمع على بطاقة جديدة. يمكن أيضاً تحديد صلاحية للمكافأة." },
-      { q: "كم يكلّف؟", a: "99 ₪ شهرياً، بدون رسوم تأسيس، مع تجربة مجانية لمدة 14 يوماً. يمكن أيضاً البدء بدون اشتراك: حتى 10 زبائن، مع التصاميم والألوان والأيقونات الجاهزة. الشعار وصورة الخلفية والختم من صورتكم تُفتح بالاشتراك. طقم الصندوق إضافة اختيارية بسعر 99 ₪ لمرة واحدة. ويوجد أيضاً اشتراك سنوي: 999 ₪ سنوياً مع طقم الصندوق مشمولاً." },
+      { q: "كم يكلّف؟", a: "$29 شهرياً، بدون رسوم تأسيس، مع تجربة مجانية لمدة 14 يوماً. يمكن أيضاً البدء بدون اشتراك: حتى 10 زبائن، مع التصاميم والألوان والأيقونات الجاهزة. الشعار وصورة الخلفية والختم من صورتكم تُفتح بالاشتراك. طقم الصندوق إضافة اختيارية بسعر $29 لمرة واحدة. ويوجد أيضاً اشتراك سنوي: $290 سنوياً مع طقم الصندوق مشمولاً." },
       { q: "هل يوجد ربط مع Apple Wallet وGoogle Wallet؟", a: "Google Wallet نعم: زبائن أندرويد يضيفون البطاقة إلى المحفظة وتتحدث تلقائياً مع كل ختم. Apple Wallet قيد التطوير، وفي الآيفون تُفتح البطاقة من الرابط الشخصي أو من اختصار في الشاشة الرئيسية." },
-      { q: "كيف نبدأ؟", a: "تفتحون حساباً، تصممون البطاقة وتدخلون تفاصيل البطاقة الائتمانية. تحصلون على رمز QR للطباعة وتبدؤون فوراً. أول 14 يوماً مجانية، ثم 99 ₪ شهرياً. يمكن الإلغاء في أي وقت." },
+      { q: "كيف نبدأ؟", a: "تفتحون حساباً، تصممون البطاقة وتدخلون تفاصيل البطاقة الائتمانية. تحصلون على رمز QR للطباعة وتبدؤون فوراً. أول 14 يوماً مجانية، ثم $29 شهرياً. يمكن الإلغاء في أي وقت." },
     ],
   },
   final: {
@@ -395,7 +395,7 @@ const en: Copy = {
     text: "A digital loyalty card in your business's own design. Customers collect stamps on their phone, staff handle them in a tap, and you see who comes back.",
     cta: "Get started",
     demo: "Try the demo",
-    price: "₪99 a month",
+    price: "$29 a month",
     priceNote: "14-day free trial · no setup fee",
     points: ["No app for customers to download", "Any phone or tablet at the counter", "Hebrew and English"],
     sceneLabel: "Illustration: a café loyalty card on a phone, with a barbershop card and an ice cream shop card behind it",
@@ -502,7 +502,7 @@ const en: Copy = {
     title: "Simple pricing, no surprises.",
     sub: {
       name: "Perkly subscription",
-      price: "₪99",
+      price: "$29",
       per: "a month",
       note: "14-day free trial · no setup fee",
       desc: "For a business that wants customers back",
@@ -510,19 +510,19 @@ const en: Copy = {
       features: ["Unlimited customers", "Full design: your logo, background image and stamp", "Your own banner in Google Wallet", "Staff station and staff invites", "Dashboard, history and alerts", "Hebrew and English"],
       cta: "Get started",
     },
-    cycle: { label: "Billing period", monthly: "Monthly", yearly: "Yearly", save: "Save 16% plus a free counter kit" },
-    free: { name: "Free", desc: "For a small start", price: "₪0", sub: "No credit card", features: ["Up to 10 customers", "Ready designs, colors and icons", "QR sign-up and stamps at the counter"], cta: "Start for free" },
-    yearly: { badge: "Recommended", price: "₪83", per: "a month", sub: "₪999 billed yearly", gift: "Free counter kit: 2 posters and a QR stand" },
+    cycle: { label: "Billing period", monthly: "Monthly", yearly: "Yearly", save: "Save 17% plus a free counter kit" },
+    free: { name: "Free", desc: "For a small start", price: "$0", sub: "No credit card", features: ["Up to 10 customers", "Ready designs, colors and icons", "QR sign-up and stamps at the counter"], cta: "Start for free" },
+    yearly: { badge: "Recommended", price: "$24", per: "a month", sub: "$290 billed yearly", gift: "Free counter kit: 2 posters and a QR stand" },
     kit: {
       tag: "Optional add-on",
       name: "Counter kit",
-      price: "₪99",
+      price: "$29",
       per: "one-time",
       items: ["2 posters with your logo and QR code", "A QR stand for the counter"],
       noSub: "You can order it without a subscription too. It's included in the yearly plan.",
       included: "Included in the yearly plan",
       cta: "Order a kit on WhatsApp",
-      waText: "Hi, I'd like to order a Perkly counter kit (₪99)",
+      waText: "Hi, I'd like to order a Perkly counter kit ($29)",
       sceneLabel: "Illustration of the counter kit: two posters and a QR stand on a counter",
       poster1: "Collect stamps. Get a reward.",
       poster2: "10 stamps = free coffee",
@@ -538,9 +538,9 @@ const en: Copy = {
       { q: "Do I need to buy equipment?", a: "No. The staff station runs in the browser of any phone or tablet with a camera. You can print the QR code yourself or order a counter kit." },
       { q: "How do you prevent unearned stamps?", a: "Each staff member has a personal login, and every action is logged with their name. The system flags unusual activity, and the owner can remove a staff member's access immediately." },
       { q: "What happens when the card is full?", a: "The reward is ready. You choose whether it's redeemed right away, or saved while the customer keeps collecting on a new card. You can also set an expiry for rewards." },
-      { q: "How much does it cost?", a: "₪99 a month, no setup fee, with a 14-day free trial. You can also start without a subscription: up to 10 customers, with the ready designs, colors and icons. Your logo, a background image and a stamp from your own image come with a subscription. The counter kit is an optional one-time add-on for ₪99. There's also a yearly plan: ₪999 a year, with the counter kit included." },
+      { q: "How much does it cost?", a: "$29 a month, no setup fee, with a 14-day free trial. You can also start without a subscription: up to 10 customers, with the ready designs, colors and icons. Your logo, a background image and a stamp from your own image come with a subscription. The counter kit is an optional one-time add-on for $29. There's also a yearly plan: $290 a year, with the counter kit included." },
       { q: "Does it work with Apple Wallet and Google Wallet?", a: "Google Wallet, yes: Android customers add the card to their wallet and it updates by itself with every stamp. Apple Wallet is in development; on iPhone the card opens from its personal link or a home screen shortcut." },
-      { q: "How do I get started?", a: "Open an account, design your card and add a payment card. You get a QR code to print and start right away. The first 14 days are free, then ₪99 a month. Cancel anytime." },
+      { q: "How do I get started?", a: "Open an account, design your card and add a payment card. You get a QR code to print and start right away. The first 14 days are free, then $29 a month. Cancel anytime." },
     ],
   },
   final: {
@@ -571,10 +571,10 @@ export function waLink(text: string) {
 }
 
 /** Links that keep the chosen language. */
-export const HOME: Record<Lang, string> = { he: "/", ar: "/ar", en: "/en" };
+export const HOME: Record<Lang, string> = { en: "/", he: "/he", ar: "/ar" };
 
 export function hrefs(lang: Lang) {
-  const q = lang === "he" ? "" : `?lang=${lang}`;
+  const q = lang === "en" ? "" : `?lang=${lang}`;
   return {
     home: HOME[lang],
     signup: `/start${q}`,
