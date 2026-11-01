@@ -320,3 +320,64 @@ export function ExamplesPicker({ lang }: { lang: Lang }) {
     </div>
   );
 }
+
+/**
+ * Pricing cards with a monthly / yearly switch. The free plan and the subscription live here;
+ * the counter kit card is rendered on the server and passed in as `children` (it reacts to the
+ * switch through the `data-cycle` attribute on the wrapper).
+ */
+export function PricingPlans({ lang, children }: { lang: Lang; children?: React.ReactNode }) {
+  const c = COPY[lang].pricing;
+  const h = hrefs(lang);
+  const [cycle, setCycle] = useState<"monthly" | "yearly">("monthly");
+  const yearly = cycle === "yearly";
+  const signupYearly = h.signup + (h.signup.includes("?") ? "&" : "?") + "plan=yearly";
+  return (
+    <div className="lp-plans" data-cycle={cycle}>
+      <div className="lp-cycle">
+        <div className="lp-cycle-switch" role="group" aria-label={c.cycle.label}>
+          {(["monthly", "yearly"] as const).map((k) => (
+            <button key={k} type="button" aria-pressed={cycle === k} className={cycle === k ? "is-on" : ""} onClick={() => setCycle(k)}>
+              {c.cycle[k]}
+            </button>
+          ))}
+        </div>
+        <span className="lp-cycle-save"><Icon name="gift" size={16} stroke={2.2} />{c.cycle.save}</span>
+      </div>
+      <div className="lp-pricing lp-pricing-3">
+        <article className="lp-price-card lp-plan" aria-labelledby="plan-free">
+          <div className="lp-plan-head">
+            <span className="lp-plan-icon lp-plan-icon-free" aria-hidden="true"><Icon name="stamp" size={20} stroke={2} /></span>
+            <h3 id="plan-free" className="lp-price-name">{c.free.name}</h3>
+          </div>
+          <p className="lp-plan-desc">{c.free.desc}</p>
+          <p className="lp-price"><strong>{c.free.price}</strong></p>
+          <p className="lp-plan-sub">{c.free.sub}</p>
+          <a href={h.signup} className="lp-btn lp-btn-ghost lp-btn-wide">{c.free.cta}</a>
+          <ul className="lp-list lp-plan-list">
+            {c.free.features.map((f) => <li key={f}><Icon name="check" size={18} stroke={2.6} />{f}</li>)}
+          </ul>
+        </article>
+        <article className="lp-price-card lp-plan lp-plan-main" aria-labelledby="plan-sub">
+          <span className="lp-plan-badge">{c.yearly.badge}</span>
+          <div className="lp-plan-head">
+            <span className="lp-plan-icon lp-plan-icon-main" aria-hidden="true"><Icon name="star" size={20} stroke={2} /></span>
+            <h3 id="plan-sub" className="lp-price-name">{c.sub.name}</h3>
+          </div>
+          <p className="lp-plan-desc">{c.sub.desc}</p>
+          <p className="lp-price" aria-live="polite">
+            <strong>{yearly ? c.yearly.price : c.sub.price}</strong><span>{yearly ? c.yearly.per : c.sub.per}</span>
+          </p>
+          <p className="lp-plan-sub">{yearly ? c.yearly.sub : c.sub.monthlySub}</p>
+          <a href={yearly ? signupYearly : h.signup} className="lp-btn lp-btn-primary lp-btn-wide">{c.sub.cta}</a>
+          <p className="lp-plan-trial">{c.sub.note}</p>
+          <ul className="lp-list lp-plan-list">
+            {yearly && <li className="lp-plan-gift"><Icon name="gift" size={18} stroke={2.2} />{c.yearly.gift}</li>}
+            {c.sub.features.map((f) => <li key={f}><Icon name="check" size={18} stroke={2.6} />{f}</li>)}
+          </ul>
+        </article>
+        {children}
+      </div>
+    </div>
+  );
+}

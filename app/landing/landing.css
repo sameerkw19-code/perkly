@@ -262,9 +262,35 @@
 .lp-price-card { background: #fff; border: 1px solid var(--line); border-radius: 28px; padding: clamp(22px, 3.5vw, 32px); display: flex; flex-direction: column; gap: 14px; box-shadow: var(--shadow); }
 .lp-price-main { border: 2px solid var(--p); }
 .lp-price-main .lp-btn { margin-top: auto; }
-.lp-price-alt { border: 1px dashed var(--p); border-radius: 18px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; background: #FCFBFF; }
-.lp-price-alt .lp-price strong { font-size: 28px; }
-.lp-price-alt .lp-price-note { margin: 0; }
+/* Monthly / yearly switch and the three plan cards */
+.lp-plans { margin-top: 28px; }
+.lp-cycle { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; }
+.lp-cycle-switch { display: inline-flex; padding: 5px; border-radius: 999px; background: #fff; border: 1px solid var(--line); box-shadow: 0 6px 16px rgba(23, 19, 41, 0.06); }
+.lp-cycle-switch button { min-height: 44px; min-width: 104px; padding: 8px 22px; border: 0; border-radius: 999px; background: none; color: var(--muted); font: inherit; font-weight: 700; font-size: 16px; cursor: pointer; transition: background-color .15s ease, color .15s ease; }
+.lp-cycle-switch button.is-on { background: var(--ink); color: #fff; }
+.lp-cycle-switch button:focus-visible { outline: 3px solid var(--p); outline-offset: 2px; }
+.lp-cycle-save { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: #FFF1CC; color: #5C3D00; font-weight: 700; font-size: 14px; }
+.lp-pricing-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; margin-top: 26px; }
+.lp-plan { position: relative; gap: 12px; }
+.lp-plan-head { display: flex; align-items: center; gap: 10px; }
+.lp-plan-icon { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; flex: none; }
+.lp-plan-icon-free { background: var(--p-soft); color: var(--p); }
+.lp-plan-icon-main { background: var(--yellow); color: var(--yellow-ink); }
+.lp-plan-desc { color: var(--muted); margin: -4px 0 0; font-size: 15px; }
+.lp-plan .lp-price { margin-top: 4px; }
+.lp-plan .lp-price strong { font-size: 48px; }
+.lp-plan-sub { color: var(--muted); font-size: 14.5px; margin: -4px 0 4px; min-height: 1.5em; }
+.lp-plan-trial { color: var(--muted); font-size: 13.5px; text-align: center; margin: -4px 0 0; }
+.lp-plan-list { margin-top: 6px; padding-top: 14px; border-top: 1px solid var(--line); }
+.lp-plan-list li svg { color: var(--green); flex: none; margin-top: 2px; }
+.lp-plan-list .lp-plan-gift { font-weight: 700; color: var(--ink); }
+.lp-plan-list .lp-plan-gift svg { color: #B07A00; }
+.lp-plan-main { border: 2px solid var(--p); background: linear-gradient(180deg, #F6F2FF 0%, #fff 42%); }
+.lp-plan-badge { position: absolute; top: -14px; inset-inline-end: 22px; padding: 5px 14px; border-radius: 999px; background: var(--p); color: #fff; font-weight: 700; font-size: 13.5px; box-shadow: 0 6px 14px rgba(117, 88, 232, 0.3); }
+.lp-kit-included { display: none; }
+.lp-plans[data-cycle="yearly"] .lp-kit-included { display: inline-flex; background: #E3F5EC; color: #11603F; }
+.lp-plans[data-cycle="yearly"] .lp-kit-tag { display: none; }
+.lp-plans[data-cycle="yearly"] .lp-price-kit .lp-price { text-decoration: line-through; text-decoration-thickness: 2px; opacity: .55; }
 .lp-price-name { font-size: 22px; font-weight: 700; }
 .lp-price { display: flex; align-items: baseline; gap: 8px; }
 .lp-price strong { font-family: var(--font-display); font-size: 52px; font-weight: 800; line-height: 1; }
@@ -329,7 +355,8 @@
   .lp-nav-desktop { display: none !important; }
 }
 @media (max-width: 960px) {
-  .lp-hero-grid, .lp-split, .lp-split-wide, .lp-how-grid, .lp-pricing { grid-template-columns: minmax(0, 1fr); }
+  .lp-hero-grid, .lp-split, .lp-split-wide, .lp-how-grid, .lp-pricing, .lp-pricing-3 { grid-template-columns: minmax(0, 1fr); }
+  .lp-plan-main { order: -1; }
   .lp-hero-visual { min-height: 0; }
   .lp-scene { height: 520px; }
   .lp-dash { transform: none; }
