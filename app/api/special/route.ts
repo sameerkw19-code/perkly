@@ -17,7 +17,7 @@ type SpecialRow = { id: string; send_at: string; text: string; queued: string | 
 
 /** The owner's businesses, and the chosen one (or the first). Only owners schedule messages. */
 async function ownerBusiness(db: D1Database, userId: string, wanted: unknown) {
-  const owned = (await getMemberships(db, userId)).filter((m) => m.role === "owner");
+  const owned = (await getMemberships(db, userId)).filter((m) => m.role === "owner" && m.product !== "club");
   const pick = typeof wanted === "string" && wanted ? owned.find((m) => m.business === wanted) : owned[0];
   return { owned, pick };
 }

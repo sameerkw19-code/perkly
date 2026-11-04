@@ -1,0 +1,44 @@
+/* Perkly for Clubs public page. Builds on landing.css; everything here is scoped under .lc. */
+.lc main { padding: 0; margin: 0; width: 100%; max-width: none; }
+.lc .lp-hero { background: radial-gradient(900px 480px at 80% 0%, #EDE7FF 0%, transparent 70%); }
+.lc-hero-text { display: flex; flex-direction: column; gap: 16px; align-items: flex-start; }
+.lc-ctas { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 22px; margin-top: 6px; }
+.lc .lc-talk { font-weight: 700; min-height: 44px; display: inline-flex; align-items: center; }
+.lc-free { font-weight: 700; color: var(--green); }
+.lc-points { display: flex; flex-direction: column; gap: 8px; color: var(--muted); }
+.lc-points li { display: flex; align-items: center; gap: 8px; }
+.lc-points svg { color: var(--p); flex: none; }
+.lc .lc-login { font-weight: 600; color: var(--ink); min-height: 44px; display: inline-flex; align-items: center; }
+
+/* Sample phone */
+.lc-phone { justify-self: center; width: min(340px, 100%); padding: 12px; border-radius: 44px; background: var(--ink); box-shadow: var(--shadow-lg); }
+.lc-screen { border-radius: 34px; background: #F7F6FC; padding: 44px 14px 26px; display: flex; flex-direction: column; gap: 12px; }
+.lc-card { border-radius: 22px; padding: 22px; min-height: 250px; display: flex; flex-direction: column; color: #fff; background: linear-gradient(150deg, #7558E8 0%, #4B2FC4 100%); }
+.lc-kind { font-size: 13px; opacity: .85; }
+.lc-club { font-family: var(--font-display); font-weight: 700; font-size: 19px; line-height: 1.3; }
+.lc-name { font-family: var(--font-display); font-weight: 800; font-size: 28px; line-height: 1.2; margin-top: 24px; }
+.lc-facts { margin-top: auto; padding-top: 22px; display: flex; flex-wrap: wrap; gap: 10px 22px; }
+.lc-facts span { display: flex; flex-direction: column; }
+.lc-facts small { font-size: 12px; opacity: .85; }
+.lc-facts b { font-size: 15px; }
+.lc-status { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px; border-radius: 16px; background: #DCF5E8; color: #0F6B45; font-weight: 800; font-size: 18px; }
+
+.lc-soft { background: #F3F0FF; }
+.lc-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 28px; }
+.lc-steps li { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; display: flex; flex-direction: column; gap: 8px; }
+.lc-steps h3, .lc-features h3 { margin: 0; font-family: var(--font-display); font-size: 20px; font-weight: 700; line-height: 1.3; }
+.lc-steps p, .lc-features p { color: var(--muted); }
+.lc-icon { width: 46px; height: 46px; border-radius: 14px; background: var(--p-soft); color: var(--p-strong); display: flex; align-items: center; justify-content: center; }
+.lc-features { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px 32px; margin-top: 28px; }
+.lc-features li { display: flex; flex-direction: column; gap: 6px; }
+.lc-features svg { color: var(--p-strong); }
+.lc .lc-btn-light { background: #fff; color: var(--p-strong); }
+.lc .lc-btn-light:hover { background: #F0EBFF; color: var(--p-strong); }
+.lc .lp-final .lp-h2 { color: #fff; }
+.lc-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 28px; padding-block: 28px; font-size: 15px; }
+@media (max-width: 900px) {
+  .lc-steps, .lc-features { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 520px) {
+  .lc .lc-login, .lc .lp-header .lp-btn { display: none; }
+}

@@ -11,6 +11,8 @@ declare namespace Cloudflare {
     POLAR_ACCESS_TOKEN?: string;
     POLAR_PRODUCT_ID?: string;
     POLAR_PRODUCT_ID_YEARLY?: string;
+    /** The Perkly for Clubs product. Without it clubs can use the free places but cannot subscribe. */
+    POLAR_PRODUCT_ID_CLUBS?: string;
     POLAR_WEBHOOK_SECRET?: string;
     POLAR_SANDBOX?: string;
     /** Full Google Wallet loyalty class id, exactly as Google lists it. */

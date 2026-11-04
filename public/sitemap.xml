@@ -30,4 +30,22 @@
   <url>
     <loc>https://perkly.shop/accessibility</loc>
   </url>
+  <url>
+    <loc>https://perkly.shop/clubs</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://perkly.shop/clubs"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://perkly.shop/clubs/ar"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://perkly.shop/clubs/en"/>
+  </url>
+  <url>
+    <loc>https://perkly.shop/clubs/ar</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://perkly.shop/clubs"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://perkly.shop/clubs/ar"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://perkly.shop/clubs/en"/>
+  </url>
+  <url>
+    <loc>https://perkly.shop/clubs/en</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://perkly.shop/clubs"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://perkly.shop/clubs/ar"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://perkly.shop/clubs/en"/>
+  </url>
 </urlset>

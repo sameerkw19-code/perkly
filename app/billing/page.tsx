@@ -15,7 +15,8 @@ export default async function BillingPage() {
   const user = await currentUser();
   if (!user) redirect("/login");
   const db = getD1();
-  const memberships = (await getMemberships(db, user.id)).filter((m) => m.role === "owner");
+  // Clubs have their own plan, on the /club page.
+  const memberships = (await getMemberships(db, user.id)).filter((m) => m.role === "owner" && m.product !== "club");
   const subs = await db
     .prepare(
       `SELECT b.id, b.name, s.status, s.plan, s.current_period_end AS periodEnd, b.comp_until AS compUntil, b.kit_due AS kitDue, b.kit_sent AS kitSent

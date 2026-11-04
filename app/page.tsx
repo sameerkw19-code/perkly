@@ -23,6 +23,9 @@ export default async function Page() {
   const user = await currentUser();
   if (!user) return <Landing lang="he" />;
   // Signed in but no business yet (or the setup was left halfway): continue the guided setup.
-  if ((await getMemberships(getD1(), user.id)).length === 0) redirect("/start");
+  const memberships = await getMemberships(getD1(), user.id);
+  if (memberships.length === 0) redirect("/start");
+  // Perkly for Clubs has its own dashboard.
+  if (memberships.every((m) => m.product === "club")) redirect("/club");
   return <Dashboard />;
 }

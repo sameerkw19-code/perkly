@@ -54,7 +54,7 @@ export default {
       headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
     }
     // Card links carry a secret in the path: never send it to other sites.
-    if (url.pathname.startsWith("/c/") || url.pathname.startsWith("/invite/")) {
+    if (url.pathname.startsWith("/c/") || url.pathname.startsWith("/m/") || url.pathname.startsWith("/invite/")) {
       headers.set("Referrer-Policy", "no-referrer");
       headers.set("Cache-Control", "no-store");
     }
@@ -76,5 +76,9 @@ export default {
       runScheduled(env.DB, env as unknown as Record<string, string | undefined>),
     );
     ctx.waitUntil(run.catch((e) => console.error("scheduled run failed:", e)));
+    const clubs = import("../lib/server/club").then(({ retryMemberPasses }) =>
+      retryMemberPasses(env.DB, env as unknown as Record<string, string | undefined>),
+    );
+    ctx.waitUntil(clubs.catch((e) => console.error("club wallet run failed:", e)));
   },
 };

@@ -3,7 +3,7 @@
 // so deploying this code before Google approves the account changes nothing for customers.
 
 import { base64url } from "./crypto";
-import { classBody, lookFields, type ClassLook, type PassLook } from "../wallet-look";
+import { classBody, lookFields, memberFields, type ClassLook, type MemberPass, type PassLook } from "../wallet-look";
 
 export type WalletConfig = { issuerId: string; serviceEmail: string; privateKeyPem: string; classId: string };
 
@@ -224,6 +224,41 @@ export async function updateLoyaltyObject(config: WalletConfig, card: LoyaltyCar
     return "updated";
   } catch (e) {
     console.warn(`google wallet update failed: ${(e as Error).message}`);
+    return "failed";
+  }
+}
+
+// ---- Perkly for Clubs: member passes ----
+
+export function memberObjectId(config: WalletConfig, memberId: string): string {
+  return `${config.issuerId}.m_${safeId(memberId)}`;
+}
+
+/** Signs the "save to Google Wallet" token for a club member. Returns the full save URL. */
+export async function memberSaveUrl(config: WalletConfig, memberId: string, pass: MemberPass, origin: string): Promise<string> {
+  const object = { id: memberObjectId(config, memberId), classId: config.classId, ...memberFields(pass) };
+  const now = Math.floor(Date.now() / 1000);
+  const token = await signJwt(config, { iss: config.serviceEmail, aud: "google", typ: "savetowallet", iat: now, origins: [origin], payload: { loyaltyObjects: [object] } });
+  return `https://pay.google.com/gp/v/save/${token}`;
+}
+
+/** Pushes a member's current details to a pass. Never throws, so a Google outage can't block the club. */
+export async function updateMemberObject(config: WalletConfig, memberId: string, pass: MemberPass): Promise<UpdateResult> {
+  try {
+    const token = await accessToken(config);
+    const r = await fetch(`${API}/loyaltyObject/${encodeURIComponent(memberObjectId(config, memberId))}`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(memberFields(pass)),
+    });
+    if (r.status === 404) return "not_saved";
+    if (!r.ok) {
+      console.warn(`google wallet member update failed: HTTP ${r.status}`);
+      return "failed";
+    }
+    return "updated";
+  } catch (e) {
+    console.warn(`google wallet member update failed: ${(e as Error).message}`);
     return "failed";
   }
 }

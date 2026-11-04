@@ -32,9 +32,9 @@ function validTarget(v: unknown): v is number {
 
 async function loadBusiness(db: D1Database, id: string) {
   const row = await db
-    .prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays, social FROM businesses WHERE id = ?")
+    .prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays, social, product FROM businesses WHERE id = ?")
     .bind(id)
-    .first<Omit<Business, "social"> & { social: string | null }>();
+    .first<Omit<Business, "social"> & { social: string | null; product: string }>();
   return row ? { ...row, social: parseSocial(row.social) } : null;
 }
 
@@ -70,7 +70,8 @@ export async function GET(request: Request) {
   if (!user) return fail("signin", 401, "Sign in required");
 
   const url = new URL(request.url);
-  const memberships = await getMemberships(db, user.id);
+  // Clubs live in /club (app/api/club). The stamp screens never see them.
+  const memberships = (await getMemberships(db, user.id)).filter((m) => m.product !== "club");
   const wanted = url.searchParams.get("business");
   const membership = memberships.find((m) => m.business === wanted) ?? memberships[0];
   // The admin control center is not linked from the site, so nothing here says who is an admin.
@@ -291,6 +292,7 @@ export async function POST(request: Request) {
   if (!membership) return fail("not_found", 404, "Business not found");
   const role = membership.role;
   const business = (await loadBusiness(db, p.business as string))!;
+  if (business.product === "club") return fail("not_found", 404, "Business not found");
   const ownerOnly = () => (role === "owner" ? null : fail("forbidden", 403, "Owner permission required"));
   // Access rules. Redeeming a reward a customer already earned is always allowed.
   // - No subscription: free up to FREE_CUSTOMERS customers; beyond that no new stamps, adjustments or customers.

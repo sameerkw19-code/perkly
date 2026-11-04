@@ -5,7 +5,7 @@ const SESSION_DAYS = 30;
 
 export type User = { id: string; email: string; name: string };
 export type Role = "owner" | "staff";
-export type Membership = { business: string; role: Role; businessName: string; branch: string | null };
+export type Membership = { business: string; role: Role; businessName: string; branch: string | null; product: string };
 
 export function readCookie(cookieHeader: string | null, name: string): string | null {
   if (!cookieHeader) return null;
@@ -72,7 +72,7 @@ export async function getUser(db: D1Database, cookieHeader: string | null): Prom
 export async function getMemberships(db: D1Database, userId: string): Promise<Membership[]> {
   const rows = await db
     .prepare(
-      `SELECT m.business, m.role, m.branch, b.name AS businessName FROM memberships m
+      `SELECT m.business, m.role, m.branch, b.name AS businessName, b.product FROM memberships m
        JOIN businesses b ON b.id = m.business
        WHERE m.user = ? AND m.revoked IS NULL AND b.archived IS NULL ORDER BY b.created`,
     )

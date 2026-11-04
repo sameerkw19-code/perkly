@@ -41,16 +41,19 @@ export type Access =
 export async function businessAccess(db: D1Database, businessId: string, now = new Date().toISOString()): Promise<Access> {
   const row = await db
     .prepare(
-      `SELECT b.suspended, b.comp_until, s.status FROM businesses b
+      `SELECT b.suspended, b.comp_until, b.product, s.status FROM businesses b
        LEFT JOIN subscriptions s ON s.business = b.id WHERE b.id = ?`,
     )
     .bind(businessId)
-    .first<{ suspended: string | null; comp_until: string | null; status: string | null }>();
+    .first<{ suspended: string | null; comp_until: string | null; product: string; status: string | null }>();
   if (!row) return { ok: false, code: "subscription_required" };
   if (row.suspended) return { ok: false, code: "business_suspended" };
   if (row.comp_until && row.comp_until > now) return { ok: true };
   if (row.status === null || isEntitled(row.status)) return { ok: true };
-  const count = await db
+  const count = row.product === "club"
+    // Clubs add every member themselves. Removed members count too, so removing does not free up places.
+    ? await db.prepare("SELECT COUNT(*) AS n FROM club_members WHERE business = ?").bind(businessId).first<{ n: number }>()
+    : await db
     // Every customer ever added counts, so removing customers does not free up places. The exception:
     // someone who joined by the public QR and never got a stamp (otherwise strangers could fill the places).
     .prepare(

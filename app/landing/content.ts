@@ -193,6 +193,7 @@ const he = {
     login: "כניסה לבעלי עסקים",
     contact: "דברו איתנו",
     links: "כל הקישורים",
+    clubs: "כרטיסי חבר למועדונים",
     rights: "© 2026 Perkly",
   },
 };
@@ -377,6 +378,7 @@ const ar: Copy = {
     login: "دخول أصحاب المشاريع",
     contact: "تحدثوا معنا",
     links: "كل الروابط",
+    clubs: "بطاقات عضوية للنوادي",
     rights: "© 2026 Perkly",
   },
 };
@@ -559,6 +561,7 @@ const en: Copy = {
     login: "Business sign-in",
     contact: "Talk to us",
     links: "All links",
+    clubs: "Member cards for clubs",
     rights: "© 2026 Perkly",
   },
 };

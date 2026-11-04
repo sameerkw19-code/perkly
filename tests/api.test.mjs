@@ -675,3 +675,111 @@ test("deleting an account: staff can, an owner of an active business is told to 
   assert.equal((await solo.get("/api/loyalty")).status, 401, "signed out");
   assert.equal((await new Client().post("/api/auth", { action: "login", email, password: "solo pass 12" })).status, 401, "cannot sign in again");
 });
+
+// ---- Perkly for Clubs ----
+const inDays = (n) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+
+test("clubs: an owner opens a club and adds members; each has a private card", async () => {
+  const owner = new Client();
+  await signup(owner, "club-owner");
+  const created = await owner.post("/api/club", { action: "create_club", name: "Iron Gym", color: "#17132B" });
+  assert.equal(created.status, 200, JSON.stringify(created.body));
+  const club = created.body.id;
+
+  const added = await owner.post("/api/club", { business: club, action: "add_member", name: "Dana Levi", phone: "052-123-4567", plan: "Yearly", validUntil: inDays(100) });
+  assert.equal(added.status, 200, JSON.stringify(added.body));
+  assert.equal(added.body.member.memberNo, 1);
+  assert.equal(added.body.member.phone, "+972521234567");
+  const second = await owner.post("/api/club", { business: club, action: "add_member", name: "Omar", validUntil: inDays(-3) });
+  assert.equal(second.body.member.memberNo, 2);
+
+  const path = new URL(added.body.link).pathname;
+  const card = await owner.get(path);
+  assert.equal(card.status, 200);
+  assert.match(card.text, /Dana Levi/);
+  assert.match(card.text, /Iron Gym/);
+  assert.doesNotMatch(card.text, /521234567/, "the phone number is never on the card");
+
+  const list = await owner.get(`/api/club?business=${club}`);
+  assert.equal(list.body.members.length, 2);
+  assert.equal(JSON.stringify(list.body).includes("card_hash"), false);
+
+  // Bad details are refused.
+  assert.equal((await owner.post("/api/club", { business: club, action: "add_member", name: "X", validUntil: "2026-02-31" })).body.code, "bad_date");
+  assert.equal((await owner.post("/api/club", { business: club, action: "add_member", name: "X", phone: "123", validUntil: inDays(5) })).body.code, "bad_phone");
+  assert.equal((await owner.post("/api/club", { business: club, action: "add_member", name: "", validUntil: inDays(5) })).body.code, "bad_name");
+
+  // Renewing changes the date on the card.
+  const date = inDays(400);
+  const renewed = await owner.post("/api/club", { business: club, action: "update_member", member: added.body.member.id, name: "Dana Levi", phone: "", plan: "Yearly", validUntil: date });
+  assert.equal(renewed.status, 200, JSON.stringify(renewed.body));
+  const [y, m, d] = date.split("-");
+  assert.match((await owner.get(path)).text, new RegExp(`${d}/${m}/${y}`));
+
+  // A new link replaces the old one.
+  const fresh = await owner.post("/api/club", { business: club, action: "new_link", member: added.body.member.id });
+  assert.equal(fresh.status, 200);
+  assert.doesNotMatch((await owner.get(path)).text, /Dana Levi/);
+  const freshPath = new URL(fresh.body.link).pathname;
+  assert.match((await owner.get(freshPath)).text, /Dana Levi/);
+
+  // Removing a member ends the card; the number is not given to anyone else.
+  assert.equal((await owner.post("/api/club", { business: club, action: "archive_member", member: added.body.member.id })).status, 200);
+  assert.doesNotMatch((await owner.get(freshPath)).text, /Dana Levi/);
+  assert.equal((await owner.get(`/api/club?business=${club}`)).body.members.length, 1);
+  const third = await owner.post("/api/club", { business: club, action: "add_member", name: "Lea", validUntil: inDays(30) });
+  assert.equal(third.body.member.memberNo, 3);
+});
+
+test("clubs: other owners and signed-out visitors get nothing; stamps and clubs stay apart", async () => {
+  const owner = new Client();
+  const stranger = new Client();
+  await signup(owner, "club-owner2");
+  await signup(stranger, "club-stranger");
+  const club = (await owner.post("/api/club", { action: "create_club", name: "Yoga Place", color: "#0F766E" })).body.id;
+  const member = (await owner.post("/api/club", { business: club, action: "add_member", name: "Noa", validUntil: inDays(30) })).body.member;
+
+  assert.equal((await new Client().get(`/api/club?business=${club}`)).status, 401);
+  const seen = await stranger.get(`/api/club?business=${club}`);
+  assert.equal(seen.body.club, null);
+  assert.equal((await stranger.post("/api/club", { business: club, action: "update_member", member: member.id, name: "Hacked", validUntil: inDays(900) })).status, 404);
+  assert.equal((await stranger.post("/api/club", { business: club, action: "archive_member", member: member.id })).status, 404);
+
+  // A request from another site is refused.
+  assert.equal((await owner.post("/api/club", { business: club, action: "new_link", member: member.id }, { origin: "https://evil.example" })).status, 403);
+
+  // A stamp business is not a club, and a club does not answer to stamp actions.
+  const stamps = (await owner.post("/api/loyalty", { action: "create_business", name: "Cafe", reward: "Coffee", target: 5, color: "#7558E8" })).body.id;
+  assert.equal((await owner.post("/api/club", { business: stamps, action: "add_member", name: "Nope", validUntil: inDays(5) })).status, 404);
+  assert.equal((await owner.post("/api/loyalty", { business: club, action: "register_customer", name: "Nope", phone: "0521234567" })).status, 404);
+  const lists = await owner.get("/api/loyalty");
+  assert.equal(lists.body.memberships.some((m) => m.business === club), false);
+  assert.equal((await owner.get("/api/club")).body.hasStamps, true);
+});
+
+test("clubs: the free places run out, and removing a member does not free one", async () => {
+  const owner = new Client();
+  await signup(owner, "club-owner3");
+  const club = (await owner.post("/api/club", { action: "create_club", name: "Small Club", color: "#7558E8" })).body.id;
+  const sub = await owner.get(`/api/club?business=${club}`);
+  if (!sub.body.access.free) return; // Only when the site runs with subscriptions required.
+  let first;
+  for (let i = 0; i < 10; i++) {
+    const r = await owner.post("/api/club", { business: club, action: "add_member", name: `M${i}`, validUntil: inDays(30) });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    first ??= r.body.member;
+  }
+  assert.equal((await owner.post("/api/club", { business: club, action: "add_member", name: "Over", validUntil: inDays(30) })).status, 402);
+  await owner.post("/api/club", { business: club, action: "archive_member", member: first.id });
+  assert.equal((await owner.post("/api/club", { business: club, action: "add_member", name: "Over", validUntil: inDays(30) })).status, 402);
+});
+
+test("clubs: the public pages open for everyone and the card page has no secrets in links", async () => {
+  const visitor = new Client();
+  for (const path of ["/clubs", "/clubs/ar", "/clubs/en"]) assert.equal((await visitor.get(path)).status, 200, path);
+  assert.equal((await visitor.get("/club")).status, 200);
+  const res = await fetch(BASE + "/m/not-a-real-card");
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("referrer-policy"), "no-referrer");
+  assert.equal(res.headers.get("cache-control"), "no-store");
+});

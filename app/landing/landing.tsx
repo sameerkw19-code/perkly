@@ -306,6 +306,7 @@ export default function Landing({ lang }: { lang: Lang }) {
             <SocialRow lang={lang} />
           </div>
           <nav aria-label={c.footer.nav} className="lp-footer-links">
+            <a href={lang === "he" ? "/clubs" : `/clubs/${lang}`}>{c.footer.clubs}</a>
             <a href={h.terms}>{c.footer.terms}</a>
             <a href={h.privacy}>{c.footer.privacy}</a>
             <a href={h.accessibility}>{c.footer.accessibility}</a>

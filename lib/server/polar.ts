@@ -9,6 +9,8 @@ export type PolarEnv = {
   POLAR_PRODUCT_ID?: string;
   /** Optional: the yearly product (999 ILS a year, counter kit included). Without it only the monthly plan is offered. */
   POLAR_PRODUCT_ID_YEARLY?: string;
+  /** Optional: the Perkly for Clubs product. Without it clubs can't subscribe yet. */
+  POLAR_PRODUCT_ID_CLUBS?: string;
   POLAR_WEBHOOK_SECRET?: string;
   POLAR_SANDBOX?: string;
 };
@@ -22,6 +24,11 @@ export function yearlyConfigured(env: PolarEnv): boolean {
   return polarConfigured(env) && !!env.POLAR_PRODUCT_ID_YEARLY;
 }
 
+/** Whether Perkly for Clubs can be sold: billing works and the clubs product is set. */
+export function clubPlanConfigured(env: PolarEnv): boolean {
+  return polarConfigured(env) && !!env.POLAR_PRODUCT_ID_CLUBS;
+}
+
 function apiBase(env: PolarEnv): string {
   return env.POLAR_SANDBOX === "1" ? "https://sandbox-api.polar.sh/v1" : "https://api.polar.sh/v1";
 }
@@ -30,10 +37,10 @@ function apiBase(env: PolarEnv): string {
  * Creates a hosted Polar checkout for one business. Returns the URL to redirect the owner to.
  * `from: "start"` returns the owner to the guided setup (/start) instead of the billing page.
  */
-export async function createCheckoutUrl(env: PolarEnv, businessId: string, origin: string, customerEmail: string, from: "billing" | "start" = "billing", trialDays = 0, plan: "monthly" | "yearly" = "monthly"): Promise<string> {
+export async function createCheckoutUrl(env: PolarEnv, businessId: string, origin: string, customerEmail: string, from: "billing" | "start" | "club" = "billing", trialDays = 0, plan: "monthly" | "yearly" | "club" = "monthly"): Promise<string> {
   const b = encodeURIComponent(businessId);
-  const success = from === "start" ? `${origin}/start?paid=1&b=${b}` : `${origin}/billing?ok=1`;
-  const back = from === "start" ? `${origin}/start?b=${b}` : `${origin}/billing`;
+  const success = from === "club" ? `${origin}/club?paid=1` : from === "start" ? `${origin}/start?paid=1&b=${b}` : `${origin}/billing?ok=1`;
+  const back = from === "club" ? `${origin}/club` : from === "start" ? `${origin}/start?b=${b}` : `${origin}/billing`;
   const response = await fetch(`${apiBase(env)}/checkouts/`, {
     method: "POST",
     headers: {
@@ -42,7 +49,7 @@ export async function createCheckoutUrl(env: PolarEnv, businessId: string, origi
       Accept: "application/json",
     },
     body: JSON.stringify({
-      products: [plan === "yearly" && env.POLAR_PRODUCT_ID_YEARLY ? env.POLAR_PRODUCT_ID_YEARLY : env.POLAR_PRODUCT_ID],
+      products: [plan === "club" ? env.POLAR_PRODUCT_ID_CLUBS : plan === "yearly" && env.POLAR_PRODUCT_ID_YEARLY ? env.POLAR_PRODUCT_ID_YEARLY : env.POLAR_PRODUCT_ID],
       // Free trial: the card is collected now and first charged when the trial ends.
       ...(trialDays > 0 ? { allow_trial: true, trial_interval: "day", trial_interval_count: trialDays } : {}),
       success_url: success,

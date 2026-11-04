@@ -64,3 +64,37 @@ export function classBody(id: string, look: ClassLook) {
     reviewStatus: "underReview",
   };
 }
+
+/** What a club member's pass shows. Dates are ready to display. */
+export type MemberPass = {
+  club: string;
+  memberNo: number;
+  name: string;
+  plan: string | null;
+  /** The last valid day as shown, for example 31/12/2026. */
+  validUntil: string;
+  /** When the pass stops being valid, as an ISO time. Google moves it to expired passes by itself. */
+  endsAt: string;
+  active: boolean;
+  /** The club removed this member. */
+  removed: boolean;
+};
+
+function phoneLabel(en: string, he: string, ar: string) {
+  return { defaultValue: { language: "en-US", value: en }, translatedValues: [{ language: "he", value: he }, { language: "iw", value: he }, { language: "ar", value: ar }] };
+}
+
+/** The Google Wallet fields of a member pass. Used when saving and when the club changes something. No barcode: the card is only shown. */
+export function memberFields(m: MemberPass) {
+  return {
+    state: m.removed ? "INACTIVE" : m.active ? "ACTIVE" : "EXPIRED",
+    accountId: String(m.memberNo),
+    accountName: m.name.slice(0, 80),
+    validTimeInterval: { end: { date: m.endsAt } },
+    // The shared class shows Perkly's name, so the club's name is always on the pass itself.
+    textModulesData: [{ id: "club", header: m.club.slice(0, 60), body: m.name.slice(0, 80) }],
+    loyaltyPoints: { label: "Valid until", localizedLabel: phoneLabel("Valid until", "בתוקף עד", "ساري حتى"), balance: { string: m.validUntil } },
+    ...(m.plan ? { secondaryLoyaltyPoints: { label: "Plan", localizedLabel: phoneLabel("Plan", "מסלול", "الباقة"), balance: { string: m.plan.slice(0, 40) } } } : {}),
+    linksModuleData: { uris: [{ id: "perkly", uri: "https://perkly.shop/clubs", description: "Powered by Perkly" }] },
+  };
+}

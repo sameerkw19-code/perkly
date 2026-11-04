@@ -35,6 +35,10 @@ export const businesses = sqliteTable(
     // Yearly plan: the counter kit is owed from the first yearly payment (kitDue) until an admin marks it shipped (kitSent).
     kitDue: text("kit_due"),
     kitSent: text("kit_sent"),
+    // 'stamps' = the stamp card; 'club' = Perkly for Clubs (member cards, see clubMembers).
+    product: text("product").notNull().default("stamps"),
+    // The club's logo (an id in assets). Clubs have no card editor.
+    clubLogo: text("club_logo"),
   },
   (t) => [uniqueIndex("businesses_join_code").on(t.joinCode)],
 );
@@ -73,6 +77,38 @@ export const customers = sqliteTable(
     uniqueIndex("business_phone").on(t.business, t.phone),
     uniqueIndex("customers_card_hash").on(t.cardHash),
     uniqueIndex("customers_scan_code").on(t.scanCode),
+  ],
+);
+
+// Perkly for Clubs: one row per member of a club. Separate from customers (no stamps, no rewards).
+export const clubMembers = sqliteTable(
+  "club_members",
+  {
+    id: text("id").primaryKey(),
+    business: text("business").notNull().references(() => businesses.id),
+    // Shown on the card. Goes up within a club and is never reused.
+    memberNo: integer("member_no").notNull(),
+    name: text("name").notNull(),
+    // Normalized phone, only so the club can send the card link. Never shown on the card.
+    phone: text("phone"),
+    plan: text("plan"),
+    // Last valid day (YYYY-MM-DD, Israel time).
+    validUntil: text("valid_until").notNull(),
+    // SHA-256 of the secret card link. The secret itself is never stored.
+    cardHash: text("card_hash"),
+    // When the member last opened "Add to Google Wallet". Only these passes get updates.
+    googleWallet: text("google_wallet"),
+    // Set when a pass still needs the latest details (retried by the cron run).
+    walletDirty: text("wallet_dirty"),
+    created: text("created").notNull(),
+    updated: text("updated").notNull(),
+    // Set when the club removes the member. Card link stops working.
+    archived: text("archived"),
+  },
+  (t) => [
+    uniqueIndex("club_members_no").on(t.business, t.memberNo),
+    uniqueIndex("club_members_card").on(t.cardHash),
+    index("club_members_dirty").on(t.walletDirty),
   ],
 );
 
