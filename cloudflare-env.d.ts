@@ -27,5 +27,9 @@ declare namespace Cloudflare {
     /** Google Wallet. Issuer id is a Variable; the service-account JSON key is a Secret. */
     GOOGLE_WALLET_ISSUER_ID?: string;
     GOOGLE_WALLET_SA_KEY?: string;
+    APPLE_PASS_KEY?: string;
+    APPLE_PASS_TYPE_ID?: string;
+    APPLE_TEAM_ID?: string;
+    APPLE_PASS_CERT?: string;
   }
 }

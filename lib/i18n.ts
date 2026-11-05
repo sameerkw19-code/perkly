@@ -240,6 +240,7 @@ const words: Record<string, Entry> = {
   bmonth: ["חודש", "الشهر", "Month"],
   birthdayHint: ["נשמור רק יום וחודש, בלי שנה. נשתמש בזה למתנה ביום ההולדת.", "نحفظ اليوم والشهر فقط بدون السنة. سنستخدمه لهدية عيد الميلاد.", "We store only the day and month, without the year. Used for a birthday gift."],
   walletAddGoogle: ["הוספה ל-Google Wallet", "الإضافة إلى Google Wallet", "Add to Google Wallet"],
+  walletAddApple: ["הוספה ל-Apple Wallet", "الإضافة إلى Apple Wallet", "Add to Apple Wallet"],
   saveLinkHint: ["שמרו את הקישור הזה (מועדפים או מסך הבית). הוא הכרטיס שלכם.", "احفظ هذا الرابط (المفضلة أو الشاشة الرئيسية). هذه بطاقتك.", "Save this link (bookmark or home screen). It is your card."],
 
   // Customers
@@ -641,6 +642,7 @@ const CARD_EXTRA: Record<string, [ru: string, de: string, fr: string]> = {
   walletHintIOS: ["Добавление в Apple Wallet пока недоступно.", "Das Hinzufügen zu Apple Wallet ist noch nicht verfügbar.", "L'ajout à Apple Wallet n'est pas encore disponible."],
   walletHint: ["Добавление в Apple Wallet и Google Wallet пока недоступно.", "Das Hinzufügen zu Apple Wallet und Google Wallet ist noch nicht verfügbar.", "L'ajout à Apple Wallet et Google Wallet n'est pas encore disponible."],
   walletAddGoogle: ["Добавить в Google Wallet", "Zu Google Wallet hinzufügen", "Ajouter à Google Wallet"],
+  walletAddApple: ["Добавить в Apple Wallet", "Zu Apple Wallet hinzufügen", "Ajouter à Apple Wallet"],
   saveLinkHint: ["Сохраните эту ссылку (закладки или главный экран). Это ваша карта.", "Speichern Sie diesen Link (Lesezeichen oder Startbildschirm). Das ist Ihre Karte.", "Enregistrez ce lien (favoris ou écran d'accueil). C'est votre carte."],
   rewardsAvail: ["Наград доступно: {n}", "{n} Prämien verfügbar", "{n} récompenses disponibles"],
   refresh: ["Обновить", "Aktualisieren", "Actualiser"],
