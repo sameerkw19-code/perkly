@@ -455,3 +455,41 @@ test("birthday dates in Israel time, Feb 29 in other years", async () => {
   assert.deepEqual(birthdayKeys("02-28", 2028), ["02-28"]);
   assert.deepEqual(birthdayKeys("07-01", 2026), ["07-01"]);
 });
+
+// ---- Apple Wallet: zip, signature pieces and pass token ----
+
+test("apple wallet: stored zip with correct CRC-32", async () => {
+  const { zip, crc32 } = await import("../lib/server/apple-pass.ts");
+  assert.equal(crc32(new TextEncoder().encode("123456789")), 0xcbf43926);
+  const z = zip([{ name: "a.txt", data: new TextEncoder().encode("hi") }]);
+  assert.equal(new DataView(z.buffer).getUint32(0, true), 0x04034b50, "local file header");
+  assert.equal(new DataView(z.buffer).getUint32(z.length - 22, true), 0x06054b50, "end of central directory");
+});
+
+test("apple wallet: signer comes from the pass certificate (issuer = Apple WWDR G4)", async () => {
+  const { issuerAndSerial, pemToDer, rgb } = await import("../lib/server/apple-pass.ts");
+  const { PASS_CERT_PEM } = await import("../lib/server/apple-certs.ts");
+  const ias = issuerAndSerial(pemToDer(PASS_CERT_PEM));
+  const text = new TextDecoder("latin1").decode(ias);
+  assert.ok(text.includes("Apple Worldwide Developer Relations"), "issuer name");
+  assert.equal(ias[0], 0x30);
+  assert.equal(rgb("#7558E8"), "rgb(117, 88, 232)");
+  assert.equal(rgb("bad"), "rgb(30, 27, 46)");
+});
+
+test("apple wallet: off without the key; the pass token is stable per serial and checked exactly", async () => {
+  const { appleConfig, passToken, validToken } = await import("../lib/server/apple-token.ts");
+  assert.equal(appleConfig({}), null);
+  assert.equal(appleConfig({ APPLE_PASS_KEY: "not a key" }), null);
+  const cfg = appleConfig({ APPLE_PASS_KEY: "-----BEGIN PRIVATE KEY-----\nAAAA\n-----END PRIVATE KEY-----" });
+  assert.equal(cfg.passTypeId, "pass.shop.perkly.loyalty");
+  assert.equal(cfg.teamId, "MR969J2QHG");
+  const t1 = await passToken(cfg, "customer-1");
+  assert.equal(t1, await passToken(cfg, "customer-1"));
+  assert.notEqual(t1, await passToken(cfg, "customer-2"));
+  assert.ok(t1.length >= 16, "Apple needs at least 16 characters");
+  assert.equal(await validToken(cfg, "customer-1", `ApplePass ${t1}`), true);
+  assert.equal(await validToken(cfg, "customer-2", `ApplePass ${t1}`), false);
+  assert.equal(await validToken(cfg, "customer-1", null), false);
+  assert.equal(await validToken(cfg, "customer-1", t1), false, "needs the ApplePass scheme");
+});

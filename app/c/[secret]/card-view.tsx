@@ -13,7 +13,7 @@ import { Brand } from "../../../components/brand";
 
 type Card = { name: string; stamps: number; target: number; scan_code: string; design: Design; rewards: number; nextExpiry: string | null; business: string; links: { key: SocialKey; label: string; url: string }[] };
 
-export default function CardView({ card, secret, googleWallet, isIOS }: { card: Card | null; secret: string; googleWallet: boolean; isIOS: boolean }) {
+export default function CardView({ card, secret, googleWallet, appleWallet = false, isIOS }: { card: Card | null; secret: string; googleWallet: boolean; appleWallet?: boolean; isIOS: boolean }) {
   // The page's own chrome follows the visitor's site language; the card follows its business's languages.
   const { lang: siteLang, dir: siteDir } = useLang();
   const [picked, setPicked] = useState<Lang | null>(null);
@@ -100,7 +100,11 @@ export default function CardView({ card, secret, googleWallet, isIOS }: { card: 
             </section>
           )}
           <button className="btn soft wide" onClick={() => window.location.reload()}><RefreshCw size={16} />{t("refresh")}</button>
-          {googleWallet ? (
+          {appleWallet ? (
+            <a className="btn wide apple-wallet-btn" href={`/api/wallet/apple/${encodeURIComponent(secret)}`}>
+              <Wallet size={16} />{t("walletAddApple")}
+            </a>
+          ) : googleWallet ? (
             <a className="btn primary wide" href={`/api/wallet/google/${encodeURIComponent(secret)}`} target="_blank" rel="noreferrer">
               <Wallet size={16} />{t("walletAddGoogle")}
             </a>
