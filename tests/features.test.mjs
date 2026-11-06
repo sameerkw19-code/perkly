@@ -493,3 +493,14 @@ test("apple wallet: off without the key; the pass token is stable per serial and
   assert.equal(await validToken(cfg, "customer-1", null), false);
   assert.equal(await validToken(cfg, "customer-1", t1), false, "needs the ApplePass scheme");
 });
+
+test("apple wallet: stamps and new designs ask iPhones to refresh the pass", () => {
+  const read = (f) => readFileSync(new URL("../" + f, import.meta.url), "utf8");
+  const loyalty = read("app/api/loyalty/route.ts");
+  assert.match(loyalty, /pushAppleCustomer\(db, fresh\.id\)/);
+  assert.match(loyalty, /pushAppleBusiness\(db, business\.id\)/);
+  const push = read("lib/server/apple-push.ts");
+  assert.match(push, /apns-topic/);
+  assert.match(push, /status === 410/, "devices Apple says are gone are removed");
+  assert.ok(existsSync(new URL("../.github/workflows/apple-push-cert.yml", import.meta.url)));
+});
