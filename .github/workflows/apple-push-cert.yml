@@ -1,0 +1,51 @@
+# Uploads the Apple Wallet Pass Type ID certificate to Cloudflare as an mTLS client certificate, so the
+# Worker can send update pushes to Apple (binding APPLE_APNS in wrangler.jsonc).
+# Run once by hand (Actions > Upload Apple push certificate > Run workflow), and again after the
+# certificate is renewed. Needs the GitHub secret APPLE_PASS_KEY (the same private key as in Cloudflare)
+# and a CLOUDFLARE_API_TOKEN that may edit "SSL and Certificates".
+name: Upload Apple push certificate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Write the certificate and key
+        env:
+          APPLE_PASS_KEY: ${{ secrets.APPLE_PASS_KEY }}
+        run: |
+          if [ -z "$APPLE_PASS_KEY" ]; then echo "::error::Add the APPLE_PASS_KEY secret in GitHub (Settings > Secrets and variables > Actions)."; exit 1; fi
+          umask 077
+          node -e '
+            const fs = require("fs");
+            const src = fs.readFileSync("lib/server/apple-certs.ts", "utf8");
+            const cert = src.match(/PASS_CERT_PEM = `([^`]+)`/)[1].trim();
+            fs.writeFileSync("cert.pem", cert + "\n");
+            // The key may have been pasted on one line: rebuild a normal PEM.
+            const raw = process.env.APPLE_PASS_KEY;
+            const b64 = raw.replace(/-----[^-]+-----/g, "").replace(/\s+/g, "");
+            fs.writeFileSync("key.pem", "-----BEGIN PRIVATE KEY-----\n" + b64.match(/.{1,64}/g).join("\n") + "\n-----END PRIVATE KEY-----\n");
+          '
+          openssl x509 -in cert.pem -noout -subject -enddate
+          test "$(openssl x509 -in cert.pem -noout -modulus | md5sum)" = "$(openssl rsa -in key.pem -noout -modulus | md5sum)" || { echo "::error::APPLE_PASS_KEY does not match the certificate."; exit 1; }
+      - name: Upload to Cloudflare
+        run: npx wrangler mtls-certificate upload --cert cert.pem --key key.pem --name perkly-apple-pass
+      - name: Certificates on the account (copy the ID of perkly-apple-pass)
+        run: npx wrangler mtls-certificate list
+      - name: Clean up
+        if: always()
+        run: rm -f key.pem cert.pem

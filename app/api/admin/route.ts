@@ -4,6 +4,7 @@ import { getUser, isPlatformAdmin } from "../../../lib/server/auth";
 import { fail, json, readJson, sameOrigin, str } from "../../../lib/server/http";
 import { normalizeEmail } from "../../../lib/server/auth";
 import { cancelAtPeriodEnd } from "../../../lib/server/polar";
+import { applePushReady, pushTokens } from "../../../lib/server/apple-push";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,8 @@ const FOREVER = "9999-12-31T00:00:00.000Z";
 // Platform admin actions on one business. Every change is written to admin_log in the same batch.
 // Actions: suspend (with reason), unsuspend, grant_comp (free access for N days, or forever: true), clear_comp,
 // update_business (name, reward, target), transfer_owner (to an existing user by email), archive, restore,
-// kit_sent (the yearly plan's counter kit was shipped).
+// kit_sent (the yearly plan's counter kit was shipped), apple_push_test (refresh the business's Apple Wallet passes
+// now and return what Apple answered).
 export async function POST(request: Request) {
   const db = getD1();
   const user = await getUser(db, request.headers.get("cookie"));
@@ -36,6 +38,14 @@ export async function POST(request: Request) {
       .bind(crypto.randomUUID(), user.email, businessId, action, detail, nowIso);
 
   switch (body.action) {
+    case "apple_push_test": {
+      const rows = await db
+        .prepare("SELECT r.push_token FROM apple_registrations r JOIN customers c ON c.id = r.serial WHERE c.business = ? LIMIT 20")
+        .bind(businessId)
+        .all<{ push_token: string }>();
+      const results = applePushReady() ? await pushTokens(db, rows.results.map((r) => r.push_token)) : [];
+      return json({ ok: true, ready: applePushReady(), devices: rows.results.length, results });
+    }
     case "kit_sent": {
       // Yearly plan: marks the included counter kit as shipped. Only for a business that is owed one.
       const r = await db.prepare("UPDATE businesses SET kit_sent = ? WHERE id = ? AND kit_due IS NOT NULL AND kit_sent IS NULL").bind(nowIso, businessId).run();

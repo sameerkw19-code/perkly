@@ -5,6 +5,28 @@ import { LoyaltyCard } from "../../../../components/loyalty-card";
 import { useLang } from "../../../../lib/i18n";
 import type { Design } from "../../../../lib/design";
 
+/** Sends an Apple Wallet update push to every iPhone that saved this business's card, and shows Apple's answers. */
+export function ApplePushTest({ business }: { business: string }) {
+  const [busy, setBusy] = useState(false);
+  const [out, setOut] = useState("");
+  return (
+    <span>
+      <button className="btn soft small" disabled={busy} onClick={async () => {
+        setBusy(true);
+        const r = await post<{ ready: boolean; devices: number; results: { token: string; status: number; reason?: string }[] }>("/api/admin", { action: "apple_push_test", business });
+        setBusy(false);
+        if (!r.ok || !r.data) return setOut("הבדיקה נכשלה.");
+        const d = r.data;
+        if (!d.ready) return setOut(`שליחה ל-Apple עוד לא מחוברת. מכשירים רשומים: ${d.devices}.`);
+        if (!d.devices) return setOut("אין עדיין אייפון שנרשם לעדכונים של כרטיס בעסק הזה.");
+        const ok = d.results.filter((x) => x.status === 200).length;
+        setOut(`נשלחו ${ok} מתוך ${d.results.length}.` + (ok < d.results.length ? ` שגיאה: ${d.results.find((x) => x.status !== 200)?.status} ${d.results.find((x) => x.status !== 200)?.reason ?? ""}` : ""));
+      }}>{busy ? "שולח..." : "בדיקת עדכון Apple Wallet"}</button>
+      {out && <small className="muted" style={{ marginInlineStart: 8 }} role="status">{out}</small>}
+    </span>
+  );
+}
+
 /** Yearly plan: marks the included counter kit as shipped. */
 export function KitSentButton({ business }: { business: string }) {
   const [busy, setBusy] = useState(false);

@@ -11,6 +11,7 @@ import { releaseArchivedPhone } from "../../../lib/server/customers";
 import { businessAccess, freeLimitReached, hasPaidDesign } from "../../../lib/server/billing";
 import { formatBirthday, parseBirthday, upcomingKeys } from "../../../lib/birthday";
 import { syncGoogleWallet } from "../../../lib/server/wallet-sync";
+import { pushAppleBusiness, pushAppleCustomer } from "../../../lib/server/apple-push";
 import { walletConfig } from "../../../lib/server/google-wallet";
 import { getSettings } from "../../../lib/server/settings";
 import { normalizeSocial, parseSocial, type Social } from "../../../lib/social";
@@ -439,6 +440,8 @@ export async function POST(request: Request) {
             : ({ kind: "stamp", added, left: Math.max(0, fresh.target - fresh.stamps), name: fresh.name } as const)
           : undefined;
         syncGoogleWallet(db, fresh, card.rewards, new URL(request.url).origin, notice);
+        // Apple Wallet: the iPhones that saved this pass fetch the new one (no-op until push is set up).
+        pushAppleCustomer(db, fresh.id);
         return json({ ok: true, card, ...extra });
       };
       const refuse = async (code: string) => {
@@ -706,6 +709,7 @@ export async function POST(request: Request) {
         )
         .bind(now, origin, business.id)
         .run();
+      pushAppleBusiness(db, business.id);
       return json({ ok: true, version: live?.version, walletUpdates: queued.meta.changes ?? 0 });
     }
 

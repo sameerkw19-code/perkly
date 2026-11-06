@@ -31,5 +31,7 @@ declare namespace Cloudflare {
     APPLE_PASS_TYPE_ID?: string;
     APPLE_TEAM_ID?: string;
     APPLE_PASS_CERT?: string;
+    /** mTLS binding with the Pass Type ID certificate, for Apple Wallet update pushes. */
+    APPLE_APNS?: Fetcher;
   }
 }
