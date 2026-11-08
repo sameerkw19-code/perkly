@@ -7,7 +7,7 @@ import { cancelAtPeriodEnd } from "../../../lib/server/polar";
 import { applePushReady, pushTokens } from "../../../lib/server/apple-push";
 import { customerForPass } from "../../../lib/server/apple-wallet";
 import { passLook } from "../../../lib/server/designs";
-import { debugObjects, updateLoyaltyObject, walletConfig } from "../../../lib/server/google-wallet";
+import { debugObjects, objectSaved, updateLoyaltyObject, walletConfig } from "../../../lib/server/google-wallet";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +45,14 @@ export async function POST(request: Request) {
       // Pushes the current stamps to every Google Wallet pass saved for the business and returns Google's answer.
       const config = walletConfig(env);
       if (!config) return json({ ok: true, ready: false, saved: 0, results: [] });
+      // Passes Google has but our flag lost (an update before the customer tapped Save): mark them again.
+      const unflagged = await db
+        .prepare("SELECT id FROM customers WHERE business = ? AND google_wallet IS NULL AND archived IS NULL ORDER BY created DESC LIMIT 20")
+        .bind(businessId)
+        .all<{ id: string }>();
+      for (const { id } of unflagged.results) {
+        if (await objectSaved(config, id)) await db.prepare("UPDATE customers SET google_wallet = ? WHERE id = ?").bind(nowIso, id).run();
+      }
       const rows = await db
         .prepare("SELECT id FROM customers WHERE business = ? AND google_wallet IS NOT NULL AND archived IS NULL ORDER BY created DESC LIMIT 10")
         .bind(businessId)
@@ -58,7 +66,6 @@ export async function POST(request: Request) {
         const look = full ? (({ notice: _n, ...rest }) => rest)(full) : undefined;
         const detail: { status?: number; text?: string } = {};
         const result = await updateLoyaltyObject(config, { customerId: c.id, businessId: c.business, stamps: c.stamps, target: c.target, scanCode: c.scan_code, rewards: c.rewards, look: look as typeof full }, null, detail);
-        if (result === "not_saved") await db.prepare("UPDATE customers SET google_wallet = NULL WHERE id = ?").bind(c.id).run();
         results.push({ name: c.name, stamps: `${c.stamps}/${c.target}`, result, status: detail.status ?? 0, text: detail.text ?? "" });
       }
       return json({ ok: true, ready: true, saved: rows.results.length, results });

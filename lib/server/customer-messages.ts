@@ -18,6 +18,8 @@ const DEFAULT_BATCH = 12;
 /** A welcome waits this long for the customer to finish saving the pass, then is retried a few times. */
 export const WELCOME_DELAY_MS = 90_000;
 const WELCOME_TRIES = 8;
+/** How long after "Add to Google Wallet" a missing pass still counts as "not saved yet". */
+export const SAVE_GRACE_MS = 24 * 60 * 60_000;
 const RETRY_MS = 3 * 60_000;
 const FAIL_TRIES = 4;
 
@@ -163,8 +165,13 @@ export async function drainOutbox(db: D1Database, config: WalletConfig, nowIso: 
       );
       if (result === "updated") await finish(o.id, "sent");
       else if (result === "not_saved") {
-        await db.prepare("UPDATE customers SET google_wallet = NULL WHERE id = ?").bind(o.customer).run();
-        await finish(o.id, "not_saved");
+        // Not saved yet (Google creates the pass when the customer taps Save): keep trying for a day.
+        const fresh = o.google_wallet && Date.parse(nowIso) - Date.parse(o.google_wallet) < SAVE_GRACE_MS;
+        if (fresh && o.attempts + 1 < 30) await later(o.id, Math.min(30, 3 * 2 ** Math.min(o.attempts, 4)) * 60_000);
+        else {
+          await db.prepare("UPDATE customers SET google_wallet = NULL WHERE id = ?").bind(o.customer).run();
+          await finish(o.id, "not_saved");
+        }
       } else if (o.attempts + 1 < FAIL_TRIES + 2) await later(o.id, Math.min(60, 5 * 2 ** o.attempts) * 60_000);
       else await finish(o.id, "failed");
       continue;
