@@ -152,10 +152,10 @@ export function LoyaltyCard({ design, lang, stamps, target, customerName, reward
               <span className="pcard-logo-wrap">
                 <img className="pcard-logo" src={assetUrl(design.logo)!} alt={design.look.logoName ? "" : text.title} />
               </span>
-              {design.look.logoName && <strong className="pcard-title">{text.title}</strong>}
+              {design.look.logoName && design.showTitle && <strong className="pcard-title">{text.title}</strong>}
             </div>
           ) : (
-            <strong className="pcard-title">{text.title}</strong>
+            design.showTitle && <strong className="pcard-title">{text.title}</strong>
           )}
           {text.subtitle && <small className="pcard-sub">{text.subtitle}</small>}
         </div>
@@ -217,7 +217,7 @@ export function ApplePreview({ design, lang, stamps, target, customerName }: Pro
   return (
     <div className="wallet apple" dir={isRtl(cl) ? "rtl" : "ltr"} lang={cl} style={{ ...cardStyle(design), background: design.colors.bg, color: design.colors.fg }}>
       <div className="ap-top">
-        <div className="ap-logo">{design.logo ? <Logo design={design} title={text.title} className="card-logo small" /> : <b>{text.title}</b>}</div>
+        <div className="ap-logo">{design.logo ? <Logo design={design} title={text.title} className="card-logo small" /> : design.showTitle && <b>{text.title}</b>}</div>
         {design.showCustomerName && customerName && <div className="ap-f"><small style={label}>{t("customerName")}</small><b>{customerName}</b></div>}
       </div>
       <div className="ap-strip">

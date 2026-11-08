@@ -6,13 +6,15 @@
  */
 export type PassLook = {
   title: string;
+  /** Heading of the text block when it is not the card name (the business hid the name). */
+  header?: string;
   reward: string;
   /** Optional message shown as a second text block on the pass (card language only). */
   promo?: string;
   heroUrl: string | null;
   /** Google language tag of the first card language, and the same texts in the other languages the business picked. */
   language?: string;
-  translations?: { language: string; title: string; reward: string; promo?: string }[];
+  translations?: { language: string; title: string; header?: string; reward: string; promo?: string }[];
   /** The business's own class look, when its logo can be used (see passLook). */
   classLook?: ClassLook | null;
 };
@@ -28,7 +30,7 @@ export function lookFields(look: PassLook) {
   // Phones in another language show the business's text in that language; others show the first one.
   const localized = tr.length
     ? {
-        localizedHeader: { defaultValue: { language: lang, value: look.title }, translatedValues: tr.map((x) => ({ language: x.language, value: x.title })) },
+        localizedHeader: { defaultValue: { language: lang, value: look.header ?? look.title }, translatedValues: tr.map((x) => ({ language: x.language, value: x.header ?? x.title })) },
         localizedBody: { defaultValue: { language: lang, value: look.reward }, translatedValues: tr.map((x) => ({ language: x.language, value: x.reward })) },
       }
     : {};
@@ -37,7 +39,7 @@ export function lookFields(look: PassLook) {
       ? { heroImage: { sourceUri: { uri: look.heroUrl }, contentDescription: { defaultValue: { language: "en-US", value: look.title } } } }
       : {}),
     textModulesData: [
-      { id: "business", header: look.title, body: look.reward, ...localized },
+      { id: "business", header: look.header ?? look.title, body: look.reward, ...localized },
       ...(look.promo ? [{ id: "promo", body: look.promo, ...promoLocalized }] : []),
     ],
     linksModuleData: { uris: [{ id: "perkly", uri: "https://perkly.shop", description: "Powered by Perkly" }] },

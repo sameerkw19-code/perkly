@@ -3,6 +3,9 @@ import { assetIds, cardLang, defaultDesign, noticeOn, noticeText, sanitizeDesign
 /** Google Wallet language tags for each card language. */
 export const GOOGLE_TAG: Record<Lang, string> = { he: "he", ar: "ar", en: "en-US", ru: "ru", de: "de", fr: "fr" };
 
+/** Heading of the pass text block when the business hides the card name. */
+const REWARD_LABEL: Record<Lang, string> = { he: "ההטבה", ar: "المكافأة", en: "Reward", ru: "Награда", de: "Prämie", fr: "Récompense" };
+
 type BusinessLike = { id: string; name: string; reward: string; color: string };
 
 export async function publishedDesign(db: D1Database, businessId: string): Promise<{ design: Design; version: number; published: string } | null> {
@@ -63,7 +66,7 @@ export async function passLook(db: D1Database, business: BusinessLike, origin: s
   // The other languages the business picked, for phones that use them.
   const translations = design.langs.filter((l) => l !== first).map((l) => {
     const t = textsFor(design, l);
-    return { language: GOOGLE_TAG[l], title: (t.title || business.name).slice(0, 60), reward: (t.reward || business.reward).slice(0, 120), promo: t.promo.slice(0, 120) };
+    return { language: GOOGLE_TAG[l], title: (t.title || business.name).slice(0, 60), ...(design.showTitle ? {} : { header: REWARD_LABEL[l] }), reward: (t.reward || business.reward).slice(0, 120), promo: t.promo.slice(0, 120) };
   });
   // The business's own Wallet class needs its logo as PNG or JPEG (not WebP).
   let classLook: { name: string; color: string; logoUrl: string } | null = null;
@@ -90,6 +93,7 @@ export async function passLook(db: D1Database, business: BusinessLike, origin: s
   }
   return {
     title: (text.title || business.name).slice(0, 60),
+    ...(design.showTitle ? {} : { header: REWARD_LABEL[first] }),
     reward: (text.reward || business.reward).slice(0, 120),
     promo: text.promo.slice(0, 120),
     notice,

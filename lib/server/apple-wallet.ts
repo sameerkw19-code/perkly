@@ -132,7 +132,7 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
     webServiceURL: `${origin}/api/wallet/apple-ws`,
     organizationName: title,
     description: `${title} · ${reward}`.slice(0, 120),
-    ...(logo ? {} : { logoText: title }),
+    ...(logo || !design.showTitle ? {} : { logoText: title }),
     foregroundColor: rgb(design.colors.fg),
     labelColor: rgb(design.colors.fg),
     backgroundColor: rgb(design.colors.bg),

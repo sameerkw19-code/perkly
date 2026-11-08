@@ -714,10 +714,15 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
               </label>
             ))}
           </div>
-          <label className="check" style={{ marginTop: 14 }}>
+          <label className="check" style={{ display: "flex", marginTop: 14 }}>
             <input type="checkbox" checked={design.showCustomerName} onChange={(e) => set({ showCustomerName: e.target.checked })} />
             <span>{t("edShowName")}</span>
           </label>
+          <label className="check" style={{ display: "flex", marginTop: 8 }}>
+            <input type="checkbox" checked={design.showTitle} onChange={(e) => set({ showTitle: e.target.checked })} />
+            <span>{t("edShowTitle")}</span>
+          </label>
+          {!design.showTitle && <p className="form-hint">{t("edShowTitleHint")}</p>}
         </EdSection>
 
         <EdSection title={t("edChecks")} open>
