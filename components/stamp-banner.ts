@@ -130,21 +130,6 @@ function drawStamp(ctx: CanvasRenderingContext2D, d: Design, p: BannerPictures, 
   ctx.restore();
 }
 
-function drawGift(ctx: CanvasRenderingContext2D, d: Design, p: BannerPictures, x: number, y: number, size: number, ready: boolean) {
-  const color = d.look.stampStyle === "bright" ? GOLD : d.colors.stamp;
-  ctx.save();
-  circle(ctx, x, y, size);
-  ctx.lineWidth = 2.5;
-  ctx.strokeStyle = color;
-  if (ready) {
-    ctx.fillStyle = color;
-    ctx.fill();
-  }
-  ctx.stroke();
-  ctx.drawImage(ready ? p.giftOnFill : p.giftOnCard, x + size * 0.24, y + size * 0.24, size * 0.52, size * 0.52);
-  ctx.restore();
-}
-
 /** Letter spacing only for text without Hebrew or Arabic letters (it breaks Arabic joining and looks wrong in Hebrew). */
 const latinOnly = (s: string) => !/[\u0590-\u06FF\u0750-\u077F\uFB1D-\uFEFC]/.test(s);
 
@@ -153,83 +138,14 @@ function setSpacing(ctx: CanvasRenderingContext2D, px: number) {
   if ("letterSpacing" in ctx) (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${px}px`;
 }
 
-/** Draws the banner for `stamps` out of `target` in the card's first language. */
+/** Draws the Google Wallet banner for `stamps` out of `target`: the stamp grid, or the pizza. */
 export function drawStampBanner(ctx: CanvasRenderingContext2D, d: Design, p: BannerPictures, stamps: number, target: number) {
-  const lang: Lang = d.langs[0];
-  const text = textsFor(d, lang);
-  const rtl = isRtl(lang);
-  const family = FONTS[d.look.font].family;
   const W = BANNER_W, H = BANNER_H;
-
-  // Background: the card's color, plain (no gradient).
   ctx.fillStyle = d.colors.bg;
   ctx.fillRect(0, 0, W, H);
   if (usesPizza(d, target)) return drawPizzaBanner(ctx, d, p, stamps, target);
-
-  // Layout: one row up to 12 slots (stamps + gift), otherwise two rows with smaller stamps.
-  const slots = target + 1;
-  const rows = slots > 12 ? 2 : 1;
-  const perRow = Math.ceil(slots / rows);
-  const gap = rows === 1 ? 16 : 10;
-  const size = Math.min(rows === 1 ? 66 : 46, Math.floor((W - 120 - gap * (perRow - 1)) / perRow));
-  const titleSize = rows === 1 ? 38 : 30;
-  const countSize = rows === 1 ? 30 : 24;
-  const rewardSize = rows === 1 ? 24 : 20;
-  const rowsH = rows * size + (rows - 1) * gap;
-  const blockH = titleSize + 10 + countSize + 16 + rowsH + 16 + rewardSize;
-  let y = (H - blockH) / 2;
-
-  ctx.fillStyle = d.colors.fg;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "top";
-
-  // Title with a thin line on each side.
-  ctx.save();
-  ctx.direction = rtl ? "rtl" : "ltr";
-  ctx.font = `600 ${titleSize}px ${family}`;
-  const title = text.title.toLocaleUpperCase();
-  if (latinOnly(title)) setSpacing(ctx, rows === 1 ? 6 : 4);
-  const tw = Math.min(ctx.measureText(title).width, W - 260);
-  ctx.fillText(title, W / 2, y, W - 260);
-  ctx.globalAlpha = 0.45;
-  ctx.fillRect(W / 2 - tw / 2 - 24 - 130, y + titleSize / 2, 130, 1.5);
-  ctx.fillRect(W / 2 + tw / 2 + 24, y + titleSize / 2, 130, 1.5);
-  ctx.restore();
-  y += titleSize + 10;
-
-  // Count, always left to right ("03 / 09").
-  ctx.save();
-  ctx.direction = "ltr";
-  ctx.font = `500 ${countSize}px ${family}`;
-  setSpacing(ctx, 4);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  ctx.fillText(`${pad(Math.min(stamps, target))} / ${pad(target)}`, W / 2, y);
-  ctx.restore();
-  y += countSize + 16;
-
-  // Stamps, filled from the start of the reading direction; the gift is the last slot.
-  for (let i = 0; i < slots; i++) {
-    const row = Math.floor(i / perRow);
-    const inRow = Math.min(perRow, slots - row * perRow);
-    const col = i % perRow;
-    const rowW = inRow * size + (inRow - 1) * gap;
-    const start = (W - rowW) / 2;
-    const pos = rtl ? inRow - 1 - col : col;
-    const x = start + pos * (size + gap);
-    const sy = y + row * (size + gap);
-    if (i === target) drawGift(ctx, d, p, x, sy, size, stamps >= target);
-    else drawStamp(ctx, d, p, x, sy, size, i < stamps);
-  }
-  y += rowsH + 16;
-
-  // Reward line.
-  ctx.save();
-  ctx.direction = rtl ? "rtl" : "ltr";
-  ctx.font = `500 ${rewardSize}px ${family}`;
-  if (latinOnly(text.reward)) setSpacing(ctx, 3);
-  ctx.globalAlpha = 0.9;
-  ctx.fillText(text.reward, W / 2, y, W - 120);
-  ctx.restore();
+  // Same stamp grid as the Apple Wallet strip, so both wallets look alike.
+  drawStampGrid(ctx, d, p, stamps, target, W, H);
 }
 
 /** Pizza progress: the pizza on the starting side, title, count and reward beside it. */
@@ -353,35 +269,68 @@ export async function makeStampBanners(design: Design, target: number): Promise<
 
 // ---- Apple Wallet strip ----
 
-/** Apple Wallet strip size (pixels, @3x) for a store card with a QR code: 375×123 points. */
+/** Apple Wallet strip size (pixels, @3x) for a store card: 375×144 points. */
 export const APPLE_W = 1125;
-export const APPLE_H = 369;
+export const APPLE_H = 432;
+
+const FREE_GREEN = "#3FAE49";
+
+/** The reward slot: an empty stamp with a tilted "FREE" mark over it (filled once the reward is reached). */
+function drawFreeSlot(ctx: CanvasRenderingContext2D, d: Design, p: BannerPictures, x: number, y: number, size: number, ready: boolean, label: string) {
+  drawStamp(ctx, d, p, x, y, size, ready);
+  const family = FONTS[d.look.font].family;
+  ctx.save();
+  ctx.translate(x + size / 2, y + size * 0.62);
+  ctx.rotate(-0.17);
+  let font = Math.round(size * 0.3);
+  ctx.font = `700 ${font}px ${family}`;
+  // Long labels shrink to fit the stamp.
+  while (font > 10 && ctx.measureText(label).width > size * 0.95) { font -= 1; ctx.font = `700 ${font}px ${family}`; }
+  const tw = ctx.measureText(label).width;
+  const bw = tw + font * 0.6, bh = font * 1.25;
+  ctx.fillStyle = "rgba(0,0,0,.35)";
+  ctx.fillRect(-bw / 2, -bh / 2, bw, bh);
+  ctx.strokeStyle = FREE_GREEN;
+  ctx.lineWidth = Math.max(2, font * 0.09);
+  ctx.strokeRect(-bw / 2, -bh / 2, bw, bh);
+  ctx.fillStyle = FREE_GREEN;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.direction = "ltr";
+  ctx.fillText(label, 0, font * 0.05);
+  ctx.restore();
+}
 
 /**
- * The Apple Wallet strip: only the stamps, in rows, on the card's color (the pass shows the logo,
- * name and counts as its own fields). The reward slot is the last one.
+ * The stamps alone, in rows of five, left to right, the reward slot last (as on wallet loyalty cards).
+ * Same grid on Apple Wallet (strip) and Google Wallet (banner), sized to the picture.
  */
-export function drawAppleStrip(ctx: CanvasRenderingContext2D, d: Design, p: BannerPictures, stamps: number, target: number) {
-  const rtl = isRtl(d.langs[0]);
-  const W = APPLE_W, H = APPLE_H;
+export function drawStampGrid(ctx: CanvasRenderingContext2D, d: Design, p: BannerPictures, stamps: number, target: number, W: number, H: number) {
   ctx.fillStyle = d.colors.bg;
   ctx.fillRect(0, 0, W, H);
   const slots = target + 1;
-  const rows = slots <= 6 ? 1 : slots <= 14 ? 2 : 3;
-  const perRow = Math.ceil(slots / rows);
-  const padX = 48, padY = 22;
-  const cellW = (W - padX * 2) / perRow;
-  const cellH = (H - padY * 2) / rows;
-  const size = Math.floor(Math.min(cellW * 0.78, cellH * 0.86));
+  const perRow = slots <= 5 ? slots : slots <= 15 ? 5 : Math.ceil(slots / 3);
+  const rows = Math.ceil(slots / perRow);
+  // Square cells; the grid keeps a margin of about one ninth of the width on each side.
+  const cell = Math.floor(Math.min((W * 0.89) / Math.max(perRow, 5), (H - 24) / rows));
+  const size = Math.round(cell * 0.72);
+  const gridW = cell * Math.max(perRow, 5);
+  const left = (W - gridW) / 2 + (cell * (Math.max(perRow, 5) - perRow)) / 2;
+  const top = (H - cell * rows) / 2;
+  const label = (textsFor(d, d.langs[0]).gift || "FREE").slice(0, 12);
   for (let i = 0; i < slots; i++) {
     const row = Math.floor(i / perRow);
     const col = i % perRow;
-    const pos = rtl ? perRow - 1 - col : col;
-    const x = padX + pos * cellW + (cellW - size) / 2;
-    const y = padY + row * cellH + (cellH - size) / 2;
-    if (i === target) drawGift(ctx, d, p, x, y, size, stamps >= target);
+    const x = left + col * cell + (cell - size) / 2;
+    const y = top + row * cell + (cell - size) / 2;
+    if (i === target) drawFreeSlot(ctx, d, p, x, y, size, stamps >= target, label);
     else drawStamp(ctx, d, p, x, y, size, i < stamps);
   }
+}
+
+/** The Apple Wallet strip: the stamp grid (the pass shows the logo, name and counts as its own fields). */
+export function drawAppleStrip(ctx: CanvasRenderingContext2D, d: Design, p: BannerPictures, stamps: number, target: number) {
+  drawStampGrid(ctx, d, p, stamps, target, APPLE_W, APPLE_H);
 }
 
 /** One JPEG per stamp count, 0…target, for Apple Wallet (the server turns them into PNG). */

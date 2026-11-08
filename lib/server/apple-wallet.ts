@@ -50,9 +50,9 @@ export async function passUpdated(db: D1Database, customer: { id: string; busine
   return row?.t ?? customer.created;
 }
 
-/** Wallet picture sizes (pixels, @3x). The strip sits under the logo row; a store card with a QR code shows it at 375×123 points. */
+/** Wallet picture sizes (pixels, @3x). The strip sits under the logo row; a store card shows it at 375×144 points. */
 const SPEC = {
-  strip: { width: 1125, height: 369, fit: "cover" },
+  strip2: { width: 1125, height: 432, fit: "cover" },
   logo: { width: 480, height: 150, fit: "scale-down" },
 } as const;
 
@@ -115,7 +115,7 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
   // The strip under the logo: the stamp grid for this many stamps (made by the editor when publishing).
   // Cards published before it existed: the Google Wallet stamp banner, the wallet banner or the background image.
   const grid = appleStampPicture(design, c.stamps, c.target);
-  const strip = await passImage(db, c.business, grid ?? walletStampPicture(design, c.stamps, c.target) ?? design.walletHero ?? design.hero, "strip");
+  const strip = await passImage(db, c.business, grid ?? walletStampPicture(design, c.stamps, c.target) ?? design.walletHero ?? design.hero, "strip2");
   if (strip) {
     files["strip@2x.png"] = strip;
     files["strip@3x.png"] = strip;
