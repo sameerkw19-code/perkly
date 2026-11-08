@@ -239,7 +239,7 @@ test("changing the program does not change an existing card's round", async () =
   assert.equal((await stamps(ownerA, bizA, fresh.body.id)).target, 5, "new card uses 5");
 });
 
-test("customer self-join: terms required, marketing off by default, no duplicates", async () => {
+test("customer self-join: terms required, marketing off by default, no duplicates, an unused card can start over", async () => {
   const code = (await ownerA.get(`/api/loyalty?business=${bizA}`)).body.business.join_code;
   const visitor = new Client();
   const noTerms = await visitor.post("/api/join", { code, name: "Sara", phone: "0541112222" });
@@ -247,12 +247,21 @@ test("customer self-join: terms required, marketing off by default, no duplicate
   const ok = await visitor.post("/api/join", { code, name: "Sara", phone: "0541112222", terms: true });
   assert.equal(ok.status, 200);
   assert.match(ok.body.cardPath, /^\/c\//);
-  const dup = await visitor.post("/api/join", { code, name: "Sara again", phone: "+972541112222", terms: true });
-  assert.equal(dup.status, 409);
-  assert.equal(dup.body.cardPath, undefined, "never hands out an existing card");
   const sara = (await ownerA.get(`/api/loyalty?business=${bizA}&days=all`)).body.customers.find((c) => c.name === "Sara");
   assert.equal(sara.consent_marketing, 0);
   assert.equal(sara.source, "self");
+  // Joined but never used (left before keeping the link): joining again starts the same card over with a new link.
+  const again = await visitor.post("/api/join", { code, name: "Sara", phone: "+972541112222", terms: true });
+  assert.equal(again.status, 200);
+  assert.notEqual(again.body.cardPath, ok.body.cardPath);
+  const sames = (await ownerA.get(`/api/loyalty?business=${bizA}&days=all`)).body.customers.filter((c) => c.phone.replace(/\D/g, "").endsWith("541112222"));
+  assert.equal(sames.length, 1, "still one customer for the number");
+  assert.equal(sames[0].id, sara.id);
+  // Once the card is used, it is never handed out to someone who only knows the number.
+  assert.equal((await ownerA.act(bizA, "stamp", { customer: sara.id, requestId: id() })).status, 200);
+  const dup = await visitor.post("/api/join", { code, name: "Sara again", phone: "+972541112222", terms: true });
+  assert.equal(dup.status, 409);
+  assert.equal(dup.body.cardPath, undefined, "never hands out a used card");
   const bad = await visitor.post("/api/join", { code: "nope", name: "X", phone: "0541113333", terms: true });
   assert.equal(bad.status, 404);
 });
