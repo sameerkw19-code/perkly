@@ -7,7 +7,7 @@ import { cancelAtPeriodEnd } from "../../../lib/server/polar";
 import { applePushReady, pushTokens } from "../../../lib/server/apple-push";
 import { customerForPass } from "../../../lib/server/apple-wallet";
 import { passLook } from "../../../lib/server/designs";
-import { updateLoyaltyObject, walletConfig } from "../../../lib/server/google-wallet";
+import { debugObjects, updateLoyaltyObject, walletConfig } from "../../../lib/server/google-wallet";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +62,15 @@ export async function POST(request: Request) {
         results.push({ name: c.name, stamps: `${c.stamps}/${c.target}`, result, status: detail.status ?? 0, text: detail.text ?? "" });
       }
       return json({ ok: true, ready: true, saved: rows.results.length, results });
+    }
+    case "google_debug": {
+      const config = walletConfig(env);
+      if (!config) return json({ ok: true, ready: false });
+      const rows = await db
+        .prepare("SELECT id FROM customers WHERE business = ? AND archived IS NULL ORDER BY created DESC LIMIT 5")
+        .bind(businessId)
+        .all<{ id: string }>();
+      return json({ ok: true, ready: true, ...(await debugObjects(config, businessId, rows.results.map((r) => r.id))) });
     }
     case "apple_push_test": {
       const rows = await db

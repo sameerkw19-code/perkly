@@ -232,6 +232,35 @@ export async function updateLoyaltyObject(config: WalletConfig, card: LoyaltyCar
   }
 }
 
+/**
+ * Admin diagnostics: what Google has for these customers (by our object id) and which objects exist
+ * in the business's class and the shared class.
+ */
+export async function debugObjects(config: WalletConfig, businessId: string, customerIds: string[]) {
+  const token = await accessToken(config);
+  const headers = { Authorization: `Bearer ${token}` };
+  const objects = [];
+  for (const id of customerIds.slice(0, 5)) {
+    const objectId = objectIdFor(config, id);
+    const r = await fetch(`${API}/loyaltyObject/${encodeURIComponent(objectId)}`, { headers });
+    const text = await r.text().catch(() => "");
+    let info = "";
+    try {
+      const o = JSON.parse(text) as { classId?: string; state?: string; loyaltyPoints?: { balance?: { string?: string } }; hasUsers?: boolean };
+      info = r.ok ? `class=${o.classId} state=${o.state} points=${o.loyaltyPoints?.balance?.string} hasUsers=${o.hasUsers}` : text.slice(0, 200);
+    } catch { info = text.slice(0, 200); }
+    objects.push({ objectId, status: r.status, info });
+  }
+  const list = async (classId: string) => {
+    const r = await fetch(`${API}/loyaltyObject?classId=${encodeURIComponent(classId)}&maxResults=10`, { headers });
+    const text = await r.text().catch(() => "");
+    if (!r.ok) return { classId, status: r.status, ids: [] as string[], error: text.slice(0, 200) };
+    const d = JSON.parse(text) as { resources?: { id: string; hasUsers?: boolean; loyaltyPoints?: { balance?: { string?: string } } }[] };
+    return { classId, status: r.status, ids: (d.resources ?? []).map((o) => `${o.id} (${o.loyaltyPoints?.balance?.string ?? "?"}${o.hasUsers ? ", saved" : ""})`) };
+  };
+  return { issuer: config.issuerId, objects, business: await list(businessClassId(config, businessId)), shared: await list(config.classId) };
+}
+
 // ---- Loyalty class (shared by all businesses for now) ----
 
 export type ClassStatus = { status: "draft" | "underReview" | "approved" | "rejected" | "unknown" | "missing"; raw?: string };
