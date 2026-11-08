@@ -87,6 +87,9 @@ export function AdminActions({ business, suspended, compUntil, biz }: { business
         : r.code === "user_blocked" ? "המשתמש הזה חסום."
         : r.code === "already_owner" ? "הוא כבר הבעלים."
         : r.code === "bad_details" ? "פרטים לא תקינים (מספר חותמות 2–30)."
+        : r.code === "confirm_mismatch" ? "השם שהוקלד לא תואם את שם העסק. לא נמחק כלום."
+        : r.code === "bad_login" ? "הסיסמה שגויה. לא נמחק כלום."
+        : r.code === "rate_limited" ? "יותר מדי ניסיונות. נסה שוב בעוד שעה."
         : "הפעולה נכשלה. נסה שוב.",
       );
       return;
@@ -178,6 +181,21 @@ export function AdminActions({ business, suspended, compUntil, biz }: { business
           )}
         </div>
         <small className="form-hint">בייצוא, מספרי הטלפון של הלקוחות מוסתרים חוץ מ-4 הספרות האחרונות. כל ייצוא נרשם ביומן.</small>
+      </div>
+      <div className="admin-action">
+        <h3>איפוס נתונים</h3>
+        <p className="muted">מוחק לצמיתות את כל הלקוחות, היסטוריית החותמות, ההטבות וההודעות ליום מיוחד. העיצוב, הלוגו, הצוות, המנוי וקישור ההצטרפות נשארים. כרטיסים ששמורים בארנקים יפסיקו להתעדכן. אי אפשר לבטל.</p>
+        <form className="admin-edit" autoComplete="off" onSubmit={(e) => {
+          e.preventDefault();
+          const f = new FormData(e.currentTarget);
+          const typed = String(f.get("confirm") ?? "").trim();
+          if (typed !== biz.name) { setError("השם שהוקלד לא תואם את שם העסק. לא נמחק כלום."); return; }
+          run("reset_data", { confirm: typed, password: String(f.get("password") ?? "") }, `למחוק לצמיתות את כל הלקוחות וההיסטוריה של "${biz.name}"?`);
+        }}>
+          <label>הקלד את שם העסק: <strong>{biz.name}</strong><input name="confirm" required maxLength={80} autoComplete="off" /></label>
+          <label>הסיסמה שלך<input name="password" type="password" required maxLength={200} autoComplete="current-password" dir="ltr" /></label>
+          <button className="btn soft small danger" disabled={busy}>איפוס נתונים</button>
+        </form>
       </div>
       {error && <p className="form-error" role="alert">{error}</p>}
     </div>

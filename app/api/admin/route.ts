@@ -3,6 +3,8 @@ import { getD1 } from "../../../db";
 import { getUser, isPlatformAdmin } from "../../../lib/server/auth";
 import { fail, json, readJson, sameOrigin, str } from "../../../lib/server/http";
 import { normalizeEmail } from "../../../lib/server/auth";
+import { verifyPassword } from "../../../lib/server/crypto";
+import { allow } from "../../../lib/server/rate-limit";
 import { cancelAtPeriodEnd } from "../../../lib/server/polar";
 import { applePushReady, pushTokens } from "../../../lib/server/apple-push";
 import { customerForPass } from "../../../lib/server/apple-wallet";
@@ -18,7 +20,8 @@ const FOREVER = "9999-12-31T00:00:00.000Z";
 // Platform admin actions on one business. Every change is written to admin_log in the same batch.
 // Actions: suspend (with reason), unsuspend, grant_comp (free access for N days, or forever: true), clear_comp,
 // update_business (name, reward, target), transfer_owner (to an existing user by email), archive, restore,
-// kit_sent (the yearly plan's counter kit was shipped), apple_push_test (refresh the business's Apple Wallet passes
+// kit_sent (the yearly plan's counter kit was shipped), reset_data (delete every customer, stamp and reward, for test
+// businesses; the admin types the business name and their password), apple_push_test (refresh the business's Apple Wallet passes
 // now and return what Apple answered).
 export async function POST(request: Request) {
   const db = getD1();
@@ -188,6 +191,32 @@ export async function POST(request: Request) {
       ]);
       // billing: "stopped" | "not_stopped" | "none"; the admin page warns when the subscription could not be stopped.
       return json({ ok: true, billing: live ? (stopped ? "stopped" : "not_stopped") : "none" });
+    }
+    case "reset_data": {
+      // Starts a business over without customers: deletes for good every customer, stamp, reward, wallet registration and
+      // special-day message of the business. The design, logo, team, subscription and join link stay.
+      // Platform admins only (owners cannot: removed customers count toward the free limit, and this would reset it).
+      // Two confirmations: the business name, and the admin's own password (5 tries an hour).
+      if (str(body.confirm, 80) !== business.name) return fail("confirm_mismatch", 400, "Type the business name to confirm");
+      if (!(await allow(db, `reset-data:${user.id}`, 5, 3600))) return fail("rate_limited", 429, "Too many attempts");
+      const me = await db.prepare("SELECT pass_hash FROM users WHERE id = ?").bind(user.id).first<{ pass_hash: string }>();
+      const password = typeof body.password === "string" ? body.password.slice(0, 200) : "";
+      if (!me || !(await verifyPassword(password, me.pass_hash))) return fail("bad_login", 401, "Wrong password");
+      const before = await db
+        .prepare("SELECT (SELECT COUNT(*) FROM customers WHERE business = ?1) AS customers, (SELECT COUNT(*) FROM events WHERE business = ?1) AS events")
+        .bind(businessId)
+        .first<{ customers: number; events: number }>();
+      // One batch (a transaction), children before customers because of the foreign keys.
+      await db.batch([
+        db.prepare("DELETE FROM apple_registrations WHERE serial IN (SELECT id FROM customers WHERE business = ?)").bind(businessId),
+        db.prepare("DELETE FROM wallet_outbox WHERE business = ?").bind(businessId),
+        db.prepare("DELETE FROM rewards WHERE business = ?").bind(businessId),
+        db.prepare("DELETE FROM events WHERE business = ?").bind(businessId),
+        db.prepare("DELETE FROM special_days WHERE business = ?").bind(businessId),
+        db.prepare("DELETE FROM customers WHERE business = ?").bind(businessId),
+        log("reset_data", `${before?.customers ?? 0} customers, ${before?.events ?? 0} stamp/reward events deleted`),
+      ]);
+      return json({ ok: true, deleted: before });
     }
     case "restore": {
       await db.batch([
