@@ -67,6 +67,11 @@
         { "pattern": "perkly.shop", "custom_domain": true },
         { "pattern": "www.perkly.shop", "custom_domain": true }
       ],
+      // Apple Wallet update pushes: the Pass Type ID certificate (uploaded by the apple-push-cert workflow)
+      // presented to Apple's push service. Not secret: the ID only names the certificate in this account.
+      "mtls_certificates": [
+        { "binding": "APPLE_APNS", "certificate_id": "d727abf5-437c-46da-974d-cbfd8aedd86e" }
+      ],
       "d1_databases": [
         {
           "binding": "DB",
