@@ -7,7 +7,7 @@ import { allow } from "../../../lib/server/rate-limit";
 import { formatPhone, maskPhone, normalizePhone } from "../../../lib/phone";
 import { assetIds, defaultDesign, designChecks, is3d, sanitizeDesign } from "../../../lib/design";
 import { assetMeta, liveDesign, ownsAssets, passLook, publishedDesign } from "../../../lib/server/designs";
-import { releaseArchivedPhone } from "../../../lib/server/customers";
+import { originalPhone, releaseArchivedPhone } from "../../../lib/server/customers";
 import { businessAccess, freeLimitReached, hasPaidDesign } from "../../../lib/server/billing";
 import { formatBirthday, parseBirthday, upcomingKeys } from "../../../lib/birthday";
 import { syncGoogleWallet } from "../../../lib/server/wallet-sync";
@@ -86,6 +86,19 @@ export async function GET(request: Request) {
 
   const business = await loadBusiness(db, membership.business);
   const role = membership.role;
+  // A light check the open dashboard makes every 30 seconds: who joined since the last check.
+  // Without a valid time it only returns the server's time, to start counting from now.
+  const joinedSince = url.searchParams.get("joinedSince");
+  if (joinedSince !== null) {
+    const checked = new Date().toISOString();
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(joinedSince)) return json({ joined: [], next: checked });
+    const rows = await db
+      .prepare("SELECT id, name, created FROM customers WHERE business = ? AND archived IS NULL AND created > ? ORDER BY created LIMIT 20")
+      .bind(business!.id, joinedSince)
+      .all<{ id: string; name: string; created: string }>();
+    const joined = rows.results;
+    return json({ joined: joined.map((c) => ({ id: c.id, name: c.name })), next: joined.length ? joined[joined.length - 1].created : checked });
+  }
   const branches = await activeBranches(db, business!.id);
   // Whether stamping and new customers are allowed now (subscription, admin suspension or free access).
   const access = await businessAccess(db, business!.id);
@@ -614,6 +627,43 @@ export async function POST(request: Request) {
             .bind(now, p.customer ?? "", business.id).run();
       if (!r.meta.changes) return fail("unknown_card", 404, "Customer not found");
       return json({ ok: true });
+    }
+
+    case "removed_customers": {
+      const denied = ownerOnly(); if (denied) return denied;
+      // Removed but not erased: these can come back. The newest removals first.
+      const rows = await db
+        .prepare(
+          `SELECT id, name, phone, stamps, target, archived FROM customers
+           WHERE business = ? AND archived IS NOT NULL AND erased IS NULL ORDER BY archived DESC LIMIT 300`,
+        )
+        .bind(business.id)
+        .all<{ id: string; name: string; phone: string; stamps: number; target: number; archived: string }>();
+      return json({ customers: rows.results.map((c) => ({ ...c, phone: formatPhone(originalPhone(c.phone)) })) });
+    }
+
+    case "restore_customer": {
+      const denied = ownerOnly(); if (denied) return denied;
+      const c = await db
+        .prepare("SELECT id, phone FROM customers WHERE id = ? AND business = ? AND archived IS NOT NULL AND erased IS NULL")
+        .bind(p.customer ?? "", business.id)
+        .first<{ id: string; phone: string }>();
+      if (!c) return fail("unknown_card", 404, "Customer not found");
+      // If the number joined again after the removal, that newer card stays and this one cannot come back.
+      const phone = originalPhone(c.phone);
+      const taken = await db.prepare("SELECT 1 FROM customers WHERE business = ? AND phone = ? AND archived IS NULL").bind(business.id, phone).first();
+      if (taken) return fail("phone_exists", 409, "This phone is already registered in this business");
+      // The old card link stopped working at removal; the customer gets a new one. Stamps and wallet passes stay as they were.
+      const card = await newCardSecret();
+      // Another removed card may still hold the number (removed, joined again, removed again): rename it first, in the same batch.
+      const [, r] = await db.batch([
+        releaseArchivedPhone(db, business.id, phone),
+        db
+          .prepare("UPDATE customers SET archived = NULL, phone = ?, card_hash = ? WHERE id = ? AND business = ? AND archived IS NOT NULL AND erased IS NULL")
+          .bind(phone, card.hash, c.id, business.id),
+      ]);
+      if (!r.meta.changes) return fail("unknown_card", 404, "Customer not found");
+      return json({ cardUrl: `${origin}/c/${card.secret}` });
     }
 
     case "revoke_member": {

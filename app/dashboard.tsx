@@ -4,7 +4,7 @@ import { SOCIAL_KEYS, SOCIAL_LABEL, normalizeSocial, socialDisplay, type Social 
 import { SocialIcon } from "../lib/social-icon";
 import {
   Activity, AlertTriangle, Trash2, Cake, Check, Copy, CreditCard, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode,
-  Palette, RefreshCw, ScanLine, Search, Settings, Share2, Store, Users, UserRound, Wallet, X,
+  History, Palette, RefreshCw, RotateCcw, ScanLine, Search, Settings, Share2, Store, Users, UserRound, Wallet, X,
 } from "lucide-react";
 import type { Design } from "../lib/design";
 import { CardEditor } from "../components/card-editor";
@@ -52,7 +52,7 @@ type Data = {
 type Modal =
   | { type: "customer" }
   | { type: "business" }
-  | { type: "link"; url: string; title: string }
+  | { type: "link"; url: string; title: string; note?: string }
   | { type: "correct"; customer: any }
   | { type: "remove"; customer: any };
 
@@ -114,6 +114,10 @@ export default function Dashboard() {
     return () => clearTimeout(timer);
   }, [toast]);
 
+  // Removed customers, loaded only when the owner opens the list (they can be restored).
+  const [showRemoved, setShowRemoved] = useState(false);
+  const [removed, setRemoved] = useState<{ id: string; name: string; phone: string; stamps: number; target: number; archived: string }[] | null>(null);
+
   useEffect(() => {
     const update = () => setOnline(navigator.onLine);
     update();
@@ -153,6 +157,40 @@ export default function Dashboard() {
   }, [businessId, days, branchView]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { load(); }, [load]);
+  // While the dashboard is open (for example on a tablet at the counter), check every 30 seconds whether
+  // someone joined: say so, and refresh the overview or the customer list if that is what's on screen.
+  const viewRef = useRef(view);
+  useEffect(() => { viewRef.current = view; }, [view]);
+  const activeBusiness = data?.business?.id;
+  useEffect(() => {
+    if (!activeBusiness) return;
+    let since = "";
+    let stopped = false;
+    async function check() {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const r = await fetch(`/api/loyalty?business=${encodeURIComponent(activeBusiness!)}&joinedSince=${encodeURIComponent(since)}`, { credentials: "same-origin" });
+        if (!r.ok || stopped) return;
+        const d: { joined: { id: string; name: string }[]; next: string } = await r.json();
+        const first = !since;
+        since = d.next;
+        if (first || !d.joined.length) return;
+        notify(d.joined.length === 1 ? t("joinedOne", { name: d.joined[0].name }) : t("joinedMany", { n: d.joined.length }));
+        if (viewRef.current === "overview" || viewRef.current === "customers") load();
+      } catch {}
+    }
+    check();
+    const timer = setInterval(check, 30_000);
+    const onVisible = () => { if (document.visibilityState === "visible") check(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { stopped = true; clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); };
+  }, [activeBusiness]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function loadRemoved() {
+    const r = await call({ action: "removed_customers" });
+    if (r) setRemoved(r.customers);
+  }
+
   useEffect(() => {
     if (businessId) try { localStorage.setItem("perkly-business", businessId); } catch {}
   }, [businessId]);
@@ -424,6 +462,42 @@ export default function Dashboard() {
                   </table>
                 </div>
               )}
+              <div className="removed-block">
+                <button type="button" className="btn soft small" aria-expanded={showRemoved} disabled={busy} onClick={() => {
+                  const open = !showRemoved;
+                  setShowRemoved(open);
+                  if (open) loadRemoved();
+                }}><History size={15} />{t("removedShow")}{removed && <Num>{` (${removed.length})`}</Num>}</button>
+                {showRemoved && (
+                  <div className="removed-list">
+                    <p className="form-hint">{t("removedHint")}</p>
+                    {removed === null ? null : !removed.length ? (
+                      <div className="empty compact">{t("removedNone")}</div>
+                    ) : (
+                      <ul>
+                        {removed.map((c) => (
+                          <li key={c.id}>
+                            <span className="removed-who">
+                              <strong>{c.name}</strong>
+                              <span dir="ltr">{c.phone}</span>
+                              <Num>{c.stamps}/{c.target}</Num>
+                              <span className="form-hint">{t("removedOn", { d: new Date(c.archived).toLocaleDateString(lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB") })}</span>
+                            </span>
+                            <button type="button" className="btn primary small" disabled={busy} onClick={async () => {
+                              const r = await call({ action: "restore_customer", customer: c.id });
+                              if (!r) return;
+                              setRemoved((list) => (list ?? []).filter((x) => x.id !== c.id));
+                              load();
+                              notify(t("restoredOk"));
+                              setModal({ type: "link", url: r.cardUrl, title: c.name, note: t("restoredLink") });
+                            }}><RotateCcw size={14} />{t("restore")}</button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
               <p className="form-hint">{t("privacy")}</p>
             </section>
           )}
@@ -516,7 +590,7 @@ export default function Dashboard() {
               <div>
                 <span className="modal-icon"><Share2 /></span>
                 <h2>{modal.title}</h2>
-                <p>{modal.url.includes("/invite/") ? t("inviteCreated") : t("customerCreated")}</p>
+                <p>{modal.note ?? (modal.url.includes("/invite/") ? t("inviteCreated") : t("customerCreated"))}</p>
                 <LinkBox url={modal.url} t={t} notify={notify} />
                 {!modal.url.includes("/invite/") && <p className="form-hint">{t("cardLinkHint")}</p>}
               </div>
@@ -561,14 +635,14 @@ export default function Dashboard() {
                 <div className="form-actions">
                   <button className="btn danger" disabled={busy} onClick={async () => {
                     const r = await call({ action: "archive_customer", customer: modal.customer.id });
-                    if (r) { notify(t("archivedOk")); load(); setModal(null); }
+                    if (r) { notify(t("archivedOk")); load(); setModal(null); setRemoved(null); setShowRemoved(false); }
                   }}><Trash2 size={15} />{t("archiveCustomer")}</button>
                   <button type="button" className="btn soft" onClick={() => setModal(null)}>{t("cancel")}</button>
                 </div>
                 <button type="button" className="text-btn danger-text" disabled={busy} onClick={async () => {
                   if (!window.confirm(t("eraseConfirm", { name: modal.customer.name }))) return;
                   const r = await call({ action: "archive_customer", customer: modal.customer.id, erase: true });
-                  if (r) { notify(t("erasedOk")); load(); setModal(null); }
+                  if (r) { notify(t("erasedOk")); load(); setModal(null); setRemoved(null); setShowRemoved(false); }
                 }}>{t("eraseCustomer")}</button>
               </div>
             )}
