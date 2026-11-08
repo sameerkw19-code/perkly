@@ -479,3 +479,9 @@ fieldset.birthday{border:0;padding:0;margin:0 0 14px}fieldset.birthday legend{fo
 /* Apple Wallet: Apple asks for a black "Add to Apple Wallet" button. */
 .btn.apple-wallet-btn { background: #000; color: #fff; border-color: #000; }
 .btn.apple-wallet-btn:hover { background: #1c1c1e; color: #fff; }
+
+/* Customer list: remove button and its dialog. */
+.icon-btn.danger-icon{color:#a32020}
+.icon-btn.danger-icon:hover{background:#fde8e8}
+.modal-icon.danger{background:#fde8e8;color:#a32020}
+.text-btn.danger-text{color:#a32020;margin-top:14px;font-size:13px}
