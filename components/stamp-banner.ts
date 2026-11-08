@@ -278,6 +278,7 @@ export const APPLE_W = 1125;
 export const APPLE_H = 432;
 
 const FREE_GREEN = "#3FAE49";
+const FREE_GREEN_DARK = "#1E7B34";
 
 /** The reward slot: an empty stamp with a tilted "FREE" mark over it (filled once the reward is reached). */
 function drawFreeSlot(ctx: CanvasRenderingContext2D, d: Design, p: BannerPictures, x: number, y: number, size: number, ready: boolean, label: string) {
@@ -292,12 +293,26 @@ function drawFreeSlot(ctx: CanvasRenderingContext2D, d: Design, p: BannerPicture
   while (font > 10 && ctx.measureText(label).width > size * 0.95) { font -= 1; ctx.font = `700 ${font}px ${family}`; }
   const tw = ctx.measureText(label).width;
   const bw = tw + font * 0.6, bh = font * 1.25;
-  ctx.fillStyle = "rgba(0,0,0,.35)";
-  ctx.fillRect(-bw / 2, -bh / 2, bw, bh);
-  ctx.strokeStyle = FREE_GREEN;
-  ctx.lineWidth = Math.max(2, font * 0.09);
-  ctx.strokeRect(-bw / 2, -bh / 2, bw, bh);
-  ctx.fillStyle = FREE_GREEN;
+  if (onColor(d.colors.bg) === "#FFFFFF") {
+    // Dark card: green outline and green letters, like a rubber stamp.
+    ctx.fillStyle = "rgba(0,0,0,.35)";
+    ctx.fillRect(-bw / 2, -bh / 2, bw, bh);
+    ctx.strokeStyle = FREE_GREEN;
+    ctx.lineWidth = Math.max(2, font * 0.09);
+    ctx.strokeRect(-bw / 2, -bh / 2, bw, bh);
+    ctx.fillStyle = FREE_GREEN;
+  } else {
+    // Light card: a solid green label with white letters and a white edge, so it reads on pale colors and pictures.
+    ctx.shadowColor = "rgba(0,0,0,.25)";
+    ctx.shadowBlur = font * 0.25;
+    ctx.fillStyle = FREE_GREEN_DARK;
+    ctx.fillRect(-bw / 2, -bh / 2, bw, bh);
+    ctx.shadowColor = "transparent";
+    ctx.strokeStyle = "#FFFFFF";
+    ctx.lineWidth = Math.max(2, font * 0.08);
+    ctx.strokeRect(-bw / 2, -bh / 2, bw, bh);
+    ctx.fillStyle = "#FFFFFF";
+  }
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.direction = "ltr";
