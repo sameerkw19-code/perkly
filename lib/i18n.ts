@@ -273,6 +273,9 @@ const words: Record<string, Entry> = {
   // Station
   scan: ["סריקת כרטיס לקוח", "مسح بطاقة الزبون", "Scan a customer card"],
   scanHint: ["סורקים את הקוד, בודקים שזה הלקוח הנכון ומאשרים.", "امسح الرمز، تأكد أنه الزبون الصحيح ثم أكّد.", "Scan the code, check it's the right customer, then confirm."],
+  stScan: ["סריקה", "مسح", "Scan"],
+  stHint: ["סורקים את הקוד מהטלפון של הלקוח, או מחפשים לפי שם או 4 ספרות מהטלפון.", "امسح الرمز من هاتف الزبون، أو ابحث بالاسم أو 4 أرقام من الهاتف.", "Scan the code on the customer's phone, or search by name or 4 digits of the phone."],
+  stPointCamera: ["מכוונים את המצלמה לקוד שעל הכרטיס", "وجّه الكاميرا إلى الرمز على البطاقة", "Point the camera at the code on the card"],
   camera: ["פתיחת מצלמה", "فتح الكاميرا", "Open camera"],
   stop: ["סגירת מצלמה", "إغلاق الكاميرا", "Stop camera"],
   manual: ["או חיפוש ידני", "أو بحث يدوي", "Or search manually"],

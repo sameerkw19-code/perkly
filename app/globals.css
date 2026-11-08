@@ -485,3 +485,79 @@ fieldset.birthday{border:0;padding:0;margin:0 0 14px}fieldset.birthday legend{fo
 .icon-btn.danger-icon:hover{background:#fde8e8}
 .modal-icon.danger{background:#fde8e8;color:#a32020}
 .text-btn.danger-text{color:#a32020;margin-top:14px;font-size:13px}
+
+/* ---- Staff station ---- */
+.staff-grid.st{grid-template-columns:minmax(300px,400px) minmax(0,1fr);align-items:start}
+.st .st-find{text-align:start;display:grid;gap:12px;position:sticky;top:20px}
+.st-search-row{display:flex;gap:10px;align-items:stretch}
+.st-search{flex:1;min-width:0;background:#fff;border-radius:12px;padding:0 12px;border:1.5px solid var(--line)}
+.st-search:focus-within{border-color:var(--purple);box-shadow:0 0 0 3px #7558e815}
+.st-search input{padding:14px 0;font-size:16px}
+.st-clear{border:0;background:#f1eff6;color:var(--muted);width:28px;height:28px;border-radius:50%;display:grid;place-items:center;flex-shrink:0}
+.st-scan-btn{border-radius:12px;padding:0 18px;font-size:14px;min-height:52px}
+.st-hint{margin:0;line-height:1.6}
+.st .video-wrap{margin:0}
+.st-video-hint{position:absolute;inset-inline:0;bottom:8px;margin:0;color:#fff;font-size:13px;text-align:center;text-shadow:0 1px 3px #0008}
+.st .staff-results{margin:0;display:grid;gap:8px;max-height:min(60vh,520px);overflow:auto}
+.st .customer-result{margin:0;gap:12px;padding:12px;min-height:64px;justify-content:flex-start;transition:border-color .15s,background .15s}
+.st .customer-result:hover{border-color:#cfc3f5;background:#fcfbff}
+.st-result-who{flex:1;min-width:0}
+.st-result-who strong,.st-result-who small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.st-result-count{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--purple);font-weight:600}
+.st-mini-track{width:44px;height:4px;border-radius:4px;background:#eeebf6;overflow:hidden}
+.st-mini-track i{display:block;height:100%;background:#957cdb}
+.st-avatar{width:38px;height:38px;border-radius:50%;background:#f1edf9;color:#7a5fc2;display:grid;place-items:center;font-weight:700;flex-shrink:0}
+.st-avatar.big{width:48px;height:48px;font-size:18px}
+.st-none{display:grid;justify-items:start;gap:4px}
+.st-none p{margin:0}
+.st .st-card{gap:18px;justify-content:flex-start;min-height:520px}
+.st .st-card.st-empty{justify-content:center}
+.st-who{display:flex;align-items:center;gap:12px;width:100%;max-width:465px}
+.st-who>div{flex:1;min-width:0;display:grid;gap:2px}
+.st-who h2{font-size:22px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.st-who small{color:var(--muted);font-size:13px}
+.st-close{width:40px;height:40px;flex-shrink:0}
+.st-card-wrap{position:relative;width:100%;max-width:465px}
+.st-done{position:absolute;inset:0;border-radius:18px;background:#1f1a2ecc;backdrop-filter:blur(2px);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:20px;animation:st-pop .25s ease-out}
+.st-done strong{font-size:18px;line-height:1.4;max-width:300px}
+.st-done-icon{width:62px;height:62px;border-radius:50%;background:#d9f493;color:#2f4615;display:grid;place-items:center;animation:st-bounce .45s ease-out}
+.st-done.reward .st-done-icon{background:#f5c542;color:#5a3d00}
+@keyframes st-pop{from{opacity:0}to{opacity:1}}
+@keyframes st-bounce{0%{transform:scale(.4)}70%{transform:scale(1.12)}100%{transform:scale(1)}}
+.st-actions{width:100%;max-width:465px;display:grid;gap:12px;justify-items:center}
+.st-stamp-row{width:100%;display:flex;align-items:flex-end;gap:12px}
+.st-stamp-row .qty-row{justify-items:start;gap:6px}
+.st-stamp-row .stepper button{width:48px}
+.st-stamp-row .stepper output{min-width:48px}
+.st-stamp-row .btn.big{flex:1;min-height:54px;font-size:16px;border-radius:14px}
+.st-actions>.btn.big{min-height:54px;font-size:16px;border-radius:14px}
+.st-remaining{margin:0}
+.st-more{margin-top:2px}
+@media(max-width:1150px){
+  .staff-grid.st{grid-template-columns:1fr}
+  .st .st-find{position:static}
+  .st .st-card{min-height:0}
+  .st .st-card.st-empty{min-height:200px}
+}
+@media(max-width:760px){
+  .st .st-card.st-empty{display:none}
+  .st .panel{padding:16px 14px}
+  .st-scan-btn span{display:none}
+  .st-scan-btn{width:56px;padding:0}
+  .st .staff-results{max-height:none}
+  .st-who h2{font-size:20px}
+  .st-card-wrap .loyalty-card{padding:20px}
+  /* The main button stays in reach above the bottom bar while the card scrolls. */
+  .st-actions{position:sticky;bottom:calc(67px + env(safe-area-inset-bottom, 0px) + 8px);z-index:5;background:#fffffff2;backdrop-filter:blur(6px);padding:12px;margin:0 -6px;width:calc(100% + 12px);border-radius:16px;box-shadow:0 -4px 18px #2a1f4a14,0 0 0 1px var(--line)}
+  .st-stamp-row .qty-label{display:none}
+  .st-stamp-row .stepper button{width:44px;height:50px}
+  .st-stamp-row .stepper output{min-width:40px;font-size:20px}
+}
+@media(max-width:760px){
+  .page-head.st-head{flex-direction:row;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+  .page-head.st-head h1{font-size:22px;margin:0}
+  .page-head.st-head p.muted{display:none}
+  .page-head.st-head .head-actions{width:auto;gap:8px}
+  .page-head.st-head .head-actions select{max-width:130px}
+  .page-head.st-head .st-new{padding:10px 12px}
+}
