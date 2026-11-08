@@ -14,6 +14,8 @@
   "triggers": { "crons": ["*/2 * * * *"] },
   // Videos go through the Worker so it can answer byte-range requests (needed by Safari on iPhone).
   "assets": { "binding": "ASSETS", "run_worker_first": ["/videos/*"] },
+  // Cloudflare Images: logo and banner converted to PNG for Apple Wallet passes (lib/server/apple-wallet.ts).
+  "images": { "binding": "IMAGES" },
   "d1_databases": [
     {
       "binding": "DB",
@@ -36,6 +38,7 @@
         // The console added the issuer id in front of "3388000000023227862.perkly_loyalty".
         "GOOGLE_WALLET_CLASS_ID": "3388000000023227862.3388000000023227862.perkly_loyalty"
       },
+      "images": { "binding": "IMAGES" },
       "d1_databases": [
         {
           "binding": "DB",
@@ -69,6 +72,7 @@
       ],
       // Apple Wallet update pushes: the Pass Type ID certificate (uploaded by the apple-push-cert workflow)
       // presented to Apple's push service. Not secret: the ID only names the certificate in this account.
+      "images": { "binding": "IMAGES" },
       "mtls_certificates": [
         { "binding": "APPLE_APNS", "certificate_id": "d727abf5-437c-46da-974d-cbfd8aedd86e" }
       ],

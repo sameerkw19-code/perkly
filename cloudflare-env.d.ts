@@ -33,5 +33,7 @@ declare namespace Cloudflare {
     APPLE_PASS_CERT?: string;
     /** mTLS binding with the Pass Type ID certificate, for Apple Wallet update pushes. */
     APPLE_APNS?: Fetcher;
+    /** Cloudflare Images: converts pictures to PNG for Apple Wallet passes. */
+    IMAGES?: ImagesBinding;
   }
 }
