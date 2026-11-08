@@ -556,3 +556,17 @@ test("dashboard: checks for new joins every 30 seconds while visible", () => {
   assert.match(dash, /setInterval\(check, 30_000\)/);
   assert.match(dash, /visibilityState !== "visible"/);
 });
+
+test("admin reset: business name and password, children deleted before customers", () => {
+  const api = readFileSync(new URL("../app/api/admin/route.ts", import.meta.url), "utf8");
+  const reset = api.slice(api.indexOf('case "reset_data"'), api.indexOf('case "restore"'));
+  assert.match(reset, /confirm_mismatch/);
+  assert.match(reset, /allow\(db, `reset-data:/);
+  assert.match(reset, /verifyPassword\(password/);
+  const order = ["apple_registrations", "wallet_outbox", "rewards", "events", "special_days", "customers"].map((t) => reset.indexOf(`DELETE FROM ${t} WHERE`));
+  assert.ok(order.every((i) => i > 0), "every table is cleared");
+  assert.deepEqual([...order].sort((a, b) => a - b), order, "customers last");
+  assert.match(reset, /log\("reset_data"/);
+  // Only platform admins: the owner's own API has no reset.
+  assert.doesNotMatch(readFileSync(new URL("../app/api/loyalty/route.ts", import.meta.url), "utf8"), /reset_data/);
+});
