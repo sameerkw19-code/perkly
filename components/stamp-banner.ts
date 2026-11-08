@@ -277,46 +277,47 @@ export async function makeStampBanners(design: Design, target: number): Promise<
 export const APPLE_W = 1125;
 export const APPLE_H = 432;
 
-const FREE_GREEN = "#3FAE49";
-const FREE_GREEN_DARK = "#1E7B34";
 
-/** The reward slot: an empty stamp with a tilted "FREE" mark over it (filled once the reward is reached). */
+/** The reward slot: a round gift stamp with a small tilted label under it (like the card on the web). */
 function drawFreeSlot(ctx: CanvasRenderingContext2D, d: Design, p: BannerPictures, x: number, y: number, size: number, ready: boolean, label: string) {
-  drawStamp(ctx, d, p, x, y, size, ready);
+  const color = d.look.stampStyle === "bright" ? GOLD : d.colors.stamp;
+  ctx.save();
+  circle(ctx, x, y, size);
+  ctx.lineWidth = Math.max(2.5, size * 0.035);
+  ctx.strokeStyle = color;
+  if (ready) {
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+  ctx.stroke();
+  ctx.drawImage(ready ? p.giftOnFill : p.giftOnCard, x + size * 0.25, y + size * 0.2, size * 0.5, size * 0.5);
+  ctx.restore();
+  // The label: a white pill with the stamp color, across the bottom of the circle.
   const family = FONTS[d.look.font].family;
   ctx.save();
-  ctx.translate(x + size / 2, y + size * 0.62);
-  ctx.rotate(-0.17);
-  let font = Math.round(size * 0.3);
-  ctx.font = `700 ${font}px ${family}`;
-  // Long labels shrink to fit the stamp.
-  while (font > 10 && ctx.measureText(label).width > size * 0.95) { font -= 1; ctx.font = `700 ${font}px ${family}`; }
-  const tw = ctx.measureText(label).width;
-  const bw = tw + font * 0.6, bh = font * 1.25;
-  if (onColor(d.colors.bg) === "#FFFFFF") {
-    // Dark card: green outline and green letters, like a rubber stamp.
-    ctx.fillStyle = "rgba(0,0,0,.35)";
-    ctx.fillRect(-bw / 2, -bh / 2, bw, bh);
-    ctx.strokeStyle = FREE_GREEN;
-    ctx.lineWidth = Math.max(2, font * 0.09);
-    ctx.strokeRect(-bw / 2, -bh / 2, bw, bh);
-    ctx.fillStyle = FREE_GREEN;
-  } else {
-    // Light card: a solid green label with white letters and a white edge, so it reads on pale colors and pictures.
-    ctx.shadowColor = "rgba(0,0,0,.25)";
-    ctx.shadowBlur = font * 0.25;
-    ctx.fillStyle = FREE_GREEN_DARK;
-    ctx.fillRect(-bw / 2, -bh / 2, bw, bh);
-    ctx.shadowColor = "transparent";
-    ctx.strokeStyle = "#FFFFFF";
-    ctx.lineWidth = Math.max(2, font * 0.08);
-    ctx.strokeRect(-bw / 2, -bh / 2, bw, bh);
-    ctx.fillStyle = "#FFFFFF";
-  }
+  ctx.translate(x + size / 2, y + size * 0.86);
+  ctx.rotate(-0.12);
+  let font = Math.round(size * 0.22);
+  ctx.font = `800 ${font}px ${family}`;
+  while (font > 10 && ctx.measureText(label).width > size * 0.9) { font -= 1; ctx.font = `800 ${font}px ${family}`; }
+  const bw = ctx.measureText(label).width + font * 0.9, bh = font * 1.45, r = bh / 2;
+  ctx.beginPath();
+  ctx.moveTo(-bw / 2 + r, -bh / 2);
+  ctx.arcTo(bw / 2, -bh / 2, bw / 2, bh / 2, r);
+  ctx.arcTo(bw / 2, bh / 2, -bw / 2, bh / 2, r);
+  ctx.arcTo(-bw / 2, bh / 2, -bw / 2, -bh / 2, r);
+  ctx.arcTo(-bw / 2, -bh / 2, bw / 2, -bh / 2, r);
+  ctx.closePath();
+  ctx.fillStyle = ready ? color : "#FFFFFF";
+  ctx.fill();
+  ctx.lineWidth = Math.max(2, font * 0.12);
+  ctx.strokeStyle = color;
+  ctx.stroke();
+  ctx.fillStyle = ready ? onColor(color) : color;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.direction = "ltr";
-  ctx.fillText(label, 0, font * 0.05);
+  ctx.fillText(label, 0, font * 0.06);
   ctx.restore();
 }
 
