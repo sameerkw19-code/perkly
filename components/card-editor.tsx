@@ -10,8 +10,9 @@ import { errorText, translate } from "../lib/i18n";
 import { post } from "../lib/api";
 import { ApplePreview, GooglePreview, ICONS, LoyaltyCard, Num } from "./loyalty-card";
 import { PERKLY_SOCIAL } from "../lib/perkly-social";
-import { makeStampBanners } from "./stamp-banner";
-import { PIZZA_MAX } from "../lib/pizza";
+import { makeAppleStrips, makeStampBanners } from "./stamp-banner";
+import { makeWalletLogos } from "./wallet-logo";
+import { PIZZA_MAX, usesPizza } from "../lib/pizza";
 import { PizzaProgress } from "./pizza-progress";
 import { StampBannerPreview } from "./stamp-banner-preview";
 
@@ -235,6 +236,42 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
     }
   }
 
+  /** Apple Wallet stamp grid: one picture per stamp count, every plan. On failure the pass keeps its banner image. */
+  async function withAppleStrips(d: Design): Promise<Design> {
+    if (usesPizza(d, target)) return { ...d, appleStamps: [] };
+    setBusy("banners");
+    try {
+      const blobs = await makeAppleStrips(d, target);
+      const form = new FormData();
+      blobs.forEach((b, i) => form.append(`s${i}`, b, `s${i}.jpg`));
+      const r = await fetch(`/api/asset/banners?set=apple&business=${encodeURIComponent(businessId)}`, { method: "POST", body: form, credentials: "same-origin" });
+      const data: any = await r.json().catch(() => ({}));
+      return r.ok ? { ...d, appleStamps: data.ids as string[] } : d;
+    } catch {
+      return d;
+    } finally {
+      setBusy("");
+    }
+  }
+
+  /** Wallet logos (white background removed, trimmed). On failure the wallets keep the logo as uploaded. */
+  async function withWalletLogos(d: Design): Promise<Design> {
+    if (!d.logo) return { ...d, walletLogo: null, googleLogo: null };
+    try {
+      const made = await makeWalletLogos(`/api/asset/${d.logo}`, d.colors.bg);
+      if (!made) return d;
+      const up = async (blob: Blob) => {
+        const r = await fetch(`/api/asset?business=${encodeURIComponent(businessId)}&kind=wallet_logo`, { method: "POST", headers: { "Content-Type": "image/png" }, body: blob, credentials: "same-origin" });
+        const data: any = await r.json().catch(() => ({}));
+        return r.ok ? (data.id as string) : null;
+      };
+      const [apple, google] = [await up(made.apple), await up(made.google)];
+      return apple && google ? { ...d, walletLogo: apple, googleLogo: google } : d;
+    } catch {
+      return d;
+    }
+  }
+
   async function publish() {
     if (!setup && !confirm(t("publishConfirm"))) return;
     let next = design;
@@ -242,8 +279,10 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
       const made = await withStampBanners(design);
       if (!made) return;
       next = made;
-      setDesign(made);
     }
+    next = await withAppleStrips(next);
+    next = await withWalletLogos(next);
+    if (next !== design) setDesign(next);
     if (JSON.stringify(next) !== saved && !(await saveDraft(next))) return;
     setBusy("publish");
     const r = await post("/api/loyalty", { action: "publish_design", business: businessId });

@@ -27,6 +27,7 @@ export function exampleDesign(k: ExampleKey, lang: Lang, name: string, rewardLin
     walletHero: null,
     walletBanner: "image",
     walletStamps: [],
+    appleStamps: [],
     walletNotify: false,
     walletWelcome: false,
     walletBirthday: false,

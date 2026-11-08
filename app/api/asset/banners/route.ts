@@ -10,7 +10,7 @@ import { MAX_WALLET_STAMPS } from "../../../../lib/design";
 
 export const dynamic = "force-dynamic";
 
-const MAX_BYTES = 400_000; // One banner picture (JPEG, 1032×336).
+const MAX_BYTES = 400_000; // One banner picture (JPEG, 1032×336 for Google, 1125×369 for Apple).
 
 /**
  * Uploads the stamp banner set in one request: form fields s0, s1, … sN (picture for 0…N stamps).
@@ -25,16 +25,20 @@ export async function POST(request: Request) {
   const db = getD1();
   const user = await getUser(db, request.headers.get("cookie"));
   if (!user) return fail("signin", 401);
-  const business = new URL(request.url).searchParams.get("business");
+  const url = new URL(request.url);
+  const business = url.searchParams.get("business");
+  // "apple": the Apple Wallet stamp grid (every plan). Otherwise the Google Wallet stamp banner (subscription).
+  const apple = url.searchParams.get("set") === "apple";
+  const kind = apple ? "apple_banner" : "banner";
   const role = await getRole(db, user.id, business);
   if (!role) return fail("not_found", 404);
   if (role !== "owner") return fail("forbidden", 403);
   if ((await getSettings(db)).maintenance) return fail("maintenance", 503, "Maintenance");
   const access = await businessAccess(db, business!);
   if (!access.ok && access.code === "business_suspended") return fail(access.code, 402, "Business is suspended");
-  if (!hasPaidDesign(access)) return fail("paid_feature", 402, "Available with a subscription");
+  if (!apple && !hasPaidDesign(access)) return fail("paid_feature", 402, "Available with a subscription");
   if (!form) return fail("bad_request", 400);
-  if (!(await allow(db, `banners:${user.id}`, 20, 3600))) return fail("rate_limited", 429);
+  if (!(await allow(db, `${kind}s:${user.id}`, 20, 3600))) return fail("rate_limited", 429);
 
   const pictures: { bytes: Uint8Array; mime: string; width: number; height: number }[] = [];
   for (let i = 0; i < MAX_WALLET_STAMPS + 1; i++) {
@@ -51,20 +55,21 @@ export async function POST(request: Request) {
   if (pictures.length < 3 || pictures.length > MAX_WALLET_STAMPS) return fail("bad_request", 400);
 
   // Remove banner pictures from earlier drafts. The published card's set stays until the next publish.
-  const keep = new Set((await publishedDesign(db, business!))?.design.walletStamps ?? []);
-  const old = await db.prepare("SELECT id FROM assets WHERE business = ? AND kind = 'banner'").bind(business).all<{ id: string }>();
+  const live = (await publishedDesign(db, business!))?.design;
+  const keep = new Set((apple ? live?.appleStamps : live?.walletStamps) ?? []);
+  const old = await db.prepare("SELECT id FROM assets WHERE business = ? AND kind = ?").bind(business, kind).all<{ id: string }>();
   const remove = (old.results ?? []).map((r) => r.id).filter((id) => !keep.has(id));
 
   const now = new Date().toISOString();
   const ids = pictures.map(() => crypto.randomUUID());
   await db.batch([
-    ...remove.map((id) => db.prepare("DELETE FROM assets WHERE id = ? AND business = ? AND kind = 'banner'").bind(id, business)),
+    ...remove.map((id) => db.prepare("DELETE FROM assets WHERE id = ? AND business = ? AND kind = ?").bind(id, business, kind)),
     // Their Apple Wallet copies (lib/server/apple-wallet.ts) go with them.
     ...remove.map((id) => db.prepare("DELETE FROM apple_images WHERE source = ?").bind(id)),
     ...pictures.map((p, i) =>
       db
-        .prepare("INSERT INTO assets(id, business, kind, mime, width, height, bytes, data, created, created_by) VALUES(?, ?, 'banner', ?, ?, ?, ?, ?, ?, ?)")
-        .bind(ids[i], business, p.mime, p.width, p.height, p.bytes.length, p.bytes, now, user.id),
+        .prepare("INSERT INTO assets(id, business, kind, mime, width, height, bytes, data, created, created_by) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .bind(ids[i], business, kind, p.mime, p.width, p.height, p.bytes.length, p.bytes, now, user.id),
     ),
   ]);
   return json({ ids });

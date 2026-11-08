@@ -350,3 +350,52 @@ export async function makeStampBanners(design: Design, target: number): Promise<
   }
   return out;
 }
+
+// ---- Apple Wallet strip ----
+
+/** Apple Wallet strip size (pixels, @3x) for a store card with a QR code: 375×123 points. */
+export const APPLE_W = 1125;
+export const APPLE_H = 369;
+
+/**
+ * The Apple Wallet strip: only the stamps, in rows, on the card's color (the pass shows the logo,
+ * name and counts as its own fields). The reward slot is the last one.
+ */
+export function drawAppleStrip(ctx: CanvasRenderingContext2D, d: Design, p: BannerPictures, stamps: number, target: number) {
+  const rtl = isRtl(d.langs[0]);
+  const W = APPLE_W, H = APPLE_H;
+  ctx.fillStyle = d.colors.bg;
+  ctx.fillRect(0, 0, W, H);
+  const slots = target + 1;
+  const rows = slots <= 6 ? 1 : slots <= 14 ? 2 : 3;
+  const perRow = Math.ceil(slots / rows);
+  const padX = 48, padY = 22;
+  const cellW = (W - padX * 2) / perRow;
+  const cellH = (H - padY * 2) / rows;
+  const size = Math.floor(Math.min(cellW * 0.78, cellH * 0.86));
+  for (let i = 0; i < slots; i++) {
+    const row = Math.floor(i / perRow);
+    const col = i % perRow;
+    const pos = rtl ? perRow - 1 - col : col;
+    const x = padX + pos * cellW + (cellW - size) / 2;
+    const y = padY + row * cellH + (cellH - size) / 2;
+    if (i === target) drawGift(ctx, d, p, x, y, size, stamps >= target);
+    else drawStamp(ctx, d, p, x, y, size, i < stamps);
+  }
+}
+
+/** One JPEG per stamp count, 0…target, for Apple Wallet (the server turns them into PNG). */
+export async function makeAppleStrips(design: Design, target: number): Promise<Blob[]> {
+  const pictures = await loadBannerPictures(design);
+  const canvas = document.createElement("canvas");
+  canvas.width = APPLE_W;
+  canvas.height = APPLE_H;
+  const ctx = canvas.getContext("2d")!;
+  const out: Blob[] = [];
+  for (let s = 0; s <= target; s++) {
+    ctx.clearRect(0, 0, APPLE_W, APPLE_H);
+    drawAppleStrip(ctx, design, pictures, s, target);
+    out.push(await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("blob"))), "image/jpeg", 0.9)));
+  }
+  return out;
+}

@@ -1,4 +1,4 @@
-import { env } from "cloudflare:workers";
+import { env, waitUntil } from "cloudflare:workers";
 import { getD1 } from "../../../db";
 import { getMembership, getMemberships, getUser, isPlatformAdmin, normalizeEmail } from "../../../lib/server/auth";
 import { randomCode, randomToken, sha256 } from "../../../lib/server/crypto";
@@ -6,13 +6,13 @@ import { fail, json, readJson, sameOrigin, str } from "../../../lib/server/http"
 import { allow } from "../../../lib/server/rate-limit";
 import { formatPhone, maskPhone, normalizePhone } from "../../../lib/phone";
 import { assetIds, defaultDesign, designChecks, is3d, sanitizeDesign } from "../../../lib/design";
-import { assetMeta, liveDesign, ownsAssets, publishedDesign } from "../../../lib/server/designs";
+import { assetMeta, liveDesign, ownsAssets, passLook, publishedDesign } from "../../../lib/server/designs";
 import { releaseArchivedPhone } from "../../../lib/server/customers";
 import { businessAccess, freeLimitReached, hasPaidDesign } from "../../../lib/server/billing";
 import { formatBirthday, parseBirthday, upcomingKeys } from "../../../lib/birthday";
 import { syncGoogleWallet } from "../../../lib/server/wallet-sync";
 import { pushAppleBusiness, pushAppleCustomer } from "../../../lib/server/apple-push";
-import { walletConfig } from "../../../lib/server/google-wallet";
+import { ensureBusinessClass, walletConfig } from "../../../lib/server/google-wallet";
 import { getSettings } from "../../../lib/server/settings";
 import { normalizeSocial, parseSocial, type Social } from "../../../lib/social";
 
@@ -209,7 +209,7 @@ export async function GET(request: Request) {
   const published = await publishedDesign(db, business!.id);
   const draftRow = await db.prepare("SELECT design_draft FROM businesses WHERE id = ?").bind(business!.id).first<{ design_draft: string | null }>();
   const draft = (draftRow?.design_draft && sanitizeDesign(JSON.parse(draftRow.design_draft))) || published?.design || defaultDesign(business!);
-  const images = await db.prepare("SELECT id, kind, width, height FROM assets WHERE business = ? AND kind != 'banner' ORDER BY created DESC LIMIT 60").bind(business!.id).all();
+  const images = await db.prepare("SELECT id, kind, width, height FROM assets WHERE business = ? AND kind NOT IN ('banner', 'apple_banner', 'wallet_logo') ORDER BY created DESC LIMIT 60").bind(business!.id).all();
 
   return json({
     ...base,
@@ -710,6 +710,15 @@ export async function POST(request: Request) {
         .bind(now, origin, business.id)
         .run();
       pushAppleBusiness(db, business.id);
+      // Google Wallet: the business's class carries its logo and color; refresh it with the new design.
+      const google = walletConfig(env);
+      if (google) {
+        waitUntil(
+          passLook(db, business, origin)
+            .then((look) => ensureBusinessClass(google, business.id, look.classLook))
+            .catch((e) => console.log("google wallet class refresh error", String(e))),
+        );
+      }
       return json({ ok: true, version: live?.version, walletUpdates: queued.meta.changes ?? 0 });
     }
 
