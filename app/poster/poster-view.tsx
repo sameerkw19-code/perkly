@@ -3,7 +3,13 @@
 import { useEffect, useState } from "react";
 import { QrImage } from "../../components/qr";
 import { assetUrl, cardLang, isRtl, textsFor, type Design } from "../../lib/design";
-import { translate } from "../../lib/i18n";
+import { translate, useLang } from "../../lib/i18n";
+
+// The page around the sign follows the site language; the sign itself follows the card.
+const UI = {
+  he: { failed: "לא הצלחנו לטעון את העסק.", loading: "טוען…", ownersOnly: "השלט זמין לבעלי העסק בלבד.", noCode: "קוד ההצטרפות לא פעיל כרגע.", back: "← חזרה ללוח הבקרה", backShort: "חזרה ללוח הבקרה", size: "גודל", a4: "שלט A4", sticker: "מדבקה 10×10 ס״מ", print: "הדפסה" },
+  en: { failed: "We couldn't load the business.", loading: "Loading…", ownersOnly: "The sign is for business owners only.", noCode: "The join code is not active right now.", back: "← Back to dashboard", backShort: "Back to dashboard", size: "Size", a4: "A4 sign", sticker: "10×10 cm sticker", print: "Print" },
+};
 
 type Data = { business: { id: string; name: string; target: number; join_code: string | null } | null; role: string | null; design?: Design };
 type Size = "a4" | "sticker";
@@ -13,6 +19,8 @@ export default function PosterView() {
   const [data, setData] = useState<Data | null>(null);
   const [size, setSize] = useState<Size>("a4");
   const [failed, setFailed] = useState(false);
+  const { lang: siteLang } = useLang();
+  const ui = UI[siteLang === "en" ? "en" : "he"];
 
   useEffect(() => {
     const b = new URLSearchParams(window.location.search).get("b") ?? "";
@@ -22,11 +30,11 @@ export default function PosterView() {
       .catch(() => setFailed(true));
   }, []);
 
-  if (failed) return <main className="poster-msg">לא הצלחנו לטעון את העסק. <a href="/">חזרה ללוח הבקרה</a></main>;
-  if (!data) return <main className="poster-msg">טוען…</main>;
+  if (failed) return <main className="poster-msg">{ui.failed} <a href="/">{ui.backShort}</a></main>;
+  if (!data) return <main className="poster-msg">{ui.loading}</main>;
   const b = data.business;
-  if (!b || data.role !== "owner" || !data.design) return <main className="poster-msg">השלט זמין לבעלי העסק בלבד. <a href="/">חזרה ללוח הבקרה</a></main>;
-  if (!b.join_code) return <main className="poster-msg">קוד ההצטרפות לא פעיל כרגע. <a href="/">חזרה ללוח הבקרה</a></main>;
+  if (!b || data.role !== "owner" || !data.design) return <main className="poster-msg">{ui.ownersOnly} <a href="/">{ui.backShort}</a></main>;
+  if (!b.join_code) return <main className="poster-msg">{ui.noCode} <a href="/">{ui.backShort}</a></main>;
 
   const d = data.design;
   const lang = cardLang(d);
@@ -38,13 +46,13 @@ export default function PosterView() {
 
   return (
     <div className="poster-page">
-      <div className="poster-tools no-print" dir="rtl">
-        <a href="/">← חזרה ללוח הבקרה</a>
-        <div className="seg" role="group" aria-label="גודל">
-          <button type="button" aria-pressed={size === "a4"} onClick={() => setSize("a4")}>שלט A4</button>
-          <button type="button" aria-pressed={size === "sticker"} onClick={() => setSize("sticker")}>מדבקה 10×10 ס״מ</button>
+      <div className="poster-tools no-print" dir={siteLang === "en" ? "ltr" : "rtl"}>
+        <a href="/">{ui.back}</a>
+        <div className="seg" role="group" aria-label={ui.size}>
+          <button type="button" aria-pressed={size === "a4"} onClick={() => setSize("a4")}>{ui.a4}</button>
+          <button type="button" aria-pressed={size === "sticker"} onClick={() => setSize("sticker")}>{ui.sticker}</button>
         </div>
-        <button type="button" className="btn primary" onClick={() => window.print()}>הדפסה</button>
+        <button type="button" className="btn primary" onClick={() => window.print()}>{ui.print}</button>
       </div>
 
       {size === "a4" ? (

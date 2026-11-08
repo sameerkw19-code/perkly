@@ -13,6 +13,8 @@ import { QrImage } from "../../components/qr";
 import { darken, defaultDesign, defaultLook, onColor, type Design, type PresetIcon } from "../../lib/design";
 import { errorText, translate } from "../../lib/i18n";
 import { post } from "../../lib/api";
+import { useRegion } from "../../components/region-context";
+import { withPrices, type Currency } from "../../lib/pricing";
 
 export type StartBusiness = { id: string; name: string; joinCode: string | null; paid: boolean; canWork: boolean; status: string };
 
@@ -37,12 +39,12 @@ const T = {
     kind: "סוג העסק", bizName: "שם העסק", reward: "ההטבה", target: "חותמות להטבה", other: "אחר",
     preview: "כך הלקוחות יראו את הכרטיס", createBiz: "יצירת הכרטיס",
     payTitle: "14 ימים חינם", payIntro: "הכרטיס מוכן. מוסיפים אמצעי תשלום ומקבלים מיד את ה־QR לקופה.",
-    today: "היום", todayAmount: "0 ₪", chargeOn: "החל מ־{d}", cancelNote: "מבטלים לפני כן בלחיצה, ולא משלמים כלום.",
-    plan: "מנוי Perkly", price: "99 ₪", per: "לחודש", noSetup: "14 ימי ניסיון חינם. החיוב הראשון רק אחרי 14 ימים, ואם מבטלים לפני כן לא משלמים כלום. בלי דמי הקמה.",
-    planPick: "בחירת מסלול", planMonthly: "חודשי", planYearly: "שנתי", yearlyPrice: "999 ₪", yearlyPer: "לשנה",
-    yearlyNote: "כ־83 ₪ לחודש, וערכת הקופה כלולה: 2 פוסטרים וסטנד QR, שנשלחים אחרי החיוב הראשון.", thenYearly: ["Then ₪999/year", "אחר כך 999 ₪ לשנה"] as [string, string],
+    today: "היום", todayAmount: "{$0}", chargeOn: "החל מ־{d}", cancelNote: "מבטלים לפני כן בלחיצה, ולא משלמים כלום.",
+    plan: "מנוי Perkly", price: "{$m}", per: "לחודש", noSetup: "14 ימי ניסיון חינם. החיוב הראשון רק אחרי 14 ימים, ואם מבטלים לפני כן לא משלמים כלום. בלי דמי הקמה.",
+    planPick: "בחירת מסלול", planMonthly: "חודשי", planYearly: "שנתי", yearlyPrice: "{$y}", yearlyPer: "לשנה",
+    yearlyNote: "כ־{$ym} לחודש, וערכת הקופה כלולה: 2 פוסטרים וסטנד QR, שנשלחים אחרי החיוב הראשון.", thenYearly: ["Then {$y}/year", "אחר כך {$y} לשנה"] as [string, string],
     features: ["לקוחות ללא הגבלה", "לוגו, תמונות וחותמת משלכם", "כרטיס ב־Apple Wallet וב־Google Wallet", "עמדת עובד והזמנת עובדים"],
-    englishNote: { title: "דף התשלום באנגלית. מה כתוב שם?", rows: [["14 days free", "14 ימים חינם"], ["Due today ₪0", "היום משלמים 0 ₪"], ["Then ₪99/month", "אחר כך 99 ₪ לחודש"], ["Start trial", "התחלת הניסיון (הכפתור בסוף)"]] },
+    englishNote: { title: "דף התשלום באנגלית. מה כתוב שם?", rows: [["14 days free", "14 ימים חינם"], ["Due today {$0}", "היום משלמים {$0}"], ["Then {$m}/month", "אחר כך {$m} לחודש"], ["Start trial", "התחלת הניסיון (הכפתור בסוף)"]] },
     pay: "התחלת 14 ימי ניסיון", paying: "פותחים את דף התשלום…", secure: "התשלום מתבצע אצל Polar, ספק תשלומים מאובטח. פרטי האשראי לא מגיעים אלינו.",
     later: "בינתיים בחינם, עד 10 לקוחות",
     freeNote: "בלי מנוי אפשר לצרף עד 10 לקוחות. כדי להמשיך מעבר לזה, מפעילים מנוי עם 14 ימי ניסיון חינם.", activate: "הפעלת מנוי", billingOff: "התשלום באתר עדיין לא מופעל. כתבו לנו ל־support@perkly.shop ונפעיל לכם את החשבון.",
@@ -66,12 +68,12 @@ const T = {
     kind: "نوع المشروع", bizName: "اسم المشروع", reward: "المكافأة", target: "أختام للمكافأة", other: "آخر",
     preview: "هكذا يرى الزبائن البطاقة", createBiz: "إنشاء البطاقة",
     payTitle: "14 يوماً مجاناً", payIntro: "البطاقة جاهزة. أضيفوا وسيلة دفع واحصلوا فوراً على رمز QR للصندوق.",
-    today: "اليوم", todayAmount: "0 ₪", chargeOn: "ابتداءً من {d}", cancelNote: "ألغوا قبل ذلك بنقرة ولن تدفعوا شيئاً.",
-    plan: "اشتراك Perkly", price: "99 ₪", per: "شهرياً", noSetup: "تجربة مجانية لمدة 14 يوماً. أول دفعة بعد 14 يوماً فقط، وإن ألغيتم قبل ذلك لا تدفعون شيئاً. بدون رسوم تأسيس.",
-    planPick: "اختيار الخطة", planMonthly: "شهري", planYearly: "سنوي", yearlyPrice: "999 ₪", yearlyPer: "سنوياً",
-    yearlyNote: "حوالي 83 ₪ شهرياً، وطقم الصندوق مشمول: ملصقان وحامل QR، يُرسلان بعد أول دفعة.", thenYearly: ["Then ₪999/year", "بعدها 999 ₪ سنوياً"] as [string, string],
+    today: "اليوم", todayAmount: "{$0}", chargeOn: "ابتداءً من {d}", cancelNote: "ألغوا قبل ذلك بنقرة ولن تدفعوا شيئاً.",
+    plan: "اشتراك Perkly", price: "{$m}", per: "شهرياً", noSetup: "تجربة مجانية لمدة 14 يوماً. أول دفعة بعد 14 يوماً فقط، وإن ألغيتم قبل ذلك لا تدفعون شيئاً. بدون رسوم تأسيس.",
+    planPick: "اختيار الخطة", planMonthly: "شهري", planYearly: "سنوي", yearlyPrice: "{$y}", yearlyPer: "سنوياً",
+    yearlyNote: "حوالي {$ym} شهرياً، وطقم الصندوق مشمول: ملصقان وحامل QR، يُرسلان بعد أول دفعة.", thenYearly: ["Then {$y}/year", "بعدها {$y} سنوياً"] as [string, string],
     features: ["زبائن بلا حدود", "الشعار والصور والختم الخاص بكم", "بطاقة في Apple Wallet وGoogle Wallet", "محطة موظف ودعوة موظفين"],
-    englishNote: { title: "صفحة الدفع بالإنجليزية. ماذا يعني المكتوب؟", rows: [["14 days free", "14 يوماً مجاناً"], ["Due today ₪0", "تدفعون اليوم 0 ₪"], ["Then ₪99/month", "بعدها 99 ₪ شهرياً"], ["Start trial", "بدء التجربة (الزر في الأسفل)"]] },
+    englishNote: { title: "صفحة الدفع بالإنجليزية. ماذا يعني المكتوب؟", rows: [["14 days free", "14 يوماً مجاناً"], ["Due today {$0}", "تدفعون اليوم {$0}"], ["Then {$m}/month", "بعدها {$m} شهرياً"], ["Start trial", "بدء التجربة (الزر في الأسفل)"]] },
     pay: "ابدأوا تجربة 14 يوماً", paying: "نفتح صفحة الدفع…", secure: "الدفع يتم عبر Polar، مزود دفع آمن. تفاصيل البطاقة لا تصل إلينا.",
     later: "مجاناً حالياً، حتى 10 زبائن",
     freeNote: "بدون اشتراك يمكن إضافة حتى 10 زبائن. للمتابعة بعد ذلك فعّلوا الاشتراك مع تجربة مجانية لمدة 14 يوماً.", activate: "تفعيل الاشتراك", billingOff: "الدفع في الموقع غير مفعّل بعد. راسلونا على support@perkly.shop وسنفعّل حسابكم.",
@@ -95,10 +97,10 @@ const T = {
     kind: "Type of business", bizName: "Business name", reward: "Reward", target: "Stamps for a reward", other: "Other",
     preview: "What your customers will see", createBiz: "Create my card",
     payTitle: "14 days free", payIntro: "Your card is ready. Add a payment method and get your QR code for the counter right away.",
-    today: "Today", todayAmount: "₪0", chargeOn: "From {d}", cancelNote: "Cancel before then in one click and pay nothing.",
-    plan: "Perkly subscription", price: "₪99", per: "a month", noSetup: "14-day free trial. You're first charged after 14 days, and if you cancel before then you pay nothing. No setup fee.",
-    planPick: "Choose a plan", planMonthly: "Monthly", planYearly: "Yearly", yearlyPrice: "₪999", yearlyPer: "a year",
-    yearlyNote: "About ₪83 a month, with the counter kit included: 2 posters and a QR stand, shipped after the first payment.", thenYearly: ["Then ₪999/year", "Then ₪999 a year"] as [string, string],
+    today: "Today", todayAmount: "{$0}", chargeOn: "From {d}", cancelNote: "Cancel before then in one click and pay nothing.",
+    plan: "Perkly subscription", price: "{$m}", per: "a month", noSetup: "14-day free trial. You're first charged after 14 days, and if you cancel before then you pay nothing. No setup fee.",
+    planPick: "Choose a plan", planMonthly: "Monthly", planYearly: "Yearly", yearlyPrice: "{$y}", yearlyPer: "a year",
+    yearlyNote: "About {$ym} a month, with the counter kit included: 2 posters and a QR stand, shipped after the first payment.", thenYearly: ["Then {$y}/year", "Then {$y} a year"] as [string, string],
     features: ["Unlimited customers", "Your own logo, images and stamp", "Cards in Apple Wallet and Google Wallet", "Staff station and team invites"],
     englishNote: null,
     pay: "Start the 14-day trial", paying: "Opening the payment page…", secure: "Payment is handled by Polar, a secure payment provider. Your card details never reach us.",
@@ -126,9 +128,10 @@ function readLang(): Lang {
 }
 
 /** The card a new business starts with: the example look for its type, with the owner's own texts. */
-function startDesign(kind: Kind, name: string, reward: string): Design {
+function startDesign(kind: Kind, name: string, reward: string, lang: Lang): Design {
   const th = kind === "other" ? OTHER_THEME : THEMES[kind];
-  const base = defaultDesign({ name: name || "Perkly", reward: reward || "-", color: th.bg });
+  // The card starts in the language of the sign-up (English abroad).
+  const base = defaultDesign({ name: name || "Perkly", reward: reward || "-", color: th.bg }, lang);
   const light = onColor(th.bg) !== "#FFFFFF";
   return {
     ...base,
@@ -145,16 +148,21 @@ function firstStep(signedIn: boolean, business: StartBusiness | null, billingOn:
   return billingOn || !business.canWork ? "pay" : "done";
 }
 
-export default function StartFlow({ signedIn, userName, needsCode, business: initialBusiness, isStaffOnly, billingOn, yearlyOn = false, paidReturn }: {
+export default function StartFlow({ signedIn, userName, needsCode, business: initialBusiness, isStaffOnly, billingOn, yearlyOn = false, paidReturn, currency = "ILS" }: {
   signedIn: boolean; userName: string; needsCode: boolean; business: StartBusiness | null; isStaffOnly: boolean; billingOn: boolean; yearlyOn?: boolean; paidReturn: boolean;
+  /** The business's currency, or the visitor's market before there is a business. */
+  currency?: Currency;
 }) {
+  const region = useRegion();
   const [plan, setPlan] = useState<"monthly" | "yearly">("monthly");
   // Coming from the yearly side of the pricing switch on the home page: start on the yearly plan.
   useEffect(() => {
     if (yearlyOn && new URLSearchParams(window.location.search).get("plan") === "yearly") setPlan("yearly");
   }, [yearlyOn]);
-  const lang = useSyncExternalStore(noSubscribe, readLang, () => "he" as Lang);
-  const t = T[lang];
+  // Abroad: English only. In Israel: Hebrew, or English when picked.
+  const picked = useSyncExternalStore(noSubscribe, region.intl ? () => "en" as Lang : readLang, () => region.lang as Lang);
+  const lang: Lang = region.intl ? "en" : picked;
+  const t = withPrices(T[lang], currency, lang);
   const tr = (key: string, vars?: Record<string, string | number>) => translate(lang, key, vars);
   const dir = lang === "en" ? "ltr" : "rtl";
 
@@ -175,7 +183,7 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
   const [target, setTarget] = useState(10);
   const suggestedReward = ex ? ex.reward.charAt(0).toUpperCase() + ex.reward.slice(1) : "";
   const shownReward = rewardEdited ? reward : suggestedReward;
-  const design = useMemo(() => startDesign(kind, bizName || (ex?.name ?? t.bizName), shownReward), [kind, bizName, shownReward, ex, t.bizName]);
+  const design = useMemo(() => startDesign(kind, bizName || (ex?.name ?? t.bizName), shownReward, lang), [kind, bizName, shownReward, ex, t.bizName, lang]);
 
   // Live card for the payment step, read from the server once the business exists.
   const [liveDesign, setLiveDesign] = useState<Design | null>(null);
@@ -229,7 +237,7 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
     if (!created.ok) { setError(errorText(lang, created.code)); return false; }
     const id = created.data.id;
     // The card look for this type of business. If saving it fails, the business still has the default card.
-    const saved = await post("/api/loyalty", { business: id, action: "save_design", design: startDesign(kind, name, rewardText) });
+    const saved = await post("/api/loyalty", { business: id, action: "save_design", design: startDesign(kind, name, rewardText, lang) });
     if (saved.ok) await post("/api/loyalty", { business: id, action: "publish_design" });
     setBusiness({ id, name, joinCode: null, paid: false, canWork: false, status: "none" });
     setStep("pay");
@@ -274,7 +282,9 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
 
   const current = step === "done" ? STEPS.length : STEPS.indexOf(step === "wait" ? "pay" : step);
   const chargeDate = new Date(Date.now() + 14 * 86_400_000).toLocaleDateString(lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB", { day: "numeric", month: "long" });
-  const joinUrl = business?.joinCode && typeof window !== "undefined" ? `${window.location.origin}/join/${business.joinCode}` : "";
+  // The server has no window: render without the link first, then fill it in after hydration (a mismatch otherwise).
+  const origin = useSyncExternalStore(noSubscribe, () => window.location.origin, () => "");
+  const joinUrl = business?.joinCode && origin ? `${origin}/join/${business.joinCode}` : "";
 
   return (
     <div className="lp su st" lang={lang} dir={dir}>

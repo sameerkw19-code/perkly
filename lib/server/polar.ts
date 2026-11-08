@@ -1,3 +1,4 @@
+import type { Currency } from "../pricing";
 // Polar (merchant of record): creates checkout sessions and verifies webhooks (Standard Webhooks).
 // The access token and webhook secret are never sent to the browser.
 
@@ -9,6 +10,9 @@ export type PolarEnv = {
   POLAR_PRODUCT_ID?: string;
   /** Optional: the yearly product (999 ILS a year, counter kit included). Without it only the monthly plan is offered. */
   POLAR_PRODUCT_ID_YEARLY?: string;
+  /** Dollar products for businesses abroad. Without them, those businesses get the shekel products. */
+  POLAR_PRODUCT_ID_USD?: string;
+  POLAR_PRODUCT_ID_YEARLY_USD?: string;
   POLAR_WEBHOOK_SECRET?: string;
   POLAR_SANDBOX?: string;
 };
@@ -18,8 +22,14 @@ export function polarConfigured(env: PolarEnv): boolean {
 }
 
 /** Whether the yearly plan can be sold: billing works and a yearly product is set. */
-export function yearlyConfigured(env: PolarEnv): boolean {
-  return polarConfigured(env) && !!env.POLAR_PRODUCT_ID_YEARLY;
+/** The Polar products for a currency (dollar ones when set, otherwise the shekel ones). */
+export function productsFor(env: PolarEnv, currency: Currency): { monthly?: string; yearly?: string } {
+  if (currency === "USD" && env.POLAR_PRODUCT_ID_USD) return { monthly: env.POLAR_PRODUCT_ID_USD, yearly: env.POLAR_PRODUCT_ID_YEARLY_USD };
+  return { monthly: env.POLAR_PRODUCT_ID, yearly: env.POLAR_PRODUCT_ID_YEARLY };
+}
+
+export function yearlyConfigured(env: PolarEnv, currency: Currency = "ILS"): boolean {
+  return polarConfigured(env) && !!productsFor(env, currency).yearly;
 }
 
 function apiBase(env: PolarEnv): string {
@@ -30,7 +40,8 @@ function apiBase(env: PolarEnv): string {
  * Creates a hosted Polar checkout for one business. Returns the URL to redirect the owner to.
  * `from: "start"` returns the owner to the guided setup (/start) instead of the billing page.
  */
-export async function createCheckoutUrl(env: PolarEnv, businessId: string, origin: string, customerEmail: string, from: "billing" | "start" = "billing", trialDays = 0, plan: "monthly" | "yearly" = "monthly"): Promise<string> {
+export async function createCheckoutUrl(env: PolarEnv, businessId: string, origin: string, customerEmail: string, from: "billing" | "start" = "billing", trialDays = 0, plan: "monthly" | "yearly" = "monthly", currency: Currency = "ILS"): Promise<string> {
+  const products = productsFor(env, currency);
   const b = encodeURIComponent(businessId);
   const success = from === "start" ? `${origin}/start?paid=1&b=${b}` : `${origin}/billing?ok=1`;
   const back = from === "start" ? `${origin}/start?b=${b}` : `${origin}/billing`;
@@ -42,7 +53,7 @@ export async function createCheckoutUrl(env: PolarEnv, businessId: string, origi
       Accept: "application/json",
     },
     body: JSON.stringify({
-      products: [plan === "yearly" && env.POLAR_PRODUCT_ID_YEARLY ? env.POLAR_PRODUCT_ID_YEARLY : env.POLAR_PRODUCT_ID],
+      products: [plan === "yearly" && products.yearly ? products.yearly : products.monthly],
       // Free trial: the card is collected now and first charged when the trial ends.
       ...(trialDays > 0 ? { allow_trial: true, trial_interval: "day", trial_interval_count: trialDays } : {}),
       success_url: success,

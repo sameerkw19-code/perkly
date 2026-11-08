@@ -5,6 +5,8 @@ import { validMonthDay, parseBirthday, birthdayFromParts, formatBirthday, upcomi
 import { sanitizeDesign, defaultDesign, designChecks, FONTS, cardLang, textsFor, sanitizeLangs, walletStampPicture, assetIds, is3d, ICON_GROUPS, STAMP_ICONS, STAMP_3D } from "../lib/design.ts";
 import { businessAccess, freeLimitReached, hasPaidDesign, TRIAL_DAYS, YEARLY_PRICE_ILS, MONTHLY_PRICE_ILS, planOf, monthlyValue } from "../lib/server/billing.ts";
 import { existsSync, readFileSync } from "node:fs";
+import { PRICES, fillPrices, withPrices, asCurrency, yearlySaving } from "../lib/pricing.ts";
+import { regionFrom } from "../lib/server/region.ts";
 import { lookFields } from "../lib/wallet-look.ts";
 import { usesPizza, slicePath, slicesPath, PIZZA_MAX } from "../lib/pizza.ts";
 
@@ -302,15 +304,47 @@ test("yearly plan: a twelfth of the price per month in the admin estimate", () =
 test("yearly plan: the same price and the kit in every text that sells it", () => {
   const read = (f) => readFileSync(new URL("../" + f, import.meta.url), "utf8");
   const copy = read("app/landing/content.ts");
-  for (const phrase of ["999 ₪", "₪999", "מנוי שנתי", "اشتراك سنوي", "yearly plan"]) assert.ok(copy.includes(phrase), phrase);
-  // The pricing switch: both sides in every language, and 16% matches the prices (999 against 12 × 99).
-  assert.equal(Math.round((1 - 999 / (12 * 99)) * 100), 16);
-  for (const phrase of ["חוסכים 16%", "وفّروا 16%", "Save 16%"]) assert.ok(copy.includes(phrase), phrase);
+  // Texts carry placeholders; the visitor's currency fills them (lib/pricing.ts).
+  for (const phrase of ["{$y}", "{$k}", "מנוי שנתי", "اشتراك سنوي", "yearly plan"]) assert.ok(copy.includes(phrase), phrase);
+  for (const phrase of ["חוסכים {$save}%", "وفّروا {$save}%", "Save {$save}%"]) assert.ok(copy.includes(phrase), phrase);
+  assert.ok(!/\d+ ?₪|₪\d+|(?<!\{)\$\d+/.test(copy), "no hard-coded price in the landing copy");
+  assert.equal(PRICES.ILS.yearly, YEARLY_PRICE_ILS);
+  assert.equal(PRICES.ILS.monthly, MONTHLY_PRICE_ILS);
+  assert.equal(yearlySaving("ILS"), 16);
+  assert.equal(yearlySaving("USD"), 17);
   assert.match(read("app/landing/landing-client.tsx"), /plan=yearly/);
   assert.match(read("app/terms/page.tsx"), /מנוי שנתי: 999 ₪ לשנה.*ערכת קופה/);
-  assert.match(read("app/start/start-flow.tsx"), /yearlyPrice: "999 ₪"/);
-  assert.match(read("app/billing/billing-view.tsx"), /999 ₪ לשנה/);
+  assert.match(read("app/terms/terms-en.tsx"), /Yearly subscription: \{m\(p\.yearly\)\}.*counter kit/);
+  assert.match(read("app/start/start-flow.tsx"), /yearlyPrice: "\{\$y\}"/);
+  assert.match(read("app/billing/billing-view.tsx"), /\{\$y\} לשנה/);
   assert.ok(existsSync(new URL("../drizzle/0023_counter_kit.sql", import.meta.url)));
+});
+
+test("prices: shekels in Israel, dollars abroad, written the way each language reads", () => {
+  assert.equal(fillPrices("{$m} / {$y} / {$k}", "ILS", "he"), "99 ₪ / 999 ₪ / 99 ₪");
+  assert.equal(fillPrices("{$m}", "ILS", "en"), "₪99");
+  assert.equal(fillPrices("{$m} / {$y} / {$ym} / {$0}", "USD", "he"), "$29 / $290 / $24 / $0");
+  assert.equal(fillPrices("Save {$save}%", "USD", "en"), "Save 17%");
+  assert.deepEqual(withPrices({ a: ["{$m}"], b: { c: "{$k}" }, n: 3 }, "USD", "en"), { a: ["$29"], b: { c: "$29" }, n: 3 });
+  assert.equal(asCurrency("USD"), "USD");
+  assert.equal(asCurrency(null), "ILS");
+  assert.equal(asCurrency("EUR"), "ILS");
+  // The admin estimate counts dollars in shekels.
+  assert.ok(monthlyValue("monthly", "USD") > 29);
+});
+
+test("region: Israel (or unknown) gets Hebrew and shekels, everyone else English and dollars", () => {
+  const r = (c) => regionFrom(new Headers(c === undefined ? {} : { "cf-ipcountry": c }));
+  for (const c of ["IL", "il", "XX", "", undefined]) assert.deepEqual(r(c), { israel: true, lang: "he", currency: "ILS" }, String(c));
+  for (const c of ["US", "GB", "DE", "AE", "PS"]) assert.deepEqual(r(c), { israel: false, lang: "en", currency: "USD" }, c);
+});
+
+test("abroad: no Hebrew pages and no language switch", () => {
+  const read = (f) => readFileSync(new URL("../" + f, import.meta.url), "utf8");
+  for (const f of ["app/terms/page.tsx", "app/privacy/page.tsx", "app/accessibility/page.tsx"]) assert.match(read(f), /visitorRegion\(\)\)\.israel \?/, f);
+  assert.match(read("components/lang-switch.tsx"), /useRegion\(\)\.intl\) return null/);
+  assert.match(read("app/he/page.tsx"), /redirect\("\/en"\)/);
+  assert.equal(defaultDesign({ name: "Joe", reward: "Free coffee" }, "en").langs[0], "en");
 });
 
 // ---- Wallet stamp banner: one picture per stamp count ----

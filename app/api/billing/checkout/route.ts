@@ -4,6 +4,7 @@ import { getMembership, getUser } from "../../../../lib/server/auth";
 import { fail, json, readJson, sameOrigin, str } from "../../../../lib/server/http";
 import { createCheckoutUrl, polarConfigured, yearlyConfigured } from "../../../../lib/server/polar";
 import { TRIAL_DAYS } from "../../../../lib/server/billing";
+import { asCurrency } from "../../../../lib/pricing";
 
 export const dynamic = "force-dynamic";
 
@@ -22,12 +23,13 @@ export async function POST(request: Request) {
   if (!membership || membership.role !== "owner") return fail("forbidden", 403, "Owner permission required");
   if (!polarConfigured(env)) return fail("billing_off", 503, "Billing is not set up yet");
   const plan = body.plan === "yearly" ? "yearly" : "monthly";
-  if (plan === "yearly" && !yearlyConfigured(env)) return fail("plan_unavailable", 400, "The yearly plan is not available yet");
+  const currency = asCurrency((await db.prepare("SELECT currency FROM businesses WHERE id = ?").bind(business).first<{ currency: string }>())?.currency);
+  if (plan === "yearly" && !yearlyConfigured(env, currency)) return fail("plan_unavailable", 400, "The yearly plan is not available yet");
   try {
     // A trial only for a business that never had a subscription (not for one that lapsed or was canceled).
     const sub = await db.prepare("SELECT status, external_subscription FROM subscriptions WHERE business = ?").bind(business).first<{ status: string; external_subscription: string | null }>();
     const firstTime = !sub?.external_subscription;
-    const url = await createCheckoutUrl(env, business, new URL(request.url).origin, user.email, body.from === "start" ? "start" : "billing", firstTime ? TRIAL_DAYS : 0, plan);
+    const url = await createCheckoutUrl(env, business, new URL(request.url).origin, user.email, body.from === "start" ? "start" : "billing", firstTime ? TRIAL_DAYS : 0, plan, currency);
     return json({ url });
   } catch {
     return fail("checkout_failed", 502, "Could not open the payment page");

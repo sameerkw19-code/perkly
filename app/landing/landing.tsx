@@ -1,6 +1,7 @@
 // Public marketing page (Hebrew at "/", Arabic at "/ar"). Copy lives in content.ts.
 import "./landing.css";
-import { COPY, hrefs, waLink, WHATSAPP_DISPLAY, type Lang } from "./content";
+import { COPY, copyFor, hrefs, waLink, WHATSAPP_DISPLAY, type Lang } from "./content";
+import type { Currency } from "../../lib/pricing";
 import { DemoPanel, ExamplesPicker, Logo, PricingPlans, SiteNav, TiltStage } from "./landing-client";
 import { SocialRow, Testimonials } from "./landing-parts";
 import { CafeLogo, Icon, QrArt } from "./visuals";
@@ -123,8 +124,9 @@ function DashboardMock({ lang }: { lang: Lang }) {
   );
 }
 
-export default function Landing({ lang }: { lang: Lang }) {
-  const c = COPY[lang];
+/** `currency`: the visitor's market (shekels in Israel, dollars abroad). */
+export default function Landing({ lang, currency = "ILS" }: { lang: Lang; currency?: Currency }) {
+  const c = copyFor(lang, currency);
   const h = hrefs(lang);
   return (
     <div className="lp" lang={lang} dir={c.dir}>
@@ -241,7 +243,7 @@ export default function Landing({ lang }: { lang: Lang }) {
           <div className="lp-wrap">
             <span className="lp-eyebrow">{c.pricing.eyebrow}</span>
             <h2 id="pricing-title" className="lp-h2">{c.pricing.title}</h2>
-            <PricingPlans lang={lang}>
+            <PricingPlans lang={lang} currency={currency}>
               <article className="lp-price-card lp-price-kit" aria-labelledby="plan-kit">
                 <KitScene lang={lang} />
                 <div className="lp-kit-body">

@@ -1,11 +1,23 @@
 import type { Metadata } from "next";
 import LegalPage from "../legal/legal-page";
+import AccessibilityEn from "./accessibility-en";
+import { visitorRegion } from "../../lib/server/region";
 import { OPERATOR } from "../legal/operator";
 import { WHATSAPP_DISPLAY } from "../landing/content";
 
-export const metadata: Metadata = { title: "Perkly | הצהרת נגישות", alternates: { canonical: "/accessibility" } };
+export const dynamic = "force-dynamic";
 
-export default function AccessibilityPage() {
+// Hebrew in Israel, English abroad (visitors outside Israel never see Hebrew).
+export async function generateMetadata(): Promise<Metadata> {
+  const { israel } = await visitorRegion();
+  return { title: israel ? "Perkly | הצהרת נגישות" : "Perkly | Accessibility Statement", alternates: { canonical: "/accessibility" } };
+}
+
+export default async function AccessibilityPage() {
+  return (await visitorRegion()).israel ? <AccessibilityPageHe /> : <AccessibilityEn />;
+}
+
+function AccessibilityPageHe() {
   return (
     <LegalPage title="הצהרת נגישות" updated="25 באוקטובר 2026">
       <p>אנחנו רוצים שכל אחד יוכל להשתמש ב־Perkly. ההצהרה מתארת מה נעשה עד עכשיו ומה עוד לא נבדק.</p>

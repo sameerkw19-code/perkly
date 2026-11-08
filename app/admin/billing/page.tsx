@@ -4,6 +4,7 @@ import { monthlyValue, planOf } from "../../../lib/server/billing";
 import { listOrders, polarConfigured, type PolarOrder } from "../../../lib/server/polar";
 import { STATUS_LABEL, adminStatus, requireAdminPage, shortDate, shortDateTime } from "../../../lib/server/admin";
 import { AdminHeader } from "../admin-header";
+import { asCurrency } from "../../../lib/pricing";
 
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false }, title: "Perkly · מנויים וכסף" };
@@ -11,7 +12,7 @@ export const metadata = { robots: { index: false }, title: "Perkly · מנויי
 type SubRow = {
   business: string; name: string; owner_email: string | null; status: string | null; current_period_end: string | null;
   updated: string | null; external_subscription: string | null; suspended: string | null; comp_until: string | null;
-  plan: string | null; kit_due: string | null; kit_sent: string | null;
+  plan: string | null; kit_due: string | null; kit_sent: string | null; currency: string;
 };
 
 const POLAR_STATUS: Record<string, string> = {
@@ -33,7 +34,7 @@ export default async function AdminBillingPage() {
   const subs = await db
     .prepare(
       `SELECT b.id AS business, b.name, u.email AS owner_email, s.status, s.current_period_end, s.updated, s.external_subscription,
-         b.suspended, b.comp_until, s.plan, b.kit_due, b.kit_sent
+         b.suspended, b.comp_until, s.plan, b.kit_due, b.kit_sent, b.currency
        FROM businesses b LEFT JOIN subscriptions s ON s.business = b.id LEFT JOIN users u ON u.id = b.owner
        ORDER BY (s.status = 'past_due') DESC, s.updated DESC NULLS LAST, b.created DESC LIMIT 500`,
     )
@@ -56,7 +57,7 @@ export default async function AdminBillingPage() {
   const activeRows = subs.results.filter((r) => r.status === "active");
   const active = activeRows.length;
   const yearlyActive = activeRows.filter((r) => planOf(r.plan, env) === "yearly").length;
-  const mrr = activeRows.reduce((sum, r) => sum + monthlyValue(planOf(r.plan, env)), 0);
+  const mrr = activeRows.reduce((sum, r) => sum + monthlyValue(planOf(r.plan, env), asCurrency(r.currency)), 0);
   const kitsDue = subs.results.filter((r) => r.kit_due && !r.kit_sent);
   const pastDue = subs.results.filter((r) => r.status === "past_due");
   const byMonth = new Map<string, Map<string, number>>();

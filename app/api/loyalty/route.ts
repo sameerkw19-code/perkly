@@ -15,6 +15,7 @@ import { pushAppleBusiness, pushAppleCustomer } from "../../../lib/server/apple-
 import { ensureBusinessClass, walletConfig } from "../../../lib/server/google-wallet";
 import { getSettings } from "../../../lib/server/settings";
 import { normalizeSocial, parseSocial, type Social } from "../../../lib/social";
+import { regionFrom } from "../../../lib/server/region";
 
 export const dynamic = "force-dynamic";
 
@@ -266,9 +267,16 @@ export async function POST(request: Request) {
     // The free trial is for an owner's first business only (a second business would otherwise reset it).
     const earlier = await db.prepare("SELECT COUNT(*) AS n FROM businesses WHERE owner = ?").bind(user.id).first<{ n: number }>();
     const trialDays = earlier?.n ? 0 : sys.trialDays;
+    const region = regionFrom(request.headers);
     await db.batch([
-      db.prepare("INSERT INTO businesses(id, owner, name, reward, target, color, created, join_code, reward_mode) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .bind(id, user.id, name, reward, p.target, p.color, now, randomCode(10), mode),
+      // The currency follows where the owner signs up: shekels in Israel, dollars abroad.
+      db.prepare("INSERT INTO businesses(id, owner, name, reward, target, color, created, join_code, reward_mode, currency) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .bind(id, user.id, name, reward, p.target, p.color, now, randomCode(10), mode, region.currency),
+      // Abroad the card starts in English (the default card is Hebrew).
+      ...(region.israel
+        ? []
+        : [db.prepare("INSERT INTO card_designs(id, business, version, data, published, published_by) VALUES(?, ?, 1, ?, ?, ?)")
+            .bind(crypto.randomUUID(), id, JSON.stringify(defaultDesign({ name, reward, color: p.color }, "en")), now, user.id)]),
       db.prepare("INSERT INTO memberships(id, business, user, role, created) VALUES(?, ?, ?, 'owner', ?)")
         .bind(crypto.randomUUID(), id, user.id, now),
       // With "require subscription": a free trial, then a subscription is needed (status 'none' is not entitled).
