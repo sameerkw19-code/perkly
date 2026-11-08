@@ -209,7 +209,7 @@ export async function GET(request: Request) {
   const published = await publishedDesign(db, business!.id);
   const draftRow = await db.prepare("SELECT design_draft FROM businesses WHERE id = ?").bind(business!.id).first<{ design_draft: string | null }>();
   const draft = (draftRow?.design_draft && sanitizeDesign(JSON.parse(draftRow.design_draft))) || published?.design || defaultDesign(business!);
-  const images = await db.prepare("SELECT id, kind, width, height FROM assets WHERE business = ? AND kind != 'banner' ORDER BY created DESC LIMIT 60").bind(business!.id).all();
+  const images = await db.prepare("SELECT id, kind, width, height FROM assets WHERE business = ? AND kind NOT IN ('banner', 'apple_banner') ORDER BY created DESC LIMIT 60").bind(business!.id).all();
 
   return json({
     ...base,

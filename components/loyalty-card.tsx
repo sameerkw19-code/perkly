@@ -211,20 +211,21 @@ export function ApplePreview({ design, lang, stamps, target, customerName }: Pro
   const cl = cardLang(design, lang);
   const t: T = (key, vars) => translate(cl, key, vars);
   const text = textsFor(design, cl);
-  const banner = design.walletHero ?? design.hero;
   const label = { color: `color-mix(in srgb, ${design.colors.fg} 70%, transparent)` };
+  // Same layout as the real pass (lib/server/apple-wallet.ts): logo and name, the stamp grid, stamps and rewards ready.
+  const ready = stamps >= target ? 1 : 0;
   return (
     <div className="wallet apple" dir={isRtl(cl) ? "rtl" : "ltr"} lang={cl} style={{ ...cardStyle(design), background: design.colors.bg, color: design.colors.fg }}>
       <div className="ap-top">
-        <div className="ap-logo"><Logo design={design} title={text.title} className="card-logo small" /><b>{text.title}</b></div>
+        <div className="ap-logo">{design.logo ? <Logo design={design} title={text.title} className="card-logo small" /> : <b>{text.title}</b>}</div>
         {design.showCustomerName && customerName && <div className="ap-f"><small style={label}>{t("customerName")}</small><b>{customerName}</b></div>}
       </div>
-      <div className="ap-strip" style={banner ? { backgroundImage: `linear-gradient(color-mix(in srgb, ${design.colors.bg} 50%, transparent), color-mix(in srgb, ${design.colors.bg} 50%, transparent)), url(${assetUrl(banner)})` } : undefined}>
+      <div className="ap-strip">
         <StampGrid design={design} stamps={stamps} target={target} giftLabel={text.gift} />
       </div>
       <div className="ap-row">
         <div><small style={label}>{t("stampsWord")}</small><b><Num>{stamps}/{target}</Num></b></div>
-        <div className="end"><small style={label}>{t("reward")}</small><b>{text.reward}</b></div>
+        <div className="end"><small style={label}>{t("rewardsWord")}</small><b><Num>{ready}</Num></b></div>
       </div>
       <div className="fake-qr">QR</div>
     </div>

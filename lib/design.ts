@@ -162,6 +162,8 @@ export type Design = {
   progressImage: string | null;
   /** For "stamps": picture ids for 0, 1, … target stamps, made by the editor when publishing. */
   walletStamps: string[];
+  /** Apple Wallet strip: the stamp grid for 0, 1, … target stamps, made by the editor when publishing (every plan). */
+  appleStamps: string[];
   /** A phone notification (Google Wallet) after each stamp and when a reward is reached. Off unless the business turns it on. */
   walletNotify: boolean;
   /** A welcome notification right after the customer saves the card to Google Wallet. */
@@ -252,6 +254,7 @@ export function defaultDesign(b: { name: string; reward: string; color: string }
     walletHero: null,
     walletBanner: "image",
     walletStamps: [],
+    appleStamps: [],
     walletNotify: false,
     walletWelcome: false,
     walletBirthday: false,
@@ -302,6 +305,7 @@ export function sanitizeDesign(input: unknown): Design | null {
     walletHero: asset(d.walletHero),
     walletBanner: d.walletBanner === "stamps" ? "stamps" : "image",
     walletStamps: walletStampIds(d.walletStamps),
+    appleStamps: walletStampIds(d.appleStamps),
     walletNotify: d.walletNotify === true,
     walletWelcome: d.walletWelcome === true,
     walletBirthday: d.walletBirthday === true,
@@ -338,7 +342,7 @@ function sanitizeLook(input: unknown, bg: string): CardLook {
 }
 
 export function assetIds(d: Design): string[] {
-  return [d.logo, d.hero, d.walletHero, d.stamp.image, d.stamp.emptyImage, d.progressImage, ...d.walletStamps].filter((x): x is string => !!x);
+  return [d.logo, d.hero, d.walletHero, d.stamp.image, d.stamp.emptyImage, d.progressImage, ...d.walletStamps, ...d.appleStamps].filter((x): x is string => !!x);
 }
 
 /** Most stamps a card can have (see validTarget), so at most 31 banner pictures (0 to 30 stamps). */
@@ -352,6 +356,12 @@ function walletStampIds(input: unknown): string[] {
 }
 
 /** The banner picture for a pass with this many stamps, or null when the set does not match the target. */
+/** The Apple Wallet stamp grid picture for this many stamps, or null when the editor has not made the set. */
+export function appleStampPicture(d: Design, stamps: number, target: number): string | null {
+  if (d.appleStamps.length !== target + 1) return null;
+  return d.appleStamps[Math.max(0, Math.min(target, stamps))] ?? null;
+}
+
 export function walletStampPicture(d: Design, stamps: number, target: number): string | null {
   if (d.walletBanner !== "stamps" || d.walletStamps.length !== target + 1) return null;
   return d.walletStamps[Math.max(0, Math.min(target, stamps))] ?? null;

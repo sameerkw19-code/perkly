@@ -1,7 +1,7 @@
 // Apple Wallet store cards for customers: the pass content, its images, and the per-pass token the
 // iPhone uses to fetch updates from the web service (app/api/wallet/apple-ws).
 import { env } from "cloudflare:workers";
-import { cardLang, textsFor, walletStampPicture, type Lang } from "../design";
+import { appleStampPicture, cardLang, textsFor, walletStampPicture, type Lang } from "../design";
 import { buildPkpass, rgb, type Bytes } from "./apple-pass";
 import { PASS_ICONS } from "./apple-pass-icons";
 import { liveDesign } from "./designs";
@@ -111,15 +111,17 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
     files["logo@2x.png"] = logo;
     files["logo@3x.png"] = logo;
   }
-  // The banner under the logo: the stamp picture for this many stamps when the business uses stamp
-  // banners (as on Google Wallet), otherwise its wallet banner or background image.
-  const strip = await passImage(db, c.business, walletStampPicture(design, c.stamps, c.target) ?? design.walletHero ?? design.hero, "strip");
+  // The strip under the logo: the stamp grid for this many stamps (made by the editor when publishing).
+  // Cards published before it existed: the Google Wallet stamp banner, the wallet banner or the background image.
+  const grid = appleStampPicture(design, c.stamps, c.target);
+  const strip = await passImage(db, c.business, grid ?? walletStampPicture(design, c.stamps, c.target) ?? design.walletHero ?? design.hero, "strip");
   if (strip) {
     files["strip@2x.png"] = strip;
     files["strip@3x.png"] = strip;
   }
-  const stamps = { key: "stamps", label: L.stamps, value: `${c.stamps}/${c.target}`, changeMessage: L.changed };
-  const ready = c.rewards > 0 ? [{ key: "ready", label: L.ready, value: c.rewards, changeMessage: L.readyChanged }] : [];
+  const stamps = { key: "stamps", label: L.stamps, value: `${Math.min(c.stamps, c.target)}/${c.target}`, changeMessage: L.changed };
+  const ready = { key: "ready", label: L.ready, value: c.rewards, changeMessage: L.readyChanged, textAlignment: "PKTextAlignmentRight" };
+  const name = { key: "customer", label: L.customer, value: c.name.slice(0, 40), textAlignment: "PKTextAlignmentRight" };
   const pass = {
     formatVersion: 1,
     passTypeIdentifier: config.passTypeId,
@@ -134,14 +136,15 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
     labelColor: rgb(design.colors.fg),
     backgroundColor: rgb(design.colors.bg),
     sharingProhibited: true,
-    barcodes: [{ format: "PKBarcodeFormatQR", message: "perkly:" + c.scan_code, messageEncoding: "iso-8859-1" }],
+    barcodes: [{ format: "PKBarcodeFormatQR", message: "perkly:" + c.scan_code, messageEncoding: "iso-8859-1", altText: "Powered by Perkly" }],
     storeCard: {
-      // With a banner, the stamp count sits at the top right and the banner stays clear;
-      // without one, the count is the large number on the card.
-      headerFields: strip ? [...ready, stamps] : ready,
-      primaryFields: strip ? [] : [stamps],
-      secondaryFields: [{ key: "reward", label: L.reward, value: reward }, { key: "customer", label: L.customer, value: c.name.slice(0, 40) }],
+      // Logo and the customer's name on top, the stamps as a picture, then the stamp count and the rewards ready.
+      headerFields: design.showCustomerName ? [name] : [],
+      primaryFields: [],
+      secondaryFields: [stamps, ready],
+      ...(strip ? {} : { auxiliaryFields: [{ key: "reward", label: L.reward, value: reward }] }),
       backFields: [
+        { key: "rewardBack", label: L.reward, value: reward },
         ...(text.promo ? [{ key: "offer", label: L.offer, value: text.promo.slice(0, 200) }] : []),
         { key: "about", label: "Perkly", value: L.about },
       ],
