@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getD1 } from "../../../../db";
 import { liveDesign } from "../../../../lib/server/designs";
 import { STATUS_LABEL, adminStatus, requireAdminPage, shortDate, shortDateTime } from "../../../../lib/server/admin";
-import { AdminActions, AdminCardPreview, ApplePushTest, KitSentButton } from "./admin-actions";
+import { AdminActions, AdminCardPreview, ApplePushTest, GoogleSyncTest, KitSentButton } from "./admin-actions";
 import { env } from "cloudflare:workers";
 import { planOf } from "../../../../lib/server/billing";
 
@@ -107,6 +107,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
               <dt>סטטוס ב-Polar</dt><dd>{b.status ?? "אין מנוי"}</dd>
               <dt>מסלול</dt><dd>{b.status ? (planOf(b.plan, env) === "yearly" ? "שנתי (ערכת קופה כלולה)" : "חודשי") : "—"}</dd>
               <dt>Apple Wallet</dt><dd><ApplePushTest business={b.id} /></dd>
+              <dt>Google Wallet</dt><dd><GoogleSyncTest business={b.id} /></dd>
               <dt>ערכת קופה</dt><dd>{b.kit_sent ? `נשלחה ${shortDate(b.kit_sent)}` : b.kit_due ? <>מגיעה מאז {shortDate(b.kit_due)} <KitSentButton business={b.id} /></> : "—"}</dd>
               <dt>סוף תקופה</dt><dd>{shortDate(b.current_period_end)}</dd>
               <dt>מזהה מנוי</dt><dd dir="ltr"><code>{b.external_subscription ?? "—"}</code></dd>

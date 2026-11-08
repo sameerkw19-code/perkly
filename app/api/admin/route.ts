@@ -5,6 +5,9 @@ import { fail, json, readJson, sameOrigin, str } from "../../../lib/server/http"
 import { normalizeEmail } from "../../../lib/server/auth";
 import { cancelAtPeriodEnd } from "../../../lib/server/polar";
 import { applePushReady, pushTokens } from "../../../lib/server/apple-push";
+import { customerForPass } from "../../../lib/server/apple-wallet";
+import { passLook } from "../../../lib/server/designs";
+import { updateLoyaltyObject, walletConfig } from "../../../lib/server/google-wallet";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +41,28 @@ export async function POST(request: Request) {
       .bind(crypto.randomUUID(), user.email, businessId, action, detail, nowIso);
 
   switch (body.action) {
+    case "google_sync_test": {
+      // Pushes the current stamps to every Google Wallet pass saved for the business and returns Google's answer.
+      const config = walletConfig(env);
+      if (!config) return json({ ok: true, ready: false, saved: 0, results: [] });
+      const rows = await db
+        .prepare("SELECT id FROM customers WHERE business = ? AND google_wallet IS NOT NULL AND archived IS NULL ORDER BY created DESC LIMIT 10")
+        .bind(businessId)
+        .all<{ id: string }>();
+      const origin = new URL(request.url).origin;
+      const results = [];
+      for (const { id } of rows.results) {
+        const c = await customerForPass(db, id);
+        if (!c) continue;
+        const full = await passLook(db, { id: c.business, name: c.business_name, reward: c.reward, color: c.color }, origin, { stamps: c.stamps, target: c.target }).catch(() => undefined);
+        const look = full ? (({ notice: _n, ...rest }) => rest)(full) : undefined;
+        const detail: { status?: number; text?: string } = {};
+        const result = await updateLoyaltyObject(config, { customerId: c.id, businessId: c.business, stamps: c.stamps, target: c.target, scanCode: c.scan_code, rewards: c.rewards, look: look as typeof full }, null, detail);
+        if (result === "not_saved") await db.prepare("UPDATE customers SET google_wallet = NULL WHERE id = ?").bind(c.id).run();
+        results.push({ name: c.name, stamps: `${c.stamps}/${c.target}`, result, status: detail.status ?? 0, text: detail.text ?? "" });
+      }
+      return json({ ok: true, ready: true, saved: rows.results.length, results });
+    }
     case "apple_push_test": {
       const rows = await db
         .prepare("SELECT r.push_token FROM apple_registrations r JOIN customers c ON c.id = r.serial WHERE c.business = ? LIMIT 20")

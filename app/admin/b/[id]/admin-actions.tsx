@@ -27,6 +27,27 @@ export function ApplePushTest({ business }: { business: string }) {
   );
 }
 
+/** Sends the current stamps to the business's Google Wallet passes now and shows Google's answer. */
+export function GoogleSyncTest({ business }: { business: string }) {
+  const [busy, setBusy] = useState(false);
+  const [out, setOut] = useState("");
+  return (
+    <span>
+      <button className="btn soft small" disabled={busy} onClick={async () => {
+        setBusy(true);
+        const r = await post<{ ready: boolean; saved: number; results: { name: string; stamps: string; result: string; status: number; text: string }[] }>("/api/admin", { action: "google_sync_test", business });
+        setBusy(false);
+        if (!r.ok || !r.data) return setOut("הבדיקה נכשלה.");
+        const d = r.data;
+        if (!d.ready) return setOut("Google Wallet לא מחובר בשרת.");
+        if (!d.saved) return setOut("אף לקוח בעסק הזה לא שמר עדיין כרטיס ב-Google Wallet.");
+        setOut(d.results.map((x) => `${x.name} ${x.stamps}: ${x.result === "updated" ? "עודכן" : x.result === "not_saved" ? "הכרטיס כבר לא שמור ב-Google" : `נכשל (${x.status}) ${x.text}`}`).join(" · "));
+      }}>{busy ? "שולח..." : "בדיקת עדכון Google Wallet"}</button>
+      {out && <small className="muted" style={{ marginInlineStart: 8, overflowWrap: "anywhere" }} role="status">{out}</small>}
+    </span>
+  );
+}
+
 /** Yearly plan: marks the included counter kit as shipped. */
 export function KitSentButton({ business }: { business: string }) {
   const [busy, setBusy] = useState(false);

@@ -205,7 +205,7 @@ async function addNotice(token: string, objectUrl: string, notice: WalletNotice)
  * "not_saved": Google has no such pass (the customer opened the link but never saved it).
  * Never throws, so a Google outage can't break stamping.
  */
-export async function updateLoyaltyObject(config: WalletConfig, card: LoyaltyCard, notice?: WalletNotice | null): Promise<UpdateResult> {
+export async function updateLoyaltyObject(config: WalletConfig, card: LoyaltyCard, notice?: WalletNotice | null, detail?: { status?: number; text?: string }): Promise<UpdateResult> {
   try {
     const token = await accessToken(config);
     const objectUrl = `${API}/loyaltyObject/${encodeURIComponent(objectIdFor(config, card.customerId))}`;
@@ -215,14 +215,18 @@ export async function updateLoyaltyObject(config: WalletConfig, card: LoyaltyCar
       // A new notification replaces the previous one on the back of the pass.
       body: JSON.stringify({ ...liveFields(card), ...(card.look ? lookFields(card.look) : {}), ...(notice ? { messages: [] } : {}) }),
     });
+    if (detail) detail.status = r.status;
     if (r.status === 404) return "not_saved";
     if (!r.ok) {
-      console.warn(`google wallet update failed: HTTP ${r.status}`);
+      const text = (await r.text().catch(() => "")).slice(0, 400);
+      if (detail) detail.text = text;
+      console.warn(`google wallet update failed: HTTP ${r.status} ${text}`);
       return "failed";
     }
     if (notice) await addNotice(token, objectUrl, notice);
     return "updated";
   } catch (e) {
+    if (detail) detail.text = (e as Error).message;
     console.warn(`google wallet update failed: ${(e as Error).message}`);
     return "failed";
   }
