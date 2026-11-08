@@ -50,7 +50,22 @@ export async function POST(request: Request) {
     .bind(crypto.randomUUID(), business.id, name, phone, scan, business.target, now, await sha256(secret), scan, now, marketing, birthday);
   // A removed customer's phone may join again: free it first, in the same batch as the insert.
   const [, r] = await db.batch([releaseArchivedPhone(db, business.id, phone), insert]);
-  // Never hand out an existing card to someone who only knows the phone number.
-  if (!r.meta.changes) return fail("phone_exists", 409, "This phone is already registered here. Ask the staff for your card link.");
-  return json({ cardPath: `/c/${secret}?welcome=1` });
+  if (r.meta.changes) return json({ cardPath: `/c/${secret}?welcome=1` });
+
+  // The number is already here. Often the customer filled in the form and left before keeping the card link,
+  // and now cannot get back in. If that card was never used (no stamps, no activity, no reward, not saved
+  // to a wallet), start it over with a new link: there is nothing on it to take. The old link stops working.
+  // A card that was used is never handed to someone who only knows the phone number.
+  const restart = await db
+    .prepare(
+      `UPDATE customers SET name = ?1, token = ?2, scan_code = ?2, card_hash = ?3, consent_terms = ?4, consent_marketing = ?5, birthday = ?6
+       WHERE business = ?7 AND phone = ?8 AND archived IS NULL AND stamps = 0 AND google_wallet IS NULL
+         AND NOT EXISTS (SELECT 1 FROM events WHERE customer = customers.id)
+         AND NOT EXISTS (SELECT 1 FROM rewards WHERE customer = customers.id)
+         AND NOT EXISTS (SELECT 1 FROM apple_registrations WHERE serial = customers.id)`,
+    )
+    .bind(name, scan, await sha256(secret), now, marketing, birthday, business.id, phone)
+    .run();
+  if (restart.meta.changes) return json({ cardPath: `/c/${secret}?welcome=1` });
+  return fail("phone_exists", 409, "This phone is already registered here. Ask the staff for your card link.");
 }

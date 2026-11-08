@@ -570,3 +570,14 @@ test("admin reset: business name and password, children deleted before customers
   // Only platform admins: the owner's own API has no reset.
   assert.doesNotMatch(readFileSync(new URL("../app/api/loyalty/route.ts", import.meta.url), "utf8"), /reset_data/);
 });
+
+test("join again: an unused card starts over, a used one stays protected", () => {
+  const api = readFileSync(new URL("../app/api/join/route.ts", import.meta.url), "utf8");
+  const restart = api.slice(api.indexOf("const restart"));
+  for (const guard of ["archived IS NULL", "stamps = 0", "google_wallet IS NULL", "FROM events WHERE customer", "FROM rewards WHERE customer", "FROM apple_registrations WHERE serial"]) assert.ok(restart.includes(guard), guard);
+  assert.match(restart, /card_hash = \?3/);
+  assert.match(api, /fail\("phone_exists", 409/);
+  const form = readFileSync(new URL("../app/join/[code]/join-form.tsx", import.meta.url), "utf8");
+  assert.match(form, /localStorage\.setItem\(cardKey\(code\)/);
+  assert.match(form, /useSyncExternalStore\(noSubscribe, \(\) => savedCard\(code\), \(\) => ""\)/);
+});

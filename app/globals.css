@@ -608,3 +608,6 @@ html,body{overflow-x:clip}
 .removed-who{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;min-width:0;font-size:13px;color:#686775}
 .removed-who strong{color:#494155;font-weight:500}
 .removed-who .form-hint{font-size:12px}
+
+/* Join page: this phone already has a card here */
+.join-have-card{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#f4f1fa;border-radius:12px;padding:12px 14px;margin:4px 0 8px;font-size:14px;color:#494155}
