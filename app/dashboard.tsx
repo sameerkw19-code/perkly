@@ -750,13 +750,32 @@ function Station({ business, design, branches, myBranch, canFix, owner, t, lang,
   const [qty, setQty] = useState(1);
   const [fixing, setFixing] = useState<{ value: number; note: string } | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
-  // Showing a new customer: reset the quantity and bring the card into view (phones).
+  const searchRef = useRef<HTMLInputElement>(null);
+  // A short confirmation over the card after a stamp or reward (the toast is easy to miss at a busy counter).
+  const [done, setDone] = useState<{ text: string; reward: boolean } | null>(null);
+  const doneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function flash(text: string, reward: boolean) {
+    setDone({ text, reward });
+    if (doneTimer.current) clearTimeout(doneTimer.current);
+    doneTimer.current = setTimeout(() => setDone(null), 2200);
+  }
+  useEffect(() => () => { if (doneTimer.current) clearTimeout(doneTimer.current); }, []);
+  // Showing a new customer: reset the quantity, clear the search and bring the card into view (phones).
   function choose(c: CardState) {
     setSelected(c);
     setPending(null);
     setQty(1);
     setFixing(null);
+    setDone(null);
+    setQuery("");
+    setResults([]);
     setTimeout(() => cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }
+  /** Ready for the next customer: no card open, the search box focused. */
+  function next() {
+    setSelected(null); setPending(null); setFixing(null); setDone(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    setTimeout(() => searchRef.current?.focus(), 50);
   }
   // The branch this device works at (remembered per business on this device).
   const [branch, setBranch] = useState<string>("");
@@ -868,9 +887,11 @@ function Station({ business, design, branches, myBranch, canFix, owner, t, lang,
       setSelected({ ...selected, ...r.data.card });
       setQty(1);
       const earned = r.data.earned as number | undefined;
-      notify(r.data.replayed ? t("replayed")
+      const message = r.data.replayed ? t("replayed")
         : earned ? (earned === 1 ? t("earnedSaved") : t("earnedSavedN", { n: earned }))
-        : kind === "stamp" ? (count === 1 ? t("stampOk") : t("stampsOk", { n: count! })) : t("redeemOk"));
+        : kind === "stamp" ? (count === 1 ? t("stampOk") : t("stampsOk", { n: count! })) : t("redeemOk");
+      // Shown over the card (role=status), so no separate toast.
+      flash(message, !!earned || kind === "redeem");
       onDone();
     } else if (r.network) {
       notify(t("err_network"), true); // outcome unknown: keep the request id for a safe retry
@@ -902,7 +923,7 @@ function Station({ business, design, branches, myBranch, canFix, owner, t, lang,
 
   return (
     <>
-      <div className="page-head"><div><h1>{t("stationTitle")}</h1><p className="muted">{t("stationSubtitle")}</p></div>
+      <div className="page-head st-head"><div><h1>{t("stationTitle")}</h1><p className="muted">{t("stationSubtitle")}</p></div>
         <div className="head-actions">
           {fixedBranch ? <span className="pill branch-pill">{t("workingAt", { b: fixedBranch.name })}</span>
             : branches.length > 0 && (
@@ -910,43 +931,75 @@ function Station({ business, design, branches, myBranch, canFix, owner, t, lang,
                 <option value="">{t("chooseBranch")}</option>
                 {branches.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
               </select>
-            )}<button className="btn soft" onClick={onRegister}><Plus size={16} />{t("newCustomer")}</button></div>
+            )}<button className="btn soft st-new" onClick={onRegister}><Plus size={16} /><span>{t("newCustomer")}</span></button></div>
       </div>
-      <section className="staff-grid">
-        <div className="panel scanner">
-          <span className="scan-icon"><ScanLine size={30} /></span>
-          <h2>{t("scan")}</h2>
-          <p>{t("scanHint")}</p>
-          {scanning ? (
-            <div className="video-wrap"><video ref={video} muted playsInline /><div className="scan-frame" /></div>
-          ) : (
-            <div className="scanner-art"><ScanLine size={70} strokeWidth={1} /></div>
-          )}
-          <button className="btn primary" onClick={scanning ? stop : start}>{scanning ? t("stop") : t("camera")}</button>
-          <p className="divider">{t("manual")}</p>
-          <label className="search"><Search size={17} /><input value={query} placeholder={t("search")} onChange={(e) => setQuery(e.target.value)} /></label>
-          <small className="form-hint">{t("searchHint")}</small>
-          <div className="staff-results">
-            {results.map((c) => (
-              <button key={c.id} className={"customer-result" + (selected?.id === c.id ? " active-result" : "")} onClick={() => choose(c)}>
-                <span><strong>{c.name}</strong><small dir="ltr">{c.phone}</small></span>
-                <span><Num>{c.stamps}/{c.target}</Num></span>
-              </button>
-            ))}
-            {query.trim().length >= 2 && !results.length && <p className="form-hint">{t("noCustomer")}</p>}
+      <section className={"staff-grid st" + (selected ? " has-card" : "")}>
+        <div className="panel scanner st-find">
+          <div className="st-search-row">
+            <label className="search st-search">
+              <Search size={18} />
+              <input ref={searchRef} value={query} placeholder={t("search")} aria-label={t("search")} enterKeyHint="search"
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && results[0]) { e.preventDefault(); choose(results[0]); } }} />
+              {query && <button type="button" className="st-clear" aria-label={t("close")} onClick={() => { setQuery(""); searchRef.current?.focus(); }}><X size={16} /></button>}
+            </label>
+            <button className={"btn st-scan-btn " + (scanning ? "soft" : "primary")} onClick={scanning ? stop : start}>
+              {scanning ? <X size={18} /> : <ScanLine size={18} />}<span>{scanning ? t("stop") : t("stScan")}</span>
+            </button>
           </div>
+          {scanning ? (
+            <div className="video-wrap"><video ref={video} muted playsInline /><div className="scan-frame" /><p className="st-video-hint">{t("stPointCamera")}</p></div>
+          ) : query.trim().length < 2 && (
+            <p className="form-hint st-hint">{t("stHint")}</p>
+          )}
+          {(results.length > 0 || query.trim().length >= 2) && (
+            <div className="staff-results" role="listbox" aria-label={t("search")}>
+              {results.map((c) => {
+                const ready = (c.rewards ?? 0) > 0 || c.stamps >= c.target;
+                return (
+                  <button key={c.id} role="option" aria-selected={selected?.id === c.id} className={"customer-result" + (selected?.id === c.id ? " active-result" : "")} onClick={() => choose(c)}>
+                    <span className="st-avatar" aria-hidden="true">{c.name.charAt(0)}</span>
+                    <span className="st-result-who"><strong>{c.name}</strong><small dir="ltr">{c.phone}</small></span>
+                    <span className="st-result-count">
+                      {ready && <span className="pill ready-pill"><Gift size={11} /></span>}
+                      <span className="st-mini-track" aria-hidden="true"><i style={{ width: Math.min(100, (c.stamps / c.target) * 100) + "%" }} /></span>
+                      <Num>{c.stamps}/{c.target}</Num>
+                    </span>
+                  </button>
+                );
+              })}
+              {query.trim().length >= 2 && !results.length && (
+                <div className="st-none">
+                  <p className="form-hint">{t("noCustomer")}</p>
+                  <button className="btn soft small" onClick={onRegister}><Plus size={14} />{t("newCustomer")}</button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        <div className="panel staff-card" ref={cardRef}>
+        <div className={"panel staff-card st-card" + (selected ? "" : " st-empty")} ref={cardRef}>
           {!selected ? (
-            <><ScanLine size={60} strokeWidth={1} /><p>{t("selectHint")}</p></>
+            <><ScanLine size={56} strokeWidth={1} /><p>{t("selectHint")}</p></>
           ) : (
             <>
-              <div className="staff-who">
-                <h2>{selected.name}</h2>
-                {selected.phone && <small dir="ltr">{selected.phone}</small>}
+              <div className="st-who">
+                <span className="st-avatar big" aria-hidden="true">{selected.name.charAt(0)}</span>
+                <div>
+                  <h2>{selected.name}</h2>
+                  {selected.phone && <small dir="ltr">{selected.phone}</small>}
+                </div>
+                <button className="icon-btn st-close" aria-label={t("close")} title={t("close")} onClick={next}><X size={18} /></button>
               </div>
-              <LoyaltyCard design={design} lang={lang} stamps={selected.stamps} target={selected.target} customerName={selected.name} rewards={selected.rewards} t={t} />
+              <div className="st-card-wrap">
+                <LoyaltyCard design={design} lang={lang} stamps={selected.stamps} target={selected.target} customerName={selected.name} rewards={selected.rewards} t={t} />
+                {done && (
+                  <div className={"st-done" + (done.reward ? " reward" : "")} role="status">
+                    <span className="st-done-icon">{done.reward ? <Gift size={30} /> : <Check size={30} />}</span>
+                    <strong>{done.text}</strong>
+                  </div>
+                )}
+              </div>
               {!!selected.rewards && selected.nextExpiry && <small className="form-hint">{t("expiresOnShort", { d: new Date(selected.nextExpiry).toLocaleDateString(lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB") })}</small>}
 
               {fixing ? (
@@ -964,27 +1017,32 @@ function Station({ business, design, branches, myBranch, canFix, owner, t, lang,
                     <button className="btn soft" onClick={() => setFixing(null)}>{t("cancel")}</button>
                   </div>
                 </div>
-              ) : selected.stamps >= selected.target ? (
-                <button className="btn lime big" disabled={busy} onClick={() => act("redeem")}><Gift size={18} />{busy ? t("sending") : retrying ? t("retry") : redeemAsk ? t("redeemAgain") : t("redeem")}</button>
               ) : (
-                <>
-                  {!!selected.rewards && (
-                    <button className="btn lime big" disabled={busy} onClick={() => act("redeem")}><Gift size={18} />{busy ? t("sending") : redeemAsk ? t("redeemAgain") : t("redeem")}</button>
+                <div className="st-actions">
+                  {selected.stamps >= selected.target ? (
+                    <button className="btn lime big" disabled={busy} onClick={() => act("redeem")}><Gift size={18} />{busy ? t("sending") : retrying ? t("retry") : redeemAsk ? t("redeemAgain") : t("redeem")}</button>
+                  ) : (
+                    <>
+                      {!!selected.rewards && (
+                        <button className="btn lime big" disabled={busy} onClick={() => act("redeem")}><Gift size={18} />{busy ? t("sending") : redeemAsk ? t("redeemAgain") : t("redeem")}</button>
+                      )}
+                      <div className="st-stamp-row">
+                        <div className="qty-row">
+                          <span className="qty-label">{t("qtyLabel")}</span>
+                          <Stepper value={qty} min={1} max={business.reward_mode === "bank" ? 10 : Math.min(10, remaining)} onChange={setQty} label={t("qtyLabel")} />
+                        </div>
+                        <button className="btn primary big" disabled={busy} onClick={() => act("stamp")}>
+                          <Plus size={18} />{busy ? t("sending") : retrying ? t("retry") : qty === 1 ? t("addStamp") : t("addStamps", { n: qty })}
+                        </button>
+                      </div>
+                      <small className="form-hint st-remaining">{t("remainingHint", { k: remaining })}</small>
+                    </>
                   )}
-                  <div className="qty-row">
-                    <span className="qty-label">{t("qtyLabel")}</span>
-                    <Stepper value={qty} min={1} max={business.reward_mode === "bank" ? 10 : Math.min(10, remaining)} onChange={setQty} label={t("qtyLabel")} />
-                    <small className="form-hint">{t("remainingHint", { k: remaining })}</small>
-                  </div>
-                  <button className="btn primary big" disabled={busy} onClick={() => act("stamp")}>
-                    <Plus size={18} />{busy ? t("sending") : retrying ? t("retry") : qty === 1 ? t("addStamp") : t("addStamps", { n: qty })}
-                  </button>
-                </>
+                </div>
               )}
-              <div className="row-actions center-row">
+              <div className="row-actions center-row st-more">
+                <button className="btn soft small" onClick={next}><Search size={14} />{t("nextCustomer")}</button>
                 {canFix && !fixing && <button className="btn soft small" onClick={() => setFixing({ value: selected.stamps, note: "" })}><Activity size={14} />{t("fixCount")}</button>}
-                <button className="btn soft small" onClick={() => { setSelected(null); setPending(null); setFixing(null); start(); }}><ScanLine size={14} />{t("nextCustomer")}</button>
-                <button className="text-btn" onClick={() => { setSelected(null); setPending(null); setFixing(null); }}><X size={14} />{t("close")}</button>
                 {owner && <button className="text-btn" style={{ color: "#b4413a" }} disabled={busy} onClick={() => archiveCustomer(false)}>{archiveAsk ? t("archiveAgain") : t("archiveCustomer")}</button>}
                 {owner && archiveAsk && <button className="text-btn" style={{ color: "#b4413a" }} disabled={busy} onClick={() => archiveCustomer(true)}>{t("eraseCustomer")}</button>}
               </div>

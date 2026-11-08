@@ -532,3 +532,8 @@
 .st-glossary dl div { display: flex; justify-content: space-between; gap: 12px; }
 .st-glossary dt { font-family: ui-monospace, Menlo, monospace; font-size: 13.5px; color: var(--ink); }
 .st-glossary dd { margin: 0; color: var(--muted); text-align: end; }
+
+/* Phones: the example chips wrap onto more lines instead of scrolling sideways. */
+@media (max-width: 760px) {
+  .lp-example-chips, .lp[dir="ltr"] .lp-example-chips { flex-wrap: wrap; overflow: visible; mask-image: none; -webkit-mask-image: none; }
+}

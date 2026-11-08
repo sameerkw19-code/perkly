@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./fonts.css";
 import "./globals.css";
+import { TableLabels } from "../components/table-labels";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://perkly.shop"),
@@ -16,7 +17,7 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1, them
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="he" dir="rtl">
-      <body>{children}</body>
+      <body>{children}<TableLabels /></body>
     </html>
   );
 }
