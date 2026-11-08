@@ -537,3 +537,26 @@
 @media (max-width: 760px) {
   .lp-example-chips, .lp[dir="ltr"] .lp-example-chips { flex-wrap: wrap; overflow: visible; mask-image: none; -webkit-mask-image: none; }
 }
+
+/* ---- Guided setup: business → account → activate ---- */
+.st-biz-chip { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: #FCFBFF; }
+.st-biz-chip > span { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.st-biz-chip strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-biz-chip small { color: var(--muted); font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-biz-chip .st-later { font-size: 13.5px; white-space: nowrap; }
+.st-pw { display: flex; align-items: stretch; gap: 8px; }
+.st-pw input { flex: 1; min-width: 0; }
+.st-pw button { flex: none; border: 1.5px solid var(--line); background: #fff; border-radius: 12px; padding: 0 14px; font: inherit; font-weight: 700; font-size: 14px; color: var(--ink); cursor: pointer; }
+.st-center { text-align: center; }
+.st-timeline { border: 1.5px solid var(--p); border-radius: 18px; padding: 6px 18px 12px; background: #FCFBFF; display: grid; }
+.st-tl-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 12px 0; border-bottom: 1px dashed var(--line); font-size: 16px; }
+.st-tl-row b { font-family: var(--font-display); font-size: 22px; font-weight: 800; }
+.st-tl-row b small { font-family: inherit; font-size: 14px; font-weight: 600; color: var(--muted); }
+.st-tl-row.is-now span { font-weight: 700; color: var(--ink); }
+.st-tl-row.is-now b { color: var(--green); }
+.st-timeline .su-opt { margin: 10px 0 0; }
+.st-feats { display: grid; gap: 8px; list-style: none; padding: 0; margin: 0; }
+.st-feats li { display: flex; align-items: center; gap: 8px; font-size: 15.5px; }
+.st-feats li svg { color: var(--green); flex: none; }
+details.st-glossary summary { cursor: pointer; font-weight: 700; }
+details.st-glossary dl { margin: 10px 0 0; }
