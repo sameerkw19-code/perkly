@@ -5,11 +5,13 @@ import { getSettings } from "../../../lib/server/settings";
 import { fail, json, sameOrigin } from "../../../lib/server/http";
 import { imageInfo } from "../../../lib/server/image";
 import { allow } from "../../../lib/server/rate-limit";
+import { publishedDesign } from "../../../lib/server/designs";
 
 export const dynamic = "force-dynamic";
 
 const MAX_BYTES = 800_000; // The editor shrinks images before upload; this is a safety cap.
-const KINDS = new Set(["logo", "hero", "stamp", "wallet"]);
+// wallet_logo: the logo prepared for Apple and Google Wallet by the editor when publishing.
+const KINDS = new Set(["logo", "hero", "stamp", "wallet", "wallet_logo"]);
 
 // Upload one image (raw bytes in the body). Owner only. SVG is not accepted.
 export async function POST(request: Request) {
@@ -38,6 +40,16 @@ export async function POST(request: Request) {
   if (!info || info.width < 1 || info.height < 1 || info.width > 6000 || info.height > 6000) return fail("image_type", 415);
 
   const id = crypto.randomUUID();
+  // Wallet logos are remade on every publish: drop older ones the published card no longer uses
+  // (kept for a day, so a publish in progress never loses the ones it just made).
+  if (kind === "wallet_logo") {
+    const live = (await publishedDesign(db, business!))?.design;
+    const dayAgo = new Date(Date.now() - 86_400_000).toISOString();
+    await db
+      .prepare("DELETE FROM assets WHERE business = ? AND kind = 'wallet_logo' AND created < ? AND id NOT IN (?, ?)")
+      .bind(business, dayAgo, live?.walletLogo ?? "", live?.googleLogo ?? "")
+      .run();
+  }
   await db
     .prepare("INSERT INTO assets(id, business, kind, mime, width, height, bytes, data, created, created_by) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
     .bind(id, business, kind, info.mime, info.width, info.height, bytes.length, bytes, new Date().toISOString(), user.id)

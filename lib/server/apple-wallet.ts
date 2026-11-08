@@ -105,7 +105,8 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
   const reward = (text.reward || c.reward).slice(0, 120);
   const files: Record<string, Bytes> = {};
   for (const [name, b64] of Object.entries(PASS_ICONS)) files[name] = b64bytes(b64);
-  const logo = await passImage(db, c.business, design.logo, "logo");
+  // The wallet version of the logo (white background removed, trimmed) when the editor made one.
+  const logo = await passImage(db, c.business, design.walletLogo ?? design.logo, "logo");
   if (logo) {
     files["logo.png"] = logo;
     files["logo@2x.png"] = logo;

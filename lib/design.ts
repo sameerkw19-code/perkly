@@ -164,6 +164,10 @@ export type Design = {
   walletStamps: string[];
   /** Apple Wallet strip: the stamp grid for 0, 1, … target stamps, made by the editor when publishing (every plan). */
   appleStamps: string[];
+  /** Wallet logos made by the editor when publishing: the logo without its white background, trimmed
+   *  (Apple Wallet), and the same centred in a square (Google Wallet's round logo). Null without a logo. */
+  walletLogo?: string | null;
+  googleLogo?: string | null;
   /** A phone notification (Google Wallet) after each stamp and when a reward is reached. Off unless the business turns it on. */
   walletNotify: boolean;
   /** A welcome notification right after the customer saves the card to Google Wallet. */
@@ -306,6 +310,8 @@ export function sanitizeDesign(input: unknown): Design | null {
     walletBanner: d.walletBanner === "stamps" ? "stamps" : "image",
     walletStamps: walletStampIds(d.walletStamps),
     appleStamps: walletStampIds(d.appleStamps),
+    walletLogo: asset(d.walletLogo),
+    googleLogo: asset(d.googleLogo),
     walletNotify: d.walletNotify === true,
     walletWelcome: d.walletWelcome === true,
     walletBirthday: d.walletBirthday === true,
@@ -342,7 +348,7 @@ function sanitizeLook(input: unknown, bg: string): CardLook {
 }
 
 export function assetIds(d: Design): string[] {
-  return [d.logo, d.hero, d.walletHero, d.stamp.image, d.stamp.emptyImage, d.progressImage, ...d.walletStamps, ...d.appleStamps].filter((x): x is string => !!x);
+  return [d.logo, d.hero, d.walletHero, d.stamp.image, d.stamp.emptyImage, d.progressImage, ...d.walletStamps, ...d.appleStamps, d.walletLogo, d.googleLogo].filter((x): x is string => !!x);
 }
 
 /** Most stamps a card can have (see validTarget), so at most 31 banner pictures (0 to 30 stamps). */

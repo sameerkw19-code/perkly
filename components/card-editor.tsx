@@ -11,6 +11,7 @@ import { post } from "../lib/api";
 import { ApplePreview, GooglePreview, ICONS, LoyaltyCard, Num } from "./loyalty-card";
 import { PERKLY_SOCIAL } from "../lib/perkly-social";
 import { makeAppleStrips, makeStampBanners } from "./stamp-banner";
+import { makeWalletLogos } from "./wallet-logo";
 import { PIZZA_MAX, usesPizza } from "../lib/pizza";
 import { PizzaProgress } from "./pizza-progress";
 import { StampBannerPreview } from "./stamp-banner-preview";
@@ -253,6 +254,24 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
     }
   }
 
+  /** Wallet logos (white background removed, trimmed). On failure the wallets keep the logo as uploaded. */
+  async function withWalletLogos(d: Design): Promise<Design> {
+    if (!d.logo) return { ...d, walletLogo: null, googleLogo: null };
+    try {
+      const made = await makeWalletLogos(`/api/asset/${d.logo}`, d.colors.bg);
+      if (!made) return d;
+      const up = async (blob: Blob) => {
+        const r = await fetch(`/api/asset?business=${encodeURIComponent(businessId)}&kind=wallet_logo`, { method: "POST", headers: { "Content-Type": "image/png" }, body: blob, credentials: "same-origin" });
+        const data: any = await r.json().catch(() => ({}));
+        return r.ok ? (data.id as string) : null;
+      };
+      const [apple, google] = [await up(made.apple), await up(made.google)];
+      return apple && google ? { ...d, walletLogo: apple, googleLogo: google } : d;
+    } catch {
+      return d;
+    }
+  }
+
   async function publish() {
     if (!setup && !confirm(t("publishConfirm"))) return;
     let next = design;
@@ -262,6 +281,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
       next = made;
     }
     next = await withAppleStrips(next);
+    next = await withWalletLogos(next);
     if (next !== design) setDesign(next);
     if (JSON.stringify(next) !== saved && !(await saveDraft(next))) return;
     setBusy("publish");
