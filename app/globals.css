@@ -561,3 +561,41 @@ fieldset.birthday{border:0;padding:0;margin:0 0 14px}fieldset.birthday legend{fo
   .page-head.st-head .head-actions select{max-width:130px}
   .page-head.st-head .st-new{padding:10px 12px}
 }
+
+/* ---- Phones: the page only scrolls up and down ---- */
+html,body{overflow-x:clip}
+@media(max-width:760px){
+  /* Tables become a list of cards: one card per row, each cell as "column: value". */
+  .table-wrap{overflow:visible}
+  .table-wrap table,.table-wrap tbody,.table-wrap tr,.table-wrap td{display:block;width:100%}
+  .table-wrap thead{display:none}
+  .table-wrap table{white-space:normal}
+  .table-wrap tr{background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px 14px;margin-bottom:10px}
+  .table-wrap td{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid #f3f1f6;text-align:end;min-width:0;overflow-wrap:anywhere}
+  .table-wrap td:last-child{border-bottom:0}
+  .table-wrap td::before{content:attr(data-label);color:var(--muted);font-size:12px;text-align:start;flex-shrink:0;max-width:45%}
+  .table-wrap td:first-child{font-size:15px;justify-content:flex-start;text-align:start}
+  .table-wrap td:first-child::before{display:none}
+  .table-wrap td[data-label=""]::before{display:none}
+  .table-wrap td .row-actions{flex-wrap:wrap;justify-content:flex-end}
+  .table-wrap td[colspan]{justify-content:center;text-align:center}
+  .table-wrap td[colspan]::before{display:none}
+  .customer-panel .table-wrap td .progress-track{width:60px}
+  /* Platform admin: the top bar wraps, tabs on their own line. */
+  .admin-top{flex-wrap:wrap;gap:10px}
+  .admin-top .admin-nav{order:3;width:100%;margin:0;overflow:visible}
+  .admin-tools input{min-width:0}
+  .admin-dl{grid-template-columns:1fr}
+  .admin-dl dd{margin-bottom:6px}
+  .admin-wrap{min-width:0}
+}
+/* The printable sign and sticker keep their print size; on a phone screen they are shown smaller. */
+@media screen and (max-width:860px){.poster.a4{zoom:.8}.poster-page{overflow-x:clip}}
+@media screen and (max-width:700px){.poster.a4{zoom:.62}}
+@media screen and (max-width:560px){.poster.a4{zoom:.48}.poster.sticker{zoom:.8}}
+@media screen and (max-width:420px){.poster.a4{zoom:.4}.poster.sticker{zoom:.82}}
+@media(max-width:760px){
+  .table-tools{flex-wrap:wrap}
+  .table-tools .search{flex:1 1 100%}
+  .table-tools .btn{flex:1}
+}
