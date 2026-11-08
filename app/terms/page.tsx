@@ -1,11 +1,23 @@
 import type { Metadata } from "next";
 import LegalPage from "../legal/legal-page";
+import TermsEn from "./terms-en";
+import { visitorRegion } from "../../lib/server/region";
 import { OPERATOR, OPERATOR_LINE } from "../legal/operator";
 
-export const metadata: Metadata = { title: "Perkly | תנאי שימוש", alternates: { canonical: "/terms" } };
+export const dynamic = "force-dynamic";
+
+// Hebrew in Israel, English abroad (visitors outside Israel never see Hebrew).
+export async function generateMetadata(): Promise<Metadata> {
+  const { israel } = await visitorRegion();
+  return { title: israel ? "Perkly | תנאי שימוש" : "Perkly | Terms of Use", alternates: { canonical: "/terms" } };
+}
+
+export default async function TermsPage() {
+  return (await visitorRegion()).israel ? <TermsPageHe /> : <TermsEn />;
+}
 
 // Reviewed by a lawyer on 25 October 2026. Pending review: the trial, free-start and design-extras lines in section 5.
-export default function TermsPage() {
+function TermsPageHe() {
   return (
     <LegalPage title="תנאי שימוש" updated="26 באוקטובר 2026">
       <p>

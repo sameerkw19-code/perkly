@@ -1,7 +1,9 @@
 "use client";
 /* eslint-disable @next/next/no-html-link-for-pages -- plain links on purpose: client-side navigation breaks on this server */
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { COPY, hrefs, type Lang } from "./content";
+import { COPY, hrefs, type Lang, copyFor } from "./content";
+import type { Currency } from "../../lib/pricing";
+import { useRegion } from "../../components/region-context";
 import { Icon } from "./visuals";
 import { ExampleCard } from "./example-card";
 
@@ -46,7 +48,9 @@ export function SiteNav({ lang }: { lang: Lang }) {
     { href: "#pricing", label: c.pricing },
     { href: "#faq", label: c.faq },
   ];
-  const langLinks = (
+  // Abroad the site is English only, so there is no language to switch to.
+  const intl = useRegion().intl;
+  const langLinks = intl ? null : (
     <span className="lp-langs" role="group" aria-label={c.lang}>
       <a href="/" lang="he" hrefLang="he" aria-current={lang === "he" ? "true" : undefined} onClick={() => rememberLang("he")}>עברית</a>
       <a href="/en" lang="en" hrefLang="en" aria-current={lang === "en" ? "true" : undefined} onClick={() => rememberLang("en")}>English</a>
@@ -326,8 +330,8 @@ export function ExamplesPicker({ lang }: { lang: Lang }) {
  * the counter kit card is rendered on the server and passed in as `children` (it reacts to the
  * switch through the `data-cycle` attribute on the wrapper).
  */
-export function PricingPlans({ lang, children }: { lang: Lang; children?: React.ReactNode }) {
-  const c = COPY[lang].pricing;
+export function PricingPlans({ lang, currency = "ILS", children }: { lang: Lang; currency?: Currency; children?: React.ReactNode }) {
+  const c = copyFor(lang, currency).pricing;
   const h = hrefs(lang);
   const [cycle, setCycle] = useState<"monthly" | "yearly">("monthly");
   const yearly = cycle === "yearly";

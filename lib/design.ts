@@ -248,7 +248,8 @@ export function cardLang(d: Design, wanted?: string | null): Lang {
   return langs.find((l) => l === wanted) ?? langs[0];
 }
 
-export function defaultDesign(b: { name: string; reward: string; color: string }): Design {
+/** `lang`: the card's language (English for businesses abroad). */
+export function defaultDesign(b: { name: string; reward: string; color: string }, lang: Lang = "he"): Design {
   const t = (l: Lang): Texts => ({ title: b.name.slice(0, LIMITS.title), subtitle: "", reward: b.reward.slice(0, LIMITS.reward), gift: GIFT[l], promo: "", notify: "", notifyReward: "", welcome: "", birthday: "" });
   return {
     v: 1,
@@ -266,7 +267,7 @@ export function defaultDesign(b: { name: string; reward: string; color: string }
     walletBirthday: false,
     birthdayGift: false,
     progressImage: null,
-    langs: ["he"],
+    langs: [lang],
     texts: Object.fromEntries(CARD_LANGS.map((l) => [l, t(l)])) as Record<Lang, Texts>,
     showCustomerName: true,
     showTitle: true,

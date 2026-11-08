@@ -4,6 +4,7 @@ import { getD1 } from "../../db";
 import { monthlyValue, planOf } from "../../lib/server/billing";
 import { WalletPanel } from "./wallet-panel";
 import { STATUS_LABEL, adminStatus, requireAdminPage, shortDate, shortDateTime, type AdminStatus } from "../../lib/server/admin";
+import { asCurrency } from "../../lib/pricing";
 
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false }, title: "Perkly · ניהול" };
@@ -83,8 +84,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     ).bind(nowIso, sinceWeeks).all<{ w: number; n: number }>(),
     // Status counts and revenue always cover every business, whatever the search or filter.
     db.prepare(
-      `SELECT b.suspended, b.comp_until, s.status, s.plan FROM businesses b LEFT JOIN subscriptions s ON s.business = b.id`,
-    ).all<{ suspended: string | null; comp_until: string | null; status: string | null; plan: string | null }>(),
+      `SELECT b.suspended, b.comp_until, b.currency, s.status, s.plan FROM businesses b LEFT JOIN subscriptions s ON s.business = b.id`,
+    ).all<{ suspended: string | null; comp_until: string | null; currency: string; status: string | null; plan: string | null }>(),
   ]);
 
   const all = list.results.map((r) => ({ ...r, st: adminStatus(r, nowIso) }));
@@ -96,7 +97,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   // Yearly subscriptions count as a twelfth of their price.
   const paying = statusRows.results.filter((r) => adminStatus(r, nowIso) === "active");
   const yearlyCount = paying.filter((r) => planOf(r.plan, env) === "yearly").length;
-  const mrr = Math.round(paying.reduce((sum, r) => sum + monthlyValue(planOf(r.plan, env)), 0));
+  const mrr = Math.round(paying.reduce((sum, r) => sum + monthlyValue(planOf(r.plan, env), asCurrency(r.currency)), 0));
   const t = totals!;
 
   // Oldest week first, so the chart reads in time order.

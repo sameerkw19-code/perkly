@@ -1,4 +1,5 @@
 "use client";
+import { useRegion } from "../components/region-context";
 import { useEffect, useState } from "react";
 
 import type { Lang, SiteLang } from "./i18n-types";
@@ -696,22 +697,31 @@ export function errorText(lang: Lang, code: string | undefined): string {
 
 /** Language choice, remembered on this device, with page direction (RTL/LTR) kept in sync. */
 export function useLang() {
-  const [lang, setLang] = useState<SiteLang>("he");
+  // Israel starts in Hebrew, abroad in English; abroad the site is English only (components/region-context.tsx).
+  const region = useRegion();
+  const allowed: SiteLang[] = region.intl ? ["en"] : LANGS;
+  const [lang, setLangState] = useState<SiteLang>(region.lang);
   useEffect(() => {
     try {
       // A ?lang= link (for example from the Arabic marketing page) wins over the saved choice.
       const fromUrl = new URLSearchParams(window.location.search).get("lang");
       const saved = fromUrl && LANGS.includes(fromUrl as SiteLang) ? fromUrl : localStorage.getItem("perkly-language");
-      if (saved && LANGS.includes(saved as SiteLang)) setLang(saved as SiteLang);
+      if (saved && allowed.includes(saved as SiteLang)) setLangState(saved as SiteLang);
     } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
     document.documentElement.dir = lang === "en" ? "ltr" : "rtl";
     document.documentElement.lang = lang;
-    try {
-      localStorage.setItem("perkly-language", lang);
-    } catch {}
   }, [lang]);
+  /** An explicit choice is remembered; the region's default is not, so it can follow the visitor. */
+  const setLang = (l: SiteLang) => {
+    if (!allowed.includes(l)) return;
+    setLangState(l);
+    try {
+      localStorage.setItem("perkly-language", l);
+    } catch {}
+  };
   const t = (key: string, vars?: Record<string, string | number>) => translate(lang, key, vars);
-  return { lang, setLang, t, dir: lang === "en" ? "ltr" : "rtl" } as const;
+  return { lang, setLang, t, dir: lang === "en" ? "ltr" : "rtl", langs: allowed } as const;
 }

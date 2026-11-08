@@ -5,6 +5,8 @@ import "../landing/landing.css";
 import { hrefs, waLink, WHATSAPP_DISPLAY, type Lang } from "../landing/content";
 import { Logo } from "../landing/landing-client";
 import { Icon } from "../landing/visuals";
+import { useRegion } from "../../components/region-context";
+import { withPrices } from "../../lib/pricing";
 
 // Pilot request form. Real: the request is saved (POST /api/lead) and shown on /admin.
 // Online payment is not connected yet, so nothing is charged here.
@@ -16,7 +18,7 @@ const T = {
     business: "שם העסק", contact: "שם איש הקשר", phone: "טלפון", email: "אימייל", optional: "(לא חובה)",
     kind: "סוג העסק", kindPick: "בחרו…", city: "עיר", note: "משהו שחשוב שנדע?",
     kinds: { cafe: "בית קפה", barber: "מספרה", food: "מסעדה או פיצרייה", icecream: "גלידרייה", studio: "סטודיו או חדר כושר", bar: "בר", other: "אחר" },
-    kit: "מעוניינים גם בערכת קופה (99 ₪ חד־פעמי): 2 פוסטרים וסטנד QR",
+    kit: "מעוניינים גם בערכת קופה ({$k} חד־פעמי): 2 פוסטרים וסטנד QR",
     privacyBefore: "קראתי את ",
     privacyLink: "מדיניות הפרטיות",
     privacyAfter: " ואני מסכים/ה ש־Perkly תיצור איתי קשר",
@@ -33,8 +35,8 @@ const T = {
     askWaText: "היי, יש לי שאלה על Perkly",
     home: "חזרה לדף הבית",
     nextTitle: "או שמתחילים לבד",
-    next: ["פותחים חשבון ומעצבים את הכרטיס", "14 ימי ניסיון חינם, ואחר כך 99 ₪ לחודש, בלי התחייבות", "מציבים QR בקופה ומתחילים להחתים"],
-    price: "99 ₪ לחודש", priceNote: "14 ימי ניסיון חינם · בלי דמי הקמה",
+    next: ["פותחים חשבון ומעצבים את הכרטיס", "14 ימי ניסיון חינם, ואחר כך {$m} לחודש, בלי התחייבות", "מציבים QR בקופה ומתחילים להחתים"],
+    price: "{$m} לחודש", priceNote: "14 ימי ניסיון חינם · בלי דמי הקמה",
     support: "שאלות? וואטסאפ",
     login: "כבר יש לי חשבון",
     start: "פתיחת חשבון עכשיו",
@@ -45,7 +47,7 @@ const T = {
     business: "اسم المشروع", contact: "اسم الشخص المسؤول", phone: "الهاتف", email: "البريد الإلكتروني", optional: "(اختياري)",
     kind: "نوع المشروع", kindPick: "اختاروا…", city: "المدينة", note: "شيء مهم نعرفه؟",
     kinds: { cafe: "مقهى", barber: "صالون حلاقة", food: "مطعم أو بيتزا", icecream: "بوظة", studio: "ستوديو أو نادٍ رياضي", bar: "بار", other: "آخر" },
-    kit: "مهتمون أيضاً بطقم الصندوق (99 ₪ لمرة واحدة): ملصقان وحامل QR",
+    kit: "مهتمون أيضاً بطقم الصندوق ({$k} لمرة واحدة): ملصقان وحامل QR",
     privacyBefore: "قرأت ",
     privacyLink: "سياسة الخصوصية",
     privacyAfter: " وأوافق على أن تتواصل معي Perkly",
@@ -62,8 +64,8 @@ const T = {
     askWaText: "مرحباً، لدي سؤال عن Perkly",
     home: "العودة للصفحة الرئيسية",
     nextTitle: "أو ابدأوا بأنفسكم",
-    next: ["تفتحون حساباً وتصممون البطاقة", "تجربة مجانية لمدة 14 يوماً، ثم 99 ₪ شهرياً بدون التزام", "تضعون رمز QR عند الصندوق وتبدؤون بالأختام"],
-    price: "99 ₪ شهرياً", priceNote: "تجربة مجانية لمدة 14 يوماً · بدون رسوم تأسيس",
+    next: ["تفتحون حساباً وتصممون البطاقة", "تجربة مجانية لمدة 14 يوماً، ثم {$m} شهرياً بدون التزام", "تضعون رمز QR عند الصندوق وتبدؤون بالأختام"],
+    price: "{$m} شهرياً", priceNote: "تجربة مجانية لمدة 14 يوماً · بدون رسوم تأسيس",
     support: "أسئلة؟ واتساب",
     login: "لدي حساب",
     start: "فتح حساب الآن",
@@ -74,7 +76,7 @@ const T = {
     business: "Business name", contact: "Contact name", phone: "Phone", email: "Email", optional: "(optional)",
     kind: "Type of business", kindPick: "Choose…", city: "City", note: "Anything we should know?",
     kinds: { cafe: "Café", barber: "Barbershop", food: "Restaurant or pizzeria", icecream: "Ice cream shop", studio: "Studio or gym", bar: "Bar", other: "Other" },
-    kit: "I'm also interested in a counter kit (₪99 one-time): 2 posters and a QR stand",
+    kit: "I'm also interested in a counter kit ({$k} one-time): 2 posters and a QR stand",
     privacyBefore: "I've read the ",
     privacyLink: "privacy policy",
     privacyAfter: " (in Hebrew) and agree that Perkly may contact me",
@@ -91,8 +93,8 @@ const T = {
     askWaText: "Hi, I have a question about Perkly",
     home: "Back to home",
     nextTitle: "Or start on your own",
-    next: ["Open an account and design your card", "14-day free trial, then ₪99 a month, no commitment", "Put up the QR code and start stamping"],
-    price: "₪99 a month", priceNote: "14-day free trial · no setup fee",
+    next: ["Open an account and design your card", "14-day free trial, then {$m} a month, no commitment", "Put up the QR code and start stamping"],
+    price: "{$m} a month", priceNote: "14-day free trial · no setup fee",
     support: "Questions? WhatsApp",
     login: "I have an account",
     start: "Create an account now",
@@ -115,8 +117,10 @@ function readLang(): Lang {
 }
 
 export default function ContactForm() {
-  // Hebrew on the server; the browser picks ?lang= or the saved choice.
-  const lang = useSyncExternalStore(noSubscribe, readLang, () => "he" as Lang);
+  // The region's language on the server (English only abroad); in Israel the browser picks ?lang= or the saved choice.
+  const region = useRegion();
+  const picked = useSyncExternalStore(noSubscribe, region.intl ? () => "en" as Lang : readLang, () => region.lang as Lang);
+  const lang: Lang = region.intl ? "en" : picked;
   const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({});
   const [formError, setFormError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -126,12 +130,9 @@ export default function ContactForm() {
   const summaryRef = useRef<HTMLDivElement>(null);
   const doneRef = useRef<HTMLHeadingElement>(null);
 
-  useEffect(() => {
-    try { localStorage.setItem("perkly-language", lang); } catch {}
-  }, [lang]);
   useEffect(() => { if (done) doneRef.current?.focus(); }, [done]);
 
-  const t = T[lang];
+  const t = withPrices(T[lang], region.currency, lang);
   const h = hrefs(lang);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {

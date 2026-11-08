@@ -12,13 +12,18 @@ export const YEARLY_PRICE_ILS = 999;
 
 export type Plan = "monthly" | "yearly";
 
-/** Which plan a stored Polar product id is. Unknown or missing ids count as monthly. */
-export function planOf(productId: string | null | undefined, env: { POLAR_PRODUCT_ID_YEARLY?: string }): Plan {
-  return !!productId && !!env.POLAR_PRODUCT_ID_YEARLY && productId === env.POLAR_PRODUCT_ID_YEARLY ? "yearly" : "monthly";
+/** Which plan a stored Polar product id is (shekel or dollar yearly product). Unknown or missing ids count as monthly. */
+export function planOf(productId: string | null | undefined, env: { POLAR_PRODUCT_ID_YEARLY?: string; POLAR_PRODUCT_ID_YEARLY_USD?: string }): Plan {
+  if (!productId) return "monthly";
+  return (!!env.POLAR_PRODUCT_ID_YEARLY && productId === env.POLAR_PRODUCT_ID_YEARLY) || (!!env.POLAR_PRODUCT_ID_YEARLY_USD && productId === env.POLAR_PRODUCT_ID_YEARLY_USD) ? "yearly" : "monthly";
 }
 
-/** What one active subscription brings in per month, for the admin estimate. */
-export function monthlyValue(plan: Plan): number {
+/** Shekels per dollar for the admin's revenue estimate (rounded; dollar businesses are counted in shekels). */
+export const USD_TO_ILS = 3.7;
+
+/** What one active subscription brings in per month, in shekels, for the admin estimate. */
+export function monthlyValue(plan: Plan, currency: "ILS" | "USD" = "ILS"): number {
+  if (currency === "USD") return (plan === "yearly" ? 290 / 12 : 29) * USD_TO_ILS;
   return plan === "yearly" ? YEARLY_PRICE_ILS / 12 : MONTHLY_PRICE_ILS;
 }
 /** Free trial at checkout: the card is taken up front and first charged when the trial ends. */

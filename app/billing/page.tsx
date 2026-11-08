@@ -6,6 +6,7 @@ import { env } from "cloudflare:workers";
 import { polarConfigured, yearlyConfigured } from "../../lib/server/polar";
 import { planOf } from "../../lib/server/billing";
 import BillingView, { type BillingBusiness } from "./billing-view";
+import { asCurrency } from "../../lib/pricing";
 
 export const dynamic = "force-dynamic";
 
@@ -18,12 +19,12 @@ export default async function BillingPage() {
   const memberships = (await getMemberships(db, user.id)).filter((m) => m.role === "owner");
   const subs = await db
     .prepare(
-      `SELECT b.id, b.name, s.status, s.plan, s.current_period_end AS periodEnd, b.comp_until AS compUntil, b.kit_due AS kitDue, b.kit_sent AS kitSent
+      `SELECT b.id, b.name, b.currency, s.status, s.plan, s.current_period_end AS periodEnd, b.comp_until AS compUntil, b.kit_due AS kitDue, b.kit_sent AS kitSent
        FROM businesses b LEFT JOIN subscriptions s ON s.business = b.id
        WHERE b.id IN (${memberships.map(() => "?").join(",") || "''"})`,
     )
     .bind(...memberships.map((m) => m.business))
-    .all<{ id: string; name: string; status: string | null; plan: string | null; periodEnd: string | null; compUntil: string | null; kitDue: string | null; kitSent: string | null }>();
+    .all<{ id: string; name: string; currency: string; status: string | null; plan: string | null; periodEnd: string | null; compUntil: string | null; kitDue: string | null; kitSent: string | null }>();
   const businesses: BillingBusiness[] = subs.results.map((b) => ({
     id: b.id,
     name: b.name,
@@ -33,5 +34,7 @@ export default async function BillingPage() {
     plan: b.status ? planOf(b.plan, env) : null,
     kit: b.kitSent ? "sent" : b.kitDue ? "due" : null,
   }));
-  return <BillingView businesses={businesses} configured={polarConfigured(env)} yearly={yearlyConfigured(env)} />;
+  // Prices in the owner's currency (the first business; an owner's businesses share a market).
+  const currency = asCurrency(subs.results[0]?.currency);
+  return <BillingView businesses={businesses} configured={polarConfigured(env)} yearly={yearlyConfigured(env, currency)} currency={currency} />;
 }

@@ -1,11 +1,23 @@
 import type { Metadata } from "next";
 import LegalPage from "../legal/legal-page";
+import PrivacyEn from "./privacy-en";
+import { visitorRegion } from "../../lib/server/region";
 import { OPERATOR, OPERATOR_LINE } from "../legal/operator";
 
-export const metadata: Metadata = { title: "Perkly | מדיניות פרטיות", alternates: { canonical: "/privacy" } };
+export const dynamic = "force-dynamic";
+
+// Hebrew in Israel, English abroad (visitors outside Israel never see Hebrew).
+export async function generateMetadata(): Promise<Metadata> {
+  const { israel } = await visitorRegion();
+  return { title: israel ? "Perkly | מדיניות פרטיות" : "Perkly | Privacy Policy", alternates: { canonical: "/privacy" } };
+}
+
+export default async function PrivacyPage() {
+  return (await visitorRegion()).israel ? <PrivacyPageHe /> : <PrivacyEn />;
+}
 
 // Reviewed by a lawyer on 25 October 2026; the analytics line (26 Oct) still needs review. Describes what the code actually does: keep it in sync.
-export default function PrivacyPage() {
+function PrivacyPageHe() {
   return (
     <LegalPage title="מדיניות פרטיות" updated="26 באוקטובר 2026">
       <p>מדיניות זו מסבירה איזה מידע Perkly ({OPERATOR_LINE}) אוספת, למה, איפה הוא נשמר ומה הזכויות שלכם.</p>
