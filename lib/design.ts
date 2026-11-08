@@ -180,6 +180,8 @@ export type Design = {
   langs: Lang[];
   texts: Record<Lang, Texts>;
   showCustomerName: boolean;
+  /** Show the card name on the card (web, Apple Wallet without a logo, Google Wallet's text block). Google still shows it as the program name at the top. */
+  showTitle: boolean;
   look: CardLook;
 };
 
@@ -267,6 +269,7 @@ export function defaultDesign(b: { name: string; reward: string; color: string }
     langs: ["he"],
     texts: Object.fromEntries(CARD_LANGS.map((l) => [l, t(l)])) as Record<Lang, Texts>,
     showCustomerName: true,
+    showTitle: true,
     look: defaultLook(HEX.test(b.color) ? b.color : "#1E1B2E"),
   };
 }
@@ -320,6 +323,7 @@ export function sanitizeDesign(input: unknown): Design | null {
     langs: sanitizeLangs(d.langs),
     texts,
     showCustomerName: d.showCustomerName !== false,
+    showTitle: d.showTitle !== false,
     look: sanitizeLook(d.look, colors.bg.toUpperCase()),
   };
 }

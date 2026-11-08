@@ -517,6 +517,8 @@ Object.assign(words, {
   err_account_owns_business: ["החשבון הזה הוא הבעלים של עסק פעיל. כתבו ל-support@perkly.shop כדי לסגור או להעביר אותו קודם.", "هذا الحساب مالك لمحل نشط. اكتب إلى support@perkly.shop لإغلاقه أو نقله أولاً.", "This account owns an active business. Write to support@perkly.shop to close or hand it over first."],
   skipToContent: ["דילוג לתוכן", "انتقال إلى المحتوى", "Skip to content"],
   cardOffline: ["אין חיבור לאינטרנט. זה הכרטיס מהפעם האחרונה שהייתה קליטה, ואפשר להציג אותו לסריקה כרגיל.", "لا يوجد اتصال بالإنترنت. هذه البطاقة من آخر مرة كان فيها اتصال، ويمكن عرضها للمسح كالمعتاد.", "No internet connection. This is the card from the last time you were online; you can still show it to be scanned."],
+  edShowTitle: ["להציג את שם הכרטיס על הכרטיס", "إظهار اسم البطاقة على البطاقة", "Show the card name on the card"],
+  edShowTitleHint: ["ב-Google Wallet השם נשאר למעלה ליד הלוגו (דרישה של Google).", "في Google Wallet يبقى الاسم في الأعلى بجانب الشعار (شرط من Google).", "Google Wallet still shows it at the top next to the logo (a Google requirement)."],
   edShowName: ["להציג את שם הלקוח על הכרטיס", "إظهار اسم الزبون على البطاقة", "Show the customer's name on the card"],
   edPreview: ["תצוגה מקדימה", "معاينة", "Preview"],
   pvWeb: ["בדפדפן", "في المتصفح", "Browser"],

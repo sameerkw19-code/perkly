@@ -36,6 +36,7 @@ export function exampleDesign(k: ExampleKey, lang: Lang, name: string, rewardLin
     langs: [lang],
     texts: Object.fromEntries((["he", "ar", "en", "ru", "de", "fr"] as const).map((l) => [l, { ...texts, notify: "", notifyReward: "", welcome: "", birthday: "" }])) as Design["texts"],
     showCustomerName: true,
+    showTitle: true,
     look: { ...defaultLook(th.bg), bg2: light ? darken(th.bg, 0.1) : darken(th.bg, 0.32) },
   };
 }

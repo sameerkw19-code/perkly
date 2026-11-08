@@ -29,6 +29,8 @@ export type BannerPictures = {
   giftOnFill: Picture;
   /** The business's own pizza photo for the pizza progress. */
   pizza: Picture | null;
+  /** The wallet banner or background image, drawn behind the stamp grid. */
+  background: Picture | null;
 };
 
 function loadImage(src: string): Promise<Picture> {
@@ -64,7 +66,8 @@ export async function loadBannerPictures(design: Design): Promise<BannerPictures
   const bright = design.look.stampStyle === "bright";
   const giftColor = bright ? GOLD : design.colors.stamp;
   const preset = !own && icon !== "image" && icon !== "logo" ? ICONS[icon as keyof typeof ICONS] : null;
-  const [filled, empty, iconOnStamp, iconOnCard, giftOnCard, giftOnFill, pizza] = await Promise.all([
+  const backgroundId = design.walletHero ?? design.hero;
+  const [filled, empty, iconOnStamp, iconOnCard, giftOnCard, giftOnFill, pizza, background] = await Promise.all([
     own ? loadImage(own) : Promise.resolve(null),
     own && ownEmpty ? loadImage(ownEmpty) : Promise.resolve(null),
     preset ? iconPicture(preset, onColor(design.colors.stamp)) : Promise.resolve(null),
@@ -72,8 +75,9 @@ export async function loadBannerPictures(design: Design): Promise<BannerPictures
     iconPicture(Gift, giftColor),
     iconPicture(Gift, onColor(giftColor)),
     design.look.progress === "pizza" && design.progressImage ? loadImage(asset(design.progressImage)) : Promise.resolve(null),
+    backgroundId ? loadImage(asset(backgroundId)).catch(() => null) : Promise.resolve(null),
   ]);
-  return { filled, empty, round: icon === "logo", iconOnStamp, iconOnCard, giftOnCard, giftOnFill, pizza };
+  return { filled, empty, round: icon === "logo", iconOnStamp, iconOnCard, giftOnCard, giftOnFill, pizza, background };
 }
 
 function drawContain(ctx: CanvasRenderingContext2D, img: Picture, x: number, y: number, size: number, round: boolean) {
@@ -308,6 +312,13 @@ function drawFreeSlot(ctx: CanvasRenderingContext2D, d: Design, p: BannerPicture
 export function drawStampGrid(ctx: CanvasRenderingContext2D, d: Design, p: BannerPictures, stamps: number, target: number, W: number, H: number) {
   ctx.fillStyle = d.colors.bg;
   ctx.fillRect(0, 0, W, H);
+  // The business's banner or background image behind the stamps, filling the picture (centre crop).
+  if (p.background) {
+    const img = p.background;
+    const c = Math.max(W / img.naturalWidth, H / img.naturalHeight);
+    const w = img.naturalWidth * c, h = img.naturalHeight * c;
+    ctx.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+  }
   const slots = target + 1;
   const perRow = slots <= 5 ? slots : slots <= 15 ? 5 : Math.ceil(slots / 3);
   const rows = Math.ceil(slots / perRow);
