@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { SOCIAL_KEYS, SOCIAL_LABEL, normalizeSocial, socialDisplay, type Social } from "../lib/social";
 import { SocialIcon } from "../lib/social-icon";
 import {
-  Activity, AlertTriangle, Cake, Check, Copy, CreditCard, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode,
+  Activity, AlertTriangle, Trash2, Cake, Check, Copy, CreditCard, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode,
   Palette, RefreshCw, ScanLine, Search, Settings, Share2, Store, Users, UserRound, Wallet, X,
 } from "lucide-react";
 import type { Design } from "../lib/design";
@@ -53,7 +53,8 @@ type Modal =
   | { type: "customer" }
   | { type: "business" }
   | { type: "link"; url: string; title: string }
-  | { type: "correct"; customer: any };
+  | { type: "correct"; customer: any }
+  | { type: "remove"; customer: any };
 
 export default function Dashboard() {
   const { lang, setLang, t, dir } = useLang();
@@ -414,6 +415,7 @@ export default function Dashboard() {
                                 if (r) setModal({ type: "link", url: r.cardUrl, title: c.name });
                               }}><Link2 size={16} /></button>
                               <button className="icon-btn" title={t("correct")} aria-label={t("correct")} onClick={() => setModal({ type: "correct", customer: c })}><Activity size={16} /></button>
+                              <button className="icon-btn danger-icon" title={t("archiveCustomer")} aria-label={`${t("archiveCustomer")}: ${c.name}`} onClick={() => setModal({ type: "remove", customer: c })}><Trash2 size={16} /></button>
                             </div>
                           </td>
                         </tr>
@@ -548,6 +550,27 @@ export default function Dashboard() {
                   <button type="button" className="btn soft" onClick={() => setModal(null)}>{t("cancel")}</button>
                 </div>
               </form>
+            )}
+
+            {modal.type === "remove" && (
+              <div>
+                <span className="modal-icon danger"><Trash2 /></span>
+                <h2>{t("removeTitle")}</h2>
+                <p><strong>{modal.customer.name}</strong> · <span dir="ltr">{modal.customer.phone}</span> · <Num>{modal.customer.stamps}/{modal.customer.target}</Num></p>
+                <p className="form-hint">{t("removeHint")}</p>
+                <div className="form-actions">
+                  <button className="btn danger" disabled={busy} onClick={async () => {
+                    const r = await call({ action: "archive_customer", customer: modal.customer.id });
+                    if (r) { notify(t("archivedOk")); load(); setModal(null); }
+                  }}><Trash2 size={15} />{t("archiveCustomer")}</button>
+                  <button type="button" className="btn soft" onClick={() => setModal(null)}>{t("cancel")}</button>
+                </div>
+                <button type="button" className="text-btn danger-text" disabled={busy} onClick={async () => {
+                  if (!window.confirm(t("eraseConfirm", { name: modal.customer.name }))) return;
+                  const r = await call({ action: "archive_customer", customer: modal.customer.id, erase: true });
+                  if (r) { notify(t("erasedOk")); load(); setModal(null); }
+                }}>{t("eraseCustomer")}</button>
+              </div>
             )}
 
             {modal.type === "business" && (
