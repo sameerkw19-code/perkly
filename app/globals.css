@@ -599,3 +599,12 @@ html,body{overflow-x:clip}
   .table-tools .search{flex:1 1 100%}
   .table-tools .btn{flex:1}
 }
+
+/* Removed customers (can be restored), under the customer table */
+.removed-block{margin-top:22px;border-top:1px solid var(--line);padding-top:18px}
+.removed-list{margin-top:12px}
+.removed-list ul{list-style:none;margin:0;padding:0}
+.removed-list li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid #f3f1f6;flex-wrap:wrap}
+.removed-who{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;min-width:0;font-size:13px;color:#686775}
+.removed-who strong{color:#494155;font-weight:500}
+.removed-who .form-hint{font-size:12px}

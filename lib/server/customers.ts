@@ -12,3 +12,8 @@ export function releaseArchivedPhone(db: D1Database, businessId: string, phone: 
     )
     .bind(businessId, phone);
 }
+
+/** The number a removed customer had before releaseArchivedPhone renamed it ("0501234567 (archived <id>)" → "0501234567"). */
+export function originalPhone(phone: string): string {
+  return phone.replace(/ \(archived [^)]*\)$/, "");
+}

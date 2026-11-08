@@ -538,3 +538,21 @@ test("apple wallet: stamps and new designs ask iPhones to refresh the pass", () 
   assert.match(push, /status === 410/, "devices Apple says are gone are removed");
   assert.ok(existsSync(new URL("../.github/workflows/apple-push-cert.yml", import.meta.url)));
 });
+
+// ---- Removed customers can come back; the open dashboard hears about new joins ----
+
+test("restore: a removed customer gets their own number back", async () => {
+  const { originalPhone } = await import("../lib/server/customers.ts");
+  assert.equal(originalPhone("0501234567 (archived 1f4b6dfb-aaaa)"), "0501234567");
+  assert.equal(originalPhone("0501234567"), "0501234567");
+  const api = readFileSync(new URL("../app/api/loyalty/route.ts", import.meta.url), "utf8");
+  assert.match(api, /case "restore_customer"[\s\S]*?ownerOnly\(\)[\s\S]*?erased IS NULL[\s\S]*?phone_exists[\s\S]*?releaseArchivedPhone[\s\S]*?archived = NULL/);
+  assert.match(api, /case "removed_customers"[\s\S]*?ownerOnly\(\)/);
+});
+
+test("dashboard: checks for new joins every 30 seconds while visible", () => {
+  const dash = readFileSync(new URL("../app/dashboard.tsx", import.meta.url), "utf8");
+  assert.match(dash, /joinedSince=/);
+  assert.match(dash, /setInterval\(check, 30_000\)/);
+  assert.match(dash, /visibilityState !== "visible"/);
+});
