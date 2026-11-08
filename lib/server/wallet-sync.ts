@@ -1,7 +1,7 @@
 import { env, waitUntil } from "cloudflare:workers";
 import { updateLoyaltyObject, walletConfig } from "./google-wallet";
 import { passLook } from "./designs";
-import { queueSync } from "./customer-messages";
+import { queueSync, SAVE_GRACE_MS } from "./customer-messages";
 import type { StampNotice } from "../design";
 
 /**
@@ -33,7 +33,10 @@ export function syncGoogleWallet(
         message,
       );
       if (result === "not_saved") {
-        await db.prepare("UPDATE customers SET google_wallet = NULL WHERE id = ? AND google_wallet = ?").bind(c.id, c.google_wallet).run();
+        // Google creates the pass only when the customer taps Save. Until then updates get "not found":
+        // within a day of opening "Add to Google Wallet", try again in a few minutes instead of giving up.
+        if (Date.now() - Date.parse(c.google_wallet!) < SAVE_GRACE_MS) await queueSync(db, c, origin, 3 * 60_000).run();
+        else await db.prepare("UPDATE customers SET google_wallet = NULL WHERE id = ? AND google_wallet = ?").bind(c.id, c.google_wallet).run();
       }
       // Google was unreachable or refused: the background job tries again (5, 10, 20… minutes), so the
       // pass does not stay behind the real card.

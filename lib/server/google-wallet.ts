@@ -232,6 +232,19 @@ export async function updateLoyaltyObject(config: WalletConfig, card: LoyaltyCar
   }
 }
 
+/** Whether a customer's pass exists at Google and someone saved it. */
+export async function objectSaved(config: WalletConfig, customerId: string): Promise<boolean> {
+  try {
+    const token = await accessToken(config);
+    const r = await fetch(`${API}/loyaltyObject/${encodeURIComponent(objectIdFor(config, customerId))}`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!r.ok) return false;
+    const o = (await r.json()) as { hasUsers?: boolean };
+    return o.hasUsers !== false;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Admin diagnostics: what Google has for these customers (by our object id) and which objects exist
  * in the business's class and the shared class.
