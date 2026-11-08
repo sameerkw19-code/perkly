@@ -59,6 +59,8 @@ export async function POST(request: Request) {
   const ids = pictures.map(() => crypto.randomUUID());
   await db.batch([
     ...remove.map((id) => db.prepare("DELETE FROM assets WHERE id = ? AND business = ? AND kind = 'banner'").bind(id, business)),
+    // Their Apple Wallet copies (lib/server/apple-wallet.ts) go with them.
+    ...remove.map((id) => db.prepare("DELETE FROM apple_images WHERE source = ?").bind(id)),
     ...pictures.map((p, i) =>
       db
         .prepare("INSERT INTO assets(id, business, kind, mime, width, height, bytes, data, created, created_by) VALUES(?, ?, 'banner', ?, ?, ?, ?, ?, ?, ?)")

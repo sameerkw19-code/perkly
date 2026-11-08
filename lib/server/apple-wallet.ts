@@ -1,6 +1,7 @@
 // Apple Wallet store cards for customers: the pass content, its images, and the per-pass token the
 // iPhone uses to fetch updates from the web service (app/api/wallet/apple-ws).
-import { cardLang, textsFor, type Lang } from "../design";
+import { env } from "cloudflare:workers";
+import { cardLang, textsFor, walletStampPicture, type Lang } from "../design";
 import { buildPkpass, rgb, type Bytes } from "./apple-pass";
 import { PASS_ICONS } from "./apple-pass-icons";
 import { liveDesign } from "./designs";
@@ -8,13 +9,13 @@ import { passToken, type AppleConfig } from "./apple-token";
 
 export { appleConfig, passToken, validToken, type AppleConfig } from "./apple-token";
 
-const LABELS: Record<Lang, { stamps: string; reward: string; customer: string; ready: string; offer: string; changed: string; about: string }> = {
-  he: { stamps: "חותמות", reward: "ההטבה", customer: "שם", ready: "הטבות מוכנות", offer: "מבצע", changed: "חותמות: %@", about: "כרטיס נאמנות דיגיטלי של Perkly. מציגים את הקוד בקופה." },
-  ar: { stamps: "الأختام", reward: "المكافأة", customer: "الاسم", ready: "مكافآت جاهزة", offer: "عرض", changed: "الأختام: %@", about: "بطاقة ولاء رقمية من Perkly. اعرضوا الرمز عند الصندوق." },
-  en: { stamps: "Stamps", reward: "Reward", customer: "Name", ready: "Rewards ready", offer: "Offer", changed: "Stamps: %@", about: "A Perkly digital loyalty card. Show the code at the counter." },
-  ru: { stamps: "Штампы", reward: "Награда", customer: "Имя", ready: "Готовые награды", offer: "Акция", changed: "Штампы: %@", about: "Цифровая карта лояльности Perkly. Покажите код на кассе." },
-  de: { stamps: "Stempel", reward: "Prämie", customer: "Name", ready: "Prämien bereit", offer: "Angebot", changed: "Stempel: %@", about: "Eine digitale Treuekarte von Perkly. Zeigen Sie den Code an der Kasse." },
-  fr: { stamps: "Tampons", reward: "Récompense", customer: "Nom", ready: "Récompenses prêtes", offer: "Offre", changed: "Tampons : %@", about: "Une carte de fidélité numérique Perkly. Montrez le code en caisse." },
+const LABELS: Record<Lang, { stamps: string; reward: string; customer: string; ready: string; readyChanged: string; offer: string; changed: string; about: string }> = {
+  he: { stamps: "חותמות", reward: "ההטבה", customer: "שם", ready: "הטבות מוכנות", readyChanged: "הטבות מוכנות: %@", offer: "מבצע", changed: "חותמות: %@", about: "כרטיס נאמנות דיגיטלי של Perkly. מציגים את הקוד בקופה." },
+  ar: { stamps: "الأختام", reward: "المكافأة", customer: "الاسم", ready: "مكافآت جاهزة", readyChanged: "مكافآت جاهزة: %@", offer: "عرض", changed: "الأختام: %@", about: "بطاقة ولاء رقمية من Perkly. اعرضوا الرمز عند الصندوق." },
+  en: { stamps: "Stamps", reward: "Reward", customer: "Name", ready: "Rewards ready", readyChanged: "Rewards ready: %@", offer: "Offer", changed: "Stamps: %@", about: "A Perkly digital loyalty card. Show the code at the counter." },
+  ru: { stamps: "Штампы", reward: "Награда", customer: "Имя", ready: "Готовые награды", readyChanged: "Готовые награды: %@", offer: "Акция", changed: "Штампы: %@", about: "Цифровая карта лояльности Perkly. Покажите код на кассе." },
+  de: { stamps: "Stempel", reward: "Prämie", customer: "Name", ready: "Prämien bereit", readyChanged: "Prämien bereit: %@", offer: "Angebot", changed: "Stempel: %@", about: "Eine digitale Treuekarte von Perkly. Zeigen Sie den Code an der Kasse." },
+  fr: { stamps: "Tampons", reward: "Récompense", customer: "Nom", ready: "Récompenses prêtes", readyChanged: "Récompenses prêtes : %@", offer: "Offre", changed: "Tampons : %@", about: "Une carte de fidélité numérique Perkly. Montrez le code en caisse." },
 };
 
 type CustomerRow = {
@@ -49,11 +50,47 @@ export async function passUpdated(db: D1Database, customer: { id: string; busine
   return row?.t ?? customer.created;
 }
 
-async function pngAsset(db: D1Database, business: string, id: string | null | undefined): Promise<Bytes | null> {
+/** Wallet picture sizes (pixels, @3x). The strip sits under the logo row; a store card with a QR code shows it at 375×123 points. */
+const SPEC = {
+  strip: { width: 1125, height: 369, fit: "cover" },
+  logo: { width: 480, height: 150, fit: "scale-down" },
+} as const;
+
+type ImageKind = keyof typeof SPEC;
+
+/**
+ * A business picture as PNG at the Wallet size (Wallet takes PNG only, and uploads are JPEG or WebP).
+ * Converted once with Cloudflare Images and kept in apple_images; asset ids never change, so the copy stays valid.
+ * Without the IMAGES binding (or if converting fails) only a picture that already is PNG is used.
+ */
+async function passImage(db: D1Database, business: string, id: string | null | undefined, kind: ImageKind): Promise<Bytes | null> {
   if (!id) return null;
+  const cached = await db.prepare("SELECT data FROM apple_images WHERE source = ? AND kind = ?").bind(id, kind).first<{ data: ArrayBuffer }>();
+  if (cached) return new Uint8Array(cached.data);
   const row = await db.prepare("SELECT mime, data FROM assets WHERE id = ? AND business = ?").bind(id, business).first<{ mime: string; data: ArrayBuffer }>();
-  // Wallet passes take PNG images only.
-  return row && row.mime === "image/png" ? new Uint8Array(row.data) : null;
+  if (!row) return null;
+  const original = new Uint8Array(row.data);
+  const images = (env as unknown as { IMAGES?: ImagesBinding }).IMAGES;
+  if (images) {
+    try {
+      const spec = SPEC[kind];
+      const out = await images
+        .input(new Blob([original]).stream())
+        .transform({ width: spec.width, height: spec.height, fit: spec.fit })
+        .output({ format: "image/png" });
+      const png = new Uint8Array(await out.response().arrayBuffer());
+      if (png.length > 8 && png[0] === 0x89 && png[1] === 0x50) {
+        await db
+          .prepare("INSERT OR REPLACE INTO apple_images(source, kind, data, created) VALUES(?, ?, ?, ?)")
+          .bind(id, kind, png, new Date().toISOString())
+          .run();
+        return png;
+      }
+    } catch (e) {
+      console.log("apple wallet image error", String(e).slice(0, 200));
+    }
+  }
+  return row.mime === "image/png" ? original : null;
 }
 
 const b64bytes = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
@@ -68,16 +105,21 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
   const reward = (text.reward || c.reward).slice(0, 120);
   const files: Record<string, Bytes> = {};
   for (const [name, b64] of Object.entries(PASS_ICONS)) files[name] = b64bytes(b64);
-  const logo = await pngAsset(db, c.business, design.logo);
+  const logo = await passImage(db, c.business, design.logo, "logo");
   if (logo) {
     files["logo.png"] = logo;
     files["logo@2x.png"] = logo;
+    files["logo@3x.png"] = logo;
   }
-  const strip = await pngAsset(db, c.business, design.walletHero ?? design.hero);
+  // The banner under the logo: the stamp picture for this many stamps when the business uses stamp
+  // banners (as on Google Wallet), otherwise its wallet banner or background image.
+  const strip = await passImage(db, c.business, walletStampPicture(design, c.stamps, c.target) ?? design.walletHero ?? design.hero, "strip");
   if (strip) {
-    files["strip.png"] = strip;
     files["strip@2x.png"] = strip;
+    files["strip@3x.png"] = strip;
   }
+  const stamps = { key: "stamps", label: L.stamps, value: `${c.stamps}/${c.target}`, changeMessage: L.changed };
+  const ready = c.rewards > 0 ? [{ key: "ready", label: L.ready, value: c.rewards, changeMessage: L.readyChanged }] : [];
   const pass = {
     formatVersion: 1,
     passTypeIdentifier: config.passTypeId,
@@ -94,10 +136,11 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
     sharingProhibited: true,
     barcodes: [{ format: "PKBarcodeFormatQR", message: "perkly:" + c.scan_code, messageEncoding: "iso-8859-1" }],
     storeCard: {
-      headerFields: c.rewards > 0 ? [{ key: "ready", label: L.ready, value: c.rewards }] : [],
-      primaryFields: [{ key: "stamps", label: L.stamps, value: `${c.stamps}/${c.target}`, changeMessage: L.changed }],
-      secondaryFields: [{ key: "reward", label: L.reward, value: reward }],
-      auxiliaryFields: [{ key: "customer", label: L.customer, value: c.name.slice(0, 40) }],
+      // With a banner, the stamp count sits at the top right and the banner stays clear;
+      // without one, the count is the large number on the card.
+      headerFields: strip ? [...ready, stamps] : ready,
+      primaryFields: strip ? [] : [stamps],
+      secondaryFields: [{ key: "reward", label: L.reward, value: reward }, { key: "customer", label: L.customer, value: c.name.slice(0, 40) }],
       backFields: [
         ...(text.promo ? [{ key: "offer", label: L.offer, value: text.promo.slice(0, 200) }] : []),
         { key: "about", label: "Perkly", value: L.about },
