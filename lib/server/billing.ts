@@ -6,7 +6,7 @@ export function isEntitled(status: string | null | undefined): boolean {
   return status === "active" || status === "trialing";
 }
 
-export const MONTHLY_PRICE_ILS = 99;
+export const MONTHLY_PRICE_ILS = 199;
 /** Yearly plan: one payment a year, and the counter kit is included (shipped after the first payment). */
 export const YEARLY_PRICE_ILS = 999;
 
@@ -23,7 +23,7 @@ export const USD_TO_ILS = 3.7;
 
 /** What one active subscription brings in per month, in shekels, for the admin estimate. */
 export function monthlyValue(plan: Plan, currency: "ILS" | "USD" = "ILS"): number {
-  if (currency === "USD") return (plan === "yearly" ? 290 / 12 : 29) * USD_TO_ILS;
+  if (currency === "USD") return (plan === "yearly" ? 590 / 12 : 59) * USD_TO_ILS;
   return plan === "yearly" ? YEARLY_PRICE_ILS / 12 : MONTHLY_PRICE_ILS;
 }
 /** Free trial at checkout: the card is taken up front and first charged when the trial ends. */

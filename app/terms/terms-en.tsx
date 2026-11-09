@@ -8,7 +8,7 @@ export default function TermsEn() {
   const p = PRICES.USD;
   const m = (n: number) => money(n, "USD", "en");
   return (
-    <LegalPage lang="en" title="Terms of Use" updated="October 26, 2026">
+    <LegalPage lang="en" title="Terms of Use" updated="November 9, 2026">
       <p>
         These terms apply to the use of perkly.shop and the Perkly service, operated by {OPERATOR_LINE_EN}. Using the service
         means you accept these terms and the <a href="/privacy">Privacy Policy</a>.

@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-html-link-for-pages -- plain links on purpose: client-side navigation breaks on this server */
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { COPY, hrefs, type Lang, copyFor, kitOffered } from "./content";
+import { YEARLY_SOLD } from "../../lib/pricing";
 import type { Currency } from "../../lib/pricing";
 import { useRegion } from "../../components/region-context";
 import { Icon } from "./visuals";
@@ -334,8 +335,8 @@ export function PricingPlans({ lang, currency = "ILS", children }: { lang: Lang;
   const c = copyFor(lang, currency).pricing;
   const h = hrefs(lang);
   const [cycle, setCycle] = useState<"monthly" | "yearly">("monthly");
-  // Abroad only the monthly plan is sold (no yearly plan and no counter kit there yet).
-  const withYearly = kitOffered(currency);
+  // Only the monthly plan is sold at the moment (YEARLY_SOLD); the counter kit card is for Israel.
+  const withYearly = YEARLY_SOLD && kitOffered(currency);
   const yearly = withYearly && cycle === "yearly";
   const signupYearly = h.signup + (h.signup.includes("?") ? "&" : "?") + "plan=yearly";
   return (
@@ -350,7 +351,7 @@ export function PricingPlans({ lang, currency = "ILS", children }: { lang: Lang;
         </div>
         <span className="lp-cycle-save"><Icon name="gift" size={16} stroke={2.2} />{c.cycle.save}</span>
       </div>}
-      <div className={withYearly ? "lp-pricing lp-pricing-3" : "lp-pricing lp-pricing-3 lp-pricing-two"}>
+      <div className={kitOffered(currency) ? "lp-pricing lp-pricing-3" : "lp-pricing lp-pricing-3 lp-pricing-two"}>
         <article className="lp-price-card lp-plan" aria-labelledby="plan-free">
           <div className="lp-plan-head">
             <span className="lp-plan-icon lp-plan-icon-free" aria-hidden="true"><Icon name="stamp" size={20} stroke={2} /></span>
@@ -365,12 +366,13 @@ export function PricingPlans({ lang, currency = "ILS", children }: { lang: Lang;
           </ul>
         </article>
         <article className="lp-price-card lp-plan lp-plan-main" aria-labelledby="plan-sub">
-          <span className="lp-plan-badge">{c.yearly.badge}</span>
+          {withYearly && <span className="lp-plan-badge">{c.yearly.badge}</span>}
           <div className="lp-plan-head">
             <span className="lp-plan-icon lp-plan-icon-main" aria-hidden="true"><Icon name="star" size={20} stroke={2} /></span>
             <h3 id="plan-sub" className="lp-price-name">{c.sub.name}</h3>
           </div>
           <p className="lp-plan-desc">{c.sub.desc}</p>
+          {!yearly && <p className="lp-was-line"><span className="sr-only">{c.sub.wasLabel} </span><s>{c.sub.was}</s></p>}
           <p className="lp-price" aria-live="polite">
             <strong>{yearly ? c.yearly.price : c.sub.price}</strong><span>{yearly ? c.yearly.per : c.sub.per}</span>
           </p>
@@ -382,7 +384,7 @@ export function PricingPlans({ lang, currency = "ILS", children }: { lang: Lang;
             {c.sub.features.map((f) => <li key={f}><Icon name="check" size={18} stroke={2.6} />{f}</li>)}
           </ul>
         </article>
-        {withYearly && children}
+        {kitOffered(currency) && children}
       </div>
     </div>
   );

@@ -301,38 +301,33 @@ test("yearly plan: a twelfth of the price per month in the admin estimate", () =
   assert.equal(monthlyValue("yearly"), 999 / 12);
 });
 
-test("yearly plan: the same price and the kit in every text that sells it", () => {
+test("monthly only: 199 ₪ (was 300 ₪), no yearly plan anywhere it is sold", () => {
   const read = (f) => readFileSync(new URL("../" + f, import.meta.url), "utf8");
   const copy = read("app/landing/content.ts");
-  // Texts carry placeholders; the visitor's currency fills them (lib/pricing.ts).
-  for (const phrase of ["{$y}", "{$k}", "מנוי שנתי", "اشتراك سنوي", "yearly plan"]) assert.ok(copy.includes(phrase), phrase);
-  for (const phrase of ["חוסכים {$save}%", "وفّروا {$save}%", "Save {$save}%"]) assert.ok(copy.includes(phrase), phrase);
+  // Prices are placeholders; the visitor's currency fills them (lib/pricing.ts).
   assert.ok(!/\d+ ?₪|₪\d+|(?<!\{)\$\d+/.test(copy), "no hard-coded price in the landing copy");
-  assert.equal(PRICES.ILS.yearly, YEARLY_PRICE_ILS);
+  assert.equal((copy.match(/was: "\{\$was\}"/g) || []).length, 3, "the struck-through price in he, ar and en");
+  assert.doesNotMatch(copy, /a: "[^"]*\{\$y\}/, "no FAQ answer sells a yearly plan");
   assert.equal(PRICES.ILS.monthly, MONTHLY_PRICE_ILS);
-  assert.equal(yearlySaving("ILS"), 16);
-  assert.equal(yearlySaving("USD"), 17);
-  assert.match(read("app/landing/landing-client.tsx"), /plan=yearly/);
-  assert.match(read("app/terms/page.tsx"), /מנוי שנתי: 999 ₪ לשנה.*ערכת קופה/);
-  // Abroad (English terms, dollars): monthly only, no counter kit.
-  assert.match(read("app/terms/terms-en.tsx"), /Subscription: \{m\(p\.monthly\)\} a month/);
-  assert.doesNotMatch(read("app/terms/terms-en.tsx"), /kit|[Yy]early/);
-  assert.match(read("app/start/start-flow.tsx"), /yearlyPrice: "\{\$y\}"/);
-  assert.match(read("app/billing/billing-view.tsx"), /\{\$y\} לשנה/);
+  assert.equal(PRICES.ILS.monthly, 199);
+  assert.equal(PRICES.ILS.was, 300);
+  assert.match(read("app/terms/page.tsx"), /מנוי: 199 ₪ לחודש/);
+  assert.doesNotMatch(read("app/terms/page.tsx"), /מנוי שנתי/);
+  assert.match(read("lib/server/polar.ts"), /return YEARLY_SOLD && polarConfigured/);
+  assert.match(read("lib/pricing.ts"), /export const YEARLY_SOLD = false;/);
   assert.ok(existsSync(new URL("../drizzle/0023_counter_kit.sql", import.meta.url)));
 });
 
 test("prices: shekels in Israel, dollars abroad, written the way each language reads", () => {
-  assert.equal(fillPrices("{$m} / {$y} / {$k}", "ILS", "he"), "99 ₪ / 999 ₪ / 99 ₪");
-  assert.equal(fillPrices("{$m}", "ILS", "en"), "₪99");
-  assert.equal(fillPrices("{$m} / {$y} / {$ym} / {$0}", "USD", "he"), "$29 / $290 / $24 / $0");
-  assert.equal(fillPrices("Save {$save}%", "USD", "en"), "Save 17%");
-  assert.deepEqual(withPrices({ a: ["{$m}"], b: { c: "{$k}" }, n: 3 }, "USD", "en"), { a: ["$29"], b: { c: "$29" }, n: 3 });
+  assert.equal(fillPrices("{$m} / {$was} / {$k}", "ILS", "he"), "199 ₪ / 300 ₪ / 99 ₪");
+  assert.equal(fillPrices("{$m}", "ILS", "en"), "₪199");
+  assert.equal(fillPrices("{$m} / {$was} / {$0}", "USD", "he"), "$59 / $89 / $0");
+  assert.deepEqual(withPrices({ a: ["{$m}"], b: { c: "{$was}" }, n: 3 }, "USD", "en"), { a: ["$59"], b: { c: "$89" }, n: 3 });
   assert.equal(asCurrency("USD"), "USD");
   assert.equal(asCurrency(null), "ILS");
   assert.equal(asCurrency("EUR"), "ILS");
   // The admin estimate counts dollars in shekels.
-  assert.ok(monthlyValue("monthly", "USD") > 29);
+  assert.ok(monthlyValue("monthly", "USD") > 59);
 });
 
 test("region: Israel (or unknown) gets Hebrew and shekels, everyone else English and dollars", () => {
@@ -608,7 +603,7 @@ test("polar: dollar businesses get the dollar product and the checkout names the
   assert.equal(productsFor({ ...env, POLAR_PRODUCT_ID_USD: undefined }, "USD").charge, "ils");
   // No yearly dollar product yet: abroad, only monthly is offered.
   assert.equal(yearlyConfigured(env, "USD"), false);
-  assert.equal(yearlyConfigured(env, "ILS"), true);
+  assert.equal(yearlyConfigured(env, "ILS"), false, "the yearly plan is not sold, even with a product set");
   assert.match(readFileSync(new URL("../lib/server/polar.ts", import.meta.url), "utf8"), /products\.charge === "usd" \? \{ currency: "usd" \}/);
   assert.match(readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8"), /"POLAR_PRODUCT_ID_USD": "90ddc69e-5cad-4680-a63f-489ed5db2cfa"/);
 });
@@ -624,7 +619,8 @@ test("abroad: no counter kit and no yearly plan on the landing page or the conta
   // The questions they replace exist word for word in the English FAQ.
   for (const q of ["Do I need to buy equipment?", "How much does it cost?"]) assert.ok(content.includes(`{ q: "${q}"`), q);
   const plans = readFileSync(new URL("../app/landing/landing-client.tsx", import.meta.url), "utf8");
-  assert.match(plans, /withYearly && children/);
+  assert.match(plans, /kitOffered\(currency\) && children/);
+  assert.match(plans, /const withYearly = YEARLY_SOLD && kitOffered\(currency\)/);
   assert.match(plans, /\{withYearly && <div className="lp-cycle">/);
   assert.match(readFileSync(new URL("../app/contact/contact-form.tsx", import.meta.url), "utf8"), /!region\.intl && <label className="su-check su-kit">/);
 });
