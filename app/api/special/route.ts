@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { getD1 } from "../../../db";
-import { getMemberships, getRole, getUser } from "../../../lib/server/auth";
+import { getMemberships, getUser, isPlatformAdmin, type Membership, type User } from "../../../lib/server/auth";
 import { fail, json, readJson, sameOrigin } from "../../../lib/server/http";
 import { allow } from "../../../lib/server/rate-limit";
 import { getSettings } from "../../../lib/server/settings";
@@ -15,10 +15,18 @@ const MAX_PENDING = 10;
 
 type SpecialRow = { id: string; send_at: string; text: string; queued: string | null; recipients: number | null; canceled: string | null; sent: number };
 
-/** The owner's businesses, and the chosen one (or the first). Only owners schedule messages. */
-async function ownerBusiness(db: D1Database, userId: string, wanted: unknown) {
-  const owned = (await getMemberships(db, userId)).filter((m) => m.role === "owner");
-  const pick = typeof wanted === "string" && wanted ? owned.find((m) => m.business === wanted) : owned[0];
+/**
+ * Special-day messages are sent by Perkly (a platform admin) for a business, like the rest of the card.
+ * The admin's own businesses, plus the one they opened from the control center.
+ */
+async function ownerBusiness(db: D1Database, user: User, wanted: unknown) {
+  if (!isPlatformAdmin(user, env)) return { owned: [] as Membership[], pick: undefined };
+  const owned = (await getMemberships(db, user.id)).filter((m) => m.role === "owner");
+  let pick = typeof wanted === "string" && wanted ? owned.find((m) => m.business === wanted) : owned[0];
+  if (!pick && typeof wanted === "string" && wanted) {
+    const b = await db.prepare("SELECT id, name FROM businesses WHERE id = ? AND archived IS NULL").bind(wanted).first<{ id: string; name: string }>();
+    if (b) { pick = { business: b.id, businessName: b.name, role: "owner", branch: null }; owned.push(pick); }
+  }
   return { owned, pick };
 }
 
@@ -27,8 +35,8 @@ export async function GET(request: Request) {
   const db = getD1();
   const user = await getUser(db, request.headers.get("cookie"));
   if (!user) return fail("signin", 401, "Sign in required");
-  const { owned, pick } = await ownerBusiness(db, user.id, new URL(request.url).searchParams.get("business"));
-  if (!pick) return fail("forbidden", 403, "Owners only");
+  const { owned, pick } = await ownerBusiness(db, user, new URL(request.url).searchParams.get("business"));
+  if (!pick) return fail("admin_only", 403, "Managed by Perkly");
   const [items, wallet] = await Promise.all([
     db
       .prepare(
@@ -57,7 +65,7 @@ export async function POST(request: Request) {
   const user = await getUser(db, request.headers.get("cookie"));
   if (!user) return fail("signin", 401, "Sign in required");
   if (!body) return fail("bad_request", 400);
-  if ((await getRole(db, user.id, body.business)) !== "owner") return fail("forbidden", 403, "Owners only");
+  if (!(await ownerBusiness(db, user, body.business)).pick) return fail("admin_only", 403, "Managed by Perkly");
   const business = body.business as string;
   if ((await getSettings(db)).maintenance) return fail("maintenance", 503, "Maintenance");
   if (!(await allow(db, `special:${user.id}`, 30, 3600))) return fail("rate_limited", 429, "Too many attempts");

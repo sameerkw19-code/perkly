@@ -1,5 +1,7 @@
 // End-to-end API checks against a running server.
-// 1) npm run build   2) npm run db:migrate:local   3) npm run preview
+// 1) npm run build   2) npm run db:migrate:local
+// 3) printf 'PLATFORM_ADMIN_EMAILS=admin@test.perkly\n' > dist/server/.dev.vars   (the test admin: Perkly)
+// 4) npm run preview
 // 4) in another window: npm run test:api      (BASE_URL defaults to http://127.0.0.1:8787)
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -35,6 +37,9 @@ class Client {
 
 const id = () => crypto.randomUUID();
 const ownerA = new Client();
+// Perkly: a platform admin, who alone changes a business's card design, settings, team and branches.
+const admin = new Client();
+const ADMIN_EMAIL = "admin@test.perkly";
 const ownerB = new Client();
 const staff = new Client();
 let bizA, bizB, dana, cardUrl;
@@ -48,6 +53,14 @@ async function stamps(client, business, customerId) {
   const r = await client.get(`/api/loyalty?business=${business}&days=all`);
   return r.body.customers.find((c) => c.id === customerId);
 }
+
+test("the test admin (Perkly) signs in", async () => {
+  const up = await admin.post("/api/auth", { action: "signup", name: "Perkly", email: ADMIN_EMAIL, password: "admin pass 12" });
+  if (up.status !== 200) {
+    const login = await admin.post("/api/auth", { action: "login", email: ADMIN_EMAIL, password: "admin pass 12" });
+    assert.equal(login.status, 200, JSON.stringify(login.body));
+  }
+});
 
 test("forged identity headers are ignored; pages require sign-in", async () => {
   const anon = new Client();
@@ -190,7 +203,7 @@ test("10. another business owner cannot see or change this business", async () =
 });
 
 test("11. staff: invited, limited permissions, then revoked", async () => {
-  const inv = await ownerA.act(bizA, "invite_staff", { label: "Barista", email: `noa-${run}@test.perkly` });
+  const inv = await admin.act(bizA, "invite_staff", { label: "Barista", email: `noa-${run}@test.perkly` });
   assert.equal(inv.status, 200);
   const token = new URL(inv.body.inviteUrl).pathname.split("/").pop();
   const join = await staff.post("/api/auth", { action: "accept_invite", token, name: "Barista Noa", email: `noa-${run}@test.perkly`, password: "staff pass 1" });
@@ -214,7 +227,7 @@ test("11. staff: invited, limited permissions, then revoked", async () => {
   }
 
   const staffId = (await ownerA.get(`/api/loyalty?business=${bizA}`)).body.team.find((m) => m.role === "staff").id;
-  const rev = await ownerA.act(bizA, "revoke_member", { user: staffId });
+  const rev = await admin.act(bizA, "revoke_member", { user: staffId });
   assert.equal(rev.status, 200);
   const after = await staff.act(bizA, "stamp", { customer: dana, requestId: id() });
   assert.ok([401, 404].includes(after.status), "revoked staff cannot act");
@@ -232,7 +245,7 @@ test("owner correction is logged with a reason, never deletes history", async ()
 
 test("changing the program does not change an existing card's round", async () => {
   await ownerA.act(bizA, "stamp", { customer: dana, requestId: id() });
-  const upd = await ownerA.act(bizA, "update_business", { name: "Corner Cafe", reward: "Free coffee", target: 5, color: "#7558E8" });
+  const upd = await admin.act(bizA, "update_business", { name: "Corner Cafe", reward: "Free coffee", target: 5, color: "#7558E8" });
   assert.equal(upd.status, 200);
   assert.equal((await stamps(ownerA, bizA, dana)).target, 9, "current round keeps 9");
   const fresh = await ownerA.act(bizA, "register_customer", { name: "Yossi", phone: "052-7654321" });
@@ -277,22 +290,22 @@ test("new card link replaces the old one", async () => {
 
 test("social links: owner saves them, they show on the customer card, bad ones are rejected", async () => {
   const base = { name: "Corner Cafe", reward: "Free coffee", target: 5, color: "#7558E8" };
-  const bad = await ownerA.act(bizA, "update_business", { ...base, social: { instagram: "https://evil.example/x" } });
+  const bad = await admin.act(bizA, "update_business", { ...base, social: { instagram: "https://evil.example/x" } });
   assert.equal(bad.status, 400);
   assert.equal(bad.body.code, "bad_social");
-  const ok = await ownerA.act(bizA, "update_business", { ...base, social: { instagram: "@corner.cafe", whatsapp: "050-111-2233", website: "" } });
+  const ok = await admin.act(bizA, "update_business", { ...base, social: { instagram: "@corner.cafe", whatsapp: "050-111-2233", website: "" } });
   assert.equal(ok.status, 200);
   const biz = (await ownerA.get(`/api/loyalty?business=${bizA}`)).body.business;
   assert.deepEqual(biz.social, { instagram: "corner.cafe", whatsapp: "+972501112233" });
   // Saving other settings without `social` keeps the links.
-  await ownerA.act(bizA, "update_business", base);
+  await admin.act(bizA, "update_business", base);
   assert.deepEqual((await ownerA.get(`/api/loyalty?business=${bizA}`)).body.business.social, { instagram: "corner.cafe", whatsapp: "+972501112233" });
   const r = await ownerA.act(bizA, "new_card_link", { customer: dana });
   const page = await new Client().get(new URL(r.body.cardUrl).pathname);
   assert.match(page.text, /instagram\.com\/corner\.cafe/);
   assert.match(page.text, /wa\.me\/972501112233/);
   // Clearing every field removes them.
-  await ownerA.act(bizA, "update_business", { ...base, social: {} });
+  await admin.act(bizA, "update_business", { ...base, social: {} });
   assert.deepEqual((await ownerA.get(`/api/loyalty?business=${bizA}`)).body.business.social, {});
 });
 
@@ -322,26 +335,26 @@ async function upload(client, business, kind, bytes, type = "image/png") {
 }
 
 test("design: upload, draft, publish checks, live card uses the published design", async () => {
-  const up = await upload(ownerA, bizA, "logo", PNG_1x1);
+  const up = await upload(admin, bizA, "logo", PNG_1x1);
   assert.equal(up.status, 200, JSON.stringify(up.body));
   assert.equal(up.body.width, 1);
   const img = await fetch(`${BASE}/api/asset/${up.body.id}`);
   assert.equal(img.status, 200);
   assert.equal(img.headers.get("content-type"), "image/png");
 
-  const svg = await upload(ownerA, bizA, "logo", Buffer.from("<svg xmlns='http://www.w3.org/2000/svg'><script>alert(1)</script></svg>"), "image/svg+xml");
+  const svg = await upload(admin, bizA, "logo", Buffer.from("<svg xmlns='http://www.w3.org/2000/svg'><script>alert(1)</script></svg>"), "image/svg+xml");
   assert.equal(svg.status, 415, "SVG and unknown files are refused");
 
-  const before = (await ownerA.get(`/api/loyalty?business=${bizA}&days=all`)).body;
+  const before = (await admin.get(`/api/loyalty?business=${bizA}&days=all`)).body;
   const draft = structuredClone(before.editor.draft);
   draft.logo = up.body.id;
   draft.stamp = { icon: "pizza", image: null };
   draft.texts.he.title = "פיצה של רמי";
   draft.texts.en.title = "Rami's Pizza";
   draft.colors = { bg: "#FFFFFF", fg: "#FAFAFA", stamp: "#7558E8" }; // unreadable on purpose
-  const saved = await ownerA.act(bizA, "save_design", { design: draft });
+  const saved = await admin.act(bizA, "save_design", { design: draft });
   assert.equal(saved.status, 200, JSON.stringify(saved.body));
-  const blocked = await ownerA.act(bizA, "publish_design");
+  const blocked = await admin.act(bizA, "publish_design");
   assert.equal(blocked.status, 409, "low contrast blocks publishing");
   assert.ok(blocked.body.checks.some((c) => c.level === "bad"));
 
@@ -350,24 +363,24 @@ test("design: upload, draft, publish checks, live card uses the published design
   assert.ok(stillOld.status < 500);
 
   draft.colors = { bg: "#8E1B12", fg: "#FFF4E6", stamp: "#FFC94A" };
-  await ownerA.act(bizA, "save_design", { design: draft });
+  await admin.act(bizA, "save_design", { design: draft });
   const stampsBefore = (await stamps(ownerA, bizA, dana)).stamps;
-  const pub = await ownerA.act(bizA, "publish_design");
+  const pub = await admin.act(bizA, "publish_design");
   assert.equal(pub.status, 200, JSON.stringify(pub.body));
-  assert.equal(pub.body.version, 1);
+  assert.equal(pub.body.version, 2, "the starting card is version 1");
   assert.equal((await stamps(ownerA, bizA, dana)).stamps, stampsBefore, "publishing never changes balances");
 
   const link = (await ownerA.act(bizA, "new_card_link", { customer: dana })).body.cardUrl;
   const card = await new Client().get(new URL(link).pathname);
   assert.match(card.text, /פיצה של רמי/);
   assert.match(card.text, /#8E1B12/);
-  const pub2 = await ownerA.act(bizA, "publish_design");
-  assert.equal(pub2.body.version, 2, "every publish is a new kept version");
+  const pub2 = await admin.act(bizA, "publish_design");
+  assert.equal(pub2.body.version, 3, "every publish is a new kept version");
 });
 
 test("design: staff and other businesses cannot edit or borrow images", async () => {
   const s2 = new Client();
-  const inv = await ownerA.act(bizA, "invite_staff", { label: "Cashier", email: `cash-${run}@test.perkly` });
+  const inv = await admin.act(bizA, "invite_staff", { label: "Cashier", email: `cash-${run}@test.perkly` });
   await s2.post("/api/auth", { action: "accept_invite", token: new URL(inv.body.inviteUrl).pathname.split("/").pop(), name: "Cashier", email: `cash-${run}@test.perkly`, password: "cashier pass" });
   const view = await s2.get(`/api/loyalty?business=${bizA}`);
   assert.equal(view.body.editor, undefined, "staff get no editor data");
@@ -379,11 +392,11 @@ test("design: staff and other businesses cannot edit or borrow images", async ()
   const ownerC = new Client();
   await signup(ownerC, "ownerC");
   const bizC = (await ownerC.post("/api/loyalty", { action: "create_business", name: "C", reward: "x", target: 4, color: "#222222" })).body.id;
-  const aLogo = (await ownerA.get(`/api/loyalty?business=${bizA}`)).body.editor.images[0].id;
-  const cDesign = (await ownerC.get(`/api/loyalty?business=${bizC}`)).body.editor.draft;
+  const aLogo = (await admin.get(`/api/loyalty?business=${bizA}`)).body.editor.images[0].id;
+  const cDesign = (await admin.get(`/api/loyalty?business=${bizC}`)).body.editor.draft;
   cDesign.logo = aLogo;
-  assert.equal((await ownerC.act(bizC, "save_design", { design: cDesign })).status, 404, "cannot use another business's image");
-  assert.equal((await upload(ownerC, bizA, "logo", PNG_1x1)).status, 404, "cannot upload into another business");
+  assert.equal((await admin.act(bizC, "save_design", { design: cDesign })).status, 404, "cannot use another business's image");
+  assert.equal((await upload(ownerC, bizA, "logo", PNG_1x1)).status, 403, "only Perkly uploads card images");
 });
 
 // ---------------- Branches ----------------
@@ -396,15 +409,15 @@ test("branches: required once they exist, staff locked to their branch, reports 
   // Without branches, actions work without one.
   assert.equal((await owner.act(biz, "stamp", { customer: cust, requestId: id() })).status, 200);
 
-  const north = (await owner.act(biz, "create_branch", { name: "North" })).body.id;
-  const south = (await owner.act(biz, "create_branch", { name: "South" })).body.id;
+  const north = (await admin.act(biz, "create_branch", { name: "North" })).body.id;
+  const south = (await admin.act(biz, "create_branch", { name: "South" })).body.id;
   const noBranch = await owner.act(biz, "stamp", { customer: cust, requestId: id() });
   assert.equal(noBranch.status, 400);
   assert.equal(noBranch.body.code, "branch_required");
   assert.equal((await owner.act(biz, "stamp", { customer: cust, branch: south, requestId: id() })).status, 200);
 
   // Staff invited to North: whatever branch they send, North is recorded.
-  const inv = await owner.act(biz, "invite_staff", { label: "N", branch: north, email: `north-${run}@test.perkly` });
+  const inv = await admin.act(biz, "invite_staff", { label: "N", branch: north, email: `north-${run}@test.perkly` });
   const st = new Client();
   await st.post("/api/auth", { action: "accept_invite", token: new URL(inv.body.inviteUrl).pathname.split("/").pop(), name: "North Staff", email: `north-${run}@test.perkly`, password: "north pass 1" });
   const me = (await st.get(`/api/loyalty?business=${biz}`)).body;
@@ -419,21 +432,21 @@ test("branches: required once they exist, staff locked to their branch, reports 
   assert.ok(onlyNorth.events.every((e) => e.branch_name === "North"));
 
   // Another business's branch id is rejected.
-  const otherBranch = (await ownerA.act(bizA, "create_branch", { name: "A-branch" })).body.id;
+  const otherBranch = (await admin.act(bizA, "create_branch", { name: "A-branch" })).body.id;
   assert.equal((await owner.act(biz, "stamp", { customer: cust, branch: otherBranch, requestId: id() })).status, 400);
-  assert.equal((await owner.act(biz, "set_member_branch", { user: "x", branch: otherBranch })).status, 400);
+  assert.equal((await admin.act(biz, "set_member_branch", { user: "x", branch: otherBranch })).status, 400);
 
   // Staff cannot manage branches.
   assert.equal((await st.act(biz, "create_branch", { name: "Hack" })).status, 403);
   assert.equal((await st.act(biz, "archive_branch", { branch: north })).status, 403);
 
   // Closing North blocks its staff until the owner moves them.
-  assert.equal((await owner.act(biz, "archive_branch", { branch: north })).status, 200);
+  assert.equal((await admin.act(biz, "archive_branch", { branch: north })).status, 200);
   const blocked = await st.act(biz, "stamp", { customer: cust, requestId: id() });
   assert.equal(blocked.status, 409);
   assert.equal(blocked.body.code, "branch_invalid");
   const staffId = view.team.find((m) => m.role === "staff").id;
-  assert.equal((await owner.act(biz, "set_member_branch", { user: staffId, branch: south })).status, 200);
+  assert.equal((await admin.act(biz, "set_member_branch", { user: staffId, branch: south })).status, 200);
   assert.equal((await st.act(biz, "stamp", { customer: cust, requestId: id() })).status, 200);
   const hist = (await owner.get(`/api/loyalty?business=${biz}&days=all`)).body.events;
   assert.equal(hist.filter((e) => e.branch_name === "North").length, 1, "closed branch keeps its history");
@@ -446,7 +459,7 @@ test("station: several purchases in one action; staff can fix the count with a r
   await signup(owner, "stationOwner");
   const biz = (await owner.post("/api/loyalty", { action: "create_business", name: "Cafe2", reward: "Free", target: 9, color: "#123456", rewardMode: "block" })).body.id;
   const cust = (await owner.act(biz, "register_customer", { name: "Omer", phone: "0549876543" })).body.id;
-  const inv = await owner.act(biz, "invite_staff", { label: "S", email: `station-${run}@test.perkly` });
+  const inv = await admin.act(biz, "invite_staff", { label: "S", email: `station-${run}@test.perkly` });
   const st = new Client();
   await st.post("/api/auth", { action: "accept_invite", token: new URL(inv.body.inviteUrl).pathname.split("/").pop(), name: "Station Staff", email: `station-${run}@test.perkly`, password: "station pass" });
 
@@ -483,7 +496,7 @@ test("station: several purchases in one action; staff can fix the count with a r
   assert.ok(view.alerts.some((a) => a.type === "staffFix"), "owner is told about staff corrections");
 
   // Owner turns staff corrections off.
-  const off = await owner.act(biz, "update_business", { name: "Cafe2", reward: "Free", target: 9, color: "#123456", staffAdjust: false });
+  const off = await admin.act(biz, "update_business", { name: "Cafe2", reward: "Free", target: 9, color: "#123456", staffAdjust: false });
   assert.equal(off.status, 200);
   assert.equal((await st.act(biz, "adjust", { customer: cust, delta: 1, from: 4, note: "x", requestId: id() })).status, 403);
   assert.equal((await owner.act(biz, "adjust", { customer: cust, delta: 1, from: 4, note: "owner fix", requestId: id() })).status, 200);
@@ -544,7 +557,7 @@ test("collect mode: expiry applies to new rewards only; switching modes converts
   const full = await owner.act(biz, "stamp", { customer: cust, requestId: id() });
   assert.equal(full.body.code, "reward_ready", "redeem-first mode stops at a full card");
 
-  const sw = await owner.act(biz, "update_business", { name: "Exp", reward: "Free", target: 2, color: "#123456", rewardMode: "bank", rewardExpiryDays: 30 });
+  const sw = await admin.act(biz, "update_business", { name: "Exp", reward: "Free", target: 2, color: "#123456", rewardMode: "bank", rewardExpiryDays: 30 });
   assert.equal(sw.status, 200);
   let c = (await owner.get(`/api/loyalty?business=${biz}&days=all`)).body.customers.find((x) => x.id === cust);
   assert.deepEqual([c.stamps, c.rewards], [0, 1], "full card became a saved reward");
@@ -553,10 +566,10 @@ test("collect mode: expiry applies to new rewards only; switching modes converts
   assert.equal(r.body.card.rewards, 2);
   const days = (Date.parse(r.body.card.nextExpiry) - Date.now()) / 86_400_000;
   assert.ok(days > 29 && days <= 30.01, "new reward expires in 30 days");
-  assert.equal((await owner.act(biz, "update_business", { name: "Exp", reward: "Free", target: 2, color: "#123456", rewardExpiryDays: 7 })).status, 400, "only listed expiry values");
+  assert.equal((await admin.act(biz, "update_business", { name: "Exp", reward: "Free", target: 2, color: "#123456", rewardExpiryDays: 7 })).status, 400, "only listed expiry values");
 
   // Staff can use saved rewards too.
-  const inv = await owner.act(biz, "invite_staff", { label: "S", email: `exp-${run}@test.perkly` });
+  const inv = await admin.act(biz, "invite_staff", { label: "S", email: `exp-${run}@test.perkly` });
   const st = new Client();
   await st.post("/api/auth", { action: "accept_invite", token: new URL(inv.body.inviteUrl).pathname.split("/").pop(), name: "Exp Staff", email: `exp-${run}@test.perkly`, password: "exp staff 1" });
   const used = await st.act(biz, "redeem", { customer: cust, requestId: id() });
@@ -624,9 +637,9 @@ test("invites work only for their email; removing staff cancels their unused inv
   await signup(owner, "invowner");
   const biz = (await owner.post("/api/loyalty", { action: "create_business", name: "Inv Cafe", reward: "Coffee", target: 5, color: "#123456" })).body.id;
   const target = `kim-${run}@test.perkly`;
-  assert.equal((await owner.act(biz, "invite_staff", { label: "Kim" })).body.code, "invite_email", "an email is required");
-  const first = await owner.act(biz, "invite_staff", { label: "Kim", email: target });
-  const second = await owner.act(biz, "invite_staff", { label: "Kim again", email: target });
+  assert.equal((await admin.act(biz, "invite_staff", { label: "Kim" })).body.code, "invite_email", "an email is required");
+  const first = await admin.act(biz, "invite_staff", { label: "Kim", email: target });
+  const second = await admin.act(biz, "invite_staff", { label: "Kim again", email: target });
   const tok = (r) => new URL(r.body.inviteUrl).pathname.split("/").pop();
 
   const stranger = await new Client().post("/api/auth", { action: "accept_invite", token: tok(first), name: "Mallory", email: `mallory-${run}@test.perkly`, password: "mallory pass 1" });
@@ -636,7 +649,7 @@ test("invites work only for their email; removing staff cancels their unused inv
   const kim = new Client();
   assert.equal((await kim.post("/api/auth", { action: "accept_invite", token: tok(first), name: "Kim", email: target, password: "kim pass 12" })).status, 200);
   const kimId = (await owner.get(`/api/loyalty?business=${biz}`)).body.team.find((m) => m.role === "staff").id;
-  assert.equal((await owner.act(biz, "revoke_member", { user: kimId })).status, 200);
+  assert.equal((await admin.act(biz, "revoke_member", { user: kimId })).status, 200);
   const back = await new Client().post("/api/auth", { action: "login", email: target, password: "kim pass 12" });
   const kim2 = new Client();
   await kim2.post("/api/auth", { action: "login", email: target, password: "kim pass 12" });
@@ -683,4 +696,43 @@ test("deleting an account: staff can, an owner of an active business is told to 
   assert.equal((await solo.post("/api/auth", { action: "delete_account", password: "solo pass 12" })).status, 200);
   assert.equal((await solo.get("/api/loyalty")).status, 401, "signed out");
   assert.equal((await new Client().post("/api/auth", { action: "login", email, password: "solo pass 12" })).status, 401, "cannot sign in again");
+});
+
+test("Perkly manages the card, settings and team; the owner gets reports, customers and the station", async () => {
+  const o = new Client();
+  await signup(o, "managed");
+  const biz = (await o.post("/api/loyalty", { action: "create_business", name: "Managed", reward: "Free tea", target: 6, color: "#2F2A4A", kind: "cafe", lang: "he" })).body.id;
+  // The owner: no card editor, and every management action is refused.
+  const view = await o.get(`/api/loyalty?business=${biz}`);
+  assert.equal(view.body.role, "owner");
+  assert.equal(view.body.manage, false);
+  assert.equal(view.body.editor, null);
+  assert.ok(view.body.summary.week && "returning_now" in view.body.summary.week, "reports have returning customers");
+  assert.ok(Array.isArray(view.body.breakdown.staff) && Array.isArray(view.body.breakdown.branches), "reports by staff and branch");
+  // The starting card was built on the server for the business type (coffee stamp).
+  assert.equal(view.body.design.stamp.icon, "coffee");
+  for (const [action, extra] of [
+    ["update_business", { name: "X", reward: "x", target: 5, color: "#000000" }], ["save_design", { design: view.body.design }], ["publish_design", {}],
+    ["invite_staff", { label: "S", email: `s-${run}@test.perkly` }], ["create_branch", { name: "B" }], ["new_join_code", {}],
+  ]) {
+    const r = await o.act(biz, action, extra);
+    assert.equal(r.status, 403, action);
+    assert.equal(r.body.code, "admin_only", action);
+  }
+  assert.equal((await upload(o, biz, "logo", PNG_1x1)).status, 403, "owners do not upload card images");
+  // What the owner keeps: customers and stamps.
+  const c = await o.act(biz, "register_customer", { name: "Lea", phone: "0541234567" });
+  assert.equal(c.status, 200, JSON.stringify(c.body));
+  // Perkly opens the business from the control center and manages it.
+  const asAdmin = await admin.get(`/api/loyalty?business=${biz}`);
+  assert.equal(asAdmin.body.business.id, biz);
+  assert.equal(asAdmin.body.manage, true);
+  assert.equal(asAdmin.body.ownsBusiness, false);
+  assert.ok(asAdmin.body.editor, "Perkly gets the card editor");
+  assert.equal((await admin.act(biz, "update_business", { name: "Managed", reward: "Free tea", target: 6, color: "#2F2A4A" })).status, 200);
+  assert.equal((await admin.act(biz, "save_design", { design: asAdmin.body.editor.draft })).status, 200);
+  assert.equal((await admin.act(biz, "publish_design")).status, 200);
+  // Another owner still cannot open it.
+  const stranger = await ownerB.get(`/api/loyalty?business=${biz}`);
+  assert.notEqual(stranger.body?.business?.id, biz);
 });

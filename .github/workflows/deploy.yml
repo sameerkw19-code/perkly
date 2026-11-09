@@ -38,6 +38,8 @@ jobs:
       - run: npm run db:migrate:local
       - name: Acceptance tests against a local server
         run: |
+          # The test admin (Perkly), for the actions only a platform admin may take. Local server only.
+          printf 'PLATFORM_ADMIN_EMAILS=admin@test.perkly\n' > dist/server/.dev.vars
           npm run preview > preview.log 2>&1 &
           for i in $(seq 1 60); do curl -s -o /dev/null http://127.0.0.1:8787/login && break; sleep 1; done
           npm run test:api

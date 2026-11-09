@@ -16,6 +16,7 @@ import { ensureBusinessClass, walletConfig } from "../../../lib/server/google-wa
 import { getSettings } from "../../../lib/server/settings";
 import { normalizeSocial, parseSocial, type Social } from "../../../lib/social";
 import { regionFrom } from "../../../lib/server/region";
+import { isKind, startDesign } from "../../../lib/start-design";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +61,13 @@ async function activeBranches(db: D1Database, businessId: string) {
   return (await db.prepare("SELECT id, name FROM branches WHERE business = ? AND archived IS NULL ORDER BY created").bind(businessId).all<Branch>()).results;
 }
 
+/** A platform admin opening a business they are not a member of: owner permissions (plus the admin-only actions). */
+async function adminMembership(db: D1Database, businessId: unknown) {
+  if (typeof businessId !== "string" || !businessId) return null;
+  const b = await db.prepare("SELECT id, name FROM businesses WHERE id = ? AND archived IS NULL").bind(businessId).first<{ id: string; name: string }>();
+  return b ? { business: b.id, businessName: b.name, role: "owner" as const, branch: null as string | null } : null;
+}
+
 async function newCardSecret() {
   const secret = randomToken(24);
   return { secret, hash: await sha256(secret) };
@@ -74,6 +82,10 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const memberships = await getMemberships(db, user.id);
   const wanted = url.searchParams.get("business");
+  // A platform admin can open any business (from the control center) to manage its card, settings and team.
+  const admin = isPlatformAdmin(user, env);
+  const managed = admin && wanted && !memberships.some((m) => m.business === wanted) ? await adminMembership(db, wanted) : null;
+  if (managed) memberships.push(managed);
   const membership = memberships.find((m) => m.business === wanted) ?? memberships[0];
   // The admin control center is not linked from the site, so nothing here says who is an admin.
   const me = { name: user.name, email: user.email };
@@ -117,7 +129,7 @@ export async function GET(request: Request) {
     .sort((a, b) => a.inDays - b.inDays);
   // No QR or join link until the business may accept customers (paid, free access, or not suspended).
   if (!access.ok) business!.join_code = null;
-  const base = { me, memberships, role, business, branches, myBranch: membership.branch, design: await liveDesign(db, business!), access, birthdays, system, googleWallet: walletConfig(env) !== null };
+  const base = { me, memberships, role, manage: admin, ownsBusiness: membership !== managed, business, branches, myBranch: membership.branch, design: await liveDesign(db, business!), access, birthdays, system, googleWallet: walletConfig(env) !== null };
 
   if (role === "staff") {
     const mine = await db
@@ -147,19 +159,38 @@ export async function GET(request: Request) {
     const mid = new Date(Date.now() - days * 86_400_000).toISOString();
     const start = new Date(Date.now() - 2 * days * 86_400_000).toISOString();
     return db.prepare(
+      // Returning: customers who came in the period and had joined before it started.
       `SELECT
-         COALESCE(SUM(CASE WHEN kind = 'stamp' AND created >= ?2 THEN delta ELSE 0 END), 0) AS stamps_now,
-         COALESCE(SUM(CASE WHEN kind = 'stamp' AND created < ?2 THEN delta ELSE 0 END), 0) AS stamps_prev,
-         COALESCE(SUM(kind = 'redeem' AND created >= ?2), 0) AS redeemed_now,
-         COALESCE(SUM(kind = 'redeem' AND created < ?2), 0) AS redeemed_prev,
-         COUNT(DISTINCT CASE WHEN created >= ?2 THEN customer END) AS visitors_now,
-         COUNT(DISTINCT CASE WHEN created < ?2 THEN customer END) AS visitors_prev,
+         COALESCE(SUM(CASE WHEN e.kind = 'stamp' AND e.created >= ?2 THEN e.delta ELSE 0 END), 0) AS stamps_now,
+         COALESCE(SUM(CASE WHEN e.kind = 'stamp' AND e.created < ?2 THEN e.delta ELSE 0 END), 0) AS stamps_prev,
+         COALESCE(SUM(e.kind = 'redeem' AND e.created >= ?2), 0) AS redeemed_now,
+         COALESCE(SUM(e.kind = 'redeem' AND e.created < ?2), 0) AS redeemed_prev,
+         COUNT(DISTINCT CASE WHEN e.created >= ?2 THEN e.customer END) AS visitors_now,
+         COUNT(DISTINCT CASE WHEN e.created < ?2 THEN e.customer END) AS visitors_prev,
+         COUNT(DISTINCT CASE WHEN e.created >= ?2 AND c.created < ?2 THEN e.customer END) AS returning_now,
+         COUNT(DISTINCT CASE WHEN e.created < ?2 AND c.created < ?3 THEN e.customer END) AS returning_prev,
          (SELECT COUNT(*) FROM customers WHERE business = ?1 AND created >= ?2) AS joined_now,
          (SELECT COUNT(*) FROM customers WHERE business = ?1 AND created >= ?3 AND created < ?2) AS joined_prev
-       FROM events WHERE business = ?1 AND created >= ?3 AND kind IN ('stamp', 'redeem')`,
+       FROM events e JOIN customers c ON c.id = e.customer
+       WHERE e.business = ?1 AND e.created >= ?3 AND e.kind IN ('stamp', 'redeem')`,
     ).bind(business!.id, mid, start);
   };
-  const [customers, events, stats, team, invites, busyCustomers, busyStaff, perBranch, staffFixes, sumDay, sumWeek, sumMonth] = await db.batch([
+  // Stamps and rewards per staff member and per branch, for the last day, week and month (the reports).
+  const ago = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
+  const breakdown = (by: "actor" | "branch") =>
+    db.prepare(
+      `SELECT e.${by} AS id, ${by === "actor" ? "u.name" : "br.name"} AS name,
+         COALESCE(SUM(CASE WHEN e.kind = 'stamp' AND e.created >= ?2 THEN e.delta ELSE 0 END), 0) AS stamps_day,
+         COALESCE(SUM(e.kind = 'redeem' AND e.created >= ?2), 0) AS redeemed_day,
+         COALESCE(SUM(CASE WHEN e.kind = 'stamp' AND e.created >= ?3 THEN e.delta ELSE 0 END), 0) AS stamps_week,
+         COALESCE(SUM(e.kind = 'redeem' AND e.created >= ?3), 0) AS redeemed_week,
+         COALESCE(SUM(CASE WHEN e.kind = 'stamp' THEN e.delta ELSE 0 END), 0) AS stamps_month,
+         COALESCE(SUM(e.kind = 'redeem'), 0) AS redeemed_month
+       FROM events e ${by === "actor" ? "LEFT JOIN users u ON u.id = e.actor" : "LEFT JOIN branches br ON br.id = e.branch"}
+       WHERE e.business = ?1 AND e.created >= ?4 AND e.kind IN ('stamp', 'redeem')
+       GROUP BY e.${by} ORDER BY stamps_month DESC LIMIT 50`,
+    ).bind(business!.id, ago(1), ago(7), ago(30));
+  const [customers, events, stats, team, invites, busyCustomers, busyStaff, perBranch, staffFixes, sumDay, sumWeek, sumMonth, byStaff, byBranch] = await db.batch([
     db.prepare(
       `SELECT c.id, c.name, c.phone, c.stamps, c.target, c.created, c.source, c.consent_marketing, c.birthday, c.card_hash IS NOT NULL AS has_link,
          (SELECT COUNT(*) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2))
@@ -217,23 +248,29 @@ export async function GET(request: Request) {
     periodSummary(1),
     periodSummary(7),
     periodSummary(30),
+    breakdown("actor"),
+    breakdown("branch"),
   ]);
 
-  // Card editor data (owner only): draft, live version and uploaded images.
-  const published = await publishedDesign(db, business!.id);
-  const draftRow = await db.prepare("SELECT design_draft FROM businesses WHERE id = ?").bind(business!.id).first<{ design_draft: string | null }>();
-  const draft = (draftRow?.design_draft && sanitizeDesign(JSON.parse(draftRow.design_draft))) || published?.design || defaultDesign(business!);
-  const images = await db.prepare("SELECT id, kind, width, height FROM assets WHERE business = ? AND kind NOT IN ('banner', 'apple_banner', 'wallet_logo') ORDER BY created DESC LIMIT 60").bind(business!.id).all();
-
-  return json({
-    ...base,
-    editor: {
+  // Card editor data (Perkly only): draft, live version and uploaded images.
+  const published = admin ? await publishedDesign(db, business!.id) : null;
+  let editor = null;
+  if (admin) {
+    const draftRow = await db.prepare("SELECT design_draft FROM businesses WHERE id = ?").bind(business!.id).first<{ design_draft: string | null }>();
+    const draft = (draftRow?.design_draft && sanitizeDesign(JSON.parse(draftRow.design_draft))) || published?.design || defaultDesign(business!);
+    const images = await db.prepare("SELECT id, kind, width, height FROM assets WHERE business = ? AND kind NOT IN ('banner', 'apple_banner', 'wallet_logo') ORDER BY created DESC LIMIT 60").bind(business!.id).all();
+    editor = {
       draft,
       publishedVersion: published?.version ?? 0,
       publishedAt: published?.published ?? null,
       hasUnpublished: !!draftRow?.design_draft && draftRow.design_draft !== JSON.stringify(published?.design ?? null),
       images: images.results,
-    },
+    };
+  }
+
+  return json({
+    ...base,
+    editor,
     range: days ?? "all",
     branchFilter,
     perBranch: perBranch.results,
@@ -241,6 +278,7 @@ export async function GET(request: Request) {
     events: events.results,
     stats: stats.results[0],
     summary: { day: sumDay.results[0], week: sumWeek.results[0], month: sumMonth.results[0] },
+    breakdown: { staff: byStaff.results, branches: byBranch.results },
     team: team.results,
     invites: invites.results,
     alerts: [
@@ -281,15 +319,15 @@ export async function POST(request: Request) {
     const earlier = await db.prepare("SELECT COUNT(*) AS n FROM businesses WHERE owner = ?").bind(user.id).first<{ n: number }>();
     const trialDays = earlier?.n ? 0 : sys.trialDays;
     const region = regionFrom(request.headers);
+    const cardLang = region.israel ? (p.lang === "en" ? "en" : "he") : "en";
     await db.batch([
       // The currency follows where the owner signs up: shekels in Israel, dollars abroad.
       db.prepare("INSERT INTO businesses(id, owner, name, reward, target, color, created, join_code, reward_mode, currency) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .bind(id, user.id, name, reward, p.target, p.color, now, randomCode(10), mode, region.currency),
-      // Abroad the card starts in English (the default card is Hebrew).
-      ...(region.israel
-        ? []
-        : [db.prepare("INSERT INTO card_designs(id, business, version, data, published, published_by) VALUES(?, ?, 1, ?, ?, ?)")
-            .bind(crypto.randomUUID(), id, JSON.stringify(defaultDesign({ name, reward, color: p.color }, "en")), now, user.id)]),
+      // The starting card: the example look for the business type, in the sign-up language (English abroad).
+      // After this, only Perkly (a platform admin) changes the design.
+      db.prepare("INSERT INTO card_designs(id, business, version, data, published, published_by) VALUES(?, ?, 1, ?, ?, ?)")
+        .bind(crypto.randomUUID(), id, JSON.stringify(isKind(p.kind) ? startDesign(p.kind, name, reward, cardLang) : defaultDesign({ name, reward, color: p.color }, cardLang)), now, user.id),
       db.prepare("INSERT INTO memberships(id, business, user, role, created) VALUES(?, ?, ?, 'owner', ?)")
         .bind(crypto.randomUUID(), id, user.id, now),
       // With "require subscription": a free trial, then a subscription is needed (status 'none' is not entitled).
@@ -309,11 +347,15 @@ export async function POST(request: Request) {
   }
 
   // Every other action: the server checks the user's role in this business.
-  const membership = await getMembership(db, user.id, p.business);
+  // A platform admin (Perkly) manages every business with the owner's permissions and more.
+  const admin = isPlatformAdmin(user, env);
+  const membership = (await getMembership(db, user.id, p.business)) ?? (admin ? await adminMembership(db, p.business) : null);
   if (!membership) return fail("not_found", 404, "Business not found");
   const role = membership.role;
   const business = (await loadBusiness(db, p.business as string))!;
   const ownerOnly = () => (role === "owner" ? null : fail("forbidden", 403, "Owner permission required"));
+  // The card design, business settings, team, branches and the join code are managed by Perkly only.
+  const adminOnly = () => (admin ? null : fail("admin_only", 403, "Managed by Perkly"));
   // Access rules. Redeeming a reward a customer already earned is always allowed.
   // - No subscription: free up to FREE_CUSTOMERS customers; beyond that no new stamps, adjustments or customers.
   // - Suspended by a platform admin: nothing changes except redeeming, looking up and removing customers.
@@ -336,7 +378,7 @@ export async function POST(request: Request) {
 
   switch (p.action) {
     case "update_business": {
-      const denied = ownerOnly(); if (denied) return denied;
+      const denied = adminOnly(); if (denied) return denied;
       const name = str(p.name, 80);
       const reward = str(p.reward, 160);
       if (!name || !reward || !validTarget(p.target) || typeof p.color !== "string" || !COLOR.test(p.color)) {
@@ -588,7 +630,7 @@ export async function POST(request: Request) {
     }
 
     case "invite_staff": {
-      const denied = ownerOnly(); if (denied) return denied;
+      const denied = adminOnly(); if (denied) return denied;
       if (!(await allow(db, `invite-create:${user.id}`, 30, 86_400))) return fail("rate_limited", 429);
       const label = str(p.label, 60);
       // The invite works only for this email, so a forwarded or leaked link is useless to anyone else.
@@ -604,7 +646,7 @@ export async function POST(request: Request) {
     }
 
     case "revoke_invite": {
-      const denied = ownerOnly(); if (denied) return denied;
+      const denied = adminOnly(); if (denied) return denied;
       await db.prepare("UPDATE invites SET revoked = ? WHERE id = ? AND business = ? AND used IS NULL").bind(now, p.invite ?? "", business.id).run();
       return json({ ok: true });
     }
@@ -667,7 +709,7 @@ export async function POST(request: Request) {
     }
 
     case "revoke_member": {
-      const denied = ownerOnly(); if (denied) return denied;
+      const denied = adminOnly(); if (denied) return denied;
       // Owners cannot be removed here, so a business never loses its last owner by mistake.
       const r = await db
         .prepare("UPDATE memberships SET revoked = ? WHERE business = ? AND user = ? AND role = 'staff' AND revoked IS NULL")
@@ -684,7 +726,7 @@ export async function POST(request: Request) {
     }
 
     case "create_branch": {
-      const denied = ownerOnly(); if (denied) return denied;
+      const denied = adminOnly(); if (denied) return denied;
       const name = str(p.name, 60);
       if (!name) return fail("bad_details", 400);
       const count = await db.prepare("SELECT COUNT(*) AS n FROM branches WHERE business = ?").bind(business.id).first<{ n: number }>();
@@ -695,7 +737,7 @@ export async function POST(request: Request) {
     }
 
     case "rename_branch": {
-      const denied = ownerOnly(); if (denied) return denied;
+      const denied = adminOnly(); if (denied) return denied;
       const name = str(p.name, 60);
       if (!name) return fail("bad_details", 400);
       const r = await db.prepare("UPDATE branches SET name = ? WHERE id = ? AND business = ? AND archived IS NULL").bind(name, p.branch ?? "", business.id).run();
@@ -703,14 +745,14 @@ export async function POST(request: Request) {
     }
 
     case "archive_branch": {
-      const denied = ownerOnly(); if (denied) return denied;
+      const denied = adminOnly(); if (denied) return denied;
       // History keeps the branch name; staff tied to it must be moved before they can act again.
       const r = await db.prepare("UPDATE branches SET archived = ? WHERE id = ? AND business = ? AND archived IS NULL").bind(now, p.branch ?? "", business.id).run();
       return r.meta.changes ? json({ ok: true }) : fail("branch_invalid", 404);
     }
 
     case "set_member_branch": {
-      const denied = ownerOnly(); if (denied) return denied;
+      const denied = adminOnly(); if (denied) return denied;
       const branch = typeof p.branch === "string" && p.branch ? p.branch : null;
       if (branch && !(await activeBranches(db, business.id)).some((b) => b.id === branch)) return fail("branch_invalid", 400);
       const r = await db.prepare("UPDATE memberships SET branch = ? WHERE business = ? AND user = ? AND role = 'staff' AND revoked IS NULL")
@@ -719,7 +761,7 @@ export async function POST(request: Request) {
     }
 
     case "save_design": {
-      const denied = ownerOnly(); if (denied) return denied;
+      const denied = adminOnly(); if (denied) return denied;
       const design = sanitizeDesign(p.design);
       if (!design) return fail("bad_details", 400, "Invalid design");
       if (!(await ownsAssets(db, business.id, design))) return fail("not_found", 404, "Image not found");
@@ -740,7 +782,7 @@ export async function POST(request: Request) {
     }
 
     case "publish_design": {
-      const denied = ownerOnly(); if (denied) return denied;
+      const denied = adminOnly(); if (denied) return denied;
       const row = await db.prepare("SELECT design_draft FROM businesses WHERE id = ?").bind(business.id).first<{ design_draft: string | null }>();
       const design = row?.design_draft ? sanitizeDesign(JSON.parse(row.design_draft)) : null;
       if (!design) return fail("nothing_to_publish", 400, "Save a draft first");
@@ -781,7 +823,7 @@ export async function POST(request: Request) {
     }
 
     case "new_join_code": {
-      const denied = ownerOnly(); if (denied) return denied;
+      const denied = adminOnly(); if (denied) return denied;
       await db.prepare("UPDATE businesses SET join_code = ? WHERE id = ?").bind(randomCode(10), business.id).run();
       return json({ ok: true });
     }

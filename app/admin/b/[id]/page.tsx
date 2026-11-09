@@ -80,7 +80,11 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
             <h1>{b.name}</h1>
             <p className="muted">נוצר {shortDate(b.created)} · {b.target} חותמות להטבה · {b.reward}</p>
           </div>
-          <span className={"admin-chip st-" + st}>{STATUS_LABEL[st]}</span>
+          <div className="head-actions">
+            <span className={"admin-chip st-" + st}>{STATUS_LABEL[st]}</span>
+            {/* The business's own dashboard, with the screens only Perkly manages: design, settings and team. */}
+            {!b.archived && <a className="btn primary" href={`/?business=${encodeURIComponent(b.id)}`}>ניהול העסק: עיצוב, הגדרות וצוות</a>}
+          </div>
         </div>
 
         {b.archived && <p className="admin-alert">בארכיון מאז {shortDateTime(b.archived)}. הבעלים והצוות לא רואים את העסק.</p>}
