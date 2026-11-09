@@ -1,14 +1,25 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { KeyRound, LogIn, MailCheck, UserPlus } from "lucide-react";
 import { errorText, useLang } from "../../lib/i18n";
 import { post } from "../../lib/api";
 import { LangSwitch } from "../../components/lang-switch";
 import { Brand } from "../../components/brand";
+import { rememberWorkerPhone, rememberedWorkerPhone } from "../../components/install-app";
 
 export default function AuthForm({ needsCode, mailReady = false, next = "/", initialMode = "login" }: { needsCode: boolean; mailReady?: boolean; next?: string; initialMode?: "login" | "signup" }) {
   const { lang, setLang, t, dir } = useLang();
   const [mode, setMode] = useState<"login" | "signup" | "forgot" | "worker">(initialMode);
+  // A worker's own phone remembers their number: the sign-in opens on phone + date of birth.
+  const [savedPhone, setSavedPhone] = useState("");
+  useEffect(() => {
+    const p = rememberedWorkerPhone();
+    if (!p) return;
+    // Read from this browser after mount (not available on the server).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSavedPhone(p);
+    if (initialMode === "login") setMode("worker");
+  }, [initialMode]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
@@ -72,8 +83,11 @@ export default function AuthForm({ needsCode, mailReady = false, next = "/", ini
     if (busy) return;
     setBusy(true);
     setError("");
-    const result = await post("/api/auth", { action: "worker_login", code: new FormData(e.currentTarget).get("code") });
+    const form = new FormData(e.currentTarget);
+    const phone = String(form.get("phone") ?? "");
+    const result = await post("/api/auth", { action: "worker_login", phone, birthDate: form.get("birthDate") });
     if (result.ok) {
+      rememberWorkerPhone(phone);
       window.location.href = "/?business=" + encodeURIComponent(result.data.business);
       return;
     }
@@ -156,7 +170,8 @@ export default function AuthForm({ needsCode, mailReady = false, next = "/", ini
           <span className="modal-icon"><KeyRound /></span>
           <h1>{t("workerSignIn")}</h1>
           <p className="muted">{t("workerSignInHint")}</p>
-          <label>{t("workerCode")}<input name="code" required inputMode="numeric" autoComplete="one-time-code" maxLength={12} dir="ltr" className="code-input" autoFocus /></label>
+          <label>{t("phone")}<input name="phone" type="tel" required maxLength={20} autoComplete="tel" dir="ltr" defaultValue={savedPhone} autoFocus={!savedPhone} /></label>
+          <label>{t("birthDate")}<input name="birthDate" required inputMode="numeric" maxLength={10} placeholder={t("birthDatePh")} dir="ltr" className="code-input" autoComplete="bday" autoFocus={!!savedPhone} /></label>
           {error && <p className="form-error" role="alert">{error}</p>}
           <button className="btn primary wide" disabled={busy}>{busy ? t("loading") : t("signIn")}</button>
           <button type="button" className="text-btn" onClick={() => { setMode("login"); setError(""); }}>{t("workerUseEmail")}</button>

@@ -12,6 +12,7 @@ import jsQR from "jsqr";
 import { errorText, useLang } from "../lib/i18n";
 import { copyText, post, whatsappLink } from "../lib/api";
 import { LangSwitch } from "../components/lang-switch";
+import { InstallApp } from "../components/install-app";
 import { Num } from "../components/loyalty-card";
 import { QrImage } from "../components/qr";
 import { BirthdayFields } from "../components/birthday-fields";
@@ -1116,6 +1117,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
           )}
           <button className="btn primary big sx-wide sx-register" onClick={onRegister}><UserPlus size={18} />{t("sxRegister")}</button>
           {onStaffLink && <button className="btn soft sx-wide" onClick={onStaffLink}><Share2 size={16} />{t("staffLinkButton")}</button>}
+          <InstallApp t={t} />
           {!!myRecent?.length && (
             <div className="sx-recent">
               <h2>{t("myRecent")}</h2>

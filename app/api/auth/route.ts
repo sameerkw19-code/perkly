@@ -7,12 +7,14 @@ import {
   getUser,
   normalizeEmail,
   sessionCookie,
+  WORKER_SESSION_DAYS,
 } from "../../../lib/server/auth";
 import { DUMMY_HASH, hashPassword, randomToken, sameText, sha256, verifyPassword } from "../../../lib/server/crypto";
 import { clientIp, fail, json, readJson, sameOrigin, str } from "../../../lib/server/http";
 import { allow, limited } from "../../../lib/server/rate-limit";
 import { getSettings } from "../../../lib/server/settings";
-import { WORKER_CODE_LENGTH, formatWorkerCode, hashWorkerCode, newWorkerCode } from "../../../lib/server/worker-code";
+import { normalizeBirthDate, workerLoginFields, type WorkerLoginInput } from "../../../lib/server/worker-login";
+import { formatPhone, normalizePhone } from "../../../lib/phone";
 import { maskEmail, mailReady, sendMail, simpleMail } from "../../../lib/server/mailer";
 import { CODE_MAX_ATTEMPTS, CODE_MAX_SENDS, CODE_TTL_MS, deviceTrusted, hashCode, newCode, trustDevice } from "../../../lib/server/login-code";
 
@@ -308,6 +310,7 @@ export async function POST(request: Request) {
 
       let user = await getUser(db, request.headers.get("cookie"));
       let setCookie: string | undefined;
+      let workerLogin: WorkerLoginInput | null = null;
       // An invite made for an email works only for an account with that email.
       if (user && invite.email && user.email !== invite.email) return fail("invite_other_email", 403, "This invite is for another email");
       if (!user) {
@@ -317,10 +320,18 @@ export async function POST(request: Request) {
         if (invite.email && email !== invite.email) return fail("invite_other_email", 403, "This invite is for another email");
         if (!validPassword(body.password)) return fail("weak_password", 400, "Password must be 8+ characters");
       if (!strongEnough(body.password, email)) return fail("common_password", 400, "This password is too easy to guess");
+        // Staff: phone + date of birth, for signing in at the counter.
+        if (invite.role === "staff") {
+          const wl = await workerLoginFields(body.phone, body.birthDate);
+          if (typeof wl === "string") return fail(wl, 400, "Invalid phone or date of birth");
+          if (await db.prepare("SELECT 1 FROM users WHERE worker_phone = ?").bind(wl.phone).first()) return fail("worker_phone_taken", 409, "This phone already belongs to another worker");
+          workerLogin = wl;
+        }
         const userId = await newUser(db, name, email, body.password);
         if (!userId) return fail("email_taken_signin", 409, "Email already registered. Sign in first, then open the invite again.");
         user = { id: userId, email, name };
-        setCookie = sessionCookie(await createSession(db, userId), request);
+        if (workerLogin) await db.prepare("UPDATE users SET worker_phone = ?, worker_secret = ? WHERE id = ?").bind(workerLogin.phone, workerLogin.secret, userId).run();
+        setCookie = sessionCookie(await createSession(db, userId, WORKER_SESSION_DAYS), request, WORKER_SESSION_DAYS);
       }
 
       // Use the invite and add the membership in one atomic step.
@@ -352,50 +363,56 @@ export async function POST(request: Request) {
           { text: "ללוח הבקרה", href: `${origin}/?business=${invite.business}` },
         )))));
       }
-      // Staff get a personal code for signing in at the counter (shown once, here).
-      const workerCode = invite.role === "staff" && !(await ownsAnyBusiness(db, user.id)) ? await newWorkerCode(db, invite.business, user.id) : null;
-      return json({ ok: true, business: invite.business, workerCode: workerCode && formatWorkerCode(workerCode) }, 200, setCookie ? { "Set-Cookie": setCookie } : undefined);
+      return json({ ok: true, business: invite.business, workerPhone: workerLogin ? formatPhone(workerLogin.phone) : null }, 200, setCookie ? { "Set-Cookie": setCookie } : undefined);
     }
 
-    // Signing in at the counter with a worker's personal code instead of email and password.
+    // Signing in at the counter: phone number + date of birth, instead of email and password.
     case "worker_login": {
-      const failKey = `worker-fail:${ip}`;
-      // Wrong codes: 10 per network every 15 minutes, and 300 an hour in total across the site.
-      if ((await limited(db, failKey, 10, 900)) || (await limited(db, "worker-fail", 300, 3600))) {
+      const phone = normalizePhone(body.phone);
+      const ipKey = `worker-fail:${ip}`;
+      const phoneKey = `worker-fail-phone:${phone ?? "invalid"}`;
+      // Wrong attempts: 5 per phone and 10 per network every 15 minutes, 300 an hour across the site.
+      if ((await limited(db, phoneKey, 5, 900)) || (await limited(db, ipKey, 10, 900)) || (await limited(db, "worker-fail", 300, 3600))) {
         return fail("rate_limited", 429, "Too many attempts. Try again in 15 minutes.");
       }
       if ((await getSettings(db)).maintenance) return fail("maintenance", 503, "Maintenance");
-      const code = typeof body.code === "string" ? body.code.replace(/\D/g, "").slice(0, 20) : "";
-      const row = code.length === WORKER_CODE_LENGTH
-        ? await db
-            .prepare(
-              `SELECT m.user, m.business, u.blocked FROM memberships m JOIN users u ON u.id = m.user JOIN businesses b ON b.id = m.business
-               WHERE m.worker_code = ? AND m.role = 'staff' AND m.revoked IS NULL AND b.archived IS NULL`,
-            )
-            .bind(await hashWorkerCode(code))
-            .first<{ user: string; business: string; blocked: string | null }>()
+      const birth = normalizeBirthDate(body.birthDate);
+      const row = phone
+        ? await db.prepare("SELECT id, worker_secret, blocked FROM users WHERE worker_phone = ?").bind(phone).first<{ id: string; worker_secret: string | null; blocked: string | null }>()
         : null;
-      // An owner's account never signs in with a code (it would skip the email step that protects it).
-      if (!row || (await ownsAnyBusiness(db, row.user))) {
-        await allow(db, failKey, 10, 900);
+      const valid = await verifyPassword(birth ?? "", row?.worker_secret ?? DUMMY_HASH);
+      // Where they work: their first active staff membership. An owner's account never signs in this way.
+      const work = row && valid && birth
+        ? await db.prepare(
+            `SELECT m.business FROM memberships m JOIN businesses b ON b.id = m.business
+             WHERE m.user = ? AND m.role = 'staff' AND m.revoked IS NULL AND b.archived IS NULL ORDER BY m.created LIMIT 1`,
+          ).bind(row.id).first<{ business: string }>()
+        : null;
+      if (!row || !work || (await ownsAnyBusiness(db, row.id))) {
+        await allow(db, phoneKey, 5, 900);
+        await allow(db, ipKey, 10, 900);
         await allow(db, "worker-fail", 300, 3600);
-        return fail("bad_worker_code", 401, "Wrong worker code");
+        return fail("bad_worker_login", 401, "Wrong phone or date of birth");
       }
       if (row.blocked) return fail("account_blocked", 403, "This account is blocked");
-      const token = await createSession(db, row.user);
-      return json({ ok: true, business: row.business }, 200, { "Set-Cookie": sessionCookie(token, request) });
+      const token = await createSession(db, row.id, WORKER_SESSION_DAYS);
+      return json({ ok: true, business: work.business }, 200, { "Set-Cookie": sessionCookie(token, request, WORKER_SESSION_DAYS) });
     }
 
-    // A worker who forgot their code makes a new one (signed in, in a business where they are staff).
-    case "new_worker_code": {
+    // A worker sets (or changes) their counter sign-in: phone + date of birth. Needs their password.
+    case "set_worker_login": {
       const user = await getUser(db, request.headers.get("cookie"));
       if (!user) return fail("signin", 401, "Sign in required");
-      if (!(await allow(db, `worker-new:${user.id}`, 10, 3600))) return fail("rate_limited", 429, "Too many attempts");
+      if (!(await allow(db, `worker-set:${user.id}`, 10, 3600))) return fail("rate_limited", 429, "Too many attempts");
       if (await ownsAnyBusiness(db, user.id)) return fail("worker_code_owner", 403, "Owners sign in with email and password");
-      const business = typeof body.business === "string" ? body.business : "";
-      const code = business ? await newWorkerCode(db, business, user.id) : null;
-      if (!code) return fail("not_found", 404, "Not a worker in this business");
-      return json({ ok: true, workerCode: formatWorkerCode(code) });
+      const me = await db.prepare("SELECT pass_hash FROM users WHERE id = ?").bind(user.id).first<{ pass_hash: string }>();
+      const password = typeof body.password === "string" ? body.password.slice(0, 200) : "";
+      if (!me || !(await verifyPassword(password, me.pass_hash))) return fail("bad_login", 401, "Wrong password");
+      const wl = await workerLoginFields(body.phone, body.birthDate);
+      if (typeof wl === "string") return fail(wl, 400, "Invalid phone or date of birth");
+      if (await db.prepare("SELECT 1 FROM users WHERE worker_phone = ? AND id != ?").bind(wl.phone, user.id).first()) return fail("worker_phone_taken", 409, "This phone already belongs to another worker");
+      await db.prepare("UPDATE users SET worker_phone = ?, worker_secret = ? WHERE id = ?").bind(wl.phone, wl.secret, user.id).run();
+      return json({ ok: true, workerPhone: formatPhone(wl.phone) });
     }
 
     default:

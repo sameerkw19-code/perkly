@@ -21,6 +21,10 @@ class Client {
     if (set) this.cookie = set.split(";")[0];
   }
   async post(path, body, extra) {
+    // Staff joining with an invite give a phone and a date of birth (counter sign-in); tests that don't care get unique ones.
+    if (body?.action === "accept_invite" && body.name && !("phone" in body)) {
+      body = { ...body, phone: "05" + String(Math.floor(Math.random() * 1e8)).padStart(8, "0"), birthDate: "01011990" };
+    }
     const res = await fetch(BASE + path, { method: "POST", headers: this.headers(extra), body: JSON.stringify(body) });
     this.keep(res);
     return { status: res.status, body: await res.json().catch(() => null) };
@@ -740,7 +744,7 @@ test("Perkly manages the card, settings and team; the owner gets reports, custom
   assert.notEqual(stranger.body?.business?.id, biz);
 });
 
-test("staff link: one link per worker, tied to a branch; worker code sign-in", async () => {
+test("staff link: one link per worker, tied to a branch; counter sign-in with phone + date of birth", async () => {
   const o = new Client();
   await signup(o, "linkowner");
   const biz = (await o.post("/api/loyalty", { action: "create_business", name: "Linked", reward: "Free", target: 5, color: "#123456", branchName: "Center", branchAddress: "1 Main St, Haifa" })).body.id;
@@ -750,27 +754,34 @@ test("staff link: one link per worker, tied to a branch; worker code sign-in", a
   const link = await o.act(biz, "staff_link", { label: "Dan" });
   assert.equal(link.status, 200, JSON.stringify(link.body));
   const token = new URL(link.body.inviteUrl).pathname.split("/").pop();
+  const phone = "05" + String(Date.now()).slice(-8);
   const w = new Client();
-  const joined = await w.post("/api/auth", { action: "accept_invite", token, name: "Dan", email: `dan-${run}@test.perkly`, password: "dan pass 123" });
+  const base = { action: "accept_invite", token, name: "Dan", email: `dan-${run}@test.perkly`, password: "dan pass 123" };
+  assert.equal((await w.post("/api/auth", { ...base, phone, birthDate: "31021995" })).body.code, "bad_birth");
+  assert.equal((await w.post("/api/auth", { ...base, phone: "123", birthDate: "15031995" })).body.code, "bad_phone");
+  const joined = await w.post("/api/auth", { ...base, phone, birthDate: "15/03/1995" });
   assert.equal(joined.status, 200, JSON.stringify(joined.body));
-  assert.match(joined.body.workerCode, /^\d{4} \d{4}$/);
+  assert.ok(joined.body.workerPhone);
   assert.equal((await w.get(`/api/loyalty?business=${biz}`)).body.myBranch, branches[0].id);
   // The link works once.
-  assert.equal((await new Client().post("/api/auth", { action: "accept_invite", token, name: "Eve", email: `eve2-${run}@test.perkly`, password: "eve pass 123" })).status, 404);
-  // Signing in at the counter with the code.
+  assert.equal((await new Client().post("/api/auth", { action: "accept_invite", token, name: "Eve", email: `eve2-${run}@test.perkly`, password: "eve pass 123", phone: "0529990000", birthDate: "01011990" })).status, 404);
+  // Signing in at the counter with phone + date of birth.
   const counter = new Client();
-  const good = await counter.post("/api/auth", { action: "worker_login", code: joined.body.workerCode });
+  const good = await counter.post("/api/auth", { action: "worker_login", phone, birthDate: "15031995" });
   assert.equal(good.status, 200, JSON.stringify(good.body));
   assert.equal(good.body.business, biz);
   assert.equal((await counter.get(`/api/loyalty?business=${biz}`)).body.role, "staff");
-  assert.equal((await new Client().post("/api/auth", { action: "worker_login", code: "0000 0000" })).body.code, "bad_worker_code");
-  // A new code replaces the old one.
-  const fresh = await w.post("/api/auth", { action: "new_worker_code", business: biz });
-  assert.equal(fresh.status, 200);
-  assert.equal((await new Client().post("/api/auth", { action: "worker_login", code: joined.body.workerCode })).status, 401, "the old code stops working");
-  assert.equal((await new Client().post("/api/auth", { action: "worker_login", code: fresh.body.workerCode })).status, 200);
-  // Owners never get or use a worker code.
-  assert.equal((await o.post("/api/auth", { action: "new_worker_code", business: biz })).body.code, "worker_code_owner");
+  assert.equal((await new Client().post("/api/auth", { action: "worker_login", phone, birthDate: "16031995" })).body.code, "bad_worker_login");
+  // Changing them needs the password; the old date stops working.
+  assert.equal((await w.post("/api/auth", { action: "set_worker_login", phone, birthDate: "16031995", password: "wrong pass 1" })).status, 401);
+  assert.equal((await w.post("/api/auth", { action: "set_worker_login", phone, birthDate: "16031995", password: "dan pass 123" })).status, 200);
+  assert.equal((await new Client().post("/api/auth", { action: "worker_login", phone, birthDate: "15031995" })).status, 401);
+  assert.equal((await new Client().post("/api/auth", { action: "worker_login", phone, birthDate: "16031995" })).status, 200);
+  // Owners never sign in this way.
+  assert.equal((await o.post("/api/auth", { action: "set_worker_login", phone: "0521112233", birthDate: "01011980", password: "correct horse 1" })).body.code, "worker_code_owner");
+  // Wrong guesses for one phone are limited.
+  for (let i = 0; i < 5; i++) await new Client().post("/api/auth", { action: "worker_login", phone, birthDate: "0101199" + i });
+  assert.equal((await new Client().post("/api/auth", { action: "worker_login", phone, birthDate: "16031995" })).status, 429, "locked for a while after 5 wrong tries");
   // Several branches: the owner must pick the worker's branch.
   const north = (await admin.act(biz, "create_branch", { name: "North", address: "2 North Rd" })).body.id;
   assert.equal((await o.act(biz, "staff_link", {})).body.code, "branch_required");

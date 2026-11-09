@@ -26,20 +26,23 @@ export function secureCookie(request: Request): boolean {
   return !(hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]");
 }
 
-export function sessionCookie(token: string, request: Request): string {
+export function sessionCookie(token: string, request: Request, days = SESSION_DAYS): string {
   const secure = secureCookie(request);
-  return `${SESSION_COOKIE}=${token}; ${cookieAttributes(secure, SESSION_DAYS * 86_400)}`;
+  return `${SESSION_COOKIE}=${token}; ${cookieAttributes(secure, days * 86_400)}`;
 }
+
+/** Workers at the counter stay signed in longer on their own phone. */
+export const WORKER_SESSION_DAYS = 90;
 
 export function clearSessionCookie(request: Request): string {
   const secure = secureCookie(request);
   return `${SESSION_COOKIE}=; ${cookieAttributes(secure, 0)}`;
 }
 
-export async function createSession(db: D1Database, userId: string): Promise<string> {
+export async function createSession(db: D1Database, userId: string, days = SESSION_DAYS): Promise<string> {
   const token = randomToken();
   const now = new Date();
-  const expires = new Date(now.getTime() + SESSION_DAYS * 86_400_000);
+  const expires = new Date(now.getTime() + days * 86_400_000);
   await db
     .prepare("INSERT INTO sessions(id, user, created, expires) VALUES(?, ?, ?, ?)")
     .bind(await sha256(token), userId, now.toISOString(), expires.toISOString())

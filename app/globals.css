@@ -699,3 +699,9 @@ html,body{overflow-x:clip}
 .invite-row>span small{display:block;font-size:12px;margin-top:3px;color:var(--muted)}
 .invite-row>span small.form-error{color:#b4413a}
 .inline-form input[name=address]{flex:2}
+
+/* "Add to home screen" */
+.install-app{display:flex;flex-direction:column;gap:8px;width:100%}
+.install-help{position:relative;background:#faf9fc;border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px}
+.install-help .icon-btn{position:absolute;top:8px;inset-inline-end:8px;width:28px;height:28px}
+.install-help ol{margin:6px 0 0;padding-inline-start:20px;line-height:1.8}
