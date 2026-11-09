@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Users } from "lucide-react";
+import { KeyRound, Users } from "lucide-react";
 import { errorText, useLang } from "../../../lib/i18n";
 import { post } from "../../../lib/api";
 import { LangSwitch } from "../../../components/lang-switch";
@@ -10,6 +10,8 @@ export default function InviteForm({ token, business, inviteEmail, signedInEmail
   const { lang, setLang, t, dir } = useLang();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Shown once after joining: the worker's personal code for signing in at the counter.
+  const [joined, setJoined] = useState<{ business: string; code: string } | null>(null);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -25,6 +27,7 @@ export default function InviteForm({ token, business, inviteEmail, signedInEmail
       password: form.get("password"),
     });
     if (result.ok) {
+      if (result.data.workerCode) { setJoined({ business: result.data.business, code: result.data.workerCode }); setBusy(false); return; }
       window.location.href = "/?business=" + encodeURIComponent(result.data.business);
       return;
     }
@@ -39,6 +42,15 @@ export default function InviteForm({ token, business, inviteEmail, signedInEmail
         <LangSwitch lang={lang} setLang={setLang} />
       </header>
       <main id="main" className="page-main">
+      {joined ? (
+        <div className="auth-card panel worker-code-card" role="status">
+          <span className="modal-icon"><KeyRound /></span>
+          <h1>{t("workerCodeTitle")}</h1>
+          <p className="worker-code" dir="ltr">{joined.code}</p>
+          <p className="muted">{t("workerCodeHint")}</p>
+          <a className="btn primary wide" href={"/?business=" + encodeURIComponent(joined.business)}>{t("workerCodeGo")}</a>
+        </div>
+      ) : (
       <form className="auth-card panel" onSubmit={submit}>
         <span className="modal-icon"><Users /></span>
         {!business ? (
@@ -68,6 +80,7 @@ export default function InviteForm({ token, business, inviteEmail, signedInEmail
           </>
         )}
       </form>
+      )}
       </main>
     </div>
   );

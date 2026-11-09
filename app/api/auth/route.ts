@@ -12,6 +12,7 @@ import { DUMMY_HASH, hashPassword, randomToken, sameText, sha256, verifyPassword
 import { clientIp, fail, json, readJson, sameOrigin, str } from "../../../lib/server/http";
 import { allow, limited } from "../../../lib/server/rate-limit";
 import { getSettings } from "../../../lib/server/settings";
+import { WORKER_CODE_LENGTH, formatWorkerCode, hashWorkerCode, newWorkerCode } from "../../../lib/server/worker-code";
 import { maskEmail, mailReady, sendMail, simpleMail } from "../../../lib/server/mailer";
 import { CODE_MAX_ATTEMPTS, CODE_MAX_SENDS, CODE_TTL_MS, deviceTrusted, hashCode, newCode, trustDevice } from "../../../lib/server/login-code";
 
@@ -346,15 +347,62 @@ export async function POST(request: Request) {
         waitUntil(Promise.all((owners.results ?? []).map((o) => sendMail(env, simpleMail(
           o.email,
           `עובד חדש הצטרף ל-${invite.business_name}`,
-          [`${who} הצטרף/ה לצוות של ${invite.business_name} ב-Perkly.`, "לא הזמנת? אפשר להסיר אותו/ה בלשונית \"צוות\" בלוח הבקרה."],
-          [`${who} joined the ${invite.business_name} team on Perkly. Didn't invite them? Remove them under "Team" in the dashboard.`],
+          [`${who} הצטרף/ה לצוות של ${invite.business_name} ב-Perkly.`, "לא הזמנת? כתבו ל-support@perkly.shop ונסיר את הגישה מיד."],
+          [`${who} joined the ${invite.business_name} team on Perkly. Didn't invite them? Email support@perkly.shop and we'll remove the access right away.`],
           { text: "ללוח הבקרה", href: `${origin}/?business=${invite.business}` },
         )))));
       }
-      return json({ ok: true, business: invite.business }, 200, setCookie ? { "Set-Cookie": setCookie } : undefined);
+      // Staff get a personal code for signing in at the counter (shown once, here).
+      const workerCode = invite.role === "staff" && !(await ownsAnyBusiness(db, user.id)) ? await newWorkerCode(db, invite.business, user.id) : null;
+      return json({ ok: true, business: invite.business, workerCode: workerCode && formatWorkerCode(workerCode) }, 200, setCookie ? { "Set-Cookie": setCookie } : undefined);
+    }
+
+    // Signing in at the counter with a worker's personal code instead of email and password.
+    case "worker_login": {
+      const failKey = `worker-fail:${ip}`;
+      // Wrong codes: 10 per network every 15 minutes, and 300 an hour in total across the site.
+      if ((await limited(db, failKey, 10, 900)) || (await limited(db, "worker-fail", 300, 3600))) {
+        return fail("rate_limited", 429, "Too many attempts. Try again in 15 minutes.");
+      }
+      if ((await getSettings(db)).maintenance) return fail("maintenance", 503, "Maintenance");
+      const code = typeof body.code === "string" ? body.code.replace(/\D/g, "").slice(0, 20) : "";
+      const row = code.length === WORKER_CODE_LENGTH
+        ? await db
+            .prepare(
+              `SELECT m.user, m.business, u.blocked FROM memberships m JOIN users u ON u.id = m.user JOIN businesses b ON b.id = m.business
+               WHERE m.worker_code = ? AND m.role = 'staff' AND m.revoked IS NULL AND b.archived IS NULL`,
+            )
+            .bind(await hashWorkerCode(code))
+            .first<{ user: string; business: string; blocked: string | null }>()
+        : null;
+      // An owner's account never signs in with a code (it would skip the email step that protects it).
+      if (!row || (await ownsAnyBusiness(db, row.user))) {
+        await allow(db, failKey, 10, 900);
+        await allow(db, "worker-fail", 300, 3600);
+        return fail("bad_worker_code", 401, "Wrong worker code");
+      }
+      if (row.blocked) return fail("account_blocked", 403, "This account is blocked");
+      const token = await createSession(db, row.user);
+      return json({ ok: true, business: row.business }, 200, { "Set-Cookie": sessionCookie(token, request) });
+    }
+
+    // A worker who forgot their code makes a new one (signed in, in a business where they are staff).
+    case "new_worker_code": {
+      const user = await getUser(db, request.headers.get("cookie"));
+      if (!user) return fail("signin", 401, "Sign in required");
+      if (!(await allow(db, `worker-new:${user.id}`, 10, 3600))) return fail("rate_limited", 429, "Too many attempts");
+      if (await ownsAnyBusiness(db, user.id)) return fail("worker_code_owner", 403, "Owners sign in with email and password");
+      const business = typeof body.business === "string" ? body.business : "";
+      const code = business ? await newWorkerCode(db, business, user.id) : null;
+      if (!code) return fail("not_found", 404, "Not a worker in this business");
+      return json({ ok: true, workerCode: formatWorkerCode(code) });
     }
 
     default:
       return fail("bad_request", 400, "Unknown action");
   }
+}
+
+async function ownsAnyBusiness(db: D1Database, userId: string): Promise<boolean> {
+  return !!(await db.prepare("SELECT 1 FROM memberships WHERE user = ? AND role = 'owner' AND revoked IS NULL").bind(userId).first());
 }

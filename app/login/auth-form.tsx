@@ -8,7 +8,7 @@ import { Brand } from "../../components/brand";
 
 export default function AuthForm({ needsCode, mailReady = false, next = "/", initialMode = "login" }: { needsCode: boolean; mailReady?: boolean; next?: string; initialMode?: "login" | "signup" }) {
   const { lang, setLang, t, dir } = useLang();
-  const [mode, setMode] = useState<"login" | "signup" | "forgot">(initialMode);
+  const [mode, setMode] = useState<"login" | "signup" | "forgot" | "worker">(initialMode);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
@@ -64,6 +64,20 @@ export default function AuthForm({ needsCode, mailReady = false, next = "/", ini
     const result = await post("/api/auth", { action: "resend_code", challenge: step.challenge });
     if (result.ok) setInfo(t("codeResent"));
     else setError(errorText(lang, result.code));
+    setBusy(false);
+  }
+
+  async function submitWorker(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    const result = await post("/api/auth", { action: "worker_login", code: new FormData(e.currentTarget).get("code") });
+    if (result.ok) {
+      window.location.href = "/?business=" + encodeURIComponent(result.data.business);
+      return;
+    }
+    setError(errorText(lang, result.code));
     setBusy(false);
   }
 
@@ -129,6 +143,29 @@ export default function AuthForm({ needsCode, mailReady = false, next = "/", ini
     );
   }
 
+  // At the counter: a worker signs in with their personal code instead of email and password.
+  if (mode === "worker") {
+    return (
+      <div className="auth-page" dir={dir}>
+        <header className="auth-top">
+          <Brand href="/" />
+          <LangSwitch lang={lang} setLang={setLang} />
+        </header>
+        <main id="main" className="page-main">
+        <form key="worker-step" className="auth-card panel" onSubmit={submitWorker}>
+          <span className="modal-icon"><KeyRound /></span>
+          <h1>{t("workerSignIn")}</h1>
+          <p className="muted">{t("workerSignInHint")}</p>
+          <label>{t("workerCode")}<input name="code" required inputMode="numeric" autoComplete="one-time-code" maxLength={12} dir="ltr" className="code-input" autoFocus /></label>
+          {error && <p className="form-error" role="alert">{error}</p>}
+          <button className="btn primary wide" disabled={busy}>{busy ? t("loading") : t("signIn")}</button>
+          <button type="button" className="text-btn" onClick={() => { setMode("login"); setError(""); }}>{t("workerUseEmail")}</button>
+        </form>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="auth-page" dir={dir}>
       <header className="auth-top">
@@ -161,6 +198,7 @@ export default function AuthForm({ needsCode, mailReady = false, next = "/", ini
         ) : (
           <button type="button" className="text-btn" onClick={() => { setMode("login"); setError(""); }}>{t("haveAccount")}</button>
         )}
+        {mode === "login" && <button type="button" className="btn soft wide" onClick={() => { setMode("worker"); setError(""); }}><KeyRound size={16} />{t("workerSignIn")}</button>}
         <p className="form-hint">{t("staffNoAccount")}</p>
         {mode === "login" && (mailReady
           ? <button type="button" className="text-btn" onClick={() => { setMode("forgot"); setError(""); }}>{t("forgotLink")}</button>
