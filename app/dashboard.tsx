@@ -4,7 +4,7 @@ import { SOCIAL_KEYS, SOCIAL_LABEL, normalizeSocial, socialDisplay, type Social 
 import { SocialIcon } from "../lib/social-icon";
 import {
   Activity, AlertTriangle, Trash2, Cake, Check, Copy, CreditCard, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode,
-  History, Palette, RefreshCw, RotateCcw, ScanLine, Search, Settings, Share2, Store, Users, UserRound, Wallet, X,
+  ChevronRight, History, Palette, RefreshCw, RotateCcw, ScanLine, Search, Settings, Share2, Store, UserPlus, Users, UserRound, Wallet, X,
 } from "lucide-react";
 import type { Design } from "../lib/design";
 import { CardEditor } from "../components/card-editor";
@@ -812,8 +812,8 @@ function BusinessForm({ t, busy, initial, submitLabel, onSubmit, onInvalid }: {
 
 // ---------- Staff station: scan or search, then confirm. The server is the source of truth. ----------
 
-function Station({ business, design, branches, myBranch, canFix, owner, t, lang, initial, onDone, notify, onRegister, myRecent }: {
-  business: Business; design: Design; branches: { id: string; name: string }[]; myBranch: string | null; canFix: boolean; owner: boolean; t: any; lang: any; initial: CardState | null; onDone: () => void;
+function Station({ business, branches, myBranch, canFix, owner, t, lang, initial, onDone, notify, onRegister, myRecent }: {
+  business: Business; design?: Design; branches: { id: string; name: string }[]; myBranch: string | null; canFix: boolean; owner: boolean; t: any; lang: any; initial: CardState | null; onDone: () => void;
   notify: (s: string, bad?: boolean) => void; onRegister: () => void; myRecent?: any[];
 }) {
   const [selected, setSelected] = useState<CardState | null>(initial);
@@ -823,34 +823,7 @@ function Station({ business, design, branches, myBranch, canFix, owner, t, lang,
   const [busy, setBusy] = useState(false);
   const [qty, setQty] = useState(1);
   const [fixing, setFixing] = useState<{ value: number; note: string } | null>(null);
-  const cardRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  // A short confirmation over the card after a stamp or reward (the toast is easy to miss at a busy counter).
-  const [done, setDone] = useState<{ text: string; reward: boolean } | null>(null);
-  const doneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  function flash(text: string, reward: boolean) {
-    setDone({ text, reward });
-    if (doneTimer.current) clearTimeout(doneTimer.current);
-    doneTimer.current = setTimeout(() => setDone(null), 2200);
-  }
-  useEffect(() => () => { if (doneTimer.current) clearTimeout(doneTimer.current); }, []);
-  // Showing a new customer: reset the quantity, clear the search and bring the card into view (phones).
-  function choose(c: CardState) {
-    setSelected(c);
-    setPending(null);
-    setQty(1);
-    setFixing(null);
-    setDone(null);
-    setQuery("");
-    setResults([]);
-    setTimeout(() => cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
-  }
-  /** Ready for the next customer: no card open, the search box focused. */
-  function next() {
-    setSelected(null); setPending(null); setFixing(null); setDone(null);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    setTimeout(() => searchRef.current?.focus(), 50);
-  }
   // The branch this device works at (remembered per business on this device).
   const [branch, setBranch] = useState<string>("");
   useEffect(() => {
@@ -866,6 +839,39 @@ function Station({ business, design, branches, myBranch, canFix, owner, t, lang,
   const [pending, setPending] = useState<{ kind: string; customer: string; requestId: string } | null>(null);
   const [redeemAsk, setRedeemAsk] = useState(false);
   const [archiveAsk, setArchiveAsk] = useState(false);
+  // The station works in steps, like a till: find the customer → their card → add stamps → done.
+  // "done" says what happened, then returns to the start by itself for the next customer.
+  const [step, setStep] = useState<"customer" | "stamp" | "done">("customer");
+  const [result, setResult] = useState<{ text: string; reward: boolean } | null>(null);
+  const [countdown, setCountdown] = useState(0);
+  const DONE_SECONDS = 4;
+  // Showing a new customer: reset the quantity and clear the search.
+  function choose(c: CardState) {
+    setSelected(c);
+    setStep("customer");
+    setPending(null);
+    setQty(1);
+    setFixing(null);
+    setResult(null);
+    setQuery("");
+    setResults([]);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  /** Ready for the next customer: back to the start, the search box focused. */
+  function next() {
+    setSelected(null); setPending(null); setFixing(null); setResult(null); setStep("customer"); setQty(1);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    setTimeout(() => searchRef.current?.focus(), 50);
+  }
+  // The countdown starts when the done screen is shown (in act), and ticks down to the next customer.
+  const nextRef = useRef(next);
+  useEffect(() => { nextRef.current = next; });
+  useEffect(() => {
+    if (step !== "done") return;
+    const tick = setInterval(() => setCountdown((n) => Math.max(0, n - 1)), 1000);
+    const back = setTimeout(() => nextRef.current(), DONE_SECONDS * 1000);
+    return () => { clearInterval(tick); clearTimeout(back); };
+  }, [step]);
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
 
@@ -936,7 +942,7 @@ function Station({ business, design, branches, myBranch, canFix, owner, t, lang,
     setBusy(false);
     if (r.ok) {
       notify(t("archivedOk"));
-      setSelected(null); setPending(null); setFixing(null);
+      next();
       onDone();
     } else {
       notify(errorText(lang, r.code), true);
@@ -964,8 +970,9 @@ function Station({ business, design, branches, myBranch, canFix, owner, t, lang,
       const message = r.data.replayed ? t("replayed")
         : earned ? (earned === 1 ? t("earnedSaved") : t("earnedSavedN", { n: earned }))
         : kind === "stamp" ? (count === 1 ? t("stampOk") : t("stampsOk", { n: count! })) : t("redeemOk");
-      // Shown over the card (role=status), so no separate toast.
-      flash(message, !!earned || kind === "redeem");
+      setResult({ text: message, reward: !!earned || kind === "redeem" });
+      setCountdown(DONE_SECONDS);
+      setStep("done");
       onDone();
     } else if (r.network) {
       notify(t("err_network"), true); // outcome unknown: keep the request id for a safe retry
@@ -995,43 +1002,74 @@ function Station({ business, design, branches, myBranch, canFix, owner, t, lang,
   }
   const fixedBranch = myBranch ? branches.find((x) => x.id === myBranch) : null;
 
-  return (
-    <>
-      <div className="page-head st-head"><div><h1>{t("stationTitle")}</h1><p className="muted">{t("stationSubtitle")}</p></div>
-        <div className="head-actions">
-          {fixedBranch ? <span className="pill branch-pill">{t("workingAt", { b: fixedBranch.name })}</span>
-            : branches.length > 0 && (
-              <select aria-label={t("branch")} value={branch} onChange={(e) => pickBranch(e.target.value)} className={branch ? "" : "needs-choice"}>
-                <option value="">{t("chooseBranch")}</option>
-                {branches.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-              </select>
-            )}<button className="btn soft st-new" onClick={onRegister}><Plus size={16} /><span>{t("newCustomer")}</span></button></div>
+  const hour = new Date().getHours();
+  const greeting = hour >= 5 && hour < 12 ? t("sxMorning") : hour >= 12 && hour < 17 ? t("sxAfternoon") : t("sxEvening");
+  const full = !!selected && selected.stamps >= selected.target; // "block" mode: redeem before stamping again
+  const maxQty = business.reward_mode === "bank" ? 10 : Math.min(10, remaining);
+  const branchControl = fixedBranch ? <span className="pill branch-pill">{t("workingAt", { b: fixedBranch.name })}</span>
+    : branches.length > 0 && (
+      <select aria-label={t("branch")} value={branch} onChange={(e) => pickBranch(e.target.value)} className={branch ? "" : "needs-choice"}>
+        <option value="">{t("chooseBranch")}</option>
+        {branches.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+      </select>
+    );
+  const who = selected && (
+    <div className="sx-who">
+      <span className="st-avatar big" aria-hidden="true">{selected.name.charAt(0)}</span>
+      <div className="sx-who-text">
+        <strong>{selected.name}</strong>
+        {selected.phone && <small dir="ltr">{selected.phone}</small>}
       </div>
-      <section className={"staff-grid st" + (selected ? " has-card" : "")}>
-        <div className="panel scanner st-find">
-          <div className="st-search-row">
+      <button className="icon-btn" aria-label={t("close")} title={t("close")} onClick={next}><X size={18} /></button>
+    </div>
+  );
+  const redeemButton = (
+    <button className="btn lime big sx-wide" disabled={busy} onClick={() => act("redeem")}>
+      <Gift size={18} />{busy ? t("sending") : retrying && pending?.kind.startsWith("redeem") ? t("retry") : redeemAsk ? t("redeemAgain") : t("redeem")}
+    </button>
+  );
+
+  return (
+    <div className="sx">
+      {/* 1. Find the customer */}
+      {!selected && (
+        <section className="sx-screen" aria-labelledby="sx-find">
+          <div className="sx-top">
+            <span className="sx-greeting">{greeting}</span>
+            {branchControl}
+          </div>
+          <h1 id="sx-find" className="sx-title">{t("sxFind")}</h1>
+          {scanning ? (
+            <div className="video-wrap sx-video">
+              <video ref={video} muted playsInline /><div className="scan-frame" />
+              <p className="st-video-hint">{t("stPointCamera")}</p>
+              <button className="btn soft sx-wide" onClick={stop}><X size={18} />{t("stop")}</button>
+            </div>
+          ) : (
+            <button className="btn primary big sx-wide sx-scan" onClick={start}><ScanLine size={20} />{t("sxScan")}</button>
+          )}
+          <div className="sx-or" aria-hidden="true"><span>{t("sxOr")}</span></div>
+          <form className="sx-search" role="search" onSubmit={async (e) => {
+            e.preventDefault();
+            const q = query.trim();
+            if (q.length < 2) { searchRef.current?.focus(); return; }
+            const found = results.length ? results : await lookup({ query: q });
+            if (found.length === 1) choose(found[0]); else setResults(found);
+          }}>
             <label className="search st-search">
               <Search size={18} />
-              <input ref={searchRef} value={query} placeholder={t("search")} aria-label={t("search")} enterKeyHint="search"
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && results[0]) { e.preventDefault(); choose(results[0]); } }} />
+              <input ref={searchRef} value={query} placeholder={t("sxSearchPh")} aria-label={t("sxSearchPh")} enterKeyHint="search" autoComplete="off"
+                onChange={(e) => setQuery(e.target.value)} />
               {query && <button type="button" className="st-clear" aria-label={t("close")} onClick={() => { setQuery(""); searchRef.current?.focus(); }}><X size={16} /></button>}
             </label>
-            <button className={"btn st-scan-btn " + (scanning ? "soft" : "primary")} onClick={scanning ? stop : start}>
-              {scanning ? <X size={18} /> : <ScanLine size={18} />}<span>{scanning ? t("stop") : t("stScan")}</span>
-            </button>
-          </div>
-          {scanning ? (
-            <div className="video-wrap"><video ref={video} muted playsInline /><div className="scan-frame" /><p className="st-video-hint">{t("stPointCamera")}</p></div>
-          ) : query.trim().length < 2 && (
-            <p className="form-hint st-hint">{t("stHint")}</p>
-          )}
+            <button type="submit" className="btn soft sx-wide">{t("sxSearch")}<ChevronRight size={16} className="sx-fwd" /></button>
+          </form>
           {(results.length > 0 || query.trim().length >= 2) && (
             <div className="staff-results" role="listbox" aria-label={t("search")}>
               {results.map((c) => {
                 const ready = (c.rewards ?? 0) > 0 || c.stamps >= c.target;
                 return (
-                  <button key={c.id} role="option" aria-selected={selected?.id === c.id} className={"customer-result" + (selected?.id === c.id ? " active-result" : "")} onClick={() => choose(c)}>
+                  <button key={c.id} role="option" aria-selected={false} className="customer-result" onClick={() => choose(c)}>
                     <span className="st-avatar" aria-hidden="true">{c.name.charAt(0)}</span>
                     <span className="st-result-who"><strong>{c.name}</strong><small dir="ltr">{c.phone}</small></span>
                     <span className="st-result-count">
@@ -1042,95 +1080,125 @@ function Station({ business, design, branches, myBranch, canFix, owner, t, lang,
                   </button>
                 );
               })}
-              {query.trim().length >= 2 && !results.length && (
-                <div className="st-none">
-                  <p className="form-hint">{t("noCustomer")}</p>
-                  <button className="btn soft small" onClick={onRegister}><Plus size={14} />{t("newCustomer")}</button>
-                </div>
-              )}
+              {query.trim().length >= 2 && !results.length && <p className="form-hint st-none">{t("noCustomer")}</p>}
             </div>
           )}
-        </div>
-
-        <div className={"panel staff-card st-card" + (selected ? "" : " st-empty")} ref={cardRef}>
-          {!selected ? (
-            <><ScanLine size={56} strokeWidth={1} /><p>{t("selectHint")}</p></>
-          ) : (
-            <>
-              <div className="st-who">
-                <span className="st-avatar big" aria-hidden="true">{selected.name.charAt(0)}</span>
-                <div>
-                  <h2>{selected.name}</h2>
-                  {selected.phone && <small dir="ltr">{selected.phone}</small>}
-                </div>
-                <button className="icon-btn st-close" aria-label={t("close")} title={t("close")} onClick={next}><X size={18} /></button>
-              </div>
-              <div className="st-card-wrap">
-                <LoyaltyCard design={design} lang={lang} stamps={selected.stamps} target={selected.target} customerName={selected.name} rewards={selected.rewards} t={t} />
-                {done && (
-                  <div className={"st-done" + (done.reward ? " reward" : "")} role="status">
-                    <span className="st-done-icon">{done.reward ? <Gift size={30} /> : <Check size={30} />}</span>
-                    <strong>{done.text}</strong>
-                  </div>
-                )}
-              </div>
-              {!!selected.rewards && selected.nextExpiry && <small className="form-hint">{t("expiresOnShort", { d: new Date(selected.nextExpiry).toLocaleDateString(lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB") })}</small>}
-
-              {fixing ? (
-                <div className="fix-panel">
-                  <h3>{t("fixTitle")}</h3>
-                  <span className="qty-label">{t("correctCount")}</span>
-                  <Stepper value={fixing.value} min={Math.max(0, canFixMin(selected.stamps))} max={Math.min(business.reward_mode === "bank" ? selected.target - 1 : selected.target, canFixMax(selected.stamps, selected.target))}
-                    onChange={(v) => setFixing({ ...fixing, value: v })} label={t("correctCount")} />
-                  <label className="fix-reason">{t("reason")}
-                    <input value={fixing.note} maxLength={200} onChange={(e) => setFixing({ ...fixing, note: e.target.value })} />
-                  </label>
-                  <p className="form-hint">{t("fixHint")}</p>
-                  <div className="form-actions">
-                    <button className="btn primary" disabled={busy || !fixing.note.trim() || fixing.value === selected.stamps} onClick={saveFix}>{busy ? t("sending") : t("saveFix")}</button>
-                    <button className="btn soft" onClick={() => setFixing(null)}>{t("cancel")}</button>
-                  </div>
-                </div>
-              ) : (
-                <div className="st-actions">
-                  {selected.stamps >= selected.target ? (
-                    <button className="btn lime big" disabled={busy} onClick={() => act("redeem")}><Gift size={18} />{busy ? t("sending") : retrying ? t("retry") : redeemAsk ? t("redeemAgain") : t("redeem")}</button>
-                  ) : (
-                    <>
-                      {!!selected.rewards && (
-                        <button className="btn lime big" disabled={busy} onClick={() => act("redeem")}><Gift size={18} />{busy ? t("sending") : redeemAsk ? t("redeemAgain") : t("redeem")}</button>
-                      )}
-                      <div className="st-stamp-row">
-                        <div className="qty-row">
-                          <span className="qty-label">{t("qtyLabel")}</span>
-                          <Stepper value={qty} min={1} max={business.reward_mode === "bank" ? 10 : Math.min(10, remaining)} onChange={setQty} label={t("qtyLabel")} />
-                        </div>
-                        <button className="btn primary big" disabled={busy} onClick={() => act("stamp")}>
-                          <Plus size={18} />{busy ? t("sending") : retrying ? t("retry") : qty === 1 ? t("addStamp") : t("addStamps", { n: qty })}
-                        </button>
-                      </div>
-                      <small className="form-hint st-remaining">{t("remainingHint", { k: remaining })}</small>
-                    </>
-                  )}
-                </div>
-              )}
-              <div className="row-actions center-row st-more">
-                <button className="btn soft small" onClick={next}><Search size={14} />{t("nextCustomer")}</button>
-                {canFix && !fixing && <button className="btn soft small" onClick={() => setFixing({ value: selected.stamps, note: "" })}><Activity size={14} />{t("fixCount")}</button>}
-                {owner && <button className="text-btn" style={{ color: "#b4413a" }} disabled={busy} onClick={() => archiveCustomer(false)}>{archiveAsk ? t("archiveAgain") : t("archiveCustomer")}</button>}
-                {owner && archiveAsk && <button className="text-btn" style={{ color: "#b4413a" }} disabled={busy} onClick={() => archiveCustomer(true)}>{t("eraseCustomer")}</button>}
-              </div>
-            </>
+          <button className="btn primary big sx-wide sx-register" onClick={onRegister}><UserPlus size={18} />{t("sxRegister")}</button>
+          {!!myRecent?.length && (
+            <div className="sx-recent">
+              <h2>{t("myRecent")}</h2>
+              <EventList events={myRecent} t={t} lang={lang} />
+            </div>
           )}
-        </div>
-      </section>
-      {!!myRecent?.length && (
-        <section className="panel" style={{ marginTop: 22 }}>
-          <div className="section-head"><h2>{t("myRecent")}</h2></div>
-          <EventList events={myRecent} t={t} lang={lang} />
         </section>
       )}
-    </>
+
+      {/* 2. The customer's card */}
+      {selected && step === "customer" && (
+        <section className="sx-screen" aria-label={selected.name}>
+          {who}
+          <div className="sx-chips">
+            <span className="sx-chip"><Num>{selected.stamps}/{selected.target}</Num> {t("sxStampsLabel")}</span>
+            {!!selected.rewards && <span className="sx-chip ready"><Gift size={12} />{selected.rewards === 1 ? t("sxRewardsChip1") : t("sxRewardsChip", { n: selected.rewards })}</span>}
+            {branchControl}
+          </div>
+          <div className="sx-box">
+            <div className="sx-box-head">
+              <span className="sx-box-icon" aria-hidden="true"><Gift size={18} /></span>
+              <strong>{selected.rewards ? (selected.rewards === 1 ? t("sxRewardReady1") : t("sxRewardReadyN", { n: selected.rewards })) : full ? t("sxRewardReady1") : t("sxNoRewards")}</strong>
+            </div>
+            {!!selected.rewards && selected.nextExpiry && <small className="form-hint">{t("expiresOnShort", { d: new Date(selected.nextExpiry).toLocaleDateString(lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB") })}</small>}
+            {(!!selected.rewards || full) && redeemButton}
+            {!full && (
+              <button className={"btn big sx-wide " + (selected.rewards ? "soft" : "primary")} onClick={() => setStep("stamp")}>
+                <Plus size={18} />{t("sxAddStamps")}<ChevronRight size={16} className="sx-fwd" />
+              </button>
+            )}
+            {full && <small className="form-hint">{t("sxFullFirst")}</small>}
+          </div>
+          <h2 className="sx-label">{t("sxPunchCards")}</h2>
+          <div className="sx-punch">
+            <div className="sx-punch-row">
+              <strong>{business.reward}</strong>
+              <span><Num>{t("sxOf", { s: selected.stamps, t: selected.target })}</Num></span>
+            </div>
+            <small>{full ? t("sxUnlocked") : t("sxMore", { k: remaining })}</small>
+            <div className="sx-segments" aria-hidden="true">
+              {Array.from({ length: selected.target }, (_, i) => <i key={i} className={i < selected.stamps ? "on" : ""} />)}
+            </div>
+          </div>
+          {fixing ? (
+            <div className="fix-panel">
+              <h3>{t("fixTitle")}</h3>
+              <span className="qty-label">{t("correctCount")}</span>
+              <Stepper value={fixing.value} min={Math.max(0, canFixMin(selected.stamps))} max={Math.min(business.reward_mode === "bank" ? selected.target - 1 : selected.target, canFixMax(selected.stamps, selected.target))}
+                onChange={(v) => setFixing({ ...fixing, value: v })} label={t("correctCount")} />
+              <label className="fix-reason">{t("reason")}
+                <input value={fixing.note} maxLength={200} onChange={(e) => setFixing({ ...fixing, note: e.target.value })} />
+              </label>
+              <p className="form-hint">{t("fixHint")}</p>
+              <div className="form-actions">
+                <button className="btn primary" disabled={busy || !fixing.note.trim() || fixing.value === selected.stamps} onClick={saveFix}>{busy ? t("sending") : t("saveFix")}</button>
+                <button className="btn soft" onClick={() => setFixing(null)}>{t("cancel")}</button>
+              </div>
+            </div>
+          ) : (canFix || owner) && (
+            <div className="row-actions center-row st-more">
+              {canFix && <button className="btn soft small" onClick={() => setFixing({ value: selected.stamps, note: "" })}><Activity size={14} />{t("fixCount")}</button>}
+              {owner && <button className="text-btn" style={{ color: "#b4413a" }} disabled={busy} onClick={() => archiveCustomer(false)}>{archiveAsk ? t("archiveAgain") : t("archiveCustomer")}</button>}
+              {owner && archiveAsk && <button className="text-btn" style={{ color: "#b4413a" }} disabled={busy} onClick={() => archiveCustomer(true)}>{t("eraseCustomer")}</button>}
+            </div>
+          )}
+          <div className="sx-bar">
+            <button className="btn soft" onClick={next}><ChevronRight size={16} className="sx-back" />{t("sxBack")}</button>
+            <button className="btn primary" disabled={full} onClick={() => setStep("stamp")}>{t("sxContinue")}<ChevronRight size={16} className="sx-fwd" /></button>
+          </div>
+        </section>
+      )}
+
+      {/* 3. Add stamps */}
+      {selected && step === "stamp" && (
+        <section className="sx-screen" aria-label={t("sxAddStamps")}>
+          {who}
+          <h2 className="sx-label">{t("sxPunchCards")}</h2>
+          <div className="sx-item">
+            <div className="sx-item-row">
+              <span className="sx-box-icon" aria-hidden="true"><Gift size={18} /></span>
+              <strong>{business.reward}</strong>
+              <Stepper value={qty} min={1} max={Math.max(1, maxQty)} onChange={setQty} label={t("qtyLabel")} />
+            </div>
+            <small>{remaining - qty > 0 ? t("sxToUnlock", { k: remaining - qty }) : t("sxUnlocked")}</small>
+            <div className="sx-dots" aria-hidden="true">
+              {Array.from({ length: selected.target }, (_, i) => (
+                <i key={i} className={i < selected.stamps ? "on" : i < selected.stamps + qty ? "new" : ""} />
+              ))}
+            </div>
+          </div>
+          <div className="sx-bar">
+            <button className="btn soft" onClick={() => setStep("customer")}><ChevronRight size={16} className="sx-back" />{t("sxBack")}</button>
+            <button className="btn primary" disabled={busy} onClick={() => act("stamp")}>
+              {busy ? t("sending") : retrying ? t("retry") : qty === 1 ? t("addStamp") : t("addStamps", { n: qty })}<Check size={16} />
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* 4. Done: says what happened, then back to the start by itself */}
+      {selected && step === "done" && result && (
+        <section className="sx-screen sx-done" role="status" aria-live="polite">
+          <span className={"sx-done-icon" + (result.reward ? " reward" : "")}>{result.reward ? <Gift size={34} /> : <Check size={34} />}</span>
+          <h2>{result.text}</h2>
+          <p className="muted">{selected.name} · <Num>{t("sxOf", { s: selected.stamps, t: selected.target })}</Num></p>
+          <div className="sx-box sx-done-box">
+            <strong>{selected.rewards ? (selected.rewards === 1 ? t("sxRewardReady1") : t("sxRewardReadyN", { n: selected.rewards })) : t("sxToUnlock", { k: remaining })}</strong>
+          </div>
+          <button className="btn primary big sx-wide" onClick={next}>{t("nextCustomer")}<ChevronRight size={16} className="sx-fwd" /></button>
+          <div className="sx-countdown" aria-hidden="true"><i style={{ animationDuration: DONE_SECONDS + "s" }} /></div>
+          <small className="form-hint">{t("sxReturning", { s: countdown })}</small>
+          <button className="text-btn sx-again" onClick={() => setStep("customer")}>{t("sxBackTo", { name: selected.name })}</button>
+        </section>
+      )}
+    </div>
   );
 }
 

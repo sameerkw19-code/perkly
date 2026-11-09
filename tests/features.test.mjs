@@ -628,3 +628,17 @@ test("abroad: no counter kit and no yearly plan on the landing page or the conta
   assert.match(plans, /\{withYearly && <div className="lp-cycle">/);
   assert.match(readFileSync(new URL("../app/contact/contact-form.tsx", import.meta.url), "utf8"), /!region\.intl && <label className="su-check su-kit">/);
 });
+
+test("staff station: find → card → stamps → done, back to the start by itself", () => {
+  const dash = readFileSync(new URL("../app/dashboard.tsx", import.meta.url), "utf8");
+  const station = dash.slice(dash.indexOf("function Station("), dash.indexOf("// ---------- Team"));
+  for (const screen of ["1. Find the customer", "2. The customer's card", "3. Add stamps", "4. Done"]) assert.ok(station.includes(screen), screen);
+  assert.match(station, /useState<"customer" \| "stamp" \| "done">/);
+  assert.match(station, /setTimeout\(\(\) => nextRef\.current\(\), DONE_SECONDS \* 1000\)/);
+  // The safe retry (same request id after a network failure) is still there.
+  assert.match(station, /pending\.requestId : crypto\.randomUUID\(\)/);
+  // A full card in "block" mode cannot be stamped before the reward is used.
+  assert.match(station, /disabled=\{full\} onClick=\{\(\) => setStep\("stamp"\)\}/);
+  const i18n = readFileSync(new URL("../lib/i18n.ts", import.meta.url), "utf8");
+  for (const k of ["sxFind", "sxScan", "sxRegister", "sxNoRewards", "sxAddStamps", "sxReturning"]) assert.match(i18n, new RegExp(`  ${k}: \\[`), k);
+});
