@@ -21,13 +21,17 @@ export function polarConfigured(env: PolarEnv): boolean {
   return !!(env.POLAR_ACCESS_TOKEN && env.POLAR_PRODUCT_ID && env.POLAR_WEBHOOK_SECRET);
 }
 
-/** Whether the yearly plan can be sold: billing works and a yearly product is set. */
-/** The Polar products for a currency (dollar ones when set, otherwise the shekel ones). */
-export function productsFor(env: PolarEnv, currency: Currency): { monthly?: string; yearly?: string } {
-  if (currency === "USD" && env.POLAR_PRODUCT_ID_USD) return { monthly: env.POLAR_PRODUCT_ID_USD, yearly: env.POLAR_PRODUCT_ID_YEARLY_USD };
-  return { monthly: env.POLAR_PRODUCT_ID, yearly: env.POLAR_PRODUCT_ID_YEARLY };
+/**
+ * The Polar products for a currency (dollar ones when set, otherwise the shekel ones), and the currency to charge in.
+ * The checkout must name the currency: a product priced in several currencies otherwise gets one guessed from the
+ * location of the server that creates the checkout, not from the customer.
+ */
+export function productsFor(env: PolarEnv, currency: Currency): { monthly?: string; yearly?: string; charge: "usd" | "ils" } {
+  if (currency === "USD" && env.POLAR_PRODUCT_ID_USD) return { monthly: env.POLAR_PRODUCT_ID_USD, yearly: env.POLAR_PRODUCT_ID_YEARLY_USD, charge: "usd" };
+  return { monthly: env.POLAR_PRODUCT_ID, yearly: env.POLAR_PRODUCT_ID_YEARLY, charge: "ils" };
 }
 
+/** Whether the yearly plan can be sold: billing works and a yearly product is set for that currency. */
 export function yearlyConfigured(env: PolarEnv, currency: Currency = "ILS"): boolean {
   return polarConfigured(env) && !!productsFor(env, currency).yearly;
 }
@@ -54,6 +58,8 @@ export async function createCheckoutUrl(env: PolarEnv, businessId: string, origi
     },
     body: JSON.stringify({
       products: [plan === "yearly" && products.yearly ? products.yearly : products.monthly],
+      // Only the dollar product has two prices; the shekel checkout stays exactly as it was.
+      ...(products.charge === "usd" ? { currency: "usd" } : {}),
       // Free trial: the card is collected now and first charged when the trial ends.
       ...(trialDays > 0 ? { allow_trial: true, trial_interval: "day", trial_interval_count: trialDays } : {}),
       success_url: success,
