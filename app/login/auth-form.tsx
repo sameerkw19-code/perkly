@@ -171,7 +171,7 @@ export default function AuthForm({ needsCode, mailReady = false, next = "/", ini
           <h1>{t("workerSignIn")}</h1>
           <p className="muted">{t("workerSignInHint")}</p>
           <label>{t("phone")}<input name="phone" type="tel" required maxLength={20} autoComplete="tel" dir="ltr" defaultValue={savedPhone} autoFocus={!savedPhone} /></label>
-          <label>{t("birthDate")}<input name="birthDate" required inputMode="numeric" maxLength={10} placeholder={t("birthDatePh")} dir="ltr" className="code-input" autoComplete="bday" autoFocus={!!savedPhone} /></label>
+          <label>{t("birthDate")}<input name="birthDate" type="password" required inputMode="numeric" maxLength={10} placeholder={t("birthDatePh")} dir="ltr" className="code-input" autoComplete="off" autoFocus={!!savedPhone} /></label>
           {error && <p className="form-error" role="alert">{error}</p>}
           <button className="btn primary wide" disabled={busy}>{busy ? t("loading") : t("signIn")}</button>
           <button type="button" className="text-btn" onClick={() => { setMode("login"); setError(""); }}>{t("workerUseEmail")}</button>
