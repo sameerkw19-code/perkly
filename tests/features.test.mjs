@@ -645,15 +645,22 @@ test("staff station: find → card → stamps → done, back to the start by its
 
 test("owners get reports, customers and the station; Perkly manages the rest", () => {
   const api = readFileSync(new URL("../app/api/loyalty/route.ts", import.meta.url), "utf8");
-  for (const action of ["update_business", "invite_staff", "revoke_invite", "revoke_member", "create_branch", "rename_branch", "archive_branch", "set_member_branch", "save_design", "publish_design", "new_join_code"]) {
+  for (const action of ["update_business", "invite_staff", "revoke_invite", "revoke_member", "create_branch", "rename_branch", "archive_branch", "set_member_branch", "new_join_code"]) {
     assert.match(api, new RegExp(`case "${action}": \\{\\n      const denied = adminOnly\\(\\);`), action);
   }
+  // The design: Perkly, or the owner when Perkly turned it on for that business.
+  for (const action of ["save_design", "publish_design"]) {
+    assert.match(api, new RegExp(`case "${action}": \\{\\n      const denied = designOnly\\(\\);`), action);
+  }
+  assert.match(api, /admin \|\| \(role === "owner" && !!business\.owner_designs\)/);
   for (const action of ["register_customer", "archive_customer", "restore_customer", "removed_customers", "new_card_link"]) {
     assert.doesNotMatch(api, new RegExp(`case "${action}": \\{\\n      const denied = adminOnly\\(\\);`), action);
   }
   assert.match(api, /returning_now/);
   assert.match(api, /breakdown\("actor"\)/);
-  for (const f of ["../app/api/asset/route.ts", "../app/api/asset/banners/route.ts"]) assert.match(readFileSync(new URL(f, import.meta.url), "utf8"), /isPlatformAdmin\(user, env\)\) return fail\("admin_only"/);
+  for (const f of ["../app/api/asset/route.ts", "../app/api/asset/banners/route.ts"]) {
+    assert.match(readFileSync(new URL(f, import.meta.url), "utf8"), /if \(!isPlatformAdmin\(user, env\) && !\(target\.owner_designs && \(await getRole\(db, user\.id, business\)\) === "owner"\)\) return fail\("admin_only"/);
+  }
   assert.match(readFileSync(new URL("../app/api/special/route.ts", import.meta.url), "utf8"), /if \(!isPlatformAdmin\(user, env\)\)/);
   const dash = readFileSync(new URL("../app/dashboard.tsx", import.meta.url), "utf8");
   assert.match(dash, /\.\.\.\(manage \? \[\[Palette, "design"\], \[Users, "team"\], \[Settings, "settings"\]\]/);

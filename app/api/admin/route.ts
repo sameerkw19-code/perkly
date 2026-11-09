@@ -90,6 +90,15 @@ export async function POST(request: Request) {
       const results = applePushReady() ? await pushTokens(db, rows.results.map((r) => r.push_token)) : [];
       return json({ ok: true, ready: applePushReady(), devices: rows.results.length, results });
     }
+    case "owner_designs": {
+      // Lets this business's owner edit their own card design (Perkly designs by default).
+      const on = body.on === true ? 1 : 0;
+      await db.batch([
+        db.prepare("UPDATE businesses SET owner_designs = ? WHERE id = ?").bind(on, businessId),
+        log("owner_designs", on ? "on" : "off"),
+      ]);
+      return json({ ok: true, on: !!on });
+    }
     case "kit_sent": {
       // Yearly plan: marks the included counter kit as shipped. Only for a business that is owed one.
       const r = await db.prepare("UPDATE businesses SET kit_sent = ? WHERE id = ? AND kit_due IS NOT NULL AND kit_sent IS NULL").bind(nowIso, businessId).run();

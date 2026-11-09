@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getD1 } from "../../../../db";
 import { liveDesign } from "../../../../lib/server/designs";
 import { STATUS_LABEL, adminStatus, requireAdminPage, shortDate, shortDateTime } from "../../../../lib/server/admin";
-import { AdminActions, AdminCardPreview, ApplePushTest, GoogleSyncTest, KitSentButton } from "./admin-actions";
+import { AdminActions, AdminCardPreview, ApplePushTest, GoogleSyncTest, KitSentButton, OwnerDesignSwitch } from "./admin-actions";
 import { env } from "cloudflare:workers";
 import { planOf } from "../../../../lib/server/billing";
 
@@ -30,7 +30,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
 
   const b = await db
     .prepare(
-      `SELECT b.id, b.name, b.reward, b.target, b.color, b.created, b.reward_mode, b.suspended, b.suspend_reason, b.comp_until, b.archived, b.kit_due, b.kit_sent,
+      `SELECT b.id, b.name, b.reward, b.target, b.color, b.created, b.reward_mode, b.suspended, b.suspend_reason, b.comp_until, b.archived, b.kit_due, b.kit_sent, b.owner_designs,
          s.status, s.plan, s.current_period_end, s.external_subscription, s.updated AS sub_updated, u.email AS owner_email
        FROM businesses b LEFT JOIN subscriptions s ON s.business = b.id LEFT JOIN users u ON u.id = b.owner WHERE b.id = ?`,
     )
@@ -39,7 +39,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
       id: string; name: string; reward: string; target: number; color: string; created: string; reward_mode: string;
       suspended: string | null; suspend_reason: string | null; comp_until: string | null; archived: string | null; owner_email: string | null;
       status: string | null; current_period_end: string | null; external_subscription: string | null; sub_updated: string | null;
-      plan: string | null; kit_due: string | null; kit_sent: string | null;
+      plan: string | null; kit_due: string | null; kit_sent: string | null; owner_designs: number;
     }>();
   if (!b) notFound();
 
@@ -123,6 +123,8 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
           <section className="panel">
             <h2>הכרטיס החי</h2>
             <AdminCardPreview design={design} target={b.target} />
+            <p className="muted">ברירת המחדל: Perkly מעצבת את הכרטיס. אפשר לתת לבעל העסק לערוך אותו בעצמו (רק את העיצוב, לא הגדרות וצוות).</p>
+            <OwnerDesignSwitch business={b.id} on={!!b.owner_designs} />
           </section>
 
           <section className="panel">

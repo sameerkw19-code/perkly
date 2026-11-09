@@ -20,7 +20,7 @@ import { isKind, startDesign } from "../../../lib/start-design";
 
 export const dynamic = "force-dynamic";
 
-type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust: number; reward_mode: "bank" | "block"; reward_expiry_days: number; birthdays: number; social: Social };
+type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust: number; reward_mode: "bank" | "block"; reward_expiry_days: number; birthdays: number; social: Social; owner_designs: number };
 type Customer = { id: string; business: string; name: string; phone: string; stamps: number; target: number; scan_code: string; google_wallet?: string | null };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -35,7 +35,7 @@ function validTarget(v: unknown): v is number {
 
 async function loadBusiness(db: D1Database, id: string) {
   const row = await db
-    .prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays, social FROM businesses WHERE id = ?")
+    .prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays, social, owner_designs FROM businesses WHERE id = ?")
     .bind(id)
     .first<Omit<Business, "social"> & { social: string | null }>();
   return row ? { ...row, social: parseSocial(row.social) } : null;
@@ -253,9 +253,10 @@ export async function GET(request: Request) {
   ]);
 
   // Card editor data (Perkly only): draft, live version and uploaded images.
-  const published = admin ? await publishedDesign(db, business!.id) : null;
+  const canDesign = admin || !!business!.owner_designs;
+  const published = canDesign ? await publishedDesign(db, business!.id) : null;
   let editor = null;
-  if (admin) {
+  if (canDesign) {
     const draftRow = await db.prepare("SELECT design_draft FROM businesses WHERE id = ?").bind(business!.id).first<{ design_draft: string | null }>();
     const draft = (draftRow?.design_draft && sanitizeDesign(JSON.parse(draftRow.design_draft))) || published?.design || defaultDesign(business!);
     const images = await db.prepare("SELECT id, kind, width, height FROM assets WHERE business = ? AND kind NOT IN ('banner', 'apple_banner', 'wallet_logo') ORDER BY created DESC LIMIT 60").bind(business!.id).all();
@@ -270,6 +271,7 @@ export async function GET(request: Request) {
 
   return json({
     ...base,
+    canDesign,
     editor,
     range: days ?? "all",
     branchFilter,
@@ -359,6 +361,8 @@ export async function POST(request: Request) {
   const ownerOnly = () => (role === "owner" ? null : fail("forbidden", 403, "Owner permission required"));
   // The card design, business settings, team, branches and the join code are managed by Perkly only.
   const adminOnly = () => (admin ? null : fail("admin_only", 403, "Managed by Perkly"));
+  // The design, by Perkly, or by the owner when Perkly turned that on for this business.
+  const designOnly = () => (admin || (role === "owner" && !!business.owner_designs) ? null : fail("admin_only", 403, "Managed by Perkly"));
   // Access rules. Redeeming a reward a customer already earned is always allowed.
   // - No subscription: free up to FREE_CUSTOMERS customers; beyond that no new stamps, adjustments or customers.
   // - Suspended by a platform admin: nothing changes except redeeming, looking up and removing customers.
@@ -789,7 +793,7 @@ export async function POST(request: Request) {
     }
 
     case "save_design": {
-      const denied = adminOnly(); if (denied) return denied;
+      const denied = designOnly(); if (denied) return denied;
       const design = sanitizeDesign(p.design);
       if (!design) return fail("bad_details", 400, "Invalid design");
       if (!(await ownsAssets(db, business.id, design))) return fail("not_found", 404, "Image not found");
@@ -810,7 +814,7 @@ export async function POST(request: Request) {
     }
 
     case "publish_design": {
-      const denied = adminOnly(); if (denied) return denied;
+      const denied = designOnly(); if (denied) return denied;
       const row = await db.prepare("SELECT design_draft FROM businesses WHERE id = ?").bind(business.id).first<{ design_draft: string | null }>();
       const design = row?.design_draft ? sanitizeDesign(JSON.parse(row.design_draft)) : null;
       if (!design) return fail("nothing_to_publish", 400, "Save a draft first");

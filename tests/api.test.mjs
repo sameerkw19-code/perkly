@@ -790,3 +790,25 @@ test("staff link: one link per worker, tied to a branch; counter sign-in with ph
   assert.equal((await w.act(biz, "staff_link", {})).status, 403);
   assert.equal((await o.act(biz, "revoke_member", { user: "x" })).body.code, "admin_only");
 });
+
+test("Perkly can let one owner edit their own design (and turn it off again)", async () => {
+  const o = new Client();
+  await signup(o, "designer");
+  const biz = (await o.post("/api/loyalty", { action: "create_business", name: "Self", reward: "Free", target: 5, color: "#123456" })).body.id;
+  const before = await o.get(`/api/loyalty?business=${biz}`);
+  assert.equal(before.body.canDesign, false);
+  assert.equal((await o.act(biz, "publish_design")).body.code, "admin_only");
+  // Only a platform admin turns it on.
+  assert.equal((await o.post("/api/admin", { action: "owner_designs", business: biz, on: true })).status, 404);
+  assert.equal((await admin.post("/api/admin", { action: "owner_designs", business: biz, on: true })).status, 200);
+  const on = await o.get(`/api/loyalty?business=${biz}`);
+  assert.equal(on.body.canDesign, true);
+  assert.ok(on.body.editor, "the owner gets the editor");
+  assert.equal((await o.act(biz, "save_design", { design: on.body.editor.draft })).status, 200);
+  assert.equal((await o.act(biz, "publish_design")).status, 200);
+  // Settings and team stay with Perkly.
+  assert.equal((await o.act(biz, "update_business", { name: "X", reward: "x", target: 5, color: "#000000" })).body.code, "admin_only");
+  assert.equal((await admin.post("/api/admin", { action: "owner_designs", business: biz, on: false })).status, 200);
+  assert.equal((await o.act(biz, "publish_design")).body.code, "admin_only");
+  assert.equal((await o.get(`/api/loyalty?business=${biz}`)).body.editor, null);
+});

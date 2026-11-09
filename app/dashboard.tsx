@@ -28,6 +28,8 @@ type Data = {
   me: { name: string; email: string };
   /** Perkly (a platform admin): manages the card, settings and team of any business. */
   manage?: boolean;
+  /** The owner may edit the card design (Perkly turned it on for this business). */
+  canDesign?: boolean;
   /** Whether the signed-in user is a member of the open business (false when Perkly opened it from the control center). */
   ownsBusiness?: boolean;
   breakdown?: { staff: BreakdownRow[]; branches: BreakdownRow[] };
@@ -228,7 +230,8 @@ export default function Dashboard() {
   // Perkly (a platform admin), who sees those screens too.
   const manage = !!data?.manage;
   const nav: [any, string][] = isOwner
-    ? [[LayoutDashboard, "overview"], [Users, "customers"], [ScanLine, "station"], ...(manage ? [[Palette, "design"], [Users, "team"], [Settings, "settings"]] as typeof nav : [])]
+    ? [[LayoutDashboard, "overview"], [Users, "customers"], [ScanLine, "station"],
+       ...(manage ? [[Palette, "design"], [Users, "team"], [Settings, "settings"]] as typeof nav : data?.canDesign ? [[Palette, "design"]] as typeof nav : [])]
     : [[ScanLine, "station"]];
 
   // ---------- Loading / empty states ----------
@@ -512,11 +515,11 @@ export default function Dashboard() {
               onRegister={() => setModal({ type: "customer" })} onStaffLink={isOwner ? () => setModal({ type: "staffLink" }) : undefined} myRecent={data.myRecent} />
           )}
 
-          {view === "design" && isOwner && manage && data.editor && (
+          {view === "design" && isOwner && (manage || data.canDesign) && data.editor && (
             <>
               <div className="page-head"><div><h1>{t("design")}</h1><p className="muted">{t("designNoBalance")}</p></div></div>
               <CardEditor key={b.id + ":" + data.editor.publishedVersion} businessId={b.id} target={b.target} editor={data.editor} t={t} lang={lang} notify={notify} reload={load}
-                paid={!!data.access?.ok && !data.access.free} upgradeHref={`/start?b=${encodeURIComponent(b.id)}`} />
+                paid={!!data.access?.ok && !data.access.free} upgradeHref={`/start?b=${encodeURIComponent(b.id)}`} specialDays={manage} />
             </>
           )}
 
