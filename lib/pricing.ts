@@ -1,7 +1,7 @@
 // Prices by market: Israel pays in shekels, everyone else in dollars (the visitor's country decides
 // for new visitors, lib/server/region.ts; a business keeps the currency it signed up with).
 // Texts write prices as placeholders and get them filled for the visitor:
-//   {$m} monthly · {$was} monthly before the discount · {$k} counter kit · {$0} zero
+//   {$m} monthly · {$was} monthly before the discount · {$launch} with the launch code · {$k} counter kit · {$0} zero
 //   (yearly: {$y} · {$ym} · {$save} — the yearly plan is not sold at the moment)
 
 export type Currency = "ILS" | "USD";
@@ -11,6 +11,12 @@ export const PRICES: Record<Currency, { monthly: number; was: number; yearly: nu
   ILS: { monthly: 199, was: 300, yearly: 1990, yearlyMonthly: 166, kit: 99 },
   USD: { monthly: 59, was: 89, yearly: 590, yearlyMonthly: 49, kit: 29 },
 };
+
+/**
+ * Launch offer (Israel, shekels): the first 20 businesses pay 99 ₪ a month for good with this code.
+ * The code itself lives in Polar (100 ₪ off forever on the monthly product, 20 redemptions, once per customer).
+ */
+export const LAUNCH = { code: "New2026perkly", price: 99, seats: 20 } as const;
 
 /** The yearly plan is not sold at the moment (only monthly). */
 export const YEARLY_SOLD = false;
@@ -31,10 +37,10 @@ export function yearlySaving(currency: Currency): number {
 export function fillPrices(text: string, currency: Currency, lang: string): string {
   if (!text.includes("{$")) return text;
   const p = PRICES[currency];
-  const values: Record<string, number> = { m: p.monthly, was: p.was, y: p.yearly, ym: p.yearlyMonthly, k: p.kit, "0": 0 };
+  const values: Record<string, number> = { m: p.monthly, was: p.was, launch: LAUNCH.price, y: p.yearly, ym: p.yearlyMonthly, k: p.kit, "0": 0 };
   return text
     .replace(/\{\$save\}/g, String(yearlySaving(currency)))
-    .replace(/\{\$(was|ym|m|y|k|0)\}/g, (_, key: string) => money(values[key], currency, lang));
+    .replace(/\{\$(launch|was|ym|m|y|k|0)\}/g, (_, key: string) => money(values[key], currency, lang));
 }
 
 /** The same object with every price placeholder filled (strings inside objects, arrays and functions' results stay as they are). */

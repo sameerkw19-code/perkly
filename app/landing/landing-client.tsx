@@ -2,7 +2,7 @@
 /* eslint-disable @next/next/no-html-link-for-pages -- plain links on purpose: client-side navigation breaks on this server */
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { COPY, hrefs, type Lang, copyFor, kitOffered } from "./content";
-import { YEARLY_SOLD } from "../../lib/pricing";
+import { LAUNCH, YEARLY_SOLD } from "../../lib/pricing";
 import type { Currency } from "../../lib/pricing";
 import { useRegion } from "../../components/region-context";
 import { Icon } from "./visuals";
@@ -326,6 +326,22 @@ export function ExamplesPicker({ lang }: { lang: Lang }) {
   );
 }
 
+/** The launch code with a copy button. */
+function LaunchOffer({ text }: { text: { tag: string; text: string; copy: string; copied: string } }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="lp-launch" role="note">
+      <span className="lp-chip lp-chip-yellow">{text.tag}</span>
+      <p>{text.text}</p>
+      <button type="button" className="lp-launch-code" dir="ltr" onClick={async () => {
+        try { await navigator.clipboard.writeText(LAUNCH.code); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {}
+      }} aria-label={`${text.copy}: ${LAUNCH.code}`}>
+        <strong>{LAUNCH.code}</strong><span>{copied ? text.copied : text.copy}</span>
+      </button>
+    </div>
+  );
+}
+
 /**
  * Pricing cards with a monthly / yearly switch. The free plan and the subscription live here;
  * the counter kit card is rendered on the server and passed in as `children` (it reacts to the
@@ -341,6 +357,8 @@ export function PricingPlans({ lang, currency = "ILS", children }: { lang: Lang;
   const signupYearly = h.signup + (h.signup.includes("?") ? "&" : "?") + "plan=yearly";
   return (
     <div className="lp-plans" data-cycle={yearly ? "yearly" : "monthly"}>
+      {/* Launch offer: Israel only (the code is in shekels). */}
+      {currency === "ILS" && <LaunchOffer text={c.launch} />}
       {withYearly && <div className="lp-cycle">
         <div className="lp-cycle-switch" role="group" aria-label={c.cycle.label}>
           {(["monthly", "yearly"] as const).map((k) => (
