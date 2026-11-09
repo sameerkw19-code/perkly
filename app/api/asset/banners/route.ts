@@ -1,5 +1,5 @@
 import { getD1 } from "../../../../db";
-import { getUser, isPlatformAdmin } from "../../../../lib/server/auth";
+import { getRole, getUser, isPlatformAdmin } from "../../../../lib/server/auth";
 import { env } from "cloudflare:workers";
 import { businessAccess, hasPaidDesign } from "../../../../lib/server/billing";
 import { getSettings } from "../../../../lib/server/settings";
@@ -31,9 +31,10 @@ export async function POST(request: Request) {
   // "apple": the Apple Wallet stamp grid (every plan). Otherwise the Google Wallet stamp banner (subscription).
   const apple = url.searchParams.get("set") === "apple";
   const kind = apple ? "apple_banner" : "banner";
-  // Images for the card are uploaded by Perkly (a platform admin) only, for any business.
-  if (!isPlatformAdmin(user, env)) return fail("admin_only", 403, "Managed by Perkly");
-  if (!business || !(await db.prepare("SELECT 1 FROM businesses WHERE id = ? AND archived IS NULL").bind(business).first())) return fail("not_found", 404);
+  // Images for the card are uploaded by Perkly (a platform admin), or by the owner when Perkly lets them design.
+  const target = business ? await db.prepare("SELECT owner_designs FROM businesses WHERE id = ? AND archived IS NULL").bind(business).first<{ owner_designs: number }>() : null;
+  if (!target) return fail("not_found", 404);
+  if (!isPlatformAdmin(user, env) && !(target.owner_designs && (await getRole(db, user.id, business)) === "owner")) return fail("admin_only", 403, "Managed by Perkly");
   if ((await getSettings(db)).maintenance) return fail("maintenance", 503, "Maintenance");
   const access = await businessAccess(db, business!);
   if (!access.ok && access.code === "business_suspended") return fail(access.code, 402, "Business is suspended");

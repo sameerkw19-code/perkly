@@ -100,8 +100,10 @@ function PaidTag({ t }: { t: T }) {
   return <span className="paid-tag"><Lock size={11} aria-hidden="true" />{t("paidTag")}</span>;
 }
 
-export function CardEditor({ businessId, target, editor, t, lang, notify, reload, paid = true, upgradeHref, setup }: {
+export function CardEditor({ businessId, target, editor, t, lang, notify, reload, paid = true, upgradeHref, setup, specialDays = true }: {
   businessId: string; target: number; editor: Editor; t: T; lang: Lang;
+  /** Special-day messages are sent by Perkly: hidden for an owner who edits the design. */
+  specialDays?: boolean;
   notify: (s: string, bad?: boolean) => void; reload: () => void;
   /** Logo, background image and stamp image need a subscription (see hasPaidDesign). */
   paid?: boolean; upgradeHref?: string;
@@ -695,9 +697,13 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
 
             {(design.walletNotify || design.walletWelcome || design.walletBirthday) && <p className="form-hint">{t("edNotifyVars")}</p>}
 
-            <h4 className="notify-head">{t("edMsgSpecial")}</h4>
-            <p className="form-hint">{t("edMsgSpecialHint")}</p>
-            <a className="btn soft small" href={`/special?b=${encodeURIComponent(businessId)}`}>{t("edMsgSpecialLink")}</a>
+            {specialDays && (
+              <>
+                <h4 className="notify-head">{t("edMsgSpecial")}</h4>
+                <p className="form-hint">{t("edMsgSpecialHint")}</p>
+                <a className="btn soft small" href={`/special?b=${encodeURIComponent(businessId)}`}>{t("edMsgSpecialLink")}</a>
+              </>
+            )}
           </div>
         </EdSection>
 

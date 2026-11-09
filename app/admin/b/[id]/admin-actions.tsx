@@ -63,6 +63,25 @@ export function KitSentButton({ business }: { business: string }) {
   );
 }
 
+/** Whether the business owner may edit their own card design (Perkly designs by default). */
+export function OwnerDesignSwitch({ business, on }: { business: string; on: boolean }) {
+  const [busy, setBusy] = useState(false);
+  const [value, setValue] = useState(on);
+  return (
+    <label className="check">
+      <input type="checkbox" checked={value} disabled={busy} onChange={async (e) => {
+        const next = e.target.checked;
+        setBusy(true);
+        const r = await post("/api/admin", { action: "owner_designs", business, on: next });
+        setBusy(false);
+        if (r.ok) setValue(next);
+        else window.alert("הפעולה נכשלה. נסה שוב.");
+      }} />
+      <span>בעל העסק יכול לערוך את העיצוב בעצמו</span>
+    </label>
+  );
+}
+
 /** Suspend / unsuspend and free-access controls for one business. Reloads the page after each change. */
 type Biz = { id: string; name: string; reward: string; target: number; archived: string | null; ownerEmail: string | null; paying: boolean };
 
