@@ -1,4 +1,5 @@
-import type { Currency } from "../pricing";
+// The .ts extension lets the Node test runner load this file directly.
+import { YEARLY_SOLD, type Currency } from "../pricing.ts";
 // Polar (merchant of record): creates checkout sessions and verifies webhooks (Standard Webhooks).
 // The access token and webhook secret are never sent to the browser.
 
@@ -33,7 +34,8 @@ export function productsFor(env: PolarEnv, currency: Currency): { monthly?: stri
 
 /** Whether the yearly plan can be sold: billing works and a yearly product is set for that currency. */
 export function yearlyConfigured(env: PolarEnv, currency: Currency = "ILS"): boolean {
-  return polarConfigured(env) && !!productsFor(env, currency).yearly;
+  // The yearly plan is not sold at the moment (lib/pricing.ts YEARLY_SOLD), even if a product is set.
+  return YEARLY_SOLD && polarConfigured(env) && !!productsFor(env, currency).yearly;
 }
 
 function apiBase(env: PolarEnv): string {

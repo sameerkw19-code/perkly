@@ -1,14 +1,19 @@
 // Prices by market: Israel pays in shekels, everyone else in dollars (the visitor's country decides
 // for new visitors, lib/server/region.ts; a business keeps the currency it signed up with).
 // Texts write prices as placeholders and get them filled for the visitor:
-//   {$m} monthly · {$y} yearly · {$ym} yearly per month · {$k} counter kit · {$0} zero · {$save} yearly saving in % (a number)
+//   {$m} monthly · {$was} monthly before the discount · {$k} counter kit · {$0} zero
+//   (yearly: {$y} · {$ym} · {$save} — the yearly plan is not sold at the moment)
 
 export type Currency = "ILS" | "USD";
 
-export const PRICES: Record<Currency, { monthly: number; yearly: number; yearlyMonthly: number; kit: number }> = {
-  ILS: { monthly: 99, yearly: 999, yearlyMonthly: 83, kit: 99 },
-  USD: { monthly: 29, yearly: 290, yearlyMonthly: 24, kit: 29 },
+// "was": the price shown struck through next to the monthly price.
+export const PRICES: Record<Currency, { monthly: number; was: number; yearly: number; yearlyMonthly: number; kit: number }> = {
+  ILS: { monthly: 199, was: 300, yearly: 1990, yearlyMonthly: 166, kit: 99 },
+  USD: { monthly: 59, was: 89, yearly: 590, yearlyMonthly: 49, kit: 29 },
 };
+
+/** The yearly plan is not sold at the moment (only monthly). */
+export const YEARLY_SOLD = false;
 
 /** "99 ₪" in Hebrew and Arabic, "₪99" in English, "$29" everywhere. */
 export function money(amount: number, currency: Currency, lang: string): string {
@@ -26,10 +31,10 @@ export function yearlySaving(currency: Currency): number {
 export function fillPrices(text: string, currency: Currency, lang: string): string {
   if (!text.includes("{$")) return text;
   const p = PRICES[currency];
-  const values: Record<string, number> = { m: p.monthly, y: p.yearly, ym: p.yearlyMonthly, k: p.kit, "0": 0 };
+  const values: Record<string, number> = { m: p.monthly, was: p.was, y: p.yearly, ym: p.yearlyMonthly, k: p.kit, "0": 0 };
   return text
     .replace(/\{\$save\}/g, String(yearlySaving(currency)))
-    .replace(/\{\$(ym|m|y|k|0)\}/g, (_, key: string) => money(values[key], currency, lang));
+    .replace(/\{\$(was|ym|m|y|k|0)\}/g, (_, key: string) => money(values[key], currency, lang));
 }
 
 /** The same object with every price placeholder filled (strings inside objects, arrays and functions' results stay as they are). */
