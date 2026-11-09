@@ -4,7 +4,7 @@ import { SOCIAL_KEYS, SOCIAL_LABEL, normalizeSocial, socialDisplay, type Social 
 import { SocialIcon } from "../lib/social-icon";
 import {
   Activity, AlertTriangle, Trash2, Cake, Check, Copy, CreditCard, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode,
-  ChevronRight, History, Palette, RefreshCw, RotateCcw, ScanLine, Search, Settings, Share2, Store, UserPlus, Users, UserRound, Wallet, X,
+  ChevronRight, History, Palette, RefreshCw, RotateCcw, ScanLine, Search, Settings, Share2, Store, UserPlus, Users, UserRound, X,
 } from "lucide-react";
 import type { Design } from "../lib/design";
 import { CardEditor } from "../components/card-editor";
@@ -12,7 +12,7 @@ import jsQR from "jsqr";
 import { errorText, useLang } from "../lib/i18n";
 import { copyText, post, whatsappLink } from "../lib/api";
 import { LangSwitch } from "../components/lang-switch";
-import { LoyaltyCard, Num } from "../components/loyalty-card";
+import { Num } from "../components/loyalty-card";
 import { QrImage } from "../components/qr";
 import { BirthdayFields } from "../components/birthday-fields";
 import { birthdayFromParts, formatBirthday } from "../lib/birthday";
@@ -25,6 +25,11 @@ type Business = { id: string; name: string; reward: string; target: number; colo
 type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; rewards?: number; nextExpiry?: string | null; phone?: string };
 type Data = {
   me: { name: string; email: string };
+  /** Perkly (a platform admin): manages the card, settings and team of any business. */
+  manage?: boolean;
+  /** Whether the signed-in user is a member of the open business (false when Perkly opened it from the control center). */
+  ownsBusiness?: boolean;
+  breakdown?: { staff: BreakdownRow[]; branches: BreakdownRow[] };
   access?: { ok: true; free?: { limit: number; used: number } } | { ok: false; code: "business_suspended" | "subscription_required" };
   birthdays?: { id: string; name: string; date: string; inDays: number }[];
   googleWallet?: boolean;
@@ -61,7 +66,7 @@ export default function Dashboard() {
   const [data, setData] = useState<Data | null>(null);
   const [loadError, setLoadError] = useState("");
   const [businessId, setBusinessId] = useState<string | null>(null);
-  const [days, setDays] = useState<string>("30");
+  const [days] = useState<string>("30");
   const [branchView, setBranchView] = useState<string>("");
   const [view, setView] = useState("overview");
   // "/#design" opens the card editor (link from the sign-up flow).
@@ -217,8 +222,11 @@ export default function Dashboard() {
   const role = data?.role;
   const b = data?.business;
   const isOwner = role === "owner";
+  // Owners: reports, customers and the staff station. The card design, settings and team are managed by
+  // Perkly (a platform admin), who sees those screens too.
+  const manage = !!data?.manage;
   const nav: [any, string][] = isOwner
-    ? [[LayoutDashboard, "overview"], [Users, "customers"], [ScanLine, "station"], [Palette, "design"], [Users, "team"], [Settings, "settings"]]
+    ? [[LayoutDashboard, "overview"], [Users, "customers"], [ScanLine, "station"], ...(manage ? [[Palette, "design"], [Users, "team"], [Settings, "settings"]] as typeof nav : [])]
     : [[ScanLine, "station"]];
 
   // ---------- Loading / empty states ----------
@@ -293,7 +301,7 @@ export default function Dashboard() {
         </nav>
         <div className="side-bottom">
           <div className="profile"><span>{data.me.name.charAt(0)}</span><div><strong>{data.me.name}</strong><small dir="ltr">{data.me.email}</small></div></div>
-          {isOwner && <a className="text-btn" href="/billing"><CreditCard size={15} />{t("billingLink")}</a>}
+          {isOwner && manage && <a className="text-btn" href={`/billing?b=${encodeURIComponent(b.id)}`}><CreditCard size={15} />{t("billingLink")}</a>}
           <button className="text-btn" onClick={signOut}><LogOut size={15} />{t("signOut")}</button>
           <a className="text-btn" href="/account"><UserRound size={15} />{t("accountTitle")}</a>
         </div>
@@ -347,6 +355,9 @@ export default function Dashboard() {
 
         <main id="main" tabIndex={-1}>
           {(view === "customers" || view === "team" || view === "settings") && <h1 className="sr-only">{t(view)}</h1>}
+          {manage && data.ownsBusiness === false && (
+            <div className="away-bar manage-bar" role="status"><Settings size={16} /><span>{t("managingAs", { b: b.name })}</span></div>
+          )}
           {view === "overview" && isOwner && away.length > 0 && (
             <div className="away-bar" role="status">
               <Users size={16} />
@@ -357,7 +368,7 @@ export default function Dashboard() {
           {view === "overview" && isOwner && (
             <>
               <div className="page-head">
-                <div><h1>{t("hello")}</h1><p className="muted">{t("subtitle")}</p></div>
+                <div><h1>{t("repTitle")}</h1><p className="muted">{t("repSubtitle")}</p></div>
                 <div className="head-actions">
                   {!!data.branches?.length && (
                     <select aria-label={t("branch")} value={branchView} onChange={(e) => setBranchView(e.target.value)}>
@@ -370,39 +381,30 @@ export default function Dashboard() {
                 </div>
               </div>
               {!!data.alerts?.length && <Alerts alerts={data.alerts} t={t} />}
-              {data.summary && <Summary summary={data.summary} totals={{ customers: data.stats!.customers, ready: data.stats!.rewards_ready }} t={t} />}
+              {data.summary && <Summary summary={data.summary} totals={{ customers: data.stats!.customers, ready: data.stats!.rewards_ready }} breakdown={data.breakdown} hasBranches={!!data.branches?.length} t={t} />}
               <section className="overview-grid">
-                <div className="panel card-panel">
-                  <div className="section-head"><h2>{t("card")}</h2></div>
-                  <LoyaltyCard design={data.design!} lang={lang} stamps={Math.min(3, b.target)} target={b.target} t={t} />
-                  <p className="wallet-note"><Wallet size={15} />{data.googleWallet ? t("walletOwnerNote") : t("walletHint")}</p>
+                <div className="panel card-panel join-panel">
+                  <div className="section-head"><h2><QrCode size={18} /> {t("joinQr")}</h2></div>
+                  {b.join_code ? (
+                    <>
+                      <QrImage text={`${window.location.origin}/join/${b.join_code}`} size={180} label={t("joinQr")} />
+                      <p className="muted">{t("joinQrHint")}</p>
+                      <LinkBox url={`${window.location.origin}/join/${b.join_code}`} t={t} notify={notify} />
+                      <a className="btn soft small" href={`/poster?b=${encodeURIComponent(b.id)}`}><QrCode size={14} />{t("posterLink")}</a>
+                    </>
+                  ) : (
+                    <>
+                      <p className="muted">{t(data.access && !data.access.ok && data.access.code === "business_suspended" ? "accessSuspended" : "joinLocked")}</p>
+                      {data.access && !data.access.ok && data.access.code === "subscription_required" && <a className="btn primary small" href={`/start?b=${encodeURIComponent(b.id)}`}>{t("activateSub")}</a>}
+                    </>
+                  )}
+                  <p className="form-hint">{t("managedByPerkly")}</p>
                 </div>
                 <div className="panel activity-panel">
                   <div className="section-head"><h2>{t("history")}</h2></div>
                   <EventList events={data.events ?? []} t={t} lang={lang} />
                 </div>
               </section>
-              {!!data.branches?.length && !!data.perBranch?.length && (
-                <section className="panel" style={{ marginBottom: 22 }}>
-                  <div className="section-head">
-                    <h2>{t("byBranch")}</h2>
-                    <select aria-label={t("inRange")} value={days} onChange={(e) => setDays(e.target.value)}>
-                      <option value="7">{t("range7")}</option><option value="30">{t("range30")}</option>
-                      <option value="90">{t("range90")}</option><option value="all">{t("rangeAll")}</option>
-                    </select>
-                  </div>
-                  <div className="table-wrap">
-                    <table>
-                      <thead><tr><th>{t("branch")}</th><th>{t("statStamps")}</th><th>{t("statRedeemed")}</th></tr></thead>
-                      <tbody>
-                        {data.perBranch.map((r, i) => (
-                          <tr key={i}><td><strong>{r.branch_name ?? t("noBranch")}</strong></td><td><Num>{r.stamps}</Num></td><td><Num>{r.redemptions}</Num></td></tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </section>
-              )}
             </>
           )}
 
@@ -507,7 +509,7 @@ export default function Dashboard() {
               onRegister={() => setModal({ type: "customer" })} myRecent={data.myRecent} />
           )}
 
-          {view === "design" && isOwner && data.editor && (
+          {view === "design" && isOwner && manage && data.editor && (
             <>
               <div className="page-head"><div><h1>{t("design")}</h1><p className="muted">{t("designNoBalance")}</p></div></div>
               <CardEditor key={b.id + ":" + data.editor.publishedVersion} businessId={b.id} target={b.target} editor={data.editor} t={t} lang={lang} notify={notify} reload={load}
@@ -515,12 +517,12 @@ export default function Dashboard() {
             </>
           )}
 
-          {view === "team" && isOwner && (
+          {view === "team" && isOwner && manage && (
             <Team data={data} t={t} lang={lang} busy={busy} call={call} reload={load}
               showLink={(url) => setModal({ type: "link", url, title: t("inviteStaff") })} />
           )}
 
-          {view === "settings" && isOwner && (
+          {view === "settings" && isOwner && manage && (
             <div className="settings-grid">
               <section className="panel">
                 <div className="section-head"><h2>{t("settings")}</h2></div>
@@ -1355,6 +1357,7 @@ type Period = "day" | "week" | "month";
 const SUMMARY_ROWS = [
   ["stamps", "sumStamps"],
   ["visitors", "sumVisitors"],
+  ["returning", "sumReturning"],
   ["redeemed", "sumRedeemed"],
   ["joined", "sumJoined"],
 ] as const;
@@ -1376,8 +1379,33 @@ function Alerts({ alerts, t }: { alerts: { type: "customer" | "staff" | "staffFi
 }
 
 /** Summary for the owner: this day, week or month against the one before. */
-function Summary({ summary, totals, t }: { summary: Record<Period, Record<string, number>>; totals: { customers: number; ready: number }; t: (k: string, v?: Record<string, string | number>) => string }) {
+type BreakdownRow = { id: string | null; name: string | null } & Record<string, number | string | null>;
+function Summary({ summary, totals, breakdown, hasBranches, t }: {
+  summary: Record<Period, Record<string, number>>; totals: { customers: number; ready: number };
+  breakdown?: { staff: BreakdownRow[]; branches: BreakdownRow[] }; hasBranches?: boolean;
+  t: (k: string, v?: Record<string, string | number>) => string;
+}) {
   const [period, setPeriod] = useState<Period>("week");
+  const rows = (list: BreakdownRow[] | undefined) =>
+    (list ?? []).filter((r) => Number(r["stamps_" + period]) || Number(r["redeemed_" + period]))
+      .sort((a, b) => Number(b["stamps_" + period]) - Number(a["stamps_" + period]));
+  const table = (title: string, column: string, list: BreakdownRow[], fallback: string) => (
+    <div className="report-table">
+      <h3>{title}</h3>
+      {!list.length ? <p className="form-hint">{t("repNone")}</p> : (
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>{column}</th><th>{t("sumStamps")}</th><th>{t("sumRedeemed")}</th></tr></thead>
+            <tbody>
+              {list.map((r, i) => (
+                <tr key={String(r.id ?? i)}><td><strong>{r.name || fallback}</strong></td><td><Num>{Number(r["stamps_" + period])}</Num></td><td><Num>{Number(r["redeemed_" + period])}</Num></td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
   const s = summary[period];
   return (
     <section className="panel summary-panel">
@@ -1413,6 +1441,12 @@ function Summary({ summary, totals, t }: { summary: Record<Period, Record<string
           );
         })}
       </div>
+      {breakdown && (
+        <div className="report-tables">
+          {table(t("repByStaff"), t("repStaffCol"), rows(breakdown.staff), t("repUnknown"))}
+          {hasBranches && table(t("repByBranch"), t("branch"), rows(breakdown.branches), t("noBranch"))}
+        </div>
+      )}
     </section>
   );
 }

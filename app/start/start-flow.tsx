@@ -6,11 +6,12 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import "../landing/landing.css";
 import { Logo } from "../landing/landing-client";
-import { Icon, THEMES } from "../landing/visuals";
-import { COPY, type ExampleKey, type Lang } from "../landing/content";
+import { Icon } from "../landing/visuals";
+import { COPY, waLink, type Lang } from "../landing/content";
 import { LoyaltyCard } from "../../components/loyalty-card";
 import { QrImage } from "../../components/qr";
-import { darken, defaultDesign, defaultLook, onColor, type Design, type PresetIcon } from "../../lib/design";
+import { startDesign, type Kind } from "../../lib/start-design";
+import type { Design } from "../../lib/design";
 import { errorText, translate } from "../../lib/i18n";
 import { post } from "../../lib/api";
 import { useRegion } from "../../components/region-context";
@@ -18,13 +19,10 @@ import { withPrices, type Currency } from "../../lib/pricing";
 
 export type StartBusiness = { id: string; name: string; joinCode: string | null; paid: boolean; canWork: boolean; status: string };
 
-type Kind = ExampleKey | "other";
 type Step = "business" | "account" | "pay" | "wait" | "done";
 const STEPS = ["business", "account", "pay"] as const;
 
-const ICON: Record<Kind, PresetIcon> = { cafe: "coffee", barber: "scissors", pizza: "pizza", icecream: "icecream", studio: "sparkle", bakery: "croissant", other: "star" };
 const KIND_ICON: Record<Kind, string> = { cafe: "coffee", barber: "scissors", pizza: "pizza", icecream: "icecream", studio: "star", bakery: "cake", other: "store" };
-const OTHER_THEME = { bg: "#2F2A4A", fg: "#FFFFFF", stamp: "#D9F493" };
 
 const T = {
   he: {
@@ -35,7 +33,7 @@ const T = {
     name: "השם שלך", email: "אימייל", password: "סיסמה", passwordHint: "לפחות 8 תווים", code: "קוד הרשמה",
     agree: "בהמשך אני מאשר/ת את", terms: "תנאי השימוש", and: "ואת", privacy: "מדיניות הפרטיות",
     next: "המשך", working: "רגע…",
-    bizTitle: "מתחילים מהעסק", bizIntro: "בוחרים סוג עסק ושם, ואנחנו מכינים כרטיס מוכן. את העיצוב אפשר לשנות בכל רגע.",
+    bizTitle: "מתחילים מהעסק", bizIntro: "בוחרים סוג עסק ושם, ואנחנו מכינים כרטיס מוכן. את העיצוב הסופי, עם הלוגו שלכם, נכין לכם אנחנו.",
     kind: "סוג העסק", bizName: "שם העסק", reward: "ההטבה", target: "חותמות להטבה", other: "אחר",
     preview: "כך הלקוחות יראו את הכרטיס", createBiz: "יצירת הכרטיס",
     payTitle: "14 ימים חינם", payIntro: "הכרטיס מוכן. מוסיפים אמצעי תשלום ומקבלים מיד את ה־QR לקופה.",
@@ -54,7 +52,7 @@ const T = {
     doneTitle: "הכל מוכן. אפשר להתחיל!", doneIntro: "תלו את ה־QR ליד הקופה. לקוח סורק, נרשם בשנייה ומקבל כרטיס אישי.",
     scan: "סרקו והצטרפו לכרטיס", print: "הדפסת ה־QR", dashboard: "ללוח הבקרה", station: "פתיחת עמדת עובד",
     staffOnly: "החשבון שלך הוא חשבון עובד. כדי לפתוח עסק משלך, אפשר להמשיך כאן.",
-    tip: "אפשר לשנות את העיצוב ולהזמין עובדים בכל רגע מלוח הבקרה.", designNow: "לעיצוב הכרטיס",
+    tip: "את העיצוב הסופי של הכרטיס, עם הלוגו שלכם, נכין לכם אנחנו. נחזור אליכם בוואטסאפ.", designNow: "לכתוב לנו עכשיו", designMsg: "היי, פתחתי את {name} ב־Perkly. הנה הלוגו שלנו לעיצוב הכרטיס:",
   },
   ar: {
     steps: ["المشروع", "الحساب", "التفعيل"],
@@ -64,7 +62,7 @@ const T = {
     name: "اسمك", email: "البريد الإلكتروني", password: "كلمة المرور", passwordHint: "8 أحرف على الأقل", code: "رمز التسجيل",
     agree: "بالمتابعة أوافق على", terms: "شروط الاستخدام", and: "و", privacy: "سياسة الخصوصية",
     next: "متابعة", working: "لحظة…",
-    bizTitle: "نبدأ بالمشروع", bizIntro: "اختاروا نوع المشروع واسمه ونجهّز لكم بطاقة جاهزة. يمكن تغيير التصميم في أي وقت.",
+    bizTitle: "نبدأ بالمشروع", bizIntro: "اختاروا نوع المشروع واسمه ونجهّز لكم بطاقة جاهزة. التصميم النهائي مع شعاركم نجهّزه لكم نحن.",
     kind: "نوع المشروع", bizName: "اسم المشروع", reward: "المكافأة", target: "أختام للمكافأة", other: "آخر",
     preview: "هكذا يرى الزبائن البطاقة", createBiz: "إنشاء البطاقة",
     payTitle: "14 يوماً مجاناً", payIntro: "البطاقة جاهزة. أضيفوا وسيلة دفع واحصلوا فوراً على رمز QR للصندوق.",
@@ -83,7 +81,7 @@ const T = {
     doneTitle: "كل شيء جاهز. لنبدأ!", doneIntro: "علّقوا رمز QR بجانب الصندوق. الزبون يمسح، يسجل بثانية ويحصل على بطاقة شخصية.",
     scan: "امسحوا وانضموا للبطاقة", print: "طباعة رمز QR", dashboard: "إلى لوحة التحكم", station: "فتح محطة الموظف",
     staffOnly: "حسابك حساب موظف. لفتح مشروع خاص بك، تابع هنا.",
-    tip: "يمكن تغيير التصميم ودعوة موظفين في أي وقت من لوحة التحكم.", designNow: "لتصميم البطاقة",
+    tip: "سنجهّز لكم التصميم النهائي للبطاقة مع شعاركم. سنتواصل معكم عبر واتساب.", designNow: "راسلونا الآن", designMsg: "مرحباً، فتحت {name} في Perkly. هذا شعارنا لتصميم البطاقة:",
   },
   en: {
     steps: ["Business", "Account", "Activate"],
@@ -93,7 +91,7 @@ const T = {
     name: "Your name", email: "Email", password: "Password", passwordHint: "At least 8 characters", code: "Sign-up code",
     agree: "By continuing I accept the", terms: "terms of use", and: "and the", privacy: "privacy policy",
     next: "Continue", working: "One moment…",
-    bizTitle: "Start with your business", bizIntro: "Pick your type of business and a name, and we'll prepare a ready card. You can change the design anytime.",
+    bizTitle: "Start with your business", bizIntro: "Pick your type of business and a name, and we'll prepare a ready card. We'll make the final design, with your logo, for you.",
     kind: "Type of business", bizName: "Business name", reward: "Reward", target: "Stamps for a reward", other: "Other",
     preview: "What your customers will see", createBiz: "Create my card",
     payTitle: "14 days free", payIntro: "Your card is ready. Add a payment method and get your QR code for the counter right away.",
@@ -112,7 +110,7 @@ const T = {
     doneTitle: "All set. Let's start!", doneIntro: "Put the QR code by the register. A customer scans, signs up in seconds and gets a personal card.",
     scan: "Scan to join our card", print: "Print the QR code", dashboard: "Go to dashboard", station: "Open the staff station",
     staffOnly: "Your account is a staff account. To open a business of your own, continue here.",
-    tip: "Change the design and invite staff anytime from the dashboard.", designNow: "Design your card",
+    tip: "We'll prepare your card's final design, with your logo, for you. We'll be in touch on WhatsApp.", designNow: "Message us now", designMsg: "Hi, I just opened {name} on Perkly. Here is our logo for the card design:",
   },
 };
 
@@ -125,20 +123,6 @@ function readLang(): Lang {
     if (saved === "en") return saved;
   } catch {}
   return "he";
-}
-
-/** The card a new business starts with: the example look for its type, with the owner's own texts. */
-function startDesign(kind: Kind, name: string, reward: string, lang: Lang): Design {
-  const th = kind === "other" ? OTHER_THEME : THEMES[kind];
-  // The card starts in the language of the sign-up (English abroad).
-  const base = defaultDesign({ name: name || "Perkly", reward: reward || "-", color: th.bg }, lang);
-  const light = onColor(th.bg) !== "#FFFFFF";
-  return {
-    ...base,
-    colors: { bg: th.bg, fg: th.fg, stamp: th.stamp },
-    stamp: { icon: ICON[kind], image: null },
-    look: { ...defaultLook(th.bg), bg2: light ? darken(th.bg, 0.1) : darken(th.bg, 0.32) },
-  };
 }
 
 function firstStep(signedIn: boolean, business: StartBusiness | null, billingOn: boolean, paidReturn: boolean): Step {
@@ -233,12 +217,10 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
   async function createBusiness(): Promise<boolean> {
     const name = bizName.trim();
     const rewardText = shownReward.trim();
-    const created = await post<{ id: string }>("/api/loyalty", { action: "create_business", name, reward: rewardText, target, color: design.colors.bg, rewardMode: "bank" });
+    // The server builds the starting card for this type of business (later changes go through Perkly).
+    const created = await post<{ id: string }>("/api/loyalty", { action: "create_business", name, reward: rewardText, target, color: design.colors.bg, rewardMode: "bank", kind, lang });
     if (!created.ok) { setError(errorText(lang, created.code)); return false; }
     const id = created.data.id;
-    // The card look for this type of business. If saving it fails, the business still has the default card.
-    const saved = await post("/api/loyalty", { business: id, action: "save_design", design: startDesign(kind, name, rewardText, lang) });
-    if (saved.ok) await post("/api/loyalty", { business: id, action: "publish_design" });
     setBusiness({ id, name, joinCode: null, paid: false, canWork: false, status: "none" });
     setStep("pay");
     return true;
@@ -450,7 +432,7 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
               {joinUrl && <button type="button" className="lp-btn lp-btn-primary" onClick={() => window.print()}><Icon name="printer" size={18} />{t.print}</button>}
               <a className="lp-btn lp-btn-ghost" href="/">{t.dashboard}</a>
             </div>
-            <p className="su-opt st-noprint">{t.tip} <a href="/#design">{t.designNow}</a></p>
+            <p className="su-opt st-noprint">{t.tip} <a href={waLink(t.designMsg.replace("{name}", business.name))} target="_blank" rel="noopener noreferrer">{t.designNow}</a></p>
           </section>
         )}
       </main>

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getD1 } from "../db";
-import { getMemberships } from "../lib/server/auth";
+import { getMemberships, isPlatformAdmin } from "../lib/server/auth";
+import { env } from "cloudflare:workers";
 import { currentUser } from "../lib/server/page-session";
 import Dashboard from "./dashboard";
 import Landing from "./landing/landing";
@@ -25,7 +26,7 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default async function Page() {
+export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   // Visitors who are not signed in see the marketing page; owners and staff see their dashboard.
   const user = await currentUser();
   if (!user) {
@@ -33,6 +34,8 @@ export default async function Page() {
     return <Landing lang={region.lang} currency={region.currency} />;
   }
   // Signed in but no business yet (or the setup was left halfway): continue the guided setup.
-  if ((await getMemberships(getD1(), user.id)).length === 0) redirect("/start");
+  // Except Perkly (a platform admin) opening a business from the control center to manage it.
+  const managing = isPlatformAdmin(user, env) && typeof (await searchParams).business === "string";
+  if (!managing && (await getMemberships(getD1(), user.id)).length === 0) redirect("/start");
   return <Dashboard />;
 }
