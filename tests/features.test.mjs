@@ -685,3 +685,13 @@ test("counter sign-in: phone + date of birth, kept like a password, never for ow
   assert.match(readFileSync(new URL("../drizzle/0027_worker_code_branches.sql", import.meta.url), "utf8"), /ALTER TABLE branches ADD COLUMN address TEXT/);
   assert.match(readFileSync(new URL("../public/manifest.webmanifest", import.meta.url), "utf8"), /"display": "standalone"/);
 });
+
+test("launch offer: New2026perkly, 99 ₪ for the first 20, Israel only", () => {
+  assert.equal(fillPrices("{$launch}", "ILS", "he"), "99 ₪");
+  const pricing = readFileSync(new URL("../lib/pricing.ts", import.meta.url), "utf8");
+  assert.match(pricing, /LAUNCH = \{ code: "New2026perkly", price: 99, seats: 20 \}/);
+  const plans = readFileSync(new URL("../app/landing/landing-client.tsx", import.meta.url), "utf8");
+  assert.match(plans, /currency === "ILS" && <LaunchOffer/);
+  const copy = readFileSync(new URL("../app/landing/content.ts", import.meta.url), "utf8");
+  assert.equal((copy.match(/launch: \{ tag: /g) || []).length, 3, "he, ar and en");
+});

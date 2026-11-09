@@ -15,7 +15,7 @@ import type { Design } from "../../lib/design";
 import { errorText, translate } from "../../lib/i18n";
 import { post } from "../../lib/api";
 import { useRegion } from "../../components/region-context";
-import { withPrices, type Currency } from "../../lib/pricing";
+import { LAUNCH, withPrices, type Currency } from "../../lib/pricing";
 
 export type StartBusiness = { id: string; name: string; joinCode: string | null; paid: boolean; canWork: boolean; status: string };
 
@@ -36,7 +36,7 @@ const T = {
     bizTitle: "מתחילים מהעסק", branchName: "שם הסניף", branchNamePh: "למשל: סניף מרכז", branchAddress: "כתובת הסניף", branchAddressPh: "רחוב, מספר ועיר", bizIntro: "בוחרים סוג עסק ושם, ואנחנו מכינים כרטיס מוכן. את העיצוב הסופי, עם הלוגו שלכם, נכין לכם אנחנו.",
     kind: "סוג העסק", bizName: "שם העסק", reward: "ההטבה", target: "חותמות להטבה", other: "אחר",
     preview: "כך הלקוחות יראו את הכרטיס", createBiz: "יצירת הכרטיס",
-    payTitle: "14 ימים חינם", payIntro: "הכרטיס מוכן. מוסיפים אמצעי תשלום ומקבלים מיד את ה־QR לקופה.",
+    payTitle: "14 ימים חינם", launchHint: "מבצע השקה ל־20 העסקים הראשונים: {$launch} לחודש, לתמיד. מקלידים בדף התשלום את הקוד", payIntro: "הכרטיס מוכן. מוסיפים אמצעי תשלום ומקבלים מיד את ה־QR לקופה.",
     today: "היום", todayAmount: "{$0}", chargeOn: "החל מ־{d}", cancelNote: "מבטלים לפני כן בלחיצה, ולא משלמים כלום.",
     plan: "מנוי Perkly", price: "{$m}", per: "לחודש", noSetup: "14 ימי ניסיון חינם. החיוב הראשון רק אחרי 14 ימים, ואם מבטלים לפני כן לא משלמים כלום. בלי דמי הקמה.",
     planPick: "בחירת מסלול", planMonthly: "חודשי", planYearly: "שנתי", yearlyPrice: "{$y}", yearlyPer: "לשנה",
@@ -65,7 +65,7 @@ const T = {
     bizTitle: "نبدأ بالمشروع", branchName: "اسم الفرع", branchNamePh: "مثلاً: الفرع الرئيسي", branchAddress: "عنوان الفرع", branchAddressPh: "الشارع والرقم والمدينة", bizIntro: "اختاروا نوع المشروع واسمه ونجهّز لكم بطاقة جاهزة. التصميم النهائي مع شعاركم نجهّزه لكم نحن.",
     kind: "نوع المشروع", bizName: "اسم المشروع", reward: "المكافأة", target: "أختام للمكافأة", other: "آخر",
     preview: "هكذا يرى الزبائن البطاقة", createBiz: "إنشاء البطاقة",
-    payTitle: "14 يوماً مجاناً", payIntro: "البطاقة جاهزة. أضيفوا وسيلة دفع واحصلوا فوراً على رمز QR للصندوق.",
+    payTitle: "14 يوماً مجاناً", launchHint: "عرض الإطلاق لأول 20 مشروعاً: {$launch} شهرياً للأبد. اكتبوا في صفحة الدفع الرمز", payIntro: "البطاقة جاهزة. أضيفوا وسيلة دفع واحصلوا فوراً على رمز QR للصندوق.",
     today: "اليوم", todayAmount: "{$0}", chargeOn: "ابتداءً من {d}", cancelNote: "ألغوا قبل ذلك بنقرة ولن تدفعوا شيئاً.",
     plan: "اشتراك Perkly", price: "{$m}", per: "شهرياً", noSetup: "تجربة مجانية لمدة 14 يوماً. أول دفعة بعد 14 يوماً فقط، وإن ألغيتم قبل ذلك لا تدفعون شيئاً. بدون رسوم تأسيس.",
     planPick: "اختيار الخطة", planMonthly: "شهري", planYearly: "سنوي", yearlyPrice: "{$y}", yearlyPer: "سنوياً",
@@ -94,7 +94,7 @@ const T = {
     bizTitle: "Start with your business", branchName: "Branch name", branchNamePh: "e.g. Main branch", branchAddress: "Branch address", branchAddressPh: "Street, number and city", bizIntro: "Pick your type of business and a name, and we'll prepare a ready card. We'll make the final design, with your logo, for you.",
     kind: "Type of business", bizName: "Business name", reward: "Reward", target: "Stamps for a reward", other: "Other",
     preview: "What your customers will see", createBiz: "Create my card",
-    payTitle: "14 days free", payIntro: "Your card is ready. Add a payment method and get your QR code for the counter right away.",
+    payTitle: "14 days free", launchHint: "Launch offer for the first 20 businesses: {$launch} a month, for good. On the payment page, type the code", payIntro: "Your card is ready. Add a payment method and get your QR code for the counter right away.",
     today: "Today", todayAmount: "{$0}", chargeOn: "From {d}", cancelNote: "Cancel before then in one click and pay nothing.",
     plan: "Perkly subscription", price: "{$m}", per: "a month", noSetup: "14-day free trial. You're first charged after 14 days, and if you cancel before then you pay nothing. No setup fee.",
     planPick: "Choose a plan", planMonthly: "Monthly", planYearly: "Yearly", yearlyPrice: "{$y}", yearlyPer: "a year",
@@ -372,6 +372,7 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
               ) : (
                 <>
                   <p className="lp-body">{t.payIntro}</p>
+                  {currency === "ILS" && <p className="su-kit st-launch">{t.launchHint} <strong dir="ltr">{LAUNCH.code}</strong></p>}
                   {yearlyOn && (
                     <div className="st-plan-pick" role="group" aria-label={t.planPick}>
                       {(["monthly", "yearly"] as const).map((p) => (

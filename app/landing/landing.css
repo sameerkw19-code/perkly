@@ -568,3 +568,10 @@ details.st-glossary dl { margin: 10px 0 0; }
 /* The monthly price before the discount, struck through */
 .lp-was-line { margin: 0 0 -6px; font-size: 22px; font-weight: 700; color: #8a8797; line-height: 1.2; }
 .lp-was-line s { text-decoration-thickness: 2px; }
+
+/* Launch offer above the pricing cards (Israel) */
+.lp-launch { display: flex; align-items: center; justify-content: center; gap: 12px 16px; flex-wrap: wrap; background: #fff8e1; border: 1px solid #f5d98a; border-radius: 18px; padding: 14px 18px; margin: 18px auto 0; max-width: 900px; text-align: center; }
+.lp-launch p { margin: 0; font-weight: 600; color: #3b2a00; }
+.lp-launch-code { display: inline-flex; align-items: center; gap: 10px; border: 2px dashed #d9a400; background: #fff; border-radius: 12px; padding: 8px 14px; cursor: pointer; font: inherit; }
+.lp-launch-code strong { font-family: "Rubik", system-ui, sans-serif; letter-spacing: 1px; color: #1b1530; }
+.lp-launch-code span { font-size: 13px; color: #6a4de3; font-weight: 700; }
