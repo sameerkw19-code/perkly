@@ -59,6 +59,9 @@
         "GOOGLE_WALLET_CLASS_ID": "3388000000023227862.3388000000023227862.perkly_loyalty",
         // Polar yearly product (999 ILS a year, counter kit included). Not secret.
         "POLAR_PRODUCT_ID_YEARLY": "5d23ccad-acfa-4617-9ee9-cb8059260c80",
+        // Polar monthly product for businesses abroad ($29 a month; it also carries a 99 ILS price, because ILS is
+        // the account's default currency). Not secret. The checkout asks for USD explicitly.
+        "POLAR_PRODUCT_ID_USD": "90ddc69e-5cad-4680-a63f-489ed5db2cfa",
         // Apple Wallet pass type and team. Not secret; the signing key is the APPLE_PASS_KEY secret.
         "APPLE_PASS_TYPE_ID": "pass.shop.perkly.loyalty",
         "APPLE_TEAM_ID": "MR969J2QHG",

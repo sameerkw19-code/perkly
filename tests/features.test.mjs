@@ -596,3 +596,17 @@ test("perkly social: every language has valid accounts and its own links page", 
     assert.ok(existsSync(new URL(`../app${LINKS_PATH[lang]}/page.tsx`, import.meta.url)), LINKS_PATH[lang]);
   }
 });
+
+test("polar: dollar businesses get the dollar product and the checkout names the currency", async () => {
+  const { productsFor, yearlyConfigured } = await import("../lib/server/polar.ts");
+  const env = { POLAR_ACCESS_TOKEN: "t", POLAR_WEBHOOK_SECRET: "s", POLAR_PRODUCT_ID: "ils-m", POLAR_PRODUCT_ID_YEARLY: "ils-y", POLAR_PRODUCT_ID_USD: "usd-m" };
+  assert.deepEqual(productsFor(env, "USD"), { monthly: "usd-m", yearly: undefined, charge: "usd" });
+  assert.deepEqual(productsFor(env, "ILS"), { monthly: "ils-m", yearly: "ils-y", charge: "ils" });
+  // No dollar product set: back to the shekel ones, charged in shekels.
+  assert.equal(productsFor({ ...env, POLAR_PRODUCT_ID_USD: undefined }, "USD").charge, "ils");
+  // No yearly dollar product yet: abroad, only monthly is offered.
+  assert.equal(yearlyConfigured(env, "USD"), false);
+  assert.equal(yearlyConfigured(env, "ILS"), true);
+  assert.match(readFileSync(new URL("../lib/server/polar.ts", import.meta.url), "utf8"), /products\.charge === "usd" \? \{ currency: "usd" \}/);
+  assert.match(readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8"), /"POLAR_PRODUCT_ID_USD": "90ddc69e-5cad-4680-a63f-489ed5db2cfa"/);
+});
