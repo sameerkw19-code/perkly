@@ -314,7 +314,9 @@ test("yearly plan: the same price and the kit in every text that sells it", () =
   assert.equal(yearlySaving("USD"), 17);
   assert.match(read("app/landing/landing-client.tsx"), /plan=yearly/);
   assert.match(read("app/terms/page.tsx"), /מנוי שנתי: 999 ₪ לשנה.*ערכת קופה/);
-  assert.match(read("app/terms/terms-en.tsx"), /Yearly subscription: \{m\(p\.yearly\)\}.*counter kit/);
+  // Abroad (English terms, dollars): monthly only, no counter kit.
+  assert.match(read("app/terms/terms-en.tsx"), /Subscription: \{m\(p\.monthly\)\} a month/);
+  assert.doesNotMatch(read("app/terms/terms-en.tsx"), /kit|[Yy]early/);
   assert.match(read("app/start/start-flow.tsx"), /yearlyPrice: "\{\$y\}"/);
   assert.match(read("app/billing/billing-view.tsx"), /\{\$y\} לשנה/);
   assert.ok(existsSync(new URL("../drizzle/0023_counter_kit.sql", import.meta.url)));
@@ -609,4 +611,20 @@ test("polar: dollar businesses get the dollar product and the checkout names the
   assert.equal(yearlyConfigured(env, "ILS"), true);
   assert.match(readFileSync(new URL("../lib/server/polar.ts", import.meta.url), "utf8"), /products\.charge === "usd" \? \{ currency: "usd" \}/);
   assert.match(readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8"), /"POLAR_PRODUCT_ID_USD": "90ddc69e-5cad-4680-a63f-489ed5db2cfa"/);
+});
+
+test("abroad: no counter kit and no yearly plan on the landing page or the contact form", () => {
+  const content = readFileSync(new URL("../app/landing/content.ts", import.meta.url), "utf8");
+  assert.match(content, /export function kitOffered\(currency: Currency\): boolean \{\n  return currency === "ILS";/);
+  assert.match(content, /kitOffered\(currency\) \? RAW\[lang\] : abroad\(RAW\[lang\], lang\)/);
+  const abroadFaq = content.slice(content.indexOf("const ABROAD_FAQ"), content.indexOf("function abroad("));
+  assert.match(abroadFaq, /"Do I need to buy equipment\?"/);
+  assert.match(abroadFaq, /"How much does it cost\?"/);
+  assert.doesNotMatch(abroadFaq.replace(/"[^"]*\?":/g, ""), /kit|yearly/i);
+  // The questions they replace exist word for word in the English FAQ.
+  for (const q of ["Do I need to buy equipment?", "How much does it cost?"]) assert.ok(content.includes(`{ q: "${q}"`), q);
+  const plans = readFileSync(new URL("../app/landing/landing-client.tsx", import.meta.url), "utf8");
+  assert.match(plans, /withYearly && children/);
+  assert.match(plans, /\{withYearly && <div className="lp-cycle">/);
+  assert.match(readFileSync(new URL("../app/contact/contact-form.tsx", import.meta.url), "utf8"), /!region\.intl && <label className="su-check su-kit">/);
 });

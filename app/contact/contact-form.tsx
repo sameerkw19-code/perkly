@@ -251,7 +251,8 @@ export default function ContactForm() {
                 <label className="su-field"><span>{t.city} <span className="su-opt">{t.optional}</span></span><input name="city" autoComplete="address-level2" maxLength={60} /></label>
               </div>
               <label className="su-field"><span>{t.note} <span className="su-opt">{t.optional}</span></span><textarea name="note" rows={3} maxLength={500} /></label>
-              <label className="su-check su-kit"><input type="checkbox" name="kit" /><span>{t.kit}</span></label>
+              {/* The counter kit is shipped from Israel: not offered abroad. */}
+              {!region.intl && <label className="su-check su-kit"><input type="checkbox" name="kit" /><span>{t.kit}</span></label>}
               <div className="su-checks">
                 <label className="su-check">
                   <input id="su-privacy" type="checkbox" name="privacy" required {...aria("privacy")} />
