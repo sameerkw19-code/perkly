@@ -1,15 +1,26 @@
 "use client";
 import { useState } from "react";
-import { ArrowRight, LogOut, Trash2, UserRound } from "lucide-react";
+import { ArrowRight, KeyRound, LogOut, Trash2, UserRound } from "lucide-react";
 import { errorText, useLang } from "../../lib/i18n";
 import { post } from "../../lib/api";
 import { LangSwitch } from "../../components/lang-switch";
 import { Brand } from "../../components/brand";
 
-export default function AccountView({ name, email }: { name: string; email: string }) {
+export default function AccountView({ name, email, staffIn = [] }: { name: string; email: string; staffIn?: { id: string; name: string }[] }) {
   const { lang, setLang, t, dir } = useLang();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [codes, setCodes] = useState<Record<string, string>>({});
+
+  async function newCode(business: string) {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    const r = await post("/api/auth", { action: "new_worker_code", business });
+    if (r.ok) setCodes((c) => ({ ...c, [business]: r.data.workerCode }));
+    else setError(errorText(lang, r.code));
+    setBusy(false);
+  }
 
   async function signOutEverywhere() {
     if (!window.confirm(t("signOutAllConfirm"))) return;
@@ -44,6 +55,19 @@ export default function AccountView({ name, email }: { name: string; email: stri
         <span className="modal-icon"><UserRound /></span>
         <h1>{t("accountTitle")}</h1>
         <p><strong>{name}</strong><br /><span dir="ltr">{email}</span></p>
+
+        {staffIn.length > 0 && (
+          <section aria-labelledby="sec-worker">
+            <h2 id="sec-worker">{t("workerCode")}</h2>
+            <p className="form-hint">{t("workerCodeAccountHint")}</p>
+            {staffIn.map((b) => (
+              <div key={b.id} className="invite-row">
+                <span><strong>{b.name}</strong>{codes[b.id] && <span className="worker-code small" dir="ltr">{codes[b.id]}</span>}</span>
+                <button type="button" className="btn soft small" disabled={busy} onClick={() => newCode(b.id)}><KeyRound size={14} />{t("workerCodeNew")}</button>
+              </div>
+            ))}
+          </section>
+        )}
 
         <section aria-labelledby="sec-devices">
           <h2 id="sec-devices">{t("accountDevices")}</h2>

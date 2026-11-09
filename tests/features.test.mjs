@@ -660,3 +660,18 @@ test("owners get reports, customers and the station; Perkly manages the rest", (
   // The sign-up no longer saves a design itself: the server builds the starting card.
   assert.doesNotMatch(readFileSync(new URL("../app/start/start-flow.tsx", import.meta.url), "utf8"), /save_design|publish_design/);
 });
+
+test("worker code: 8 digits, hashed, never for owners; branches carry an address", () => {
+  const wc = readFileSync(new URL("../lib/server/worker-code.ts", import.meta.url), "utf8");
+  assert.match(wc, /WORKER_CODE_LENGTH = 8/);
+  assert.match(wc, /sha256\("worker-code:" \+ code\)/);
+  const auth = readFileSync(new URL("../app/api/auth/route.ts", import.meta.url), "utf8");
+  const login = auth.slice(auth.indexOf('case "worker_login"'), auth.indexOf('case "new_worker_code"'));
+  assert.match(login, /limited\(db, failKey, 10, 900\)/);
+  assert.match(login, /limited\(db, "worker-fail", 300, 3600\)/);
+  assert.match(login, /ownsAnyBusiness\(db, row\.user\)/);
+  const mig = readFileSync(new URL("../drizzle/0027_worker_code_branches.sql", import.meta.url), "utf8");
+  assert.match(mig, /CREATE UNIQUE INDEX memberships_worker_code/);
+  assert.match(mig, /ALTER TABLE branches ADD COLUMN address TEXT/);
+  assert.match(mig, /INSERT INTO branches\(id, business, name, created\)/);
+});

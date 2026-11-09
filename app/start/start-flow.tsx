@@ -33,7 +33,7 @@ const T = {
     name: "השם שלך", email: "אימייל", password: "סיסמה", passwordHint: "לפחות 8 תווים", code: "קוד הרשמה",
     agree: "בהמשך אני מאשר/ת את", terms: "תנאי השימוש", and: "ואת", privacy: "מדיניות הפרטיות",
     next: "המשך", working: "רגע…",
-    bizTitle: "מתחילים מהעסק", bizIntro: "בוחרים סוג עסק ושם, ואנחנו מכינים כרטיס מוכן. את העיצוב הסופי, עם הלוגו שלכם, נכין לכם אנחנו.",
+    bizTitle: "מתחילים מהעסק", branchName: "שם הסניף", branchNamePh: "למשל: סניף מרכז", branchAddress: "כתובת הסניף", branchAddressPh: "רחוב, מספר ועיר", bizIntro: "בוחרים סוג עסק ושם, ואנחנו מכינים כרטיס מוכן. את העיצוב הסופי, עם הלוגו שלכם, נכין לכם אנחנו.",
     kind: "סוג העסק", bizName: "שם העסק", reward: "ההטבה", target: "חותמות להטבה", other: "אחר",
     preview: "כך הלקוחות יראו את הכרטיס", createBiz: "יצירת הכרטיס",
     payTitle: "14 ימים חינם", payIntro: "הכרטיס מוכן. מוסיפים אמצעי תשלום ומקבלים מיד את ה־QR לקופה.",
@@ -62,7 +62,7 @@ const T = {
     name: "اسمك", email: "البريد الإلكتروني", password: "كلمة المرور", passwordHint: "8 أحرف على الأقل", code: "رمز التسجيل",
     agree: "بالمتابعة أوافق على", terms: "شروط الاستخدام", and: "و", privacy: "سياسة الخصوصية",
     next: "متابعة", working: "لحظة…",
-    bizTitle: "نبدأ بالمشروع", bizIntro: "اختاروا نوع المشروع واسمه ونجهّز لكم بطاقة جاهزة. التصميم النهائي مع شعاركم نجهّزه لكم نحن.",
+    bizTitle: "نبدأ بالمشروع", branchName: "اسم الفرع", branchNamePh: "مثلاً: الفرع الرئيسي", branchAddress: "عنوان الفرع", branchAddressPh: "الشارع والرقم والمدينة", bizIntro: "اختاروا نوع المشروع واسمه ونجهّز لكم بطاقة جاهزة. التصميم النهائي مع شعاركم نجهّزه لكم نحن.",
     kind: "نوع المشروع", bizName: "اسم المشروع", reward: "المكافأة", target: "أختام للمكافأة", other: "آخر",
     preview: "هكذا يرى الزبائن البطاقة", createBiz: "إنشاء البطاقة",
     payTitle: "14 يوماً مجاناً", payIntro: "البطاقة جاهزة. أضيفوا وسيلة دفع واحصلوا فوراً على رمز QR للصندوق.",
@@ -91,7 +91,7 @@ const T = {
     name: "Your name", email: "Email", password: "Password", passwordHint: "At least 8 characters", code: "Sign-up code",
     agree: "By continuing I accept the", terms: "terms of use", and: "and the", privacy: "privacy policy",
     next: "Continue", working: "One moment…",
-    bizTitle: "Start with your business", bizIntro: "Pick your type of business and a name, and we'll prepare a ready card. We'll make the final design, with your logo, for you.",
+    bizTitle: "Start with your business", branchName: "Branch name", branchNamePh: "e.g. Main branch", branchAddress: "Branch address", branchAddressPh: "Street, number and city", bizIntro: "Pick your type of business and a name, and we'll prepare a ready card. We'll make the final design, with your logo, for you.",
     kind: "Type of business", bizName: "Business name", reward: "Reward", target: "Stamps for a reward", other: "Other",
     preview: "What your customers will see", createBiz: "Create my card",
     payTitle: "14 days free", payIntro: "Your card is ready. Add a payment method and get your QR code for the counter right away.",
@@ -162,6 +162,9 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
   const [kind, setKind] = useState<Kind>("cafe");
   const ex = kind === "other" ? null : examples.find((e) => e.key === kind)!;
   const [bizName, setBizName] = useState("");
+  // Every business works by branches: the first branch's name and address.
+  const [branchName, setBranchName] = useState("");
+  const [branchAddress, setBranchAddress] = useState("");
   const [reward, setReward] = useState("");
   const [rewardEdited, setRewardEdited] = useState(false);
   const [target, setTarget] = useState(10);
@@ -218,7 +221,7 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
     const name = bizName.trim();
     const rewardText = shownReward.trim();
     // The server builds the starting card for this type of business (later changes go through Perkly).
-    const created = await post<{ id: string }>("/api/loyalty", { action: "create_business", name, reward: rewardText, target, color: design.colors.bg, rewardMode: "bank", kind, lang });
+    const created = await post<{ id: string }>("/api/loyalty", { action: "create_business", name, reward: rewardText, target, color: design.colors.bg, rewardMode: "bank", kind, lang, branchName: branchName.trim() || name, branchAddress: branchAddress.trim() });
     if (!created.ok) { setError(errorText(lang, created.code)); return false; }
     const id = created.data.id;
     setBusiness({ id, name, joinCode: null, paid: false, canWork: false, status: "none" });
@@ -333,6 +336,10 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
                 ))}
               </fieldset>
               <label className="su-field">{t.bizName}<input value={bizName} onChange={(e) => setBizName(e.target.value)} required maxLength={40} placeholder={ex?.name ?? ""} autoComplete="organization" /></label>
+              <div className="su-row">
+                <label className="su-field">{t.branchName}<input value={branchName} onChange={(e) => setBranchName(e.target.value)} maxLength={60} placeholder={t.branchNamePh} /></label>
+                <label className="su-field">{t.branchAddress}<input value={branchAddress} onChange={(e) => setBranchAddress(e.target.value)} required maxLength={160} placeholder={t.branchAddressPh} autoComplete="street-address" /></label>
+              </div>
               <div className="su-row">
                 <label className="su-field">{t.reward}<input value={shownReward} onChange={(e) => { setRewardEdited(true); setReward(e.target.value); }} required maxLength={80} /></label>
                 <label className="su-field">{t.target}

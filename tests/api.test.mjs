@@ -406,7 +406,10 @@ test("branches: required once they exist, staff locked to their branch, reports 
   const biz = (await owner.post("/api/loyalty", { action: "create_business", name: "Chain", reward: "Free", target: 5, color: "#123456", rewardMode: "block" })).body.id;
   const cust = (await owner.act(biz, "register_customer", { name: "Lea", phone: "0531234567" })).body.id;
 
-  // Without branches, actions work without one.
+  // Every business starts with one branch (named after it); with one branch, actions use it automatically.
+  const first = (await owner.get(`/api/loyalty?business=${biz}`)).body.branches;
+  assert.equal(first.length, 1);
+  assert.equal(first[0].name, "Chain");
   assert.equal((await owner.act(biz, "stamp", { customer: cust, requestId: id() })).status, 200);
 
   const north = (await admin.act(biz, "create_branch", { name: "North" })).body.id;
@@ -426,7 +429,7 @@ test("branches: required once they exist, staff locked to their branch, reports 
 
   const view = (await owner.get(`/api/loyalty?business=${biz}&days=all`)).body;
   const byName = Object.fromEntries(view.perBranch.map((r) => [r.branch_name ?? "none", r.stamps]));
-  assert.deepEqual(byName, { North: 1, South: 1, none: 1 });
+  assert.deepEqual(byName, { Chain: 1, North: 1, South: 1 });
   const onlyNorth = (await owner.get(`/api/loyalty?business=${biz}&days=all&branch=${north}`)).body;
   assert.equal(onlyNorth.stats.stamps, 1);
   assert.ok(onlyNorth.events.every((e) => e.branch_name === "North"));
@@ -735,4 +738,44 @@ test("Perkly manages the card, settings and team; the owner gets reports, custom
   // Another owner still cannot open it.
   const stranger = await ownerB.get(`/api/loyalty?business=${biz}`);
   assert.notEqual(stranger.body?.business?.id, biz);
+});
+
+test("staff link: one link per worker, tied to a branch; worker code sign-in", async () => {
+  const o = new Client();
+  await signup(o, "linkowner");
+  const biz = (await o.post("/api/loyalty", { action: "create_business", name: "Linked", reward: "Free", target: 5, color: "#123456", branchName: "Center", branchAddress: "1 Main St, Haifa" })).body.id;
+  const branches = (await o.get(`/api/loyalty?business=${biz}`)).body.branches;
+  assert.deepEqual(branches.map((b) => [b.name, b.address]), [["Center", "1 Main St, Haifa"]]);
+  // One branch: the link needs no choice, and the worker lands in that branch.
+  const link = await o.act(biz, "staff_link", { label: "Dan" });
+  assert.equal(link.status, 200, JSON.stringify(link.body));
+  const token = new URL(link.body.inviteUrl).pathname.split("/").pop();
+  const w = new Client();
+  const joined = await w.post("/api/auth", { action: "accept_invite", token, name: "Dan", email: `dan-${run}@test.perkly`, password: "dan pass 123" });
+  assert.equal(joined.status, 200, JSON.stringify(joined.body));
+  assert.match(joined.body.workerCode, /^\d{4} \d{4}$/);
+  assert.equal((await w.get(`/api/loyalty?business=${biz}`)).body.myBranch, branches[0].id);
+  // The link works once.
+  assert.equal((await new Client().post("/api/auth", { action: "accept_invite", token, name: "Eve", email: `eve2-${run}@test.perkly`, password: "eve pass 123" })).status, 404);
+  // Signing in at the counter with the code.
+  const counter = new Client();
+  const good = await counter.post("/api/auth", { action: "worker_login", code: joined.body.workerCode });
+  assert.equal(good.status, 200, JSON.stringify(good.body));
+  assert.equal(good.body.business, biz);
+  assert.equal((await counter.get(`/api/loyalty?business=${biz}`)).body.role, "staff");
+  assert.equal((await new Client().post("/api/auth", { action: "worker_login", code: "0000 0000" })).body.code, "bad_worker_code");
+  // A new code replaces the old one.
+  const fresh = await w.post("/api/auth", { action: "new_worker_code", business: biz });
+  assert.equal(fresh.status, 200);
+  assert.equal((await new Client().post("/api/auth", { action: "worker_login", code: joined.body.workerCode })).status, 401, "the old code stops working");
+  assert.equal((await new Client().post("/api/auth", { action: "worker_login", code: fresh.body.workerCode })).status, 200);
+  // Owners never get or use a worker code.
+  assert.equal((await o.post("/api/auth", { action: "new_worker_code", business: biz })).body.code, "worker_code_owner");
+  // Several branches: the owner must pick the worker's branch.
+  const north = (await admin.act(biz, "create_branch", { name: "North", address: "2 North Rd" })).body.id;
+  assert.equal((await o.act(biz, "staff_link", {})).body.code, "branch_required");
+  assert.equal((await o.act(biz, "staff_link", { branch: north })).status, 200);
+  // Staff cannot send links, and removing workers stays with Perkly.
+  assert.equal((await w.act(biz, "staff_link", {})).status, 403);
+  assert.equal((await o.act(biz, "revoke_member", { user: "x" })).body.code, "admin_only");
 });

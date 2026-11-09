@@ -35,7 +35,7 @@ type Data = {
   googleWallet?: boolean;
   system?: { maintenance: boolean; maintenanceMessage: string; announcement: string; signupsOpen?: boolean };
   memberships: { business: string; role: Role; businessName: string; branch: string | null }[];
-  branches?: { id: string; name: string }[];
+  branches?: { id: string; name: string; address?: string | null }[];
   myBranch?: string | null;
   branchFilter?: string;
   perBranch?: { branch: string | null; branch_name: string | null; stamps: number; redemptions: number }[];
@@ -56,6 +56,7 @@ type Data = {
 };
 type Modal =
   | { type: "customer" }
+  | { type: "staffLink" }
   | { type: "business" }
   | { type: "link"; url: string; title: string; note?: string }
   | { type: "correct"; customer: any }
@@ -370,18 +371,19 @@ export default function Dashboard() {
               <div className="page-head">
                 <div><h1>{t("repTitle")}</h1><p className="muted">{t("repSubtitle")}</p></div>
                 <div className="head-actions">
-                  {!!data.branches?.length && (
+                  {(data.branches?.length ?? 0) > 1 && (
                     <select aria-label={t("branch")} value={branchView} onChange={(e) => setBranchView(e.target.value)}>
                       <option value="">{t("allBranches")}</option>
-                      {data.branches.map((br) => <option key={br.id} value={br.id}>{br.name}</option>)}
+                      {(data.branches ?? []).map((br) => <option key={br.id} value={br.id}>{br.name}</option>)}
                     </select>
                   )}
                   <button className="btn primary" onClick={() => setModal({ type: "customer" })}><Plus size={18} />{t("newCustomer")}</button>
                   <button className="btn soft" onClick={() => { setView("station"); setQuery(""); }}><ScanLine size={18} />{t("station")}</button>
+                  <button className="btn soft" onClick={() => setModal({ type: "staffLink" })}><UserPlus size={18} />{t("staffLinkButton")}</button>
                 </div>
               </div>
               {!!data.alerts?.length && <Alerts alerts={data.alerts} t={t} />}
-              {data.summary && <Summary summary={data.summary} totals={{ customers: data.stats!.customers, ready: data.stats!.rewards_ready }} breakdown={data.breakdown} hasBranches={!!data.branches?.length} t={t} />}
+              {data.summary && <Summary summary={data.summary} totals={{ customers: data.stats!.customers, ready: data.stats!.rewards_ready }} breakdown={data.breakdown} hasBranches={(data.branches?.length ?? 0) > 1} t={t} />}
               <section className="overview-grid">
                 <div className="panel card-panel join-panel">
                   <div className="section-head"><h2><QrCode size={18} /> {t("joinQr")}</h2></div>
@@ -506,7 +508,7 @@ export default function Dashboard() {
 
           {view === "station" && (
             <Station key={b.id} business={b} design={data.design!} branches={data.branches ?? []} myBranch={isOwner ? null : data.myBranch ?? null} canFix={isOwner || !!b.staff_adjust} owner={isOwner} t={t} lang={lang} initial={stationPick} onDone={() => load()} notify={notify}
-              onRegister={() => setModal({ type: "customer" })} myRecent={data.myRecent} />
+              onRegister={() => setModal({ type: "customer" })} onStaffLink={isOwner ? () => setModal({ type: "staffLink" }) : undefined} myRecent={data.myRecent} />
           )}
 
           {view === "design" && isOwner && manage && data.editor && (
@@ -583,6 +585,32 @@ export default function Dashboard() {
                 <p className="form-hint">{t("privacy")} {t("phoneNotVerified")}</p>
                 <div className="form-actions">
                   <button className="btn primary" disabled={busy}>{t("save")}</button>
+                  <button type="button" className="btn soft" onClick={() => setModal(null)}>{t("cancel")}</button>
+                </div>
+              </form>
+            )}
+
+            {modal.type === "staffLink" && (
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                const form = new FormData(e.currentTarget);
+                const r = await call({ action: "staff_link", label: form.get("label") || "", branch: form.get("branch") || undefined });
+                if (r) setModal({ type: "link", url: r.inviteUrl, title: t("staffLinkTitle"), note: t("staffLinkNote") });
+              }}>
+                <span className="modal-icon"><UserPlus /></span>
+                <h2>{t("staffLinkTitle")}</h2>
+                <p className="form-hint">{t("staffLinkIntro")}</p>
+                <label>{t("staffLinkName")}<input name="label" maxLength={60} autoFocus /></label>
+                {(data.branches?.length ?? 0) > 1 && (
+                  <label>{t("staffBranch")}
+                    <select name="branch" required defaultValue="">
+                      <option value="" disabled>{t("chooseBranch")}</option>
+                      {data.branches!.map((br) => <option key={br.id} value={br.id}>{br.name}{br.address ? ` · ${br.address}` : ""}</option>)}
+                    </select>
+                  </label>
+                )}
+                <div className="form-actions">
+                  <button className="btn primary" disabled={busy}><Share2 size={16} />{t("staffLinkCreate")}</button>
                   <button type="button" className="btn soft" onClick={() => setModal(null)}>{t("cancel")}</button>
                 </div>
               </form>
@@ -814,9 +842,9 @@ function BusinessForm({ t, busy, initial, submitLabel, onSubmit, onInvalid }: {
 
 // ---------- Staff station: scan or search, then confirm. The server is the source of truth. ----------
 
-function Station({ business, branches, myBranch, canFix, owner, t, lang, initial, onDone, notify, onRegister, myRecent }: {
+function Station({ business, branches, myBranch, canFix, owner, t, lang, initial, onDone, notify, onRegister, onStaffLink, myRecent }: {
   business: Business; design?: Design; branches: { id: string; name: string }[]; myBranch: string | null; canFix: boolean; owner: boolean; t: any; lang: any; initial: CardState | null; onDone: () => void;
-  notify: (s: string, bad?: boolean) => void; onRegister: () => void; myRecent?: any[];
+  notify: (s: string, bad?: boolean) => void; onRegister: () => void; onStaffLink?: () => void; myRecent?: any[];
 }) {
   const [selected, setSelected] = useState<CardState | null>(initial);
   const [query, setQuery] = useState("");
@@ -953,7 +981,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
 
   async function act(kind: "stamp" | "redeem") {
     if (!selected || busy) return;
-    if (branches.length && !myBranch && !branch) { notify(t("err_branch_required"), true); return; }
+    if (branches.length > 1 && !myBranch && !branch) { notify(t("err_branch_required"), true); return; }
     // Two taps instead of a browser confirm() box: some phones and home-screen apps block confirm() silently.
     if (kind === "redeem" && !redeemAsk) { setRedeemAsk(true); return; }
     setRedeemAsk(false);
@@ -992,7 +1020,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
     if (!selected || !fixing || busy) return;
     const delta = fixing.value - selected.stamps;
     if (!delta) { setFixing(null); return; }
-    if (branches.length && !myBranch && !branch) { notify(t("err_branch_required"), true); return; }
+    if (branches.length > 1 && !myBranch && !branch) { notify(t("err_branch_required"), true); return; }
     setBusy(true);
     const r = await post("/api/loyalty", {
       action: "adjust", business: business.id, customer: selected.id, delta, from: selected.stamps, note: fixing.note,
@@ -1008,8 +1036,9 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
   const greeting = hour >= 5 && hour < 12 ? t("sxMorning") : hour >= 12 && hour < 17 ? t("sxAfternoon") : t("sxEvening");
   const full = !!selected && selected.stamps >= selected.target; // "block" mode: redeem before stamping again
   const maxQty = business.reward_mode === "bank" ? 10 : Math.min(10, remaining);
-  const branchControl = fixedBranch ? <span className="pill branch-pill">{t("workingAt", { b: fixedBranch.name })}</span>
-    : branches.length > 0 && (
+  const onlyBranch = branches.length === 1 ? branches[0] : null;
+  const branchControl = fixedBranch || onlyBranch ? <span className="pill branch-pill">{t("workingAt", { b: (fixedBranch ?? onlyBranch)!.name })}</span>
+    : branches.length > 1 && (
       <select aria-label={t("branch")} value={branch} onChange={(e) => pickBranch(e.target.value)} className={branch ? "" : "needs-choice"}>
         <option value="">{t("chooseBranch")}</option>
         {branches.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
@@ -1086,6 +1115,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
             </div>
           )}
           <button className="btn primary big sx-wide sx-register" onClick={onRegister}><UserPlus size={18} />{t("sxRegister")}</button>
+          {onStaffLink && <button className="btn soft sx-wide" onClick={onStaffLink}><Share2 size={16} />{t("staffLinkButton")}</button>}
           {!!myRecent?.length && (
             <div className="sx-recent">
               <h2>{t("myRecent")}</h2>
@@ -1286,7 +1316,7 @@ function Team({ data, t, lang, busy, call, reload, showLink }: {
 // ---------- Branches (owner) ----------
 
 function Branches({ branches, t, busy, call, reload }: {
-  branches: { id: string; name: string }[]; t: any; busy: boolean; call: (b: Record<string, unknown>) => Promise<any>; reload: () => void;
+  branches: { id: string; name: string; address?: string | null }[]; t: any; busy: boolean; call: (b: Record<string, unknown>) => Promise<any>; reload: () => void;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
   return (
@@ -1299,15 +1329,17 @@ function Branches({ branches, t, busy, call, reload }: {
           {editing === br.id ? (
             <form className="inline-form" onSubmit={async (e) => {
               e.preventDefault();
-              if (await call({ action: "rename_branch", branch: br.id, name: new FormData(e.currentTarget).get("name") })) { setEditing(null); reload(); }
+              const f = new FormData(e.currentTarget);
+              if (await call({ action: "rename_branch", branch: br.id, name: f.get("name"), address: f.get("address") })) { setEditing(null); reload(); }
             }}>
               <input name="name" defaultValue={br.name} required maxLength={60} autoFocus aria-label={t("branchName")} />
+              <input name="address" defaultValue={br.address ?? ""} maxLength={160} placeholder={t("branchAddress")} aria-label={t("branchAddress")} />
               <button className="btn primary small" disabled={busy}>{t("save")}</button>
               <button type="button" className="btn soft small" onClick={() => setEditing(null)}>{t("cancel")}</button>
             </form>
           ) : (
             <>
-              <strong>{br.name}</strong>
+              <span><strong>{br.name}</strong><small className={br.address ? "" : "form-error"}>{br.address || t("branchNoAddress")}</small></span>
               <div className="row-actions">
                 <button className="btn soft small" onClick={() => setEditing(br.id)}>{t("rename")}</button>
                 <button className="btn soft small danger" disabled={busy} onClick={async () => {
@@ -1322,9 +1354,11 @@ function Branches({ branches, t, busy, call, reload }: {
       <form className="inline-form" style={{ marginTop: 14 }} onSubmit={async (e) => {
         e.preventDefault();
         const form = e.currentTarget;
-        if (await call({ action: "create_branch", name: new FormData(form).get("name") })) { form.reset(); reload(); }
+        const f = new FormData(form);
+        if (await call({ action: "create_branch", name: f.get("name"), address: f.get("address") })) { form.reset(); reload(); }
       }}>
         <input name="name" required maxLength={60} placeholder={t("branchName")} aria-label={t("branchName")} />
+        <input name="address" required maxLength={160} placeholder={t("branchAddress")} aria-label={t("branchAddress")} />
         <button className="btn primary small" disabled={busy}><Plus size={14} />{t("addBranch")}</button>
       </form>
     </section>

@@ -56,9 +56,9 @@ async function cardState(db: D1Database, c: Customer, mode: Business["reward_mod
   return { id: c.id, name: c.name, stamps: c.stamps, target: c.target, rewards, rewardReady: rewards > 0, nextExpiry: saved.nextExpiry, mode };
 }
 
-type Branch = { id: string; name: string };
+type Branch = { id: string; name: string; address: string | null };
 async function activeBranches(db: D1Database, businessId: string) {
-  return (await db.prepare("SELECT id, name FROM branches WHERE business = ? AND archived IS NULL ORDER BY created").bind(businessId).all<Branch>()).results;
+  return (await db.prepare("SELECT id, name, address FROM branches WHERE business = ? AND archived IS NULL ORDER BY created").bind(businessId).all<Branch>()).results;
 }
 
 /** A platform admin opening a business they are not a member of: owner permissions (plus the admin-only actions). */
@@ -330,6 +330,9 @@ export async function POST(request: Request) {
         .bind(crypto.randomUUID(), id, JSON.stringify(isKind(p.kind) ? startDesign(p.kind, name, reward, cardLang) : defaultDesign({ name, reward, color: p.color }, cardLang)), now, user.id),
       db.prepare("INSERT INTO memberships(id, business, user, role, created) VALUES(?, ?, ?, 'owner', ?)")
         .bind(crypto.randomUUID(), id, user.id, now),
+      // Every business starts with its first branch: a name (the business name when none is given) and an address.
+      db.prepare("INSERT INTO branches(id, business, name, address, created) VALUES(?, ?, ?, ?, ?)")
+        .bind(crypto.randomUUID(), id, str(p.branchName, 60) || name, str(p.branchAddress, 160) || null, now),
       // With "require subscription": a free trial, then a subscription is needed (status 'none' is not entitled).
       ...(sys.requireSubscription
         ? [
@@ -482,6 +485,8 @@ export async function POST(request: Request) {
       } else if (typeof p.branch === "string" && p.branch) {
         if (!list.some((b) => b.id === p.branch)) return fail("branch_invalid", 400, "Unknown branch");
         branch = p.branch;
+      } else if (list.length === 1) {
+        branch = list[0].id; // a single branch is always where it happened
       } else if (list.length) {
         return fail("branch_required", 400, "Choose a branch");
       }
@@ -645,6 +650,27 @@ export async function POST(request: Request) {
       return json({ inviteUrl: `${origin}/invite/${token}`, expires });
     }
 
+    // The owner sends a staff-station link to a worker's phone: it works once, for whoever opens it first,
+    // and lasts 3 days. The worker signs up with name, email and password and gets a personal worker code.
+    // (Removing a worker stays with Perkly.)
+    case "staff_link": {
+      const denied = ownerOnly(); if (denied) return denied;
+      if (!(await allow(db, `invite-create:${user.id}`, 30, 86_400))) return fail("rate_limited", 429);
+      const label = str(p.label, 60) || "";
+      // Workers belong to a branch: the owner picks it when there are several; a single branch is automatic.
+      const list = await activeBranches(db, business.id);
+      let branch: string | null = list.length === 1 ? list[0].id : null;
+      if (list.length > 1) {
+        if (typeof p.branch !== "string" || !list.some((b) => b.id === p.branch)) return fail("branch_required", 400, "Choose a branch");
+        branch = p.branch;
+      }
+      const token = randomToken(24);
+      const expires = new Date(Date.now() + 3 * 86_400_000).toISOString();
+      await db.prepare("INSERT INTO invites(id, business, role, label, created_by, created, expires, branch, email) VALUES(?, ?, 'staff', ?, ?, ?, ?, ?, NULL)")
+        .bind(await sha256(token), business.id, label, user.id, now, expires, branch).run();
+      return json({ inviteUrl: `${origin}/invite/${token}`, expires });
+    }
+
     case "revoke_invite": {
       const denied = adminOnly(); if (denied) return denied;
       await db.prepare("UPDATE invites SET revoked = ? WHERE id = ? AND business = ? AND used IS NULL").bind(now, p.invite ?? "", business.id).run();
@@ -729,10 +755,11 @@ export async function POST(request: Request) {
       const denied = adminOnly(); if (denied) return denied;
       const name = str(p.name, 60);
       if (!name) return fail("bad_details", 400);
+      const address = str(p.address, 160) || null;
       const count = await db.prepare("SELECT COUNT(*) AS n FROM branches WHERE business = ?").bind(business.id).first<{ n: number }>();
       if ((count?.n ?? 0) >= 50) return fail("rate_limited", 429, "Too many branches");
       const id = crypto.randomUUID();
-      await db.prepare("INSERT INTO branches(id, business, name, created) VALUES(?, ?, ?, ?)").bind(id, business.id, name, now).run();
+      await db.prepare("INSERT INTO branches(id, business, name, address, created) VALUES(?, ?, ?, ?, ?)").bind(id, business.id, name, address, now).run();
       return json({ id });
     }
 
@@ -740,7 +767,8 @@ export async function POST(request: Request) {
       const denied = adminOnly(); if (denied) return denied;
       const name = str(p.name, 60);
       if (!name) return fail("bad_details", 400);
-      const r = await db.prepare("UPDATE branches SET name = ? WHERE id = ? AND business = ? AND archived IS NULL").bind(name, p.branch ?? "", business.id).run();
+      const address = str(p.address, 160) || null;
+      const r = await db.prepare("UPDATE branches SET name = ?, address = ? WHERE id = ? AND business = ? AND archived IS NULL").bind(name, address, p.branch ?? "", business.id).run();
       return r.meta.changes ? json({ ok: true }) : fail("branch_invalid", 404);
     }
 
