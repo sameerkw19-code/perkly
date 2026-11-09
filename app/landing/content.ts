@@ -539,7 +539,7 @@ const en: Copy = {
       { q: "Do I need to buy equipment?", a: "No. The staff station runs in the browser of any phone or tablet with a camera. You can print the QR code yourself or order a counter kit." },
       { q: "How do you prevent unearned stamps?", a: "Each staff member has a personal login, and every action is logged with their name. The system flags unusual activity, and the owner can remove a staff member's access immediately." },
       { q: "What happens when the card is full?", a: "The reward is ready. You choose whether it's redeemed right away, or saved while the customer keeps collecting on a new card. You can also set an expiry for rewards." },
-      { q: "How much does it cost?", a: "{$m} a month, no setup fee, with a 14-day free trial. You can also start without a subscription: up to 10 customers, with the ready designs, colors and icons. Your logo, a background image and a stamp from your own image come with a subscription. The counter kit is an optional one-time add-on for {$m}. There's also a yearly plan: {$y} a year, with the counter kit included." },
+      { q: "How much does it cost?", a: "{$m} a month, no setup fee, with a 14-day free trial. You can also start without a subscription: up to 10 customers, with the ready designs, colors and icons. Your logo, a background image and a stamp from your own image come with a subscription. The counter kit is an optional one-time add-on for {$k}. There's also a yearly plan: {$y} a year, with the counter kit included." },
       { q: "Does it work with Apple Wallet and Google Wallet?", a: "Google Wallet, yes: Android customers add the card to their wallet and it updates by itself with every stamp. Apple Wallet is in development; on iPhone the card opens from its personal link or a home screen shortcut." },
       { q: "How do I get started?", a: "Open an account, design your card and add a payment card. You get a QR code to print and start right away. The first 14 days are free, then {$m} a month. Cancel anytime." },
     ],
@@ -569,10 +569,29 @@ export type { Copy };
 
 /** Texts with prices for one market (lib/pricing.ts), made once per language and currency. */
 const filled = new Map<string, Copy>();
+// Abroad (dollar prices) there is no counter kit (it is shipped from Israel) and, for now, no yearly plan:
+// these answers replace the ones that mention them. The site abroad is English only.
+const ABROAD_FAQ: Partial<Record<Lang, Record<string, string>>> = {
+  en: {
+    "Do I need to buy equipment?": "No. The staff station runs in the browser of any phone or tablet with a camera. You print the QR code sign yourself, straight from the dashboard.",
+    "How much does it cost?": "{$m} a month, no setup fee, with a 14-day free trial. You can also start without a subscription: up to 10 customers, with the ready designs, colors and icons. Your logo, a background image and a stamp from your own image come with a subscription.",
+  },
+};
+function abroad(c: Copy, lang: Lang): Copy {
+  const answers = ABROAD_FAQ[lang];
+  if (!answers) return c;
+  return { ...c, faq: { ...c.faq, items: c.faq.items.map((it) => (answers[it.q] ? { ...it, a: answers[it.q] } : it)) } };
+}
+
+/** Whether the counter kit and the yearly plan are sold in this currency (only in Israel for now). */
+export function kitOffered(currency: Currency): boolean {
+  return currency === "ILS";
+}
+
 export function copyFor(lang: Lang, currency: Currency): Copy {
   const key = `${lang}:${currency}`;
   let c = filled.get(key);
-  if (!c) { c = withPrices(RAW[lang], currency, lang); filled.set(key, c); }
+  if (!c) { c = withPrices(kitOffered(currency) ? RAW[lang] : abroad(RAW[lang], lang), currency, lang); filled.set(key, c); }
   return c;
 }
 /** Shekel prices (Israel). Components that show prices use copyFor with the visitor's currency. */

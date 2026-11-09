@@ -42,11 +42,9 @@ export default function TermsEn() {
       <h2>5. Price and payment</h2>
       <ul>
         <li>Subscription: {m(p.monthly)} a month, no setup fee.</li>
-        <li>Yearly subscription: {m(p.yearly)} a year, no setup fee. A counter kit (2 posters and a QR stand) is included and shipped after the first charge. Cancelling takes effect at the end of the paid year.</li>
-        <li>Counter kit (2 posters and a QR stand): {m(p.kit)} one-time, optional, also without a subscription.</li>
         <li>Without a subscription the service can be used for up to 10 customers, with the ready-made designs, colors and icons. Adding more customers, or uploading a logo, background image or stamp from an image, needs a subscription.</li>
         <li>A new subscription comes with a 14-day free trial. Card details are given at the start of the trial, and the first charge is made when the 14 days end. Cancelling before the trial ends costs nothing.</li>
-        <li>Subscription payments are handled by Polar, the official seller (Merchant of Record), and renew at the end of each period (month or year, by plan) until cancelled.</li>
+        <li>Subscription payments are handled by Polar, the official seller (Merchant of Record), and renew every month until cancelled.</li>
         <li>You can cancel at any time. Cancellation takes effect at the end of the current billing period.</li>
         <li>If the subscription is not active, you can still view your data and redeem rewards already earned, but you cannot add stamps or new customers.</li>
         <li>We will notify business owners of any price change at least 30 days in advance.</li>

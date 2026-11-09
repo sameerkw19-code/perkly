@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-html-link-for-pages -- plain links on purpose: client-side navigation breaks on this server */
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { COPY, hrefs, type Lang, copyFor } from "./content";
+import { COPY, hrefs, type Lang, copyFor, kitOffered } from "./content";
 import type { Currency } from "../../lib/pricing";
 import { useRegion } from "../../components/region-context";
 import { Icon } from "./visuals";
@@ -334,11 +334,13 @@ export function PricingPlans({ lang, currency = "ILS", children }: { lang: Lang;
   const c = copyFor(lang, currency).pricing;
   const h = hrefs(lang);
   const [cycle, setCycle] = useState<"monthly" | "yearly">("monthly");
-  const yearly = cycle === "yearly";
+  // Abroad only the monthly plan is sold (no yearly plan and no counter kit there yet).
+  const withYearly = kitOffered(currency);
+  const yearly = withYearly && cycle === "yearly";
   const signupYearly = h.signup + (h.signup.includes("?") ? "&" : "?") + "plan=yearly";
   return (
-    <div className="lp-plans" data-cycle={cycle}>
-      <div className="lp-cycle">
+    <div className="lp-plans" data-cycle={yearly ? "yearly" : "monthly"}>
+      {withYearly && <div className="lp-cycle">
         <div className="lp-cycle-switch" role="group" aria-label={c.cycle.label}>
           {(["monthly", "yearly"] as const).map((k) => (
             <button key={k} type="button" aria-pressed={cycle === k} className={cycle === k ? "is-on" : ""} onClick={() => setCycle(k)}>
@@ -347,8 +349,8 @@ export function PricingPlans({ lang, currency = "ILS", children }: { lang: Lang;
           ))}
         </div>
         <span className="lp-cycle-save"><Icon name="gift" size={16} stroke={2.2} />{c.cycle.save}</span>
-      </div>
-      <div className="lp-pricing lp-pricing-3">
+      </div>}
+      <div className={withYearly ? "lp-pricing lp-pricing-3" : "lp-pricing lp-pricing-3 lp-pricing-two"}>
         <article className="lp-price-card lp-plan" aria-labelledby="plan-free">
           <div className="lp-plan-head">
             <span className="lp-plan-icon lp-plan-icon-free" aria-hidden="true"><Icon name="stamp" size={20} stroke={2} /></span>
@@ -380,7 +382,7 @@ export function PricingPlans({ lang, currency = "ILS", children }: { lang: Lang;
             {c.sub.features.map((f) => <li key={f}><Icon name="check" size={18} stroke={2.6} />{f}</li>)}
           </ul>
         </article>
-        {children}
+        {withYearly && children}
       </div>
     </div>
   );
