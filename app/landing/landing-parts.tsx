@@ -1,7 +1,7 @@
 // Testimonials. Add only real quotes, with the business's written permission.
 // The section stays hidden while the list for a language is empty.
 import type { Lang } from "./content";
-import { PERKLY_SOCIAL } from "../../lib/perkly-social";
+import { PERKLY_SOCIAL, PERKLY_WHATSAPP_TEXT } from "../../lib/perkly-social";
 import { socialLinks } from "../../lib/social";
 import { SocialIcon } from "../../lib/social-icon";
 
@@ -35,11 +35,10 @@ export function Testimonials({ lang }: { lang: Lang }) {
 }
 
 const SOCIAL_LABEL: Record<Lang, string> = { he: "Perkly ברשתות", ar: "Perkly على الشبكات", en: "Perkly on social media" };
-const WA_TEXT: Record<Lang, string> = { he: "היי, אשמח לשמוע על Perkly", ar: "مرحباً، أود أن أعرف المزيد عن Perkly", en: "Hi, I'd like to hear about Perkly" };
 
-/** Perkly's own accounts (lib/perkly-social.ts). Hidden when none are set. */
+/** Perkly's own accounts in this language (lib/perkly-social.ts). Hidden when none are set. */
 export function SocialRow({ lang }: { lang: Lang }) {
-  const links = socialLinks(PERKLY_SOCIAL, WA_TEXT[lang]);
+  const links = socialLinks(PERKLY_SOCIAL[lang], PERKLY_WHATSAPP_TEXT[lang]);
   if (links.length === 0) return null;
   return (
     <nav aria-label={SOCIAL_LABEL[lang]} className="lp-social">

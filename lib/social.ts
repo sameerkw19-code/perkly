@@ -57,6 +57,8 @@ const NORMALIZE: Record<SocialKey, (raw: string) => string | null> = {
   facebook: (s) => {
     const t = s.trim();
     if (/^[A-Za-z0-9.\-]{3,80}$/.test(t)) return t;
+    // The stored form of a numeric page (new Facebook pages have no name in the address).
+    if (/^profile\.php\?id=\d{5,20}$/.test(t)) return t;
     const u = asUrl(t);
     if (!u || !onHost(u, ["facebook.com", "fb.com"])) return null;
     const id = u.searchParams.get("id");

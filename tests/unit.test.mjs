@@ -35,6 +35,9 @@ test("social links: usernames and profile URLs become the same value", () => {
   assert.equal(tt.ok && tt.value.tiktok, "cafe_yafo");
   const fb = normalizeSocial({ facebook: "https://m.facebook.com/profile.php?id=100012345678" });
   assert.equal(fb.ok && fb.value.facebook, "profile.php?id=100012345678");
+  // A saved numeric page survives being read back (customer cards read the stored value).
+  assert.deepEqual(parseSocial(JSON.stringify({ facebook: "profile.php?id=100012345678" })), { facebook: "profile.php?id=100012345678" });
+  assert.equal(normalizeSocial({ facebook: "profile.php?id=12ab" }).ok, false);
   const wa = normalizeSocial({ whatsapp: "050-123 4567", website: "cafe.co.il", waze: "https://waze.com/ul/hsv8wrvkg9" });
   assert.deepEqual(wa.ok && wa.value, { whatsapp: "+972501234567", website: "https://cafe.co.il/", waze: "https://waze.com/ul/hsv8wrvkg9" });
   assert.equal(socialUrl("whatsapp", "+972501234567"), "https://wa.me/972501234567");

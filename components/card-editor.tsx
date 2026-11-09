@@ -9,7 +9,7 @@ import { CARD_LANGS, isRtl, type Lang } from "../lib/i18n-types";
 import { errorText, translate } from "../lib/i18n";
 import { post } from "../lib/api";
 import { ApplePreview, GooglePreview, ICONS, LoyaltyCard, Num } from "./loyalty-card";
-import { PERKLY_SOCIAL } from "../lib/perkly-social";
+import { PERKLY_WHATSAPP } from "../lib/perkly-social";
 import { makeAppleStrips, makeStampBanners } from "./stamp-banner";
 import { makeWalletLogos } from "./wallet-logo";
 import { PIZZA_MAX, usesPizza } from "../lib/pizza";
@@ -355,7 +355,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
         </section>
 
         <a className="design-help" target="_blank" rel="noopener noreferrer"
-          href={`https://wa.me/${(PERKLY_SOCIAL.whatsapp ?? "").replace(/\D/g, "")}?text=${encodeURIComponent(t("designHelpText", { name: design.texts[textLang]?.title || design.texts[design.langs[0]].title }))}`}>
+          href={`https://wa.me/${PERKLY_WHATSAPP.replace(/\D/g, "")}?text=${encodeURIComponent(t("designHelpText", { name: design.texts[textLang]?.title || design.texts[design.langs[0]].title }))}`}>
           <MessageCircle size={18} aria-hidden="true" />
           <span><b>{t("designHelpTitle")}</b><small>{t("designHelpSub")}</small></span>
         </a>

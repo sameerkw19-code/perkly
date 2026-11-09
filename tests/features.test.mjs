@@ -344,6 +344,7 @@ test("abroad: no Hebrew pages and no language switch", () => {
   for (const f of ["app/terms/page.tsx", "app/privacy/page.tsx", "app/accessibility/page.tsx"]) assert.match(read(f), /visitorRegion\(\)\)\.israel \?/, f);
   assert.match(read("components/lang-switch.tsx"), /useRegion\(\)\.intl\) return null/);
   assert.match(read("app/he/page.tsx"), /redirect\("\/en"\)/);
+  assert.match(read("app/links/page.tsx"), /redirect\("\/en\/links"\)/);
   assert.equal(defaultDesign({ name: "Joe", reward: "Free coffee" }, "en").langs[0], "en");
 });
 
@@ -580,4 +581,18 @@ test("join again: an unused card starts over, a used one stays protected", () =>
   const form = readFileSync(new URL("../app/join/[code]/join-form.tsx", import.meta.url), "utf8");
   assert.match(form, /localStorage\.setItem\(cardKey\(code\)/);
   assert.match(form, /useSyncExternalStore\(noSubscribe, \(\) => savedCard\(code\), \(\) => ""\)/);
+});
+
+// ---- Perkly's own social accounts, one set per language ----
+
+import { PERKLY_SOCIAL, LINKS_PATH } from "../lib/perkly-social.ts";
+import { parseSocial } from "../lib/social.ts";
+
+test("perkly social: every language has valid accounts and its own links page", () => {
+  for (const lang of ["he", "ar", "en"]) {
+    const s = PERKLY_SOCIAL[lang];
+    assert.ok(s, lang);
+    assert.deepEqual(parseSocial(JSON.stringify(s)), s, `${lang}: every account passes validation`);
+    assert.ok(existsSync(new URL(`../app${LINKS_PATH[lang]}/page.tsx`, import.meta.url)), LINKS_PATH[lang]);
+  }
 });

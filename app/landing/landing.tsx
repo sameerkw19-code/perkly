@@ -4,6 +4,7 @@ import { COPY, copyFor, hrefs, waLink, WHATSAPP_DISPLAY, type Lang } from "./con
 import type { Currency } from "../../lib/pricing";
 import { DemoPanel, ExamplesPicker, Logo, PricingPlans, SiteNav, TiltStage } from "./landing-client";
 import { SocialRow, Testimonials } from "./landing-parts";
+import { LINKS_PATH } from "../../lib/perkly-social";
 import { CafeLogo, Icon, QrArt } from "./visuals";
 import { ExampleCard } from "./example-card";
 import SiteAnalytics from "../../components/site-analytics";
@@ -313,7 +314,7 @@ export default function Landing({ lang, currency = "ILS" }: { lang: Lang; curren
             <a href={h.accessibility}>{c.footer.accessibility}</a>
             <a href={h.login}>{c.footer.login}</a>
             <a href={h.contact}>{c.footer.contact}</a>
-            <a href="/links">{c.footer.links}</a>
+            <a href={LINKS_PATH[lang]}>{c.footer.links}</a>
           </nav>
           <span className="lp-footer-rights">{c.footer.rights}</span>
         </div>
