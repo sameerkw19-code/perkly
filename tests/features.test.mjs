@@ -661,17 +661,24 @@ test("owners get reports, customers and the station; Perkly manages the rest", (
   assert.doesNotMatch(readFileSync(new URL("../app/start/start-flow.tsx", import.meta.url), "utf8"), /save_design|publish_design/);
 });
 
-test("worker code: 8 digits, hashed, never for owners; branches carry an address", () => {
-  const wc = readFileSync(new URL("../lib/server/worker-code.ts", import.meta.url), "utf8");
-  assert.match(wc, /WORKER_CODE_LENGTH = 8/);
-  assert.match(wc, /sha256\("worker-code:" \+ code\)/);
+test("counter sign-in: phone + date of birth, kept like a password, never for owners; branches carry an address", async () => {
+  const { normalizeBirthDate } = await import("../lib/birth-date.ts");
+  const now = new Date("2026-11-09T12:00:00Z");
+  assert.equal(normalizeBirthDate("15031995", now), "15031995");
+  assert.equal(normalizeBirthDate("15/3/1995", now), "15031995");
+  assert.equal(normalizeBirthDate("31021995", now), null, "no such date");
+  assert.equal(normalizeBirthDate("01012020", now), null, "too young to work");
+  assert.equal(normalizeBirthDate("abc", now), null);
+  const wl = readFileSync(new URL("../lib/server/worker-login.ts", import.meta.url), "utf8");
+  assert.match(wl, /secret: await hashPassword\(birth\)/);
   const auth = readFileSync(new URL("../app/api/auth/route.ts", import.meta.url), "utf8");
-  const login = auth.slice(auth.indexOf('case "worker_login"'), auth.indexOf('case "new_worker_code"'));
-  assert.match(login, /limited\(db, failKey, 10, 900\)/);
-  assert.match(login, /limited\(db, "worker-fail", 300, 3600\)/);
-  assert.match(login, /ownsAnyBusiness\(db, row\.user\)/);
-  const mig = readFileSync(new URL("../drizzle/0027_worker_code_branches.sql", import.meta.url), "utf8");
-  assert.match(mig, /CREATE UNIQUE INDEX memberships_worker_code/);
-  assert.match(mig, /ALTER TABLE branches ADD COLUMN address TEXT/);
-  assert.match(mig, /INSERT INTO branches\(id, business, name, created\)/);
+  const login = auth.slice(auth.indexOf('case "worker_login"'), auth.indexOf('case "set_worker_login"'));
+  assert.match(login, /limited\(db, phoneKey, 5, 900\)/);
+  assert.match(login, /limited\(db, ipKey, 10, 900\)/);
+  assert.match(login, /ownsAnyBusiness\(db, row\.id\)/);
+  assert.match(login, /verifyPassword\(birth \?\? "", row\?\.worker_secret \?\? DUMMY_HASH\)/);
+  const mig = readFileSync(new URL("../drizzle/0028_worker_phone_login.sql", import.meta.url), "utf8");
+  assert.match(mig, /CREATE UNIQUE INDEX users_worker_phone/);
+  assert.match(readFileSync(new URL("../drizzle/0027_worker_code_branches.sql", import.meta.url), "utf8"), /ALTER TABLE branches ADD COLUMN address TEXT/);
+  assert.match(readFileSync(new URL("../public/manifest.webmanifest", import.meta.url), "utf8"), /"display": "standalone"/);
 });
