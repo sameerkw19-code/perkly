@@ -812,3 +812,19 @@ test("Perkly can let one owner edit their own design (and turn it off again)", a
   assert.equal((await o.act(biz, "publish_design")).body.code, "admin_only");
   assert.equal((await o.get(`/api/loyalty?business=${biz}`)).body.editor, null);
 });
+
+test("setup period: the owner sees until when free access runs, and the payment link signs in to /start?b=", async () => {
+  const o = new Client();
+  await signup(o, "setup");
+  const biz = (await o.post("/api/loyalty", { action: "create_business", name: "Setup", reward: "x", target: 5, color: "#123456" })).body.id;
+  assert.equal((await admin.post("/api/admin", { action: "grant_comp", business: biz, days: 14 })).status, 200);
+  const until = (await o.get(`/api/loyalty?business=${biz}`)).body.setup?.until;
+  assert.ok(until && until > new Date().toISOString());
+  // Free access with no end date is not a setup period.
+  assert.equal((await admin.post("/api/admin", { action: "grant_comp", business: biz, forever: true })).status, 200);
+  assert.equal((await o.get(`/api/loyalty?business=${biz}`)).body.setup, null);
+  // The link in the message: a signed-in owner goes straight to the subscription step of that business.
+  const r = await fetch(`${BASE}/login?next=/start?b=${biz}`, { headers: { cookie: o.cookie }, redirect: "manual" });
+  assert.ok([302, 303, 307, 308].includes(r.status), String(r.status));
+  assert.equal(new URL(r.headers.get("location"), BASE).pathname + new URL(r.headers.get("location"), BASE).search, `/start?b=${biz}`);
+});

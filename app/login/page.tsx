@@ -10,7 +10,8 @@ export const metadata = { title: "Perkly | כניסה", robots: { index: false }
 /** Only same-site paths like "/admin" are allowed as a return address (no "//host" or full URLs). */
 function safeNext(value: unknown): string {
   const v = Array.isArray(value) ? value[0] : value;
-  return typeof v === "string" && /^\/(?!\/)[A-Za-z0-9/_-]{0,100}$/.test(v) ? v : "/";
+  // An internal path, optionally with one business id (the payment link Perkly sends: /start?b=<id>).
+  return typeof v === "string" && /^\/(?!\/)[A-Za-z0-9/_-]{0,100}(\?b=[A-Za-z0-9-]{1,64})?$/.test(v) ? v : "/";
 }
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {

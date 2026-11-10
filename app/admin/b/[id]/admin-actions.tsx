@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
 import { post } from "../../../../lib/api";
+import { normalizePhone } from "../../../../lib/phone";
+import { LAUNCH } from "../../../../lib/pricing";
 import { LoyaltyCard } from "../../../../components/loyalty-card";
 import { useLang } from "../../../../lib/i18n";
 import type { Design } from "../../../../lib/design";
@@ -225,4 +227,44 @@ export function AdminActions({ business, suspended, compUntil, biz }: { business
 export function AdminCardPreview({ design, target }: { design: Design; target: number }) {
   const { lang, t } = useLang();
   return <LoyaltyCard design={design} lang={lang} stamps={Math.min(3, target)} target={target} customerName={t("sampleCustomer")} t={t} />;
+}
+
+/**
+ * When the card is ready: sends the owner a link to their payment page (sign-in, then the subscription step).
+ * Opens WhatsApp with a ready message, to the number typed here or to a chat the admin picks.
+ */
+export function PaymentLink({ business, name, shekels }: { business: string; name: string; shekels: boolean }) {
+  const [phone, setPhone] = useState("");
+  const [withCode, setWithCode] = useState(shekels);
+  const [copied, setCopied] = useState(false);
+  const link = `https://perkly.shop/login?next=/start?b=${business}`;
+  const message = shekels
+    ? [
+        `שלום! הכרטיס של ${name} ב־Perkly מוכן 🎉`,
+        "כדי להמשיך בלי הפסקה, מפעילים את המנוי כאן (14 ימים ראשונים חינם, אפשר לבטל בכל רגע):",
+        link,
+        ...(withCode ? [`בדף התשלום מקלידים את קוד ההשקה ${LAUNCH.code} ומשלמים ${LAUNCH.price} ₪ לחודש.`] : []),
+      ].join("\n")
+    : [`Hi! Your ${name} card on Perkly is ready 🎉`, "To keep going without a break, start your subscription here (the first 14 days are free, cancel any time):", link].join("\n");
+  const intl = normalizePhone(phone)?.slice(1) ?? "";
+  const bad = phone.trim() !== "" && !intl;
+  return (
+    <div className="admin-action payment-link">
+      <h3>שליחת קישור תשלום</h3>
+      <p className="muted">כשהעיצוב מוכן: הודעה לבעל העסק עם קישור לדף התשלום. בלי מספר, וואטסאפ ייתן לבחור למי לשלוח.</p>
+      <div className="admin-row">
+        <input type="tel" dir="ltr" placeholder="טלפון של בעל העסק (לא חובה)" value={phone} onChange={(e) => setPhone(e.target.value)} aria-label="טלפון של בעל העסק" aria-invalid={bad} />
+        <a className={`btn primary small${bad ? " is-disabled" : ""}`} aria-disabled={bad} target="_blank" rel="noopener noreferrer"
+          href={bad ? undefined : `https://wa.me/${intl}?text=${encodeURIComponent(message)}`}>שליחה בוואטסאפ</a>
+        <button type="button" className="btn soft small" onClick={async () => {
+          try { await navigator.clipboard.writeText(message); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {}
+        }}>{copied ? "הועתק ✓" : "העתקת ההודעה"}</button>
+      </div>
+      {bad && <small className="form-error" role="alert">מספר הטלפון לא תקין.</small>}
+      {shekels && (
+        <label className="admin-check"><input type="checkbox" checked={withCode} onChange={(e) => setWithCode(e.target.checked)} /> לצרף את קוד ההשקה ({LAUNCH.code}, {LAUNCH.price} ₪)</label>
+      )}
+      <details><summary className="muted">תצוגת ההודעה</summary><pre className="payment-preview" dir={shekels ? "rtl" : "ltr"}>{message}</pre></details>
+    </div>
+  );
 }

@@ -34,6 +34,7 @@ type Data = {
   ownsBusiness?: boolean;
   breakdown?: { staff: BreakdownRow[]; branches: BreakdownRow[] };
   access?: { ok: true; free?: { limit: number; used: number } } | { ok: false; code: "business_suspended" | "subscription_required" };
+  setup?: { until: string } | null;
   birthdays?: { id: string; name: string; date: string; inDays: number }[];
   googleWallet?: boolean;
   system?: { maintenance: boolean; maintenanceMessage: string; announcement: string; signupsOpen?: boolean };
@@ -340,6 +341,12 @@ export default function Dashboard() {
             {isOwner && data.access.code === "subscription_required" && <a className="btn primary small" href={`/start?b=${encodeURIComponent(b.id)}`}>{t("activateSub")}</a>}
           </div>
         )}
+        {data.access?.ok && data.setup && isOwner && (
+          <div className="access-bar setup-bar" role="status">
+            <span>{t("setupBanner", { date: new Date(data.setup.until).toLocaleDateString(lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB", { timeZone: "Asia/Jerusalem" }) })}</span>
+            <a className="btn primary small" href={`/start?b=${encodeURIComponent(b.id)}`}>{t("activateSub")}</a>
+          </div>
+        )}
         {data.access?.ok && data.access.free && isOwner && (
           <div className="access-bar free-bar" role="status">
             <span>{t("freeBanner", { used: data.access.free.used, limit: data.access.free.limit })}</span>
@@ -489,7 +496,7 @@ export default function Dashboard() {
                               <strong>{c.name}</strong>
                               <span dir="ltr">{c.phone}</span>
                               <Num>{c.stamps}/{c.target}</Num>
-                              <span className="form-hint">{t("removedOn", { d: new Date(c.archived).toLocaleDateString(lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB") })}</span>
+                              <span className="form-hint">{t("removedOn", { d: new Date(c.archived).toLocaleDateString(lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB", { timeZone: "Asia/Jerusalem" }) })}</span>
                             </span>
                             <button type="button" className="btn primary small" disabled={busy} onClick={async () => {
                               const r = await call({ action: "restore_customer", customer: c.id });
@@ -1144,7 +1151,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
               <span className="sx-box-icon" aria-hidden="true"><Gift size={18} /></span>
               <strong>{selected.rewards ? (selected.rewards === 1 ? t("sxRewardReady1") : t("sxRewardReadyN", { n: selected.rewards })) : full ? t("sxRewardReady1") : t("sxNoRewards")}</strong>
             </div>
-            {!!selected.rewards && selected.nextExpiry && <small className="form-hint">{t("expiresOnShort", { d: new Date(selected.nextExpiry).toLocaleDateString(lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB") })}</small>}
+            {!!selected.rewards && selected.nextExpiry && <small className="form-hint">{t("expiresOnShort", { d: new Date(selected.nextExpiry).toLocaleDateString(lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB", { timeZone: "Asia/Jerusalem" }) })}</small>}
             {(!!selected.rewards || full) && redeemButton}
             {!full && (
               <button className={"btn big sx-wide " + (selected.rewards ? "soft" : "primary")} onClick={() => setStep("stamp")}>

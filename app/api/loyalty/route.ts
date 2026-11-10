@@ -129,7 +129,17 @@ export async function GET(request: Request) {
     .sort((a, b) => a.inDays - b.inDays);
   // No QR or join link until the business may accept customers (paid, free access, or not suspended).
   if (!access.ok) business!.join_code = null;
-  const base = { me, memberships, role, manage: admin, ownsBusiness: membership !== managed, business, branches, myBranch: membership.branch, design: await liveDesign(db, business!), access, birthdays, system, googleWallet: walletConfig(env) !== null };
+  // Setup period: free access from Perkly (or the sign-up trial) while the card is prepared, and no subscription yet.
+  // The owner sees until when, and a button to start the subscription. Not for free access with no end date.
+  const comp = await db
+    .prepare("SELECT b.comp_until, s.status FROM businesses b LEFT JOIN subscriptions s ON s.business = b.id WHERE b.id = ?")
+    .bind(business!.id)
+    .first<{ comp_until: string | null; status: string | null }>();
+  const setup =
+    comp?.comp_until && comp.comp_until > new Date().toISOString() && !comp.comp_until.startsWith("9999") && !["active", "trialing"].includes(comp.status ?? "")
+      ? { until: comp.comp_until }
+      : null;
+  const base = { me, memberships, role, manage: admin, ownsBusiness: membership !== managed, business, branches, myBranch: membership.branch, design: await liveDesign(db, business!), access, setup, birthdays, system, googleWallet: walletConfig(env) !== null };
 
   if (role === "staff") {
     const mine = await db
