@@ -709,3 +709,12 @@ html,body{overflow-x:clip}
 .payment-preview{white-space:pre-wrap;background:var(--surface-2,#f6f6f8);padding:10px;border-radius:8px;font:inherit;font-size:.88rem;margin:6px 0 0}
 .btn.is-disabled{opacity:.5;pointer-events:none}
 .setup-bar{background:#e8f4ff;color:#1d4a7a;border-bottom-color:#cfe3ff}
+.admin-new{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:24px;align-items:start;margin-top:16px}
+.admin-new-form{display:grid;gap:12px}
+.admin-new-form label{display:grid;gap:4px}
+.admin-new-row{display:flex;gap:12px;flex-wrap:wrap}
+.admin-new-row label{flex:1 1 140px}
+.admin-kinds{display:flex;flex-wrap:wrap;gap:8px;border:0;padding:0;margin:0}
+.admin-kinds legend{margin-bottom:6px;font-weight:600}
+.admin-new-preview{position:sticky;top:16px}
+@media(max-width:860px){.admin-new{grid-template-columns:1fr}.admin-new-preview{position:static}}

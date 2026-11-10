@@ -253,7 +253,7 @@ export function PaymentLink({ business, name, shekels }: { business: string; nam
       <h3>שליחת קישור תשלום</h3>
       <p className="muted">כשהעיצוב מוכן: הודעה לבעל העסק עם קישור לדף התשלום. בלי מספר, וואטסאפ ייתן לבחור למי לשלוח.</p>
       <div className="admin-row">
-        <input type="tel" dir="ltr" placeholder="טלפון של בעל העסק (לא חובה)" value={phone} onChange={(e) => setPhone(e.target.value)} aria-label="טלפון של בעל העסק" aria-invalid={bad} />
+        <input type="tel" dir="ltr" placeholder="טלפון (לא חובה)" value={phone} onChange={(e) => setPhone(e.target.value)} aria-label="טלפון של בעל העסק" aria-invalid={bad} />
         <a className={`btn primary small${bad ? " is-disabled" : ""}`} aria-disabled={bad} target="_blank" rel="noopener noreferrer"
           href={bad ? undefined : `https://wa.me/${intl}?text=${encodeURIComponent(message)}`}>שליחה בוואטסאפ</a>
         <button type="button" className="btn soft small" onClick={async () => {
@@ -265,6 +265,54 @@ export function PaymentLink({ business, name, shekels }: { business: string; nam
         <label className="admin-check"><input type="checkbox" checked={withCode} onChange={(e) => setWithCode(e.target.checked)} /> לצרף את קוד ההשקה ({LAUNCH.code}, {LAUNCH.price} ₪)</label>
       )}
       <details><summary className="muted">תצוגת ההודעה</summary><pre className="payment-preview" dir={shekels ? "rtl" : "ltr"}>{message}</pre></details>
+    </div>
+  );
+}
+
+/**
+ * A business Perkly built and has not handed over yet: makes a personal, single-use link (14 days) for the client.
+ * The client opens it, creates an account and becomes the owner. Sent by WhatsApp or copied.
+ */
+export function OwnerLink({ business, name, shekels }: { business: string; name: string; shekels: boolean }) {
+  const [link, setLink] = useState<{ url: string; expires: string } | null>(null);
+  const [phone, setPhone] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
+  const message = link
+    ? shekels
+      ? [`שלום! הכרטיס של ${name} ב־Perkly מוכן 🎉`, "בקישור הזה פותחים את החשבון שלכם ומקבלים את לוח הבקרה של העסק:", link.url, "הקישור אישי, לשימוש אחד בלבד, ותקף 14 יום."].join("\n")
+      : [`Hi! Your ${name} card on Perkly is ready 🎉`, "Open your account and get the business dashboard with this link:", link.url, "The link is personal, works once, and is valid for 14 days."].join("\n")
+    : "";
+  const intl = normalizePhone(phone)?.slice(1) ?? "";
+  const bad = phone.trim() !== "" && !intl;
+  return (
+    <div className="admin-action payment-link">
+      <h3>מסירה לבעל העסק</h3>
+      <p className="muted">העסק עדיין תחת החשבון של Perkly. כשהעיצוב מוכן, יוצרים קישור אישי ושולחים לבעל העסק. הוא פותח חשבון והעסק עובר אליו, כולל העיצוב והגדרות. אחר כך תופיע כאן שליחת קישור התשלום.</p>
+      {!link ? (
+        <button type="button" className="btn primary small" disabled={busy} onClick={async () => {
+          setBusy(true); setError("");
+          const r = await post<{ url: string; expires: string }>("/api/admin", { action: "owner_link", business });
+          setBusy(false);
+          if (r.ok && r.data?.url) setLink({ url: r.data.url, expires: r.data.expires }); else setError("לא הצלחנו ליצור קישור. נסו שוב.");
+        }}>{busy ? "יוצר..." : "יצירת קישור לבעל העסק"}</button>
+      ) : (
+        <>
+          <div className="admin-row">
+            <input type="tel" dir="ltr" placeholder="טלפון (לא חובה)" value={phone} onChange={(e) => setPhone(e.target.value)} aria-label="טלפון של בעל העסק" aria-invalid={bad} />
+            <a className={`btn primary small${bad ? " is-disabled" : ""}`} aria-disabled={bad} target="_blank" rel="noopener noreferrer"
+              href={bad ? undefined : `https://wa.me/${intl}?text=${encodeURIComponent(message)}`}>שליחה בוואטסאפ</a>
+            <button type="button" className="btn soft small" onClick={async () => {
+              try { await navigator.clipboard.writeText(message); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {}
+            }}>{copied ? "הועתק ✓" : "העתקת ההודעה"}</button>
+          </div>
+          {bad && <small className="form-error" role="alert">מספר הטלפון לא תקין.</small>}
+          <small className="form-hint">תקף עד {new Date(link.expires).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" })}. קישור חדש מבטל את הקודם.</small>
+          <details><summary className="muted">תצוגת ההודעה</summary><pre className="payment-preview" dir={shekels ? "rtl" : "ltr"}>{message}</pre></details>
+        </>
+      )}
+      {error && <p className="form-error" role="alert">{error}</p>}
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { LangSwitch } from "../../../components/lang-switch";
 import { InstallApp, rememberWorkerPhone } from "../../../components/install-app";
 import { Brand } from "../../../components/brand";
 
-export default function InviteForm({ token, business, inviteEmail, signedInEmail }: { token: string; business: string | null; inviteEmail: string | null; signedInEmail: string | null }) {
+export default function InviteForm({ token, business, inviteEmail, owner = false, signedInEmail }: { token: string; business: string | null; inviteEmail: string | null; owner?: boolean; signedInEmail: string | null }) {
   const { lang, setLang, t, dir } = useLang();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -68,7 +68,7 @@ export default function InviteForm({ token, business, inviteEmail, signedInEmail
           </>
         ) : (
           <>
-            <h1>{t("inviteTitle", { b: business })}</h1>
+            <h1>{t(owner ? "ownerInviteTitle" : "inviteTitle", { b: business })}</h1>
             {inviteEmail && <p className="form-hint">{t("inviteForEmail", { email: "\u2066" + inviteEmail + "\u2069" })}</p>}
             {signedInEmail && inviteEmail && signedInEmail !== inviteEmail ? (
               <p className="form-error" role="alert">{t("err_invite_other_email")}</p>
@@ -76,16 +76,20 @@ export default function InviteForm({ token, business, inviteEmail, signedInEmail
               <p>{t("inviteSignedIn", { email: signedInEmail })}</p>
             ) : (
               <>
-                <p className="muted">{t("inviteIntro")}</p>
+                <p className="muted">{t(owner ? "ownerInviteIntro" : "inviteIntro")}</p>
                 <label>{t("yourName")}<input name="name" required maxLength={80} autoComplete="name" /></label>
-                <label>{t("phone")}<input name="phone" type="tel" required maxLength={20} autoComplete="tel" dir="ltr" /></label>
-                <label>{t("birthDate")}<input name="birthDate" required inputMode="numeric" maxLength={10} placeholder={t("birthDatePh")} dir="ltr" autoComplete="bday" /><small className="form-hint">{t("birthDateHint")}</small></label>
+                {!owner && (
+                  <>
+                    <label>{t("phone")}<input name="phone" type="tel" required maxLength={20} autoComplete="tel" dir="ltr" /></label>
+                    <label>{t("birthDate")}<input name="birthDate" required inputMode="numeric" maxLength={10} placeholder={t("birthDatePh")} dir="ltr" autoComplete="bday" /><small className="form-hint">{t("birthDateHint")}</small></label>
+                  </>
+                )}
                 <label>{t("email")}<input name="email" type="email" required maxLength={200} autoComplete="email" dir="ltr" defaultValue={inviteEmail ?? ""} readOnly={!!inviteEmail} /></label>
                 <label>{t("password")}<input name="password" type="password" required minLength={8} maxLength={200} autoComplete="new-password" dir="ltr" /><small className="form-hint">{t("passwordHint")}</small></label>
               </>
             )}
             {error && <p className="form-error" role="alert">{error}</p>}
-            <button className="btn primary wide" disabled={busy}>{busy ? t("loading") : t("acceptInvite")}</button>
+            <button className="btn primary wide" disabled={busy}>{busy ? t("loading") : t(owner ? "ownerInviteAccept" : "acceptInvite")}</button>
             {!signedInEmail && <a className="text-btn" href="/login">{t("haveAccount")}</a>}
           </>
         )}

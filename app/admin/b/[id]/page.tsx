@@ -3,9 +3,10 @@ import { notFound } from "next/navigation";
 import { getD1 } from "../../../../db";
 import { liveDesign } from "../../../../lib/server/designs";
 import { STATUS_LABEL, adminStatus, requireAdminPage, shortDate, shortDateTime } from "../../../../lib/server/admin";
-import { AdminActions, PaymentLink, AdminCardPreview, ApplePushTest, GoogleSyncTest, KitSentButton, OwnerDesignSwitch } from "./admin-actions";
+import { AdminActions, OwnerLink, PaymentLink, AdminCardPreview, ApplePushTest, GoogleSyncTest, KitSentButton, OwnerDesignSwitch } from "./admin-actions";
 import { env } from "cloudflare:workers";
 import { planOf } from "../../../../lib/server/billing";
+import { isPlatformAdmin } from "../../../../lib/server/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false }, title: "Perkly · ניהול עסק" };
@@ -14,7 +15,7 @@ const KIND_LABEL: Record<string, string> = { stamp: "חותמת", redeem: "מי�
 const ROLE_LABEL: Record<string, string> = { owner: "בעלים", staff: "עובד" };
 const ACTION_LABEL: Record<string, string> = {
   suspend: "השהיה", unsuspend: "החזרה לפעילות", grant_comp: "גישה חינם", clear_comp: "ביטול גישה חינם",
-  update_business: "עריכת פרטים", transfer_owner: "העברת בעלות", archive: "ארכוב", restore: "שחזור", export: "ייצוא נתונים",
+  update_business: "עריכת פרטים", owner_link: "קישור לבעל העסק", transfer_owner: "העברת בעלות", archive: "ארכוב", restore: "שחזור", export: "ייצוא נתונים",
 };
 
 // One business, for support. Shows team, subscription, activity counts and the live card.
@@ -30,14 +31,14 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
 
   const b = await db
     .prepare(
-      `SELECT b.id, b.name, b.reward, b.target, b.color, b.created, b.reward_mode, b.suspended, b.suspend_reason, b.comp_until, b.archived, b.kit_due, b.kit_sent, b.owner_designs, b.currency,
+      `SELECT b.id, b.owner, b.name, b.reward, b.target, b.color, b.created, b.reward_mode, b.suspended, b.suspend_reason, b.comp_until, b.archived, b.kit_due, b.kit_sent, b.owner_designs, b.currency,
          s.status, s.plan, s.current_period_end, s.external_subscription, s.updated AS sub_updated, u.email AS owner_email
        FROM businesses b LEFT JOIN subscriptions s ON s.business = b.id LEFT JOIN users u ON u.id = b.owner WHERE b.id = ?`,
     )
     .bind(id)
     .first<{
       id: string; name: string; reward: string; target: number; color: string; created: string; reward_mode: string;
-      suspended: string | null; suspend_reason: string | null; comp_until: string | null; archived: string | null; owner_email: string | null;
+      owner: string; suspended: string | null; suspend_reason: string | null; comp_until: string | null; archived: string | null; owner_email: string | null;
       status: string | null; current_period_end: string | null; external_subscription: string | null; sub_updated: string | null;
       plan: string | null; kit_due: string | null; kit_sent: string | null; owner_designs: number; currency: string;
     }>();
@@ -69,6 +70,8 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
   ]);
 
   const st = adminStatus(b, nowIso);
+  // Built by Perkly and not handed over yet: the business is still under an admin's account.
+  const withPerkly = !!b.owner_email && isPlatformAdmin({ id: b.owner, email: b.owner_email, name: "" }, env);
   const c = counts!;
 
   return (
@@ -118,7 +121,9 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
               <dt>עדכון אחרון</dt><dd>{shortDateTime(b.sub_updated)}</dd>
               <dt>גישה חינם</dt><dd>{b.comp_until && b.comp_until > nowIso ? (b.comp_until.startsWith("9999") ? "ללא הגבלת זמן" : `עד ${shortDate(b.comp_until)}`) : "לא"}</dd>
             </dl>
-            {!(b.status === "active" || b.status === "trialing") && <PaymentLink business={b.id} name={b.name} shekels={b.currency !== "USD"} />}
+            {withPerkly
+              ? <OwnerLink business={b.id} name={b.name} shekels={b.currency !== "USD"} />
+              : !(b.status === "active" || b.status === "trialing") && <PaymentLink business={b.id} name={b.name} shekels={b.currency !== "USD"} />}
           </section>
 
           <section className="panel">

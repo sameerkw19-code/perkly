@@ -3,7 +3,7 @@ import { getD1 } from "../../../db";
 import { getUser, isPlatformAdmin } from "../../../lib/server/auth";
 import { fail, json, readJson, sameOrigin, str } from "../../../lib/server/http";
 import { normalizeEmail } from "../../../lib/server/auth";
-import { verifyPassword } from "../../../lib/server/crypto";
+import { randomToken, sha256, verifyPassword } from "../../../lib/server/crypto";
 import { allow } from "../../../lib/server/rate-limit";
 import { cancelAtPeriodEnd } from "../../../lib/server/polar";
 import { applePushReady, pushTokens } from "../../../lib/server/apple-push";
@@ -22,7 +22,7 @@ const FOREVER = "9999-12-31T00:00:00.000Z";
 // update_business (name, reward, target), transfer_owner (to an existing user by email), archive, restore,
 // kit_sent (the yearly plan's counter kit was shipped), reset_data (delete every customer, stamp and reward, for test
 // businesses; the admin types the business name and their password), apple_push_test (refresh the business's Apple Wallet passes
-// now and return what Apple answered).
+// now and return what Apple answered), owner_link (a one-time link that makes the client the owner of a business Perkly built).
 export async function POST(request: Request) {
   const db = getD1();
   const user = await getUser(db, request.headers.get("cookie"));
@@ -89,6 +89,19 @@ export async function POST(request: Request) {
         .all<{ push_token: string }>();
       const results = applePushReady() ? await pushTokens(db, rows.results.map((r) => r.push_token)) : [];
       return json({ ok: true, ready: applePushReady(), devices: rows.results.length, results });
+    }
+    case "owner_link": {
+      // A business Perkly built for a client: a personal, single-use link (14 days) that opens an account for the
+      // client and makes them the owner. A new link cancels the earlier unused ones.
+      const token = randomToken(24);
+      const expires = new Date(now.getTime() + 14 * 86_400_000).toISOString();
+      await db.batch([
+        db.prepare("UPDATE invites SET revoked = ? WHERE business = ? AND role = 'owner' AND used IS NULL AND revoked IS NULL").bind(nowIso, businessId),
+        db.prepare("INSERT INTO invites(id, business, role, label, created_by, created, expires, branch, email) VALUES(?, ?, 'owner', ?, ?, ?, ?, NULL, NULL)")
+          .bind(await sha256(token), businessId, "owner", user.id, nowIso, expires),
+        log("owner_link", `until ${expires.slice(0, 10)}`),
+      ]);
+      return json({ ok: true, url: `${new URL(request.url).origin}/invite/${token}`, expires });
     }
     case "owner_designs": {
       // Lets this business's owner edit their own card design (Perkly designs by default).
