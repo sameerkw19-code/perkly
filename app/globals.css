@@ -705,3 +705,7 @@ html,body{overflow-x:clip}
 .install-help{position:relative;background:#faf9fc;border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px}
 .install-help .icon-btn{position:absolute;top:8px;inset-inline-end:8px;width:28px;height:28px}
 .install-help ol{margin:6px 0 0;padding-inline-start:20px;line-height:1.8}
+.admin-check{display:flex;gap:6px;align-items:center;margin-top:8px;font-size:.9rem}
+.payment-preview{white-space:pre-wrap;background:var(--surface-2,#f6f6f8);padding:10px;border-radius:8px;font:inherit;font-size:.88rem;margin:6px 0 0}
+.btn.is-disabled{opacity:.5;pointer-events:none}
+.setup-bar{background:#e8f4ff;color:#1d4a7a;border-bottom-color:#cfe3ff}
