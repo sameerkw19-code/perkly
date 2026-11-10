@@ -341,7 +341,7 @@ export default function Dashboard() {
             {isOwner && data.access.code === "subscription_required" && <a className="btn primary small" href={`/start?b=${encodeURIComponent(b.id)}`}>{t("activateSub")}</a>}
           </div>
         )}
-        {data.access?.ok && data.setup && isOwner && (
+        {data.access?.ok && data.setup && isOwner && !manage && (
           <div className="access-bar setup-bar" role="status">
             <span>{t("setupBanner", { date: new Date(data.setup.until).toLocaleDateString(lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB", { timeZone: "Asia/Jerusalem" }) })}</span>
             <a className="btn primary small" href={`/start?b=${encodeURIComponent(b.id)}`}>{t("activateSub")}</a>

@@ -321,7 +321,7 @@ export async function POST(request: Request) {
         if (!validPassword(body.password)) return fail("weak_password", 400, "Password must be 8+ characters");
       if (!strongEnough(body.password, email)) return fail("common_password", 400, "This password is too easy to guess");
         // Staff: phone + date of birth, for signing in at the counter.
-        if (invite.role === "staff") {
+        if (invite.role !== "owner") {
           const wl = await workerLoginFields(body.phone, body.birthDate);
           if (typeof wl === "string") return fail(wl, 400, "Invalid phone or date of birth");
           if (await db.prepare("SELECT 1 FROM users WHERE worker_phone = ?").bind(wl.phone).first()) return fail("worker_phone_taken", 409, "This phone already belongs to another worker");
@@ -345,10 +345,20 @@ export async function POST(request: Request) {
              role = CASE WHEN memberships.role = 'owner' THEN 'owner' ELSE excluded.role END,
              branch = CASE WHEN memberships.role = 'owner' THEN memberships.branch ELSE excluded.branch END`,
         ).bind(crypto.randomUUID(), invite.business, user.id, invite.role, now, invite.branch),
+        // An owner link (a business Perkly built): the client becomes the owner, and Perkly's account leaves the business
+        // (platform admins still open it from the control center). Only when this request used the invite.
+        ...(invite.role === "owner"
+          ? [
+              db.prepare("UPDATE businesses SET owner = ?1 WHERE id = ?2 AND EXISTS (SELECT 1 FROM invites WHERE id = ?3 AND used_by = ?1 AND used = ?4)")
+                .bind(user.id, invite.business, inviteId, now),
+              db.prepare("DELETE FROM memberships WHERE business = ?1 AND user != ?2 AND role = 'owner' AND EXISTS (SELECT 1 FROM invites WHERE id = ?3 AND used_by = ?2 AND used = ?4)")
+                .bind(invite.business, user.id, inviteId, now),
+            ]
+          : []),
       ]);
       if (!result[0].meta.changes) return fail("invite_invalid", 404, "Invite expired or already used");
       // The owners hear about it, so a join they did not expect does not go unnoticed.
-      if (mailReady(env)) {
+      if (mailReady(env) && invite.role !== "owner") {
         const owners = await db
           .prepare("SELECT u.email FROM memberships m JOIN users u ON u.id = m.user WHERE m.business = ? AND m.role = 'owner' AND m.revoked IS NULL")
           .bind(invite.business)

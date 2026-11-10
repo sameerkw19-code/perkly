@@ -828,3 +828,38 @@ test("setup period: the owner sees until when free access runs, and the payment 
   assert.ok([302, 303, 307, 308].includes(r.status), String(r.status));
   assert.equal(new URL(r.headers.get("location"), BASE).pathname + new URL(r.headers.get("location"), BASE).search, `/start?b=${biz}`);
 });
+
+test("Perkly builds a business for a client, then hands it over with a single-use owner link", async () => {
+  const built = await admin.post("/api/loyalty", { action: "create_business", forClient: true, kind: "pizza", name: "Built", reward: "Free slice", target: 8, color: "#123456", market: "intl", lang: "en", setupDays: 30, branchName: "Main", branchAddress: "1 Main St" });
+  assert.equal(built.status, 200, JSON.stringify(built.body));
+  const biz = built.body.id;
+  const view = (await admin.get(`/api/loyalty?business=${biz}`)).body;
+  assert.equal(view.role, "owner");
+  assert.ok(view.setup?.until > new Date(Date.now() + 29 * 86_400_000).toISOString(), "30-day setup period");
+  // Only an admin can make an owner link.
+  const stranger = new Client();
+  await signup(stranger, "stranger");
+  assert.equal((await stranger.post("/api/admin", { action: "owner_link", business: biz })).status, 404);
+  const first = (await admin.post("/api/admin", { action: "owner_link", business: biz })).body.url;
+  const link = (await admin.post("/api/admin", { action: "owner_link", business: biz })).body.url;
+  const token = (u) => u.split("/invite/")[1];
+  const client = new Client();
+  // A new link cancels the earlier one.
+  assert.equal((await client.post("/api/auth", { action: "accept_invite", token: token(first), name: "Owner", email: `owner-${run}@test.perkly`, password: "owner pass 123" })).status, 404);
+  // No phone or date of birth for an owner.
+  const took = await client.post("/api/auth", { action: "accept_invite", token: token(link), name: "Owner", email: `owner-${run}@test.perkly`, password: "owner pass 123" });
+  assert.equal(took.status, 200, JSON.stringify(took.body));
+  const mine = (await client.get(`/api/loyalty?business=${biz}`)).body;
+  assert.equal(mine.role, "owner");
+  assert.equal(mine.ownsBusiness, true);
+  assert.ok(mine.setup?.until, "the setup period goes with the business");
+  // Perkly's account left the business (the admin still opens it as a platform admin, without owning it).
+  assert.equal((await admin.get(`/api/loyalty?business=${biz}`)).body.ownsBusiness, false);
+  // Single use.
+  assert.equal((await new Client().post("/api/auth", { action: "accept_invite", token: token(link), name: "X", email: `x2-${run}@test.perkly`, password: "owner pass 123" })).status, 404);
+  // A business owner who is not an admin cannot use forClient.
+  const own = await stranger.post("/api/loyalty", { action: "create_business", forClient: true, name: "Mine", reward: "x", target: 5, color: "#123456", setupDays: 90 });
+  assert.equal(own.status, 200);
+  const ownView = (await stranger.get(`/api/loyalty?business=${own.body.id}`)).body;
+  assert.ok(!ownView.setup || ownView.setup.until < new Date(Date.now() + 60 * 86_400_000).toISOString(), "no 90-day setup for a normal owner");
+});

@@ -318,7 +318,10 @@ export async function POST(request: Request) {
   // Creating a business is the only action that does not need an existing membership.
   if (p.action === "create_business") {
     if (!sys.signupsOpen && !isPlatformAdmin(user, env)) return fail("signups_closed", 403, "New businesses are closed");
-    if (!(await allow(db, `create-business:${user.id}`, 10, 86_400))) return fail("rate_limited", 429);
+    // Perkly can build a business for a client from the control center: it starts owned by the admin, with a free
+    // setup period, the market and card language picked by hand. The owner takes it over with an owner link later.
+    const forClient = p.forClient === true && isPlatformAdmin(user, env);
+    if (!(await allow(db, `create-business:${user.id}`, forClient ? 100 : 10, 86_400))) return fail("rate_limited", 429);
     const name = str(p.name, 80);
     const reward = str(p.reward, 160);
     if (!name || !reward || !validTarget(p.target) || typeof p.color !== "string" || !COLOR.test(p.color)) {
@@ -329,13 +332,15 @@ export async function POST(request: Request) {
     const id = crypto.randomUUID();
     // The free trial is for an owner's first business only (a second business would otherwise reset it).
     const earlier = await db.prepare("SELECT COUNT(*) AS n FROM businesses WHERE owner = ?").bind(user.id).first<{ n: number }>();
-    const trialDays = earlier?.n ? 0 : sys.trialDays;
+    const setupDays = Number.isInteger(p.setupDays) && (p.setupDays as number) >= 0 && (p.setupDays as number) <= 90 ? (p.setupDays as number) : 30;
+    const trialDays = forClient ? setupDays : earlier?.n ? 0 : sys.trialDays;
     const region = regionFrom(request.headers);
-    const cardLang = region.israel ? (p.lang === "en" ? "en" : "he") : "en";
+    const currency = forClient ? (p.market === "intl" ? "USD" : "ILS") : region.currency;
+    const cardLang = forClient || region.israel ? (p.lang === "en" ? "en" : "he") : "en";
     await db.batch([
       // The currency follows where the owner signs up: shekels in Israel, dollars abroad.
       db.prepare("INSERT INTO businesses(id, owner, name, reward, target, color, created, join_code, reward_mode, currency) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .bind(id, user.id, name, reward, p.target, p.color, now, randomCode(10), mode, region.currency),
+        .bind(id, user.id, name, reward, p.target, p.color, now, randomCode(10), mode, currency),
       // The starting card: the example look for the business type, in the sign-up language (English abroad).
       // After this, only Perkly (a platform admin) changes the design.
       db.prepare("INSERT INTO card_designs(id, business, version, data, published, published_by) VALUES(?, ?, 1, ?, ?, ?)")
@@ -352,6 +357,10 @@ export async function POST(request: Request) {
             db.prepare("UPDATE businesses SET comp_until = ? WHERE id = ?")
               .bind(trialDays > 0 ? new Date(Date.now() + trialDays * 86_400_000).toISOString() : null, id),
           ]
+        : []),
+      // A business Perkly builds gets its setup period whether or not subscriptions are required.
+      ...(forClient && !sys.requireSubscription && setupDays > 0
+        ? [db.prepare("UPDATE businesses SET comp_until = ? WHERE id = ?").bind(new Date(Date.now() + setupDays * 86_400_000).toISOString(), id)]
         : []),
     ]);
     return json({ id });
