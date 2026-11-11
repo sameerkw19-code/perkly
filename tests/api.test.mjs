@@ -76,7 +76,7 @@ test("forged identity headers are ignored; pages require sign-in", async () => {
   const page = await fetch(BASE + "/", { redirect: "manual" });
   assert.equal(page.status, 200);
   const html = await page.text();
-  assert.match(html, /הכרטיס שגורם ללקוחות לחזור/);
+  assert.match(html, /הופכים לקוחות מזדמנים ללקוחות חוזרים/);
   assert.doesNotMatch(html, /oai-authenticated|join_code/);
   // Sign-up is the guided setup; the old address forwards there. "Talk to us" is a separate form.
   const signup = await fetch(BASE + "/signup", { redirect: "manual" });
