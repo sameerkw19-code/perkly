@@ -9,7 +9,9 @@ import { CafeLogo, Icon, QrArt } from "./visuals";
 import { ExampleCard } from "./example-card";
 import SiteAnalytics from "../../components/site-analytics";
 
-const STEP_ICONS = ["palette", "qr", "stamp", "repeat"];
+const STEP_ICONS = ["palette", "qr", "stamp"];
+const FIT_ICONS: Record<string, string> = { cafe: "coffee", barber: "scissors", pizza: "pizza" };
+const JOURNEY_ICONS = ["qr", "smartphone", "stamp", "gift"];
 
 function Check() {
   return <Icon name="check" size={18} stroke={2.6} className="lp-check" />;
@@ -196,6 +198,36 @@ export default function Landing({ lang, currency = "ILS" }: { lang: Lang; curren
               <p className="lp-small lp-muted">{c.examples.note}</p>
             </div>
             <ExamplesPicker lang={lang} />
+          </div>
+          <div className="lp-wrap">
+            <h3 className="lp-h3 lp-fit-title">{c.fit.title}</h3>
+            <ul className="lp-fit">
+              {c.fit.items.map((f) => (
+                <li key={f.key}>
+                  <span className="lp-step-icon" aria-hidden="true"><Icon name={FIT_ICONS[f.key]} size={22} /></span>
+                  <strong>{f.title}</strong>
+                  <span>{f.text}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        {/* The customer's side */}
+        <section className="lp-section lp-surface" aria-labelledby="journey-title">
+          <div className="lp-wrap">
+            <span className="lp-eyebrow">{c.journey.eyebrow}</span>
+            <h2 id="journey-title" className="lp-h2">{c.journey.title}</h2>
+            <ol className="lp-journey">
+              {c.journey.steps.map((j, i) => (
+                <li key={j.title}>
+                  <span className="lp-journey-num" aria-hidden="true">{i + 1}</span>
+                  <span className="lp-step-icon" aria-hidden="true"><Icon name={JOURNEY_ICONS[i]} size={22} /></span>
+                  <strong>{j.title}</strong>
+                  <span>{j.text}</span>
+                </li>
+              ))}
+            </ol>
           </div>
         </section>
 
