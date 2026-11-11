@@ -20,7 +20,7 @@ type Image = AssetMeta & { kind: string };
 type Editor = { draft: Design; publishedVersion: number; publishedAt: string | null; hasUnpublished: boolean; images: Image[] };
 type T = (key: string, vars?: Record<string, string | number>) => string;
 
-const MAX_SIDE = { logo: 660, hero: 1200, wallet: 1100, stamp: 400, stampEmpty: 400, pizza: 700 } as const;
+const MAX_SIDE = { logo: 660, hero: 1200, wallet: 1125, stamp: 400, stampEmpty: 400, pizza: 700 } as const;
 // Keep in step with MAX_BYTES in app/api/asset/route.ts (800 KB), with a margin for the request.
 const UPLOAD_CAP = 780_000;
 const SIZES: Size[] = ["s", "m", "l"];
