@@ -89,10 +89,10 @@ test("forged identity headers are ignored; pages require sign-in", async () => {
   assert.equal(contact.status, 200);
   const arabic = await fetch(BASE + "/ar", { redirect: "manual" });
   assert.equal(arabic.status, 200);
-  assert.match(await arabic.text(), /البطاقة التي تجعل الزبائن يعودون/);
+  assert.match(await arabic.text(), /نحوّل الزبائن العابرين إلى زبائن دائمين/);
   const english = await fetch(BASE + "/en", { redirect: "manual" });
   assert.equal(english.status, 200);
-  assert.match(await english.text(), /The card that brings customers back/);
+  assert.match(await english.text(), /Turn one-time customers into regulars/);
   // The admin control center sends visitors to sign in and back.
   const admin = await anon.get("/admin");
   assert.ok([302, 303, 307, 308].includes(admin.status), `admin status ${admin.status}`);
