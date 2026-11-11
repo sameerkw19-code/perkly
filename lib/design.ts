@@ -190,7 +190,7 @@ export const BIRTHDAY_GIFT_DAYS = 7;
 /** Longest special-day message a business can schedule. */
 export const SPECIAL_MAX_TEXT = 160;
 export const WALLET_LIMITS = { title: 24, reward: 36 };
-export const IMAGE_MIN = { logo: 660, hero: 1032, stamp: 120, wallet: 1032 };
+export const IMAGE_MIN = { logo: 660, hero: 800, stamp: 120, wallet: 1032 };
 
 export const PALETTES: Record<string, { bg: string; fg: string; stamp: string }> = {
   charcoal: { bg: "#1E1B2E", fg: "#FFFFFF", stamp: "#D9F493" },

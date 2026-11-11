@@ -118,7 +118,7 @@ td.start{text-align:start}
 .gw-row>div{display:grid;min-width:0}
 .gw-row small{font-size:11px;opacity:.8}
 .gw-row b{font-size:14.5px;font-weight:500;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.gw-hero{aspect-ratio:1032/812;max-height:220px;width:100%;display:grid;place-items:center;padding:18px 22px;background:color-mix(in srgb,var(--c-fg) 9%,var(--c-bg));background-size:cover;background-position:center}
+.gw-hero{aspect-ratio:1125/432;max-height:220px;width:100%;display:grid;place-items:center;padding:18px 22px;background:color-mix(in srgb,var(--c-fg) 9%,var(--c-bg));background-size:cover;background-position:center}
 
 /* editor */
 .editor-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:20px}
