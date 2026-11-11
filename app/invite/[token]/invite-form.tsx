@@ -81,7 +81,7 @@ export default function InviteForm({ token, business, inviteEmail, owner = false
                 {!owner && (
                   <>
                     <label>{t("phone")}<input name="phone" type="tel" required maxLength={20} autoComplete="tel" dir="ltr" /></label>
-                    <label>{t("birthDate")}<input name="birthDate" required inputMode="numeric" maxLength={10} placeholder={t("birthDatePh")} dir="ltr" autoComplete="bday" /><small className="form-hint">{t("birthDateHint")}</small></label>
+                    <label>{t("counterPassword")}<input name="birthDate" required inputMode="numeric" maxLength={10} placeholder={t("birthDatePh")} dir="ltr" autoComplete="bday" /><small className="form-hint">{t("birthDateHint")}</small></label>
                   </>
                 )}
                 <label>{t("email")}<input name="email" type="email" required maxLength={200} autoComplete="email" dir="ltr" defaultValue={inviteEmail ?? ""} readOnly={!!inviteEmail} /></label>
