@@ -388,13 +388,13 @@ export default function Dashboard() {
                       {(data.branches ?? []).map((br) => <option key={br.id} value={br.id}>{br.name}</option>)}
                     </select>
                   )}
-                  <button className="btn primary" onClick={() => setModal({ type: "customer" })}><Plus size={18} />{t("newCustomer")}</button>
-                  <button className="btn soft" onClick={() => { setView("station"); setQuery(""); }}><ScanLine size={18} />{t("station")}</button>
+                  <button className="btn primary" onClick={() => { setView("station"); setQuery(""); }}><ScanLine size={18} />{t("station")}</button>
+                  <button className="btn soft" onClick={() => setModal({ type: "customer" })}><Plus size={18} />{t("newCustomer")}</button>
                   <button className="btn soft" onClick={() => setModal({ type: "staffLink" })}><UserPlus size={18} />{t("staffLinkButton")}</button>
                 </div>
               </div>
-              {!!data.alerts?.length && <Alerts alerts={data.alerts} t={t} />}
               {data.summary && <Summary summary={data.summary} totals={{ customers: data.stats!.customers, ready: data.stats!.rewards_ready }} breakdown={data.breakdown} hasBranches={(data.branches?.length ?? 0) > 1} t={t} />}
+              {!!data.alerts?.length && <Alerts alerts={data.alerts} t={t} />}
               <section className="overview-grid">
                 <div className="panel card-panel join-panel">
                   <div className="section-head"><h2><QrCode size={18} /> {t("joinQr")}</h2></div>
@@ -990,17 +990,19 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
     }
   }
 
-  async function act(kind: "stamp" | "redeem") {
+  async function act(kind: "stamp" | "redeem", one = false) {
     if (!selected || busy) return;
     if (branches.length > 1 && !myBranch && !branch) { notify(t("err_branch_required"), true); return; }
     // Two taps instead of a browser confirm() box: some phones and home-screen apps block confirm() silently.
     if (kind === "redeem" && !redeemAsk) { setRedeemAsk(true); return; }
     setRedeemAsk(false);
-    const key = kind + ":" + (kind === "stamp" ? qty : "");
+    // `one`: a single stamp straight from the customer screen, whatever the quantity screen was left on.
+    const amount = one ? 1 : qty;
+    const key = kind + ":" + (kind === "stamp" ? amount : "");
     const requestId = pending && pending.kind === key && pending.customer === selected.id ? pending.requestId : crypto.randomUUID();
     setPending({ kind: key, customer: selected.id, requestId });
     setBusy(true);
-    const count = kind === "stamp" ? qty : undefined;
+    const count = kind === "stamp" ? amount : undefined;
     const r = await post("/api/loyalty", { action: kind, business: business.id, customer: selected.id, requestId, count, branch: myBranch ? undefined : branch || undefined });
     setBusy(false);
     if (r.ok) {
@@ -1154,8 +1156,8 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
             {!!selected.rewards && selected.nextExpiry && <small className="form-hint">{t("expiresOnShort", { d: new Date(selected.nextExpiry).toLocaleDateString(lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB", { timeZone: "Asia/Jerusalem" }) })}</small>}
             {(!!selected.rewards || full) && redeemButton}
             {!full && (
-              <button className={"btn big sx-wide " + (selected.rewards ? "soft" : "primary")} onClick={() => setStep("stamp")}>
-                <Plus size={18} />{t("sxAddStamps")}<ChevronRight size={16} className="sx-fwd" />
+              <button className={"btn big sx-wide " + (selected.rewards ? "soft" : "primary")} disabled={busy} onClick={() => act("stamp", true)}>
+                <Plus size={18} />{busy ? t("sending") : retrying && pending?.kind.startsWith("stamp") ? t("retry") : t("sxOneStamp")}
               </button>
             )}
             {full && <small className="form-hint">{t("sxFullFirst")}</small>}
@@ -1195,7 +1197,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
           )}
           <div className="sx-bar">
             <button className="btn soft" onClick={next}><ChevronRight size={16} className="sx-back" />{t("sxBack")}</button>
-            <button className="btn primary" disabled={full} onClick={() => setStep("stamp")}>{t("sxContinue")}<ChevronRight size={16} className="sx-fwd" /></button>
+            <button className="btn soft" disabled={full || busy} onClick={() => setStep("stamp")}>{t("sxManyStamps")}<ChevronRight size={16} className="sx-fwd" /></button>
           </div>
         </section>
       )}

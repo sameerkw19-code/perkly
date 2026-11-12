@@ -676,6 +676,8 @@ Object.assign(words, {
   sxNoRewards: ["אין עדיין הטבות זמינות", "لا توجد مكافآت متاحة بعد", "No rewards available yet"],
   sxRewardReady1: ["הטבה אחת מוכנה למימוש", "مكافأة واحدة جاهزة", "1 reward ready"],
   sxRewardReadyN: ["{n} הטבות מוכנות למימוש", "{n} مكافآت جاهزة", "{n} rewards ready"],
+  sxOneStamp: ["חותמת אחת", "ختم واحد", "One stamp"],
+  sxManyStamps: ["כמה חותמות", "عدة أختام", "Several stamps"],
   sxAddStamps: ["הוספת חותמות", "إضافة أختام", "Add stamps"],
   sxPunchCards: ["כרטיסייה", "بطاقة الأختام", "Punch card"],
   sxOf: ["{s} מתוך {t}", "{s} من {t}", "{s} of {t}"],
