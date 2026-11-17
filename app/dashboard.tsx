@@ -24,7 +24,7 @@ import { weekChange } from "../lib/weekly";
 import { Brand } from "../components/brand";
 
 type Role = "owner" | "staff";
-type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social; program?: "stamps" | "cashback" | "average"; cashback_bp?: number; cashback_min?: number; currency?: string; avg_cap?: number };
+type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social; program?: "stamps" | "cashback" | "average"; cashback_bp?: number; cashback_min?: number; currency?: string; avg_cap?: number; pos_only?: number };
 type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; rewards?: number; nextExpiry?: string | null; phone?: string; balance?: number; roundTotal?: number; rewardValue?: number | null };
 type Data = {
   me: { name: string; email: string };
@@ -948,6 +948,9 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
   const [balanceFix, setBalanceFix] = useState<{ value: string; note: string } | null>(null);
   // The "average" card: buy N, the next one free at the average of those purchases.
   const average = business.program === "average";
+  // Connected to the cashier: cards change only through the cashier; here staff see the card (owners can still correct).
+  const posOnly = !!business.pos_only;
+  const mayFix = canFix && (!posOnly || owner);
   const [avgText, setAvgText] = useState("");
   // Showing a new customer: reset the quantity and clear the search.
   function choose(c: CardState) {
@@ -1274,6 +1277,8 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
               <span className="sx-chip">{t("cbBackChip", { pct: pctLabel(bp) })}</span>
               {branchControl}
             </div>
+            {posOnly && <p className="pos-note" role="note">{t("posOnlyNote")}</p>}
+            {!posOnly && <>
             <form className="sx-box" onSubmit={(e) => { e.preventDefault(); if (buy) actBalance("purchase", buy); }}>
               <div className="sx-box-head">
                 <span className="sx-box-icon" aria-hidden="true"><Plus size={18} /></span>
@@ -1315,6 +1320,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
                 <small className="form-hint">{balance <= 0 ? t("cbNoBalance") : t("cbMinHint", { min: fmt(minUse) })}</small>
               )}
             </form>
+            </>}
             {balanceFix ? (
               <div className="fix-panel">
                 <h3>{t("cbFixTitle")}</h3>
@@ -1332,9 +1338,9 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
                   <button className="btn soft" onClick={() => setBalanceFix(null)}>{t("cancel")}</button>
                 </div>
               </div>
-            ) : (canFix || owner) && (
+            ) : (mayFix || owner) && (
               <div className="row-actions center-row st-more">
-                {canFix && <button className="btn soft small" onClick={() => setBalanceFix({ value: (balance / 100).toFixed(2).replace(/\.00$/, ""), note: "" })}><Activity size={14} />{t("cbFixTitle")}</button>}
+                {mayFix && <button className="btn soft small" onClick={() => setBalanceFix({ value: (balance / 100).toFixed(2).replace(/\.00$/, ""), note: "" })}><Activity size={14} />{t("cbFixTitle")}</button>}
                 {owner && <button className="text-btn" style={{ color: "#b4413a" }} disabled={busy} onClick={() => archiveCustomer(false)}>{archiveAsk ? t("archiveAgain") : t("archiveCustomer")}</button>}
                 {owner && archiveAsk && <button className="text-btn" style={{ color: "#b4413a" }} disabled={busy} onClick={() => archiveCustomer(true)}>{t("eraseCustomer")}</button>}
               </div>
@@ -1360,13 +1366,14 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
               <strong>{selected.rewards ? (selected.rewards === 1 ? t("sxRewardReady1") : t("sxRewardReadyN", { n: selected.rewards })) : full ? t("sxRewardReady1") : t("sxNoRewards")}</strong>
             </div>
             {!!selected.rewards && selected.nextExpiry && <small className="form-hint">{t("expiresOnShort", { d: new Date(selected.nextExpiry).toLocaleDateString(lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB", { timeZone: "Asia/Jerusalem" }) })}</small>}
-            {(!!selected.rewards || full) && redeemButton}
-            {!full && !average && (
+            {posOnly && <p className="pos-note" role="note">{t("posOnlyNote")}</p>}
+            {!posOnly && (!!selected.rewards || full) && redeemButton}
+            {!posOnly && !full && !average && (
               <button className={"btn big sx-wide " + (selected.rewards ? "soft" : "primary")} disabled={busy} onClick={() => act("stamp", true)}>
                 <Plus size={18} />{busy ? t("sending") : retrying && pending?.kind.startsWith("stamp") ? t("retry") : t("sxOneStamp")}
               </button>
             )}
-            {average && (() => {
+            {!posOnly && average && (() => {
               const amount = parseAmount(avgText);
               const total = (selected.roundTotal ?? 0) + (amount ?? 0);
               const n = selected.stamps + (amount ? 1 : 0);
@@ -1418,16 +1425,16 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
                 <button className="btn soft" onClick={() => setFixing(null)}>{t("cancel")}</button>
               </div>
             </div>
-          ) : (canFix || owner) && (
+          ) : (mayFix || owner) && (
             <div className="row-actions center-row st-more">
-              {canFix && <button className="btn soft small" onClick={() => setFixing({ value: selected.stamps, note: "" })}><Activity size={14} />{t("fixCount")}</button>}
+              {mayFix && <button className="btn soft small" onClick={() => setFixing({ value: selected.stamps, note: "" })}><Activity size={14} />{t("fixCount")}</button>}
               {owner && <button className="text-btn" style={{ color: "#b4413a" }} disabled={busy} onClick={() => archiveCustomer(false)}>{archiveAsk ? t("archiveAgain") : t("archiveCustomer")}</button>}
               {owner && archiveAsk && <button className="text-btn" style={{ color: "#b4413a" }} disabled={busy} onClick={() => archiveCustomer(true)}>{t("eraseCustomer")}</button>}
             </div>
           )}
           <div className="sx-bar">
             <button className="btn soft" onClick={next}><ChevronRight size={16} className="sx-back" />{t("sxBack")}</button>
-            {!average && <button className="btn soft" disabled={full || busy} onClick={() => setStep("stamp")}>{t("sxManyStamps")}<ChevronRight size={16} className="sx-fwd" /></button>}
+            {!average && !posOnly && <button className="btn soft" disabled={full || busy} onClick={() => setStep("stamp")}>{t("sxManyStamps")}<ChevronRight size={16} className="sx-fwd" /></button>}
           </div>
         </section>
       )}

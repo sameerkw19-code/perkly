@@ -103,6 +103,38 @@ export async function POST(request: Request) {
       ]);
       return json({ ok: true, url: `${new URL(request.url).origin}/invite/${token}`, expires });
     }
+    case "pos_key_create": {
+      // A cashier key for this business (optionally for one branch). Shown once; only its hash is kept.
+      const label = str(body.label, 60) || "קופה";
+      const branch = str(body.branch, 64);
+      if (branch && !(await db.prepare("SELECT 1 FROM branches WHERE id = ? AND business = ? AND archived IS NULL").bind(branch, businessId).first())) {
+        return fail("branch_invalid", 400, "Unknown branch");
+      }
+      const count = await db.prepare("SELECT COUNT(*) AS n FROM pos_keys WHERE business = ? AND revoked IS NULL").bind(businessId).first<{ n: number }>();
+      if ((count?.n ?? 0) >= 20) return fail("too_many", 400, "Up to 20 active keys");
+      const key = "pk_" + randomToken(32);
+      const id = crypto.randomUUID();
+      await db.batch([
+        db.prepare("INSERT INTO pos_keys(id, business, key_hash, label, branch, created, created_by) VALUES(?, ?, ?, ?, ?, ?, ?)")
+          .bind(id, businessId, await sha256(key), label, branch || null, nowIso, user.id),
+        // The first cashier key: from now on cards change through the cashier (Perkly can turn this off).
+        ...((count?.n ?? 0) === 0 ? [db.prepare("UPDATE businesses SET pos_only = 1 WHERE id = ?").bind(businessId)] : []),
+        log("pos_key_create", label),
+      ]);
+      return json({ ok: true, id, key, label });
+    }
+    case "pos_key_revoke": {
+      const id = str(body.key, 64);
+      const r = await db.prepare("UPDATE pos_keys SET revoked = ? WHERE id = ? AND business = ? AND revoked IS NULL").bind(nowIso, id, businessId).run();
+      if (!r.meta.changes) return fail("not_found", 404, "Key not found");
+      await log("pos_key_revoke", id).run();
+      return json({ ok: true });
+    }
+    case "pos_only": {
+      const on = body.on === true ? 1 : 0;
+      await db.batch([db.prepare("UPDATE businesses SET pos_only = ? WHERE id = ?").bind(on, businessId), log("pos_only", on ? "on" : "off")]);
+      return json({ ok: true, on: !!on });
+    }
     case "owner_designs": {
       // Lets this business's owner edit their own card design (Perkly designs by default).
       const on = body.on === true ? 1 : 0;

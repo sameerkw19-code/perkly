@@ -600,3 +600,4 @@ details.st-glossary dl { margin: 10px 0 0; }
 @media (max-width: 760px) { .lp-fit { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 420px) { .lp-journey { grid-template-columns: minmax(0, 1fr); } }
 @media (prefers-reduced-motion: reduce) { .lp-fit li, .lp-journey li { transition: none; } .lp-fit li:hover, .lp-journey li:hover { transform: none; } }
+.pos-code{background:#16151b;color:#f3f2ee;border-radius:12px;padding:14px 16px;overflow-x:auto;font-size:14px;line-height:1.6;text-align:left}.pos-code code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre}

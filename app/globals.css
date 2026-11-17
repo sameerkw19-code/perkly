@@ -730,3 +730,5 @@ html,body{overflow-x:clip}
 .pcard-balance b{font-size:calc(44px*var(--c-ts,1));line-height:1.1;font-variant-numeric:tabular-nums}
 @media(max-width:760px){.head-actions{flex-wrap:wrap;justify-content:flex-start}}
 .avg-form{display:grid;gap:8px}
+.pos-made{background:#fff8e6;border-radius:12px;padding:12px 14px;display:grid;gap:8px;margin:8px 0}.pos-made input{font-family:ui-monospace,monospace;flex:1;min-width:0}
+.pos-note{background:#eef6ff;color:#1d4a7a;border-radius:12px;padding:12px 14px;margin:0;font-size:14px;line-height:1.5}

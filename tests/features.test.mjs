@@ -529,7 +529,8 @@ test("apple wallet: off without the key; the pass token is stable per serial and
 test("apple wallet: stamps and new designs ask iPhones to refresh the pass", () => {
   const read = (f) => readFileSync(new URL("../" + f, import.meta.url), "utf8");
   const loyalty = read("app/api/loyalty/route.ts");
-  assert.match(loyalty, /pushAppleCustomer\(db, fresh\.id\)/);
+  // Card actions (station and cashier API) live in one module.
+  assert.match(read("lib/server/card-actions.ts"), /pushAppleCustomer\(db, fresh\.id\)/);
   assert.match(loyalty, /pushAppleBusiness\(db, business\.id\)/);
   const push = read("lib/server/apple-push.ts");
   assert.match(push, /apns-topic/);
@@ -636,7 +637,7 @@ test("staff station: find → card → stamps → done, back to the start by its
   // A full card in "block" mode cannot be stamped before the reward is used.
   assert.match(station, /disabled=\{full \|\| busy\} onClick=\{\(\) => setStep\("stamp"\)\}/);
   // One stamp is one tap on the customer's card; it is offered only when the card is not full.
-  assert.match(station, /\{!full && !average && \(\s*<button[^>]*onClick=\{\(\) => act\("stamp", true\)\}/);
+  assert.match(station, /\{!posOnly && !full && !average && \(\s*<button[^>]*onClick=\{\(\) => act\("stamp", true\)\}/);
   const i18n = readFileSync(new URL("../lib/i18n.ts", import.meta.url), "utf8");
   for (const k of ["sxFind", "sxScan", "sxRegister", "sxNoRewards", "sxAddStamps", "sxReturning"]) assert.match(i18n, new RegExp(`  ${k}: \\[`), k);
 });

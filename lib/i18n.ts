@@ -753,6 +753,8 @@ Object.assign(words, {
   avgCardHint: ["הקנייה החינם שווה לממוצע הקניות שלכם בסבב.", "الشراء المجاني يساوي متوسط مشترياتكم في الجولة.", "Your free purchase is worth the average of your purchases this round."],
   avgCardSoFar: ["כרגע: {amount}", "حالياً: {amount}", "So far: {amount}"],
   avgCardReady: ["הטבה מוכנה בשווי {amount}", "مكافأة جاهزة بقيمة {amount}", "Reward ready, worth {amount}"],
+  posOnlyNote: ["העסק מחובר לקופה: חותמות, קניות ומימוש נרשמים רק דרך הקופה. כאן רואים את מצב הכרטיס.", "المشروع مرتبط بالصندوق: الأختام والمشتريات والاستبدال تُسجَّل عبر الصندوق فقط. هنا ترى حالة البطاقة.", "This business is connected to its cashier: stamps, purchases and redemptions are recorded only through the cashier. Here you see the card."],
+  err_pos_only: ["העסק מחובר לקופה, והכרטיסים מתעדכנים רק דרך הקופה.", "المشروع مرتبط بالصندوق، والبطاقات تتحدث عبر الصندوق فقط.", "This business is connected to its cashier; cards change only through the cashier."],
   err_bad_amount: ["הסכום לא תקין. כותבים מספר, למשל 45 או 45.90.", "المبلغ غير صحيح. اكتب رقماً، مثلاً 45 أو 45.90.", "That amount is not valid. Type a number, for example 45 or 45.90."],
   err_not_enough_balance: ["אין מספיק יתרה בכרטיס.", "الرصيد في البطاقة لا يكفي.", "There is not enough balance on the card."],
   err_below_minimum: ["היתרה עוד לא הגיעה לסכום המינימלי לשימוש.", "الرصيد لم يصل بعد إلى الحد الأدنى للاستعمال.", "The balance has not reached the minimum to use it yet."],
