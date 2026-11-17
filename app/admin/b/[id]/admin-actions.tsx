@@ -233,8 +233,8 @@ export function AdminCardPreview({ design, target }: { design: Design; target: n
  * When the card is ready: sends the owner a link to their payment page (sign-in, then the subscription step).
  * Opens WhatsApp with a ready message, to the number typed here or to a chat the admin picks.
  */
-export function PaymentLink({ business, name, shekels }: { business: string; name: string; shekels: boolean }) {
-  const [phone, setPhone] = useState("");
+export function PaymentLink({ business, name, shekels, defaultPhone = "" }: { business: string; name: string; shekels: boolean; defaultPhone?: string }) {
+  const [phone, setPhone] = useState(defaultPhone);
   const [withCode, setWithCode] = useState(shekels);
   const [copied, setCopied] = useState(false);
   const link = `https://perkly.shop/login?next=/start?b=${business}`;

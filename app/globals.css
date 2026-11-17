@@ -718,3 +718,4 @@ html,body{overflow-x:clip}
 .admin-kinds legend{margin-bottom:6px;font-weight:600}
 .admin-new-preview{position:sticky;top:16px}
 @media(max-width:860px){.admin-new{grid-template-columns:1fr}.admin-new-preview{position:static}}
+.account-sub{font-size:15px;margin:10px 0 0}

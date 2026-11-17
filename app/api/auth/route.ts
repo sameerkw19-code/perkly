@@ -490,6 +490,34 @@ export async function POST(request: Request) {
       return json({ ok: true, email: row.new_email });
     }
 
+    // A contact phone on the account (empty clears it). Not used for signing in.
+    case "set_phone": {
+      const user = await getUser(db, request.headers.get("cookie"));
+      if (!user) return fail("signin", 401, "Sign in required");
+      if (!(await allow(db, `set-phone:${user.id}`, 20, 3600))) return fail("rate_limited", 429, "Too many attempts");
+      const raw = typeof body.phone === "string" ? body.phone.trim() : "";
+      const phone = raw ? normalizePhone(raw) : null;
+      if (raw && !phone) return fail("bad_phone", 400, "Invalid phone");
+      await db.prepare("UPDATE users SET phone = ? WHERE id = ?").bind(phone, user.id).run();
+      return json({ ok: true, phone: phone ? formatPhone(phone) : "" });
+    }
+
+    // Changing only the counter phone: the date of birth (the counter password) stays as it is.
+    case "change_worker_phone": {
+      const user = await getUser(db, request.headers.get("cookie"));
+      if (!user) return fail("signin", 401, "Sign in required");
+      if (!(await allow(db, `worker-set:${user.id}`, 10, 3600))) return fail("rate_limited", 429, "Too many attempts");
+      const me = await db.prepare("SELECT pass_hash, worker_secret FROM users WHERE id = ?").bind(user.id).first<{ pass_hash: string; worker_secret: string | null }>();
+      const password = typeof body.password === "string" ? body.password.slice(0, 200) : "";
+      if (!me || !(await verifyPassword(password, me.pass_hash))) return fail("bad_password", 401, "Wrong password");
+      if (!me.worker_secret) return fail("no_worker_login", 400, "Set up the counter sign-in first");
+      const phone = normalizePhone(body.phone);
+      if (!phone) return fail("bad_phone", 400, "Invalid phone");
+      if (await db.prepare("SELECT 1 FROM users WHERE worker_phone = ? AND id != ?").bind(phone, user.id).first()) return fail("worker_phone_taken", 409, "This phone already belongs to another worker");
+      await db.prepare("UPDATE users SET worker_phone = ? WHERE id = ?").bind(phone, user.id).run();
+      return json({ ok: true, workerPhone: formatPhone(phone) });
+    }
+
     case "set_worker_login": {
       const user = await getUser(db, request.headers.get("cookie"));
       if (!user) return fail("signin", 401, "Sign in required");

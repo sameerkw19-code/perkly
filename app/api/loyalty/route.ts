@@ -733,6 +733,30 @@ export async function POST(request: Request) {
       return json({ customers: rows.results.map((c) => ({ ...c, phone: formatPhone(originalPhone(c.phone)) })) });
     }
 
+    case "update_customer_phone": {
+      // The owner (or Perkly) fixes a customer's number, for example after the customer changed phones.
+      // The card, stamps and history stay; only the number changes. Another active card with that number blocks it.
+      const denied = ownerOnly(); if (denied) return denied;
+      const phone = normalizePhone(p.phone);
+      if (!phone) return fail("bad_phone", 400, "Invalid phone");
+      const c = await db
+        .prepare("SELECT id, phone FROM customers WHERE id = ? AND business = ? AND archived IS NULL AND erased IS NULL")
+        .bind(p.customer ?? "", business.id)
+        .first<{ id: string; phone: string }>();
+      if (!c) return fail("unknown_card", 404, "Customer not found");
+      if (c.phone === phone) return json({ ok: true, phone: formatPhone(phone) });
+      if (await db.prepare("SELECT 1 FROM customers WHERE business = ? AND phone = ? AND archived IS NULL").bind(business.id, phone).first()) {
+        return fail("phone_in_use", 409, "Another card in this business has this phone");
+      }
+      // A removed card may still hold the number: rename it first, in the same batch.
+      const [, r] = await db.batch([
+        releaseArchivedPhone(db, business.id, phone),
+        db.prepare("UPDATE customers SET phone = ? WHERE id = ? AND business = ? AND archived IS NULL AND erased IS NULL").bind(phone, c.id, business.id),
+      ]);
+      if (!r.meta.changes) return fail("unknown_card", 404, "Customer not found");
+      return json({ ok: true, phone: formatPhone(phone) });
+    }
+
     case "restore_customer": {
       const denied = ownerOnly(); if (denied) return denied;
       const c = await db
