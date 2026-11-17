@@ -1065,6 +1065,11 @@ test("cashier API: a business key records sales by phone or card code, once per 
   const look = await pos("customer", key, { phone: "052-123-0001" });
   assert.equal(look.body.customer.name, "Lior");
   assert.equal(look.body.customer.program, "stamps");
+  // The member's details, so the cashier can add them to its own club.
+  assert.equal(look.body.customer.phone, "+972521230001");
+  assert.equal(look.body.customer.birthday, null);
+  assert.equal(look.body.customer.marketing_consent, false);
+  assert.ok(look.body.customer.joined);
 
   assert.equal((await pos("purchase", key, { phone: "0521230001" })).body.code, "transaction_id_required");
   const sale = await pos("purchase", key, { phone: "0521230001", transaction_id: "INV-1", items: 2 });

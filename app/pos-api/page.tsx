@@ -27,8 +27,11 @@ export default function PosApiPage() {
       <h2>3. בדיקת כרטיס</h2>
       <Code>{`POST https://perkly.shop/api/pos/v1/customer
 { "phone": "0541234567" }`}</Code>
-      <Code>{`{ "ok": true, "customer": { "name": "מיכל", "program": "stamps", "currency": "ILS",
+      <Code>{`{ "ok": true, "customer": { "name": "מיכל", "phone": "+972541234567", "birthday": "03-14",
+  "marketing_consent": true, "joined": "2026-11-18T09:12:00.000Z",
+  "program": "stamps", "currency": "ILS",
   "stamps": 3, "target": 9, "rewards_ready": 0, "reward_value": null, "balance": 0, "round_total": 0 } }`}</Code>
+      <p>פרטי החבר מאפשרים לקופה להוסיף אותו גם למועדון הלקוחות שלה: <code dir="ltr">phone</code> בפורמט בינלאומי, <code dir="ltr">birthday</code> כחודש־יום (<code dir="ltr">MM-DD</code>, בלי שנה) או <code dir="ltr">null</code>, ו־<code dir="ltr">marketing_consent</code> אומר אם הלקוח הסכים לקבל הודעות שיווקיות מהעסק. בלי הסכמה כזו אסור לשלוח לו מבצעים ב־SMS, בווטסאפ או במייל.</p>
       <p><code dir="ltr">program</code> הוא סוג הכרטיס: <code dir="ltr">stamps</code> (חותמות), <code dir="ltr">cashback</code> (יתרה, הסכומים באגורות) או <code dir="ltr">average</code> (קנה X והבאה חינם לפי ממוצע; <code dir="ltr">reward_value</code> באגורות).</p>
 
       <h2>4. רישום מכירה</h2>
