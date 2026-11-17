@@ -52,8 +52,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ op:
 
   const card = async (fresh: Customer) => {
     const s = await cardState(db, fresh, business.reward_mode);
+    // The member's details, so the cashier can add them to its own customer club (the business owns this data).
+    const member = fresh as Customer & { birthday?: string | null; consent_marketing?: number | null; created?: string };
     return {
-      name: s.name, program: business.program, currency: business.currency,
+      name: s.name, phone: fresh.phone, birthday: member.birthday ?? null, marketing_consent: !!member.consent_marketing, joined: member.created ?? null,
+      program: business.program, currency: business.currency,
       stamps: s.stamps, target: s.target, rewards_ready: s.rewards, reward_value: s.rewardValue ?? null,
       balance: s.balance, round_total: s.roundTotal,
     };

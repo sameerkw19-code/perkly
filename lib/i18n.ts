@@ -392,7 +392,7 @@ const words: Record<string, Entry> = {
   joinOpenCard: ["לכרטיס שלי", "إلى بطاقتي", "Open my card"],
   joinIntro: ["ממלאים שם וטלפון ומקבלים כרטיס אישי בטלפון.", "أدخل اسمك وهاتفك واحصل على بطاقة شخصية على هاتفك.", "Enter your name and phone and get a personal card on your phone."],
   terms: ["אני מאשר/ת לעסק לשמור את השם והטלפון שלי לצורך כרטיס הנאמנות.", "أوافق على حفظ اسمي وهاتفي لدى المشروع لغرض بطاقة الولاء.", "I agree that the business may keep my name and phone for the loyalty card."],
-  marketing: ["אשמח לקבל עדכונים ומבצעים מהעסק (לא חובה).", "أرغب بتلقي تحديثات وعروض من المشروع (اختياري).", "I'd like to receive updates and offers from the business (optional)."],
+  marketing: ["אשמח לקבל מהעסק עדכונים ומבצעים ב־SMS, בווטסאפ ובמייל (לא חובה, אפשר להסיר בכל עת).", "أرغب بتلقي تحديثات وعروض من المشروع عبر SMS وواتساب والبريد الإلكتروني (اختياري، يمكن الإلغاء في أي وقت).", "I'd like to receive updates and offers from the business by SMS, WhatsApp and email (optional, you can opt out any time)."],
   legalLinks: ["מדיניות פרטיות", "سياسة الخصوصية", "Privacy policy"],
   termsLink: ["תנאי שימוש", "شروط الاستخدام", "Terms of use"],
   getCard: ["קבלת הכרטיס", "احصل على البطاقة", "Get my card"],

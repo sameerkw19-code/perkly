@@ -16,10 +16,10 @@ export default async function PrivacyPage() {
   return (await visitorRegion()).israel ? <PrivacyPageHe /> : <PrivacyEn />;
 }
 
-// Reviewed by a lawyer on 25 October 2026; the analytics line (26 Oct) still needs review. Describes what the code actually does: keep it in sync.
+// Reviewed by a lawyer on 25 October 2026; the analytics line (26 Oct) and the cashier line (18 Nov) still need review. Describes what the code actually does: keep it in sync.
 function PrivacyPageHe() {
   return (
-    <LegalPage title="מדיניות פרטיות" updated="26 באוקטובר 2026">
+    <LegalPage title="מדיניות פרטיות" updated="18 בנובמבר 2026">
       <p>מדיניות זו מסבירה איזה מידע Perkly ({OPERATOR_LINE}) אוספת, למה, איפה הוא נשמר ומה הזכויות שלכם.</p>
 
       <h2>מי אחראי על המידע</h2>
@@ -57,6 +57,7 @@ function PrivacyPageHe() {
       <ul>
         <li><strong>Cloudflare:</strong> אחסון האתר, מסד הנתונים וספירת כניסות אנונימית לדפים הציבוריים. השרתים יכולים להיות גם מחוץ לישראל.</li>
         <li><strong>Polar:</strong> עיבוד תשלומים של בעלי עסקים.</li>
+        <li><strong>מערכת הקופה של העסק:</strong> רק אם העסק חיבר את הקופה שלו ל־Perkly. כשהקופאי מחפש לקוח לפי טלפון או קוד הכרטיס, הקופה מקבלת את השם, הטלפון, יום ההולדת (אם נמסר), ההסכמה לקבל עדכונים ומצב הכרטיס, כדי לרשום את הקנייה ולצרף את הלקוח למועדון הלקוחות של העסק. מערכת הקופה שייכת לעסק, והעסק אחראי על השימוש שלה במידע.</li>
         <li><strong>Google Wallet:</strong> רק אם לקוח בוחר להוסיף את הכרטיס לארנק. במקרה כזה נשלחים לגוגל מספר החותמות, מספר ההטבות וקוד הסריקה, בלי שם ובלי טלפון.</li>
       </ul>
       <p>כל עסק רואה רק את הלקוחות שלו. עובדים רואים מידע מצומצם (למשל ארבע הספרות האחרונות של הטלפון). מנהלי המערכת של Perkly רואים נתוני עסקים לצורך תפעול ותמיכה, ולא את שמות הלקוחות ומספרי הטלפון שלהם.</p>

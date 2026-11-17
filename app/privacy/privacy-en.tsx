@@ -5,7 +5,7 @@ import { OPERATOR, OPERATOR_LINE_EN } from "../legal/operator";
 // and with what the code actually does.
 export default function PrivacyEn() {
   return (
-    <LegalPage lang="en" title="Privacy Policy" updated="October 26, 2026">
+    <LegalPage lang="en" title="Privacy Policy" updated="November 18, 2026">
       <p>This policy explains what information Perkly ({OPERATOR_LINE_EN}) collects, why, where it is kept and what your rights are.</p>
 
       <h2>Who is responsible for the information</h2>
@@ -43,6 +43,7 @@ export default function PrivacyEn() {
       <ul>
         <li><strong>Cloudflare:</strong> hosting the site, the database and anonymous visit counts for the public pages. Servers may be outside Israel.</li>
         <li><strong>Polar:</strong> processing business owners&apos; payments.</li>
+        <li><strong>The business's cashier system:</strong> only if the business connected its cashier to Perkly. When the cashier looks up a customer by phone or card code, it receives the name, phone, birthday (if given), the consent to receive updates and the card's status, to record the purchase and add the customer to the business's own customer club. The cashier system belongs to the business, which is responsible for how it uses the data.</li>
         <li><strong>Google Wallet:</strong> only if a customer chooses to add the card to their wallet. In that case the number of stamps, the number of rewards and the scan code are sent to Google, without the name or phone.</li>
       </ul>
       <p>Each business sees only its own customers. Staff see limited information (for example the last four digits of the phone). Perkly&apos;s system administrators see business data for operations and support, but not customers&apos; names and phone numbers.</p>
