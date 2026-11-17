@@ -5,6 +5,7 @@ import { SocialIcon } from "../lib/social-icon";
 import {
   Activity, AlertTriangle, Trash2, Cake, Check, Copy, CreditCard, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode,
   ChevronRight, History, Palette, RefreshCw, RotateCcw, ScanLine, Search, Settings, Share2, Store, UserPlus, Users, UserRound, X,
+  Phone,
 } from "lucide-react";
 import type { Design } from "../lib/design";
 import { CardEditor } from "../components/card-editor";
@@ -64,7 +65,8 @@ type Modal =
   | { type: "business" }
   | { type: "link"; url: string; title: string; note?: string }
   | { type: "correct"; customer: any }
-  | { type: "remove"; customer: any };
+  | { type: "remove"; customer: any }
+  | { type: "phone"; customer: any };
 
 export default function Dashboard() {
   const { lang, setLang, t, dir } = useLang();
@@ -468,6 +470,7 @@ export default function Dashboard() {
                                 if (r) setModal({ type: "link", url: r.cardUrl, title: c.name });
                               }}><Link2 size={16} /></button>
                               <button className="icon-btn" title={t("correct")} aria-label={t("correct")} onClick={() => setModal({ type: "correct", customer: c })}><Activity size={16} /></button>
+                              <button className="icon-btn" title={t("editPhone")} aria-label={`${t("editPhone")}: ${c.name}`} onClick={() => setModal({ type: "phone", customer: c })}><Phone size={16} /></button>
                               <button className="icon-btn danger-icon" title={t("archiveCustomer")} aria-label={`${t("archiveCustomer")}: ${c.name}`} onClick={() => setModal({ type: "remove", customer: c })}><Trash2 size={16} /></button>
                             </div>
                           </td>
@@ -662,6 +665,24 @@ export default function Dashboard() {
                 <p className="form-hint">{t("correctHint")}</p>
                 <div className="form-actions">
                   <button className="btn primary" disabled={busy}>{t("save")}</button>
+                  <button type="button" className="btn soft" onClick={() => setModal(null)}>{t("cancel")}</button>
+                </div>
+              </form>
+            )}
+
+            {modal.type === "phone" && (
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                const form = new FormData(e.currentTarget);
+                const r = await call({ action: "update_customer_phone", customer: modal.customer.id, phone: form.get("customerPhone") });
+                if (r) { notify(t("customerPhoneSaved", { phone: `\u2066${r.phone}\u2069` })); load(); setModal(null); }
+              }}>
+                <span className="modal-icon"><Phone /></span>
+                <h2>{t("editPhone")}</h2>
+                <p><strong>{modal.customer.name}</strong> · <span dir="ltr">{modal.customer.phone}</span></p>
+                <label>{t("newPhone")}<input id="customerPhone" name="customerPhone" type="tel" required maxLength={20} autoComplete="off" dir="ltr" autoFocus /></label>
+                <div className="form-actions">
+                  <button className="btn primary" disabled={busy}>{busy ? t("sending") : t("save")}</button>
                   <button type="button" className="btn soft" onClick={() => setModal(null)}>{t("cancel")}</button>
                 </div>
               </form>

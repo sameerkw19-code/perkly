@@ -7,6 +7,7 @@ import { AdminActions, OwnerLink, PaymentLink, AdminCardPreview, ApplePushTest, 
 import { env } from "cloudflare:workers";
 import { planOf } from "../../../../lib/server/billing";
 import { isPlatformAdmin } from "../../../../lib/server/auth";
+import { formatPhone } from "../../../../lib/phone";
 
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false }, title: "Perkly · ניהול עסק" };
@@ -32,13 +33,13 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
   const b = await db
     .prepare(
       `SELECT b.id, b.owner, b.name, b.reward, b.target, b.color, b.created, b.reward_mode, b.suspended, b.suspend_reason, b.comp_until, b.archived, b.kit_due, b.kit_sent, b.owner_designs, b.currency,
-         s.status, s.plan, s.current_period_end, s.external_subscription, s.updated AS sub_updated, u.email AS owner_email
+         s.status, s.plan, s.current_period_end, s.external_subscription, s.updated AS sub_updated, u.email AS owner_email, u.phone AS owner_phone
        FROM businesses b LEFT JOIN subscriptions s ON s.business = b.id LEFT JOIN users u ON u.id = b.owner WHERE b.id = ?`,
     )
     .bind(id)
     .first<{
       id: string; name: string; reward: string; target: number; color: string; created: string; reward_mode: string;
-      owner: string; suspended: string | null; suspend_reason: string | null; comp_until: string | null; archived: string | null; owner_email: string | null;
+      owner: string; suspended: string | null; suspend_reason: string | null; comp_until: string | null; archived: string | null; owner_email: string | null; owner_phone: string | null;
       status: string | null; current_period_end: string | null; external_subscription: string | null; sub_updated: string | null;
       plan: string | null; kit_due: string | null; kit_sent: string | null; owner_designs: number; currency: string;
     }>();
@@ -111,6 +112,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
           <section className="panel">
             <h2>מנוי</h2>
             <dl className="admin-dl">
+              <dt>בעל העסק</dt><dd><span dir="ltr">{b.owner_email ?? "—"}</span>{b.owner_phone && !withPerkly ? <> · <bdi dir="ltr">{formatPhone(b.owner_phone)}</bdi></> : null}</dd>
               <dt>סטטוס ב-Polar</dt><dd>{b.status ?? "אין מנוי"}</dd>
               <dt>מסלול</dt><dd>{b.status ? (planOf(b.plan, env) === "yearly" ? "שנתי (ערכת קופה כלולה)" : "חודשי") : "—"}</dd>
               <dt>Apple Wallet</dt><dd><ApplePushTest business={b.id} /></dd>
@@ -123,7 +125,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
             </dl>
             {withPerkly
               ? <OwnerLink business={b.id} name={b.name} shekels={b.currency !== "USD"} />
-              : !(b.status === "active" || b.status === "trialing") && <PaymentLink business={b.id} name={b.name} shekels={b.currency !== "USD"} />}
+              : !(b.status === "active" || b.status === "trialing") && <PaymentLink business={b.id} name={b.name} shekels={b.currency !== "USD"} defaultPhone={b.owner_phone ? formatPhone(b.owner_phone) : ""} />}
           </section>
 
           <section className="panel">

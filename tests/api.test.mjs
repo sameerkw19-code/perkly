@@ -863,3 +863,66 @@ test("Perkly builds a business for a client, then hands it over with a single-us
   const ownView = (await stranger.get(`/api/loyalty?business=${own.body.id}`)).body;
   assert.ok(!ownView.setup || ownView.setup.until < new Date(Date.now() + 60 * 86_400_000).toISOString(), "no 90-day setup for a normal owner");
 });
+
+test("change the sign-in email: needs the current password, refuses a taken or same address", async () => {
+  const a = new Client();
+  await signup(a, "mover");
+  const other = new Client();
+  await signup(other, "taken");
+  const oldEmail = `mover-${run}@test.perkly`;
+  const newEmail = `moved-${run}@test.perkly`;
+  assert.equal((await new Client().post("/api/auth", { action: "change_email_start", email: newEmail, password: "correct horse 1" })).status, 401);
+  assert.equal((await a.post("/api/auth", { action: "change_email_start", email: newEmail, password: "wrong pass 123" })).body.code, "bad_password");
+  assert.equal((await a.post("/api/auth", { action: "change_email_start", email: "not an email", password: "correct horse 1" })).body.code, "bad_email");
+  assert.equal((await a.post("/api/auth", { action: "change_email_start", email: oldEmail, password: "correct horse 1" })).body.code, "same_email");
+  assert.equal((await a.post("/api/auth", { action: "change_email_start", email: `taken-${run}@test.perkly`, password: "correct horse 1" })).body.code, "email_in_use");
+  // Without email sending (tests), the change happens after the password check; with it, a code goes to the new address first.
+  const r = await a.post("/api/auth", { action: "change_email_start", email: newEmail.toUpperCase(), password: "correct horse 1" });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  if (r.body.changed) {
+    assert.equal(r.body.email, newEmail);
+    assert.equal((await new Client().post("/api/auth", { action: "login", email: newEmail, password: "correct horse 1" })).status, 200);
+    assert.equal((await new Client().post("/api/auth", { action: "login", email: oldEmail, password: "correct horse 1" })).status, 401);
+  } else {
+    assert.ok(r.body.challenge);
+    assert.equal((await a.post("/api/auth", { action: "change_email_confirm", challenge: r.body.challenge, code: "000000" })).body.code, "code_invalid");
+  }
+  // A code from someone else's request does not work for this account.
+  assert.equal((await other.post("/api/auth", { action: "change_email_confirm", challenge: "x".repeat(24), code: "123456" })).body.code, "code_invalid");
+});
+
+test("phones: an owner's contact phone, a worker's counter phone, and a customer's phone", async () => {
+  // Contact phone on the account.
+  const o = new Client();
+  await signup(o, "phones");
+  assert.equal((await o.post("/api/auth", { action: "set_phone", phone: "12" })).body.code, "bad_phone");
+  assert.equal((await o.post("/api/auth", { action: "set_phone", phone: "052-111 2233" })).body.phone, "052-111-2233");
+  assert.equal((await o.post("/api/auth", { action: "set_phone", phone: "" })).body.phone, "");
+  assert.equal((await new Client().post("/api/auth", { action: "set_phone", phone: "0521112233" })).status, 401);
+
+  // A customer's phone: the owner changes it; staff cannot; a number another card uses is refused.
+  const biz = (await o.post("/api/loyalty", { action: "create_business", name: "Phones", reward: "x", target: 5, color: "#123456" })).body.id;
+  const a = (await o.act(biz, "register_customer", { name: "A", phone: "0531110001" })).body.id;
+  await o.act(biz, "register_customer", { name: "B", phone: "0531110002" });
+  assert.equal((await o.act(biz, "update_customer_phone", { customer: a, phone: "0531110002" })).body.code, "phone_in_use");
+  const moved = await o.act(biz, "update_customer_phone", { customer: a, phone: "053-111-0009" });
+  assert.equal(moved.status, 200, JSON.stringify(moved.body));
+  assert.equal(moved.body.phone, "053-111-0009");
+  // The card keeps its stamps; the old number is free for a new card.
+  assert.equal((await o.act(biz, "register_customer", { name: "C", phone: "0531110001" })).status, 200);
+
+  const inv = await o.act(biz, "staff_link", { label: "W" });
+  assert.equal(inv.status, 200, JSON.stringify(inv.body));
+  const w = new Client();
+  const wPhone = "05" + String(Math.floor(Math.random() * 1e8)).padStart(8, "0");
+  const joined = await w.post("/api/auth", { action: "accept_invite", token: new URL(inv.body.inviteUrl).pathname.split("/").pop(), name: "W", email: `w-${run}@test.perkly`, password: "staff pass 12", phone: wPhone, birthDate: "02021992" });
+  assert.equal(joined.status, 200, JSON.stringify(joined.body));
+  assert.equal((await w.act(biz, "update_customer_phone", { customer: a, phone: "0531110010" })).status, 403);
+
+  // A worker changes only the counter phone; the date of birth stays the password.
+  const newPhone = "05" + String(Math.floor(Math.random() * 1e8)).padStart(8, "0");
+  assert.equal((await w.post("/api/auth", { action: "change_worker_phone", phone: newPhone, password: "wrong pass 12" })).body.code, "bad_password");
+  assert.equal((await w.post("/api/auth", { action: "change_worker_phone", phone: newPhone, password: "staff pass 12" })).status, 200);
+  assert.equal((await new Client().post("/api/auth", { action: "worker_login", phone: newPhone, birthDate: "02021992" })).status, 200);
+  assert.equal((await new Client().post("/api/auth", { action: "worker_login", phone: wPhone, birthDate: "02021992" })).status, 401);
+});
