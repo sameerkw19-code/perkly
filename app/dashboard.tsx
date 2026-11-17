@@ -536,7 +536,7 @@ export default function Dashboard() {
               <div className="page-head"><div><h1>{t("design")}</h1><p className="muted">{t("designNoBalance")}</p></div></div>
               <CardEditor key={b.id + ":" + data.editor.publishedVersion} businessId={b.id} target={b.target} editor={data.editor} t={t} lang={lang} notify={notify} reload={load}
                 paid={!!data.access?.ok && !data.access.free} upgradeHref={`/start?b=${encodeURIComponent(b.id)}`} specialDays={manage}
-                cashback={b.program === "cashback" ? { bp: b.cashback_bp ?? 200, currency: b.currency === "USD" ? "USD" : "ILS" } : null} average={b.program === "average"} />
+                cashback={b.program === "cashback" ? { bp: b.cashback_bp ?? 200, currency: b.currency === "USD" ? "USD" : "ILS" } : null} average={b.program === "average"} currency={b.currency === "USD" ? "USD" : "ILS"} />
             </>
           )}
 
@@ -822,7 +822,14 @@ function BusinessForm({ t, busy, initial, submitLabel, onSubmit, onInvalid }: {
   onInvalid?: (message: string) => void;
 }) {
   return (
-    <form className="stack-form" onSubmit={(e) => {
+    <form className="stack-form" onChange={(e) => {
+      // The average card allows longer rounds (up to 50 purchases); stamp cards stop at 30.
+      const el = e.target as unknown as HTMLInputElement;
+      if (el.name === "program") {
+        const field = e.currentTarget.elements.namedItem("target") as HTMLInputElement | null;
+        if (field) field.max = el.value === "average" ? "50" : "30";
+      }
+    }} onSubmit={(e) => {
       e.preventDefault();
       const form = e.currentTarget;
       const f = new FormData(form);
@@ -849,7 +856,7 @@ function BusinessForm({ t, busy, initial, submitLabel, onSubmit, onInvalid }: {
       <label>{t("businessName")}<input name="name" required maxLength={80} defaultValue={initial?.name} /></label>
       <label>{t("rewardText")}<input name="reward" required maxLength={160} defaultValue={initial?.reward ?? ""} /></label>
       <div className="form-row">
-        <label>{t("target")}<input name="target" type="number" min={2} max={30} required defaultValue={initial?.target ?? 9} /></label>
+        <label>{t("target")}<input name="target" type="number" min={2} max={initial?.program === "average" ? 50 : 30} required defaultValue={initial?.target ?? 9} /></label>
         <label>{t("color")}<input name="color" type="color" defaultValue={initial?.color ?? "#7558E8"} /></label>
       </div>
       {initial && (
@@ -1356,7 +1363,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
         <section className="sx-screen" aria-label={selected.name}>
           {who}
           <div className="sx-chips">
-            <span className="sx-chip"><Num>{selected.stamps}/{selected.target}</Num> {t("sxStampsLabel")}</span>
+            <span className="sx-chip"><Num>{selected.stamps}/{selected.target}</Num> {average ? t("avgPurchasesLabel") : t("sxStampsLabel")}</span>
             {!!selected.rewards && <span className="sx-chip ready"><Gift size={12} />{selected.rewards === 1 ? t("sxRewardsChip1") : t("sxRewardsChip", { n: selected.rewards })}</span>}
             {branchControl}
           </div>
@@ -1388,7 +1395,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
                   </label>
                   <small className="form-hint">
                     {willFill ? t("avgWillFill", { amount: fmt(averageReward(total, selected.target, business.avg_cap ?? 0)) })
-                      : selected.stamps > 0 ? t("avgSoFar", { amount: fmt(averageReward(selected.roundTotal ?? 0, selected.stamps, 0)) })
+                      : selected.stamps > 0 ? t("avgSoFar", { amount: fmt(averageReward(selected.roundTotal ?? 0, selected.stamps, business.avg_cap ?? 0)) })
                       : t("avgHint", { n: selected.target })}
                   </small>
                   <button className={"btn big sx-wide " + (selected.rewards ? "soft" : "primary")} disabled={busy || !amount}>
@@ -1403,12 +1410,17 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
           <div className="sx-punch">
             <div className="sx-punch-row">
               <strong>{business.reward}</strong>
-              <span><Num>{t("sxOf", { s: selected.stamps, t: selected.target })}</Num></span>
+              <span>{t("sxOf", { s: selected.stamps, t: selected.target })}</span>
             </div>
-            <small>{full ? t("sxUnlocked") : t("sxMore", { k: remaining })}</small>
-            <div className="sx-segments" aria-hidden="true">
-              {Array.from({ length: selected.target }, (_, i) => <i key={i} className={i < selected.stamps ? "on" : ""} />)}
-            </div>
+            <small>{full ? t("sxUnlocked") : average ? t("avgMore", { k: remaining }) : t("sxMore", { k: remaining })}</small>
+            {average ? (
+              // The average card: one bar (a round can be up to 50 purchases).
+              <div className="sx-avgbar" aria-hidden="true"><i style={{ width: `${(Math.min(selected.stamps, selected.target) / selected.target) * 100}%` }} /></div>
+            ) : (
+              <div className="sx-segments" aria-hidden="true">
+                {Array.from({ length: selected.target }, (_, i) => <i key={i} className={i < selected.stamps ? "on" : ""} />)}
+              </div>
+            )}
           </div>
           {fixing ? (
             <div className="fix-panel">

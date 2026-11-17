@@ -1,3 +1,4 @@
+import { passProgram } from "../../../lib/server/balance-pass";
 import { env } from "cloudflare:workers";
 import { getD1 } from "../../../db";
 import { getUser, isPlatformAdmin } from "../../../lib/server/auth";
@@ -8,6 +9,7 @@ import { allow } from "../../../lib/server/rate-limit";
 import { cancelAtPeriodEnd } from "../../../lib/server/polar";
 import { applePushReady, pushTokens } from "../../../lib/server/apple-push";
 import { customerForPass } from "../../../lib/server/apple-wallet";
+import { AVG_TARGET_MAX } from "../../../lib/cashback.ts";
 import { passLook } from "../../../lib/server/designs";
 import { debugObjects, objectSaved, updateLoyaltyObject, walletConfig } from "../../../lib/server/google-wallet";
 
@@ -68,7 +70,7 @@ export async function POST(request: Request) {
         const full = await passLook(db, { id: c.business, name: c.business_name, reward: c.reward, color: c.color }, origin, { stamps: c.stamps, target: c.target }).catch(() => undefined);
         const look = full ? (({ notice: _n, ...rest }) => rest)(full) : undefined;
         const detail: { status?: number; text?: string } = {};
-        const result = await updateLoyaltyObject(config, { customerId: c.id, businessId: c.business, stamps: c.stamps, target: c.target, scanCode: c.scan_code, rewards: c.rewards, look: look as typeof full }, null, detail);
+        const result = await updateLoyaltyObject(config, { customerId: c.id, businessId: c.business, stamps: c.stamps, target: c.target, scanCode: c.scan_code, rewards: c.rewards, ...(await passProgram(db, c.id)), look: look as typeof full }, null, detail);
         results.push({ name: c.name, stamps: `${c.stamps}/${c.target}`, result, status: detail.status ?? 0, text: detail.text ?? "" });
       }
       return json({ ok: true, ready: true, saved: rows.results.length, results });
@@ -202,7 +204,9 @@ export async function POST(request: Request) {
       const name = str(body.name, 80);
       const reward = str(body.reward, 160);
       const target = Number(body.target);
-      if (!name || !reward || !Number.isInteger(target) || target < 2 || target > 30) return fail("bad_details", 400, "Invalid details");
+      const kind = await db.prepare("SELECT program FROM businesses WHERE id = ?").bind(businessId).first<{ program: string }>();
+      const most = kind?.program === "average" ? AVG_TARGET_MAX : 30;
+      if (!name || !reward || !Number.isInteger(target) || target < 2 || target > most) return fail("bad_details", 400, "Invalid details");
       // Same rule as the owner's settings: a new target applies to new cards and to existing cards from their next round.
       await db.batch([
         db.prepare("UPDATE businesses SET name = ?, reward = ?, target = ? WHERE id = ?").bind(name, reward, target, businessId),

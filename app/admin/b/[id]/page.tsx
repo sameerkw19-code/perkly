@@ -32,7 +32,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
 
   const b = await db
     .prepare(
-      `SELECT b.id, b.owner, b.name, b.reward, b.target, b.color, b.created, b.reward_mode, b.suspended, b.suspend_reason, b.comp_until, b.archived, b.kit_due, b.kit_sent, b.owner_designs, b.currency, b.pos_only,
+      `SELECT b.id, b.owner, b.name, b.reward, b.target, b.color, b.created, b.reward_mode, b.suspended, b.suspend_reason, b.comp_until, b.archived, b.kit_due, b.kit_sent, b.owner_designs, b.currency, b.pos_only, b.program,
          s.status, s.plan, s.current_period_end, s.external_subscription, s.updated AS sub_updated, u.email AS owner_email, u.phone AS owner_phone
        FROM businesses b LEFT JOIN subscriptions s ON s.business = b.id LEFT JOIN users u ON u.id = b.owner WHERE b.id = ?`,
     )
@@ -41,7 +41,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
       id: string; name: string; reward: string; target: number; color: string; created: string; reward_mode: string;
       owner: string; suspended: string | null; suspend_reason: string | null; comp_until: string | null; archived: string | null; owner_email: string | null; owner_phone: string | null;
       status: string | null; current_period_end: string | null; external_subscription: string | null; sub_updated: string | null;
-      plan: string | null; kit_due: string | null; kit_sent: string | null; owner_designs: number; currency: string; pos_only: number;
+      plan: string | null; kit_due: string | null; kit_sent: string | null; owner_designs: number; currency: string; pos_only: number; program: string;
     }>();
   if (!b) notFound();
 
@@ -112,7 +112,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
         <div className="admin-grid">
           <section className="panel">
             <h2>פעולות</h2>
-            <AdminActions business={b.id} suspended={!!b.suspended} compUntil={b.comp_until} biz={{ id: b.id, name: b.name, reward: b.reward, target: b.target, archived: b.archived, ownerEmail: b.owner_email, paying: b.status === "active" || b.status === "trialing" }} />
+            <AdminActions business={b.id} suspended={!!b.suspended} compUntil={b.comp_until} biz={{ id: b.id, name: b.name, reward: b.reward, target: b.target, program: b.program, archived: b.archived, ownerEmail: b.owner_email, paying: b.status === "active" || b.status === "trialing" }} />
           </section>
 
           <section className="panel">

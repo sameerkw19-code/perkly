@@ -8,7 +8,7 @@ import { formatPhone, maskPhone, normalizePhone } from "../../../lib/phone";
 import { assetIds, defaultDesign, designChecks, is3d, sanitizeDesign } from "../../../lib/design";
 import { assetMeta, liveDesign, ownsAssets, passLook, publishedDesign } from "../../../lib/server/designs";
 import { originalPhone, releaseArchivedPhone } from "../../../lib/server/customers";
-import { AMOUNT_MAX, BP_MAX, BP_MIN, type Program } from "../../../lib/cashback.ts";
+import { AMOUNT_MAX, AVG_TARGET_MAX, BP_MAX, BP_MIN, type Program } from "../../../lib/cashback.ts";
 import { businessAccess, freeLimitReached, hasPaidDesign } from "../../../lib/server/billing";
 import { formatBirthday, parseBirthday, upcomingKeys } from "../../../lib/birthday";
 import { pushAppleBusiness } from "../../../lib/server/apple-push";
@@ -25,8 +25,9 @@ export const dynamic = "force-dynamic";
 const COLOR = /^#[0-9a-fA-F]{6}$/;
 
 
-function validTarget(v: unknown): v is number {
-  return Number.isInteger(v) && (v as number) >= 2 && (v as number) <= 30;
+/** Stamps for a reward: 2 to 30. The average card allows longer rounds (a supermarket: 40 baskets, the 41st free). */
+function validTarget(v: unknown, program?: string): v is number {
+  return Number.isInteger(v) && (v as number) >= 2 && (v as number) <= (program === "average" ? AVG_TARGET_MAX : 30);
 }
 
 async function loadBusiness(db: D1Database, id: string) {
@@ -319,7 +320,8 @@ export async function POST(request: Request) {
     if (!(await allow(db, `create-business:${user.id}`, forClient ? 100 : 10, 86_400))) return fail("rate_limited", 429);
     const name = str(p.name, 80);
     const reward = str(p.reward, 160);
-    if (!name || !reward || !validTarget(p.target) || typeof p.color !== "string" || !COLOR.test(p.color)) {
+    const asAverage = forClient && p.program === "average" ? "average" : undefined;
+    if (!name || !reward || !validTarget(p.target, asAverage) || typeof p.color !== "string" || !COLOR.test(p.color)) {
       return fail("bad_details", 400, "Invalid business details");
     }
     // New businesses collect rewards by default (customers keep earning while a reward waits).
@@ -407,7 +409,8 @@ export async function POST(request: Request) {
       const denied = adminOnly(); if (denied) return denied;
       const name = str(p.name, 80);
       const reward = str(p.reward, 160);
-      if (!name || !reward || !validTarget(p.target) || typeof p.color !== "string" || !COLOR.test(p.color)) {
+      const nextProgram = p.program === "cashback" || p.program === "stamps" || p.program === "average" ? p.program : business.program;
+      if (!name || !reward || !validTarget(p.target, nextProgram) || typeof p.color !== "string" || !COLOR.test(p.color)) {
         return fail("bad_details", 400, "Invalid business details");
       }
       // A new target applies to new cards and to existing cards from their next round (after redemption).

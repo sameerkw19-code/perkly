@@ -8,6 +8,8 @@ export type CashbackCurrency = "ILS" | "USD";
 export const BP_MIN = 10;
 export const BP_MAX = 5000;
 /** One purchase or one use of the balance: at most 100,000 in major units. */
+/** Longest round on the average card (a supermarket: 40 baskets, the 41st free). Stamp cards stop at 30. */
+export const AVG_TARGET_MAX = 50;
 export const AMOUNT_MAX = 10_000_000;
 
 /** The credit a purchase earns, rounded to the nearest minor unit. */

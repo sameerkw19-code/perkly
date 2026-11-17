@@ -58,3 +58,24 @@ test("social links: empty fields are dropped, bad ones name the field", () => {
   assert.deepEqual(parseSocial('{"instagram":"ok.name","website":"javascript:x"}'), { instagram: "ok.name" });
   assert.deepEqual(parseSocial("not json"), {});
 });
+
+test("average card wallet strip: a 1125×432 PNG whose bar fills from the right on Hebrew cards", async () => {
+  const { progressStrip } = await import("../lib/server/progress-strip.ts");
+  const { inflateSync } = await import("node:zlib");
+  const png = await progressStrip({ bg: "#1F8A4C", bg2: "#156B3A", fg: "#FFFFFF", fill: "#D9F493", done: 23, target: 40, rtl: true });
+  assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+  const view = new DataView(png.buffer, png.byteOffset);
+  assert.equal(view.getUint32(16), 1125);
+  assert.equal(view.getUint32(20), 432);
+  const idatLen = view.getUint32(33);
+  const raw = inflateSync(png.subarray(41, 41 + idatLen));
+  const pixel = (x, y) => [...raw.subarray(y * (1 + 1125 * 3) + 1 + x * 3, y * (1 + 1125 * 3) + 4 + x * 3)];
+  const barY = 432 - 66 - 15;
+  assert.deepEqual(pixel(1000, barY), [0xd9, 0xf4, 0x93], "filled on the right");
+  assert.notDeepEqual(pixel(120, barY), [0xd9, 0xf4, 0x93], "empty on the left");
+  const { passAverage } = await import("../lib/server/balance-pass.ts");
+  assert.equal(passAverage({ program: "stamps" }, { stamps: 3 }, null), undefined);
+  assert.deepEqual(passAverage({ program: "average", currency: "ILS", avg_cap: 0 }, { stamps: 0 }, null), { ready: false });
+  assert.equal(passAverage({ program: "average", currency: "ILS", avg_cap: 25000 }, { stamps: 2, round_total: 60000 }, null).worth.replace(/\s/g, " "), "250 ₪");
+  assert.equal(passAverage({ program: "average", currency: "ILS" }, { stamps: 0 }, 30300).ready, true);
+});

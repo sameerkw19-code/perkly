@@ -82,7 +82,7 @@ export default function NewBusinessForm() {
         )}
         <label>שם העסק<input required maxLength={80} value={name} onChange={(e) => setName(e.target.value)} /></label>
         <label>{program === "cashback" ? "תיאור ההטבה בכרטיס" : "ההטבה"}<input required maxLength={160} value={reward} onChange={(e) => setReward(e.target.value)} placeholder="למשל: קפה חינם" /></label>
-        {program !== "cashback" && <label>{program === "average" ? "כמה קניות בסבב (למשל 4 = הקנייה החמישית חינם)" : "חותמות להטבה"}<input type="number" required min={2} max={30} value={target} onChange={(e) => setTarget(Number(e.target.value))} /></label>}
+        {program !== "cashback" && <label>{program === "average" ? "כמה קניות בסבב (למשל 4 = הקנייה החמישית חינם)" : "חותמות להטבה"}<input type="number" required min={2} max={program === "average" ? 50 : 30} value={target} onChange={(e) => setTarget(Number(e.target.value))} /></label>}
         {program === "average" && <label>תקרה להטבה (0 = בלי תקרה)<input name="avgCap" type="number" inputMode="decimal" min={0} step={0.01} dir="ltr" defaultValue={0} /></label>}
         <label>שם הסניף<input name="branchName" maxLength={60} placeholder="ריק = שם העסק" /></label>
         <label>כתובת הסניף<input name="branchAddress" maxLength={160} placeholder="רחוב, מספר ועיר" /></label>

@@ -1,4 +1,4 @@
-import { passBalance } from "./balance-pass";
+import { passProgram } from "./balance-pass";
 import { env, waitUntil } from "cloudflare:workers";
 import { updateLoyaltyObject, walletConfig } from "./google-wallet";
 import { passLook } from "./designs";
@@ -27,14 +27,15 @@ export function syncGoogleWallet(
       const business = await db.prepare("SELECT id, name, reward, color, program, currency FROM businesses WHERE id = ?").bind(c.business)
         .first<{ id: string; name: string; reward: string; color: string; program: string; currency: string }>();
       // The balance card has no stamp banner: the pass shows the balance and the business's banner image.
-      const balance = business ? passBalance(business, c.balance) : undefined;
+      // The average card shows the purchases this round and what the free purchase is worth.
+      const { balance, average } = await passProgram(db, c.id);
       const full = business
         ? await passLook(db, business, origin, balance === undefined ? { stamps: c.stamps, target: c.target, notice } : undefined).catch(() => undefined)
         : undefined;
       const { notice: message, ...look } = full ?? { notice: null };
       const result = await updateLoyaltyObject(
         config,
-        { customerId: c.id, businessId: c.business, stamps: c.stamps, target: c.target, scanCode: c.scan_code, rewards, balance, look: full ? (look as typeof full) : undefined },
+        { customerId: c.id, businessId: c.business, stamps: c.stamps, target: c.target, scanCode: c.scan_code, rewards, balance, average, look: full ? (look as typeof full) : undefined },
         message,
       );
       if (result === "not_saved") {
