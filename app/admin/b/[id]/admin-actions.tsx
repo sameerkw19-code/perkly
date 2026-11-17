@@ -85,7 +85,7 @@ export function OwnerDesignSwitch({ business, on }: { business: string; on: bool
 }
 
 /** Suspend / unsuspend and free-access controls for one business. Reloads the page after each change. */
-type Biz = { id: string; name: string; reward: string; target: number; archived: string | null; ownerEmail: string | null; paying: boolean };
+type Biz = { id: string; name: string; reward: string; target: number; program?: string; archived: string | null; ownerEmail: string | null; paying: boolean };
 
 export function AdminActions({ business, suspended, compUntil, biz }: { business: string; suspended: boolean; compUntil: string | null; biz: Biz }) {
   const [busy, setBusy] = useState(false);
@@ -168,7 +168,7 @@ export function AdminActions({ business, suspended, compUntil, biz }: { business
         }}>
           <label>שם<input name="name" defaultValue={biz.name} maxLength={80} required /></label>
           <label>הטבה<input name="reward" defaultValue={biz.reward} maxLength={160} required /></label>
-          <label>חותמות להטבה<input name="target" type="number" min={2} max={30} defaultValue={biz.target} required /></label>
+          <label>חותמות להטבה<input name="target" type="number" min={2} max={biz.program === "average" ? 50 : 30} defaultValue={biz.target} required /></label>
           <button className="btn soft small" disabled={busy}>שמירה</button>
         </form>
         <small className="form-hint">מספר חותמות חדש חל על כרטיסים חדשים, ועל קיימים מהסבב הבא.</small>

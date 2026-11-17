@@ -101,12 +101,14 @@ function PaidTag({ t }: { t: T }) {
   return <span className="paid-tag"><Lock size={11} aria-hidden="true" />{t("paidTag")}</span>;
 }
 
-export function CardEditor({ businessId, target, editor, t, lang, notify, reload, paid = true, upgradeHref, setup, specialDays = true, cashback, average = false }: {
+export function CardEditor({ businessId, target, editor, t, lang, notify, reload, paid = true, upgradeHref, setup, specialDays = true, cashback, average = false, currency = "ILS" }: {
   businessId: string; target: number; editor: Editor; t: T; lang: Lang;
   /** The balance card: the preview shows a sample balance instead of stamps. */
   cashback?: { bp: number; currency: "ILS" | "USD" } | null;
   /** The "average" card: the preview explains the free purchase's value. */
   average?: boolean;
+  /** The business's currency (the average card's sample worth). */
+  currency?: "ILS" | "USD";
   /** Special-day messages are sent by Perkly: hidden for an owner who edits the design. */
   specialDays?: boolean;
   notify: (s: string, bad?: boolean) => void; reload: () => void;
@@ -245,7 +247,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
 
   /** Apple Wallet stamp grid: one picture per stamp count, every plan. On failure the pass keeps its banner image. */
   async function withAppleStrips(d: Design): Promise<Design> {
-    if (usesPizza(d, target)) return { ...d, appleStamps: [] };
+    if (usesPizza(d, target) || average) return { ...d, appleStamps: [] };
     setBusy("banners");
     try {
       const blobs = await makeAppleStrips(d, target);
@@ -282,7 +284,8 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
   async function publish() {
     if (!setup && !confirm(t("publishConfirm"))) return;
     let next = design;
-    if (design.walletBanner === "stamps") {
+    // The average card draws its progress bar on the pass itself: no stamp pictures.
+    if (design.walletBanner === "stamps" && !average) {
       const made = await withStampBanners(design);
       if (!made) return;
       next = made;
@@ -306,7 +309,8 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
   const preview = {
     design, lang: textLang, stamps: demo, target, customerName: pt("sampleCustomer"), t: pt,
     balance: cashback ? { text: formatMoney(demo * 490, cashback.currency, textLang), pct: pctLabel(cashback.bp) } : undefined,
-    average: average ? {} : undefined,
+    // A sample worth for the average card: an average basket of 303.09.
+    average: average ? { soFar: demo > 0 ? formatMoney(30309, currency, textLang) : undefined } : undefined,
   };
   const previewDir = isRtl(textLang) ? "rtl" : "ltr";
   const locale = lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB";

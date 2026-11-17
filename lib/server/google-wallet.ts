@@ -3,6 +3,7 @@
 // so deploying this code before Google approves the account changes nothing for customers.
 
 import { base64url } from "./crypto";
+import type { PassAverage } from "./balance-pass";
 import { classBody, lookFields, type ClassLook, type PassLook } from "../wallet-look";
 
 export type WalletConfig = { issuerId: string; serviceEmail: string; privateKeyPem: string; classId: string };
@@ -38,6 +39,8 @@ export type LoyaltyCard = {
   rewards?: number;
   /** The balance card: the balance as shown ("12.40 ₪"). Replaces the stamp count. */
   balance?: string;
+  /** The average card: what the free purchase is worth now. Replaces the rewards count. */
+  average?: PassAverage;
   /** The business's own look on the pass (see passLook). */
   look?: PassLook;
 };
@@ -79,6 +82,25 @@ function liveFields(card: LoyaltyCard) {
         localizedLabel: label("Balance", "יתרה", "الرصيد", ["Баланс", "Guthaben", "Solde"]),
         balance: { string: card.balance },
       },
+    };
+  }
+  if (card.average) {
+    return {
+      loyaltyPoints: {
+        label: "Purchases this round",
+        localizedLabel: label("Purchases this round", "קניות בסבב", "مشتريات الجولة", ["Покупки в цикле", "Einkäufe dieser Runde", "Achats de ce cycle"]),
+        balance: { string: `${Math.min(card.stamps, card.target)}/${card.target}` },
+      },
+      // Always sent, so a PATCH never leaves an old value behind ("—" at the start of a round).
+      ...({
+        secondaryLoyaltyPoints: {
+          label: card.average.ready ? "Reward ready" : "Worth now",
+          localizedLabel: card.average.ready
+            ? label("Reward ready", "הטבה מוכנה", "مكافأة جاهزة", ["Награда готова", "Prämie bereit", "Récompense prête"])
+            : label("Worth now", "שווי עכשיו", "القيمة الآن", ["Стоимость сейчас", "Aktueller Wert", "Valeur actuelle"]),
+          balance: { string: card.average.worth ?? "—" },
+        },
+      }),
     };
   }
   return {

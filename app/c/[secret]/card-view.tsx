@@ -16,7 +16,7 @@ type Card = { name: string; stamps: number; target: number; scan_code: string; d
   /** The balance card: balance and minimum in minor units, basis points back. */
   cashback?: { balance: number; bp: number; min: number; currency: "ILS" | "USD" } | null;
   /** The "average" card: this round's total and the value of the next reward (minor units). */
-  average?: { roundTotal: number; ready: number | null; currency: "ILS" | "USD" } | null };
+  average?: { roundTotal: number; cap?: number; ready: number | null; currency: "ILS" | "USD" } | null };
 
 export default function CardView({ card, secret, googleWallet, appleWallet = false, isIOS }: { card: Card | null; secret: string; googleWallet: boolean; appleWallet?: boolean; isIOS: boolean }) {
   // The page's own chrome follows the visitor's site language; the card follows its business's languages.
@@ -83,7 +83,7 @@ export default function CardView({ card, secret, googleWallet, appleWallet = fal
               min: card.cashback.min > 0 ? formatMoney(card.cashback.min, card.cashback.currency, lang) : undefined,
             } : undefined}
             average={card.average ? {
-              soFar: card.stamps > 0 ? formatMoney(averageReward(card.average.roundTotal, card.stamps, 0), card.average.currency, lang) : undefined,
+              soFar: card.stamps > 0 ? formatMoney(averageReward(card.average.roundTotal, card.stamps, card.average.cap ?? 0), card.average.currency, lang) : undefined,
               ready: card.average.ready != null ? formatMoney(card.average.ready, card.average.currency, lang) : undefined,
             } : undefined}
             t={t}

@@ -77,6 +77,41 @@ type Props = {
   average?: { soFar?: string; ready?: string };
 };
 
+/**
+ * The average card: purchases this round as a count and a bar, what the free purchase is worth now,
+ * and how many purchases are left. The same picture the wallet pass draws (lib/server/progress-strip.ts).
+ */
+function AverageBar({ t, stamps, target, ready, average }: { t: T; stamps: number; target: number; ready: boolean; average: { soFar?: string; ready?: string } }) {
+  const done = Math.min(stamps, target);
+  const left = Math.max(0, target - stamps);
+  const worth = average.ready ?? average.soFar;
+  return (
+    <div className="pcard-avgbar">
+      <div className="pcard-fields">
+        <div className="pcard-field">
+          <small>{t("avgRoundWord")}</small>
+          <b className="pcard-avg-count" dir="ltr"><span>{done}</span><em> / {target}</em></b>
+        </div>
+        {worth && (
+          <div className="pcard-field pcard-end">
+            <small>{average.ready ? t("avgReadyWord") : t("avgWorthNow")}</small>
+            <b><Num>{worth}</Num></b>
+          </div>
+        )}
+      </div>
+      <div className="pcard-bar" role="progressbar" aria-valuemin={0} aria-valuemax={target} aria-valuenow={done} aria-label={t("avgRoundWord")}>
+        <i style={{ width: `${(done / target) * 100}%` }} />
+      </div>
+      <p className="pcard-hint">
+        {average.ready || ready
+          ? (average.ready ? t("avgCardReady", { amount: average.ready }) : t("earnedShort"))
+          : left === 1 ? t("avgToGoOne", { n: target + 1 }) : t("avgToGo", { k: left, n: target + 1 })}
+      </p>
+      <p className="pcard-hint pcard-avg">{t("avgCardHint")}</p>
+    </div>
+  );
+}
+
 export function cardStyle(design: Design): React.CSSProperties {
   return {
     "--c-bg": design.colors.bg,
@@ -178,6 +213,8 @@ export function LoyaltyCard({ design, lang, stamps, target, customerName, reward
           <b><Num>{balance.text}</Num></b>
           <p className="pcard-hint">{t("cbCardHint", { pct: balance.pct })}{balance.min ? " " + t("cbCardMin", { min: balance.min }) : ""}</p>
         </div>
+      ) : average ? (
+        <AverageBar t={t} stamps={stamps} target={target} ready={ready} average={average} />
       ) : <>
       {usesPizza(design, target) ? (
         <div className="pcard-pizza"><PizzaProgress design={design} stamps={stamps} target={target} /></div>
@@ -204,11 +241,6 @@ export function LoyaltyCard({ design, lang, stamps, target, customerName, reward
         </div>
       </div>
       <p className="pcard-hint">{full || ready ? t("earnedShort") : t("toGo", { k: Math.max(0, target - stamps) })}</p>
-      {average && (
-        <p className="pcard-hint pcard-avg">
-          {average.ready ? t("avgCardReady", { amount: average.ready }) : <>{t("avgCardHint")}{average.soFar ? " " + t("avgCardSoFar", { amount: average.soFar }) : ""}</>}
-        </p>
-      )}
       <p className="sr-only">{t("stampsOf", { n: stamps, t: target })}</p>
       </>}
 
@@ -223,8 +255,20 @@ export function LoyaltyCard({ design, lang, stamps, target, customerName, reward
   );
 }
 
+/** The Apple Wallet strip of the average card: the count over a progress bar (the pass draws the bar as a picture). */
+function StripBar({ design, stamps, target, label }: { design: Design; stamps: number; target: number; label: string }) {
+  const done = Math.min(stamps, target);
+  return (
+    <div className="ap-avg">
+      <small>{label}</small>
+      <b dir="ltr"><span>{done}</span><em> / {target}</em></b>
+      <div className="pcard-bar" style={{ "--c-st": design.colors.stamp } as React.CSSProperties}><i style={{ width: `${(done / target) * 100}%` }} /></div>
+    </div>
+  );
+}
+
 /** Approximate Apple Wallet store card: logo + header field, strip image with stamps, fields, code. */
-export function ApplePreview({ design, lang, stamps, target, customerName, balance }: Props) {
+export function ApplePreview({ design, lang, stamps, target, customerName, balance, average }: Props) {
   const cl = cardLang(design, lang);
   const t: T = (key, vars) => translate(cl, key, vars);
   const text = textsFor(design, cl);
@@ -235,14 +279,22 @@ export function ApplePreview({ design, lang, stamps, target, customerName, balan
     <div className="wallet apple" dir={isRtl(cl) ? "rtl" : "ltr"} lang={cl} style={{ ...cardStyle(design), background: design.colors.bg, color: design.colors.fg }}>
       <div className="ap-top">
         <div className="ap-logo">{design.logo ? <Logo design={design} title={text.title} className="card-logo small" /> : design.showTitle && <b>{text.title}</b>}</div>
-        {design.showCustomerName && customerName && <div className="ap-f"><small style={label}>{t("customerName")}</small><b>{customerName}</b></div>}
+        {average
+          ? (average.ready ?? average.soFar) && <div className="ap-f"><small style={label}>{average.ready ? t("avgReadyWord") : t("avgWorthNow")}</small><b><Num>{(average.ready ?? average.soFar)!}</Num></b></div>
+          : design.showCustomerName && customerName && <div className="ap-f"><small style={label}>{t("customerName")}</small><b>{customerName}</b></div>}
       </div>
       {/* The balance card's strip is the banner image (no stamp grid), and its field is the balance. */}
       <div className="ap-strip" style={balance && (design.walletHero ?? design.hero) ? { backgroundImage: `url(${assetUrl((design.walletHero ?? design.hero)!)})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}>
-        {!balance && <StampGrid design={design} stamps={stamps} target={target} giftLabel={text.gift} />}
+        {average ? <StripBar design={design} stamps={stamps} target={target} label={t("avgRoundWord")} />
+          : !balance && <StampGrid design={design} stamps={stamps} target={target} giftLabel={text.gift} />}
       </div>
       <div className="ap-row">
-        {balance ? (
+        {average ? (
+          <>
+            {design.showCustomerName && customerName && <div><small style={label}>{t("customerName")}</small><b>{customerName}</b></div>}
+            <div className="end"><small style={label}>{t("reward")}</small><b>{text.reward}</b></div>
+          </>
+        ) : balance ? (
           <div><small style={label}>{t("balanceWord")}</small><b><Num>{balance.text}</Num></b></div>
         ) : (
           <>
@@ -257,7 +309,7 @@ export function ApplePreview({ design, lang, stamps, target, customerName, balan
 }
 
 /** Approximate Google Wallet loyalty card: round logo, fixed header, rows, code, hero image. */
-export function GooglePreview({ design, lang, stamps, target, customerName, balance }: Props) {
+export function GooglePreview({ design, lang, stamps, target, customerName, balance, average }: Props) {
   const cl = cardLang(design, lang);
   const t: T = (key, vars) => translate(cl, key, vars);
   const text = textsFor(design, cl);
@@ -273,13 +325,14 @@ export function GooglePreview({ design, lang, stamps, target, customerName, bala
           {design.showCustomerName && customerName && <div><small>{t("customerName")}</small><b>{customerName}</b></div>}
           {balance
             ? <div><small>{t("balanceWord")}</small><b><Num>{balance.text}</Num></b></div>
-            : <div><small>{t("stampsWord")}</small><b><Num>{stamps}/{target}</Num></b></div>}
+            : <div><small>{average ? t("avgRoundWord") : t("stampsWord")}</small><b><Num>{stamps}/{target}</Num></b></div>}
+          {average && (average.ready ?? average.soFar) && <div><small>{average.ready ? t("avgReadyWord") : t("avgWorthNow")}</small><b><Num>{(average.ready ?? average.soFar)!}</Num></b></div>}
           <div><small>{t("reward")}</small><b>{text.reward}</b></div>
         </div>
         <div className="fake-qr">QR</div>
       </div>
       <div className="gw-hero" style={banner ? { backgroundImage: `url(${assetUrl(banner)})` } : undefined}>
-        {!balance && <StampGrid design={design} stamps={stamps} target={target} giftLabel={text.gift} />}
+        {!balance && !average && <StampGrid design={design} stamps={stamps} target={target} giftLabel={text.gift} />}
       </div>
     </div>
   );

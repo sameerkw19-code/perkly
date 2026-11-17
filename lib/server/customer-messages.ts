@@ -4,6 +4,7 @@
 // Everything goes through the wallet_outbox table, a few messages per run, so one run stays
 // well inside the Worker's limits and a failed message is simply tried again later.
 
+import { passProgram } from "./balance-pass";
 import { walletConfig, updateLoyaltyObject, type WalletConfig } from "./google-wallet";
 import { liveDesign, passLook } from "./designs";
 import { BIRTHDAY_GIFT_DAYS, noticeOn, type Design, type StampNotice } from "../design";
@@ -160,7 +161,7 @@ export async function drainOutbox(db: D1Database, config: WalletConfig, nowIso: 
       const { notice: _none, ...look } = full ?? { notice: null };
       const result = await updateLoyaltyObject(
         config,
-        { customerId: o.customer, businessId: o.business, stamps: o.stamps, target: o.target, scanCode: o.scan_code, rewards: await rewardsNow(), look: full ? (look as typeof full) : undefined },
+        { customerId: o.customer, businessId: o.business, stamps: o.stamps, target: o.target, scanCode: o.scan_code, rewards: await rewardsNow(), ...(await passProgram(db, o.customer)), look: full ? (look as typeof full) : undefined },
         null,
       );
       if (result === "updated") await finish(o.id, "sent");
@@ -188,7 +189,7 @@ export async function drainOutbox(db: D1Database, config: WalletConfig, nowIso: 
     // Only the stamps and rewards are refreshed with the message; the pass keeps its look.
     const result = await updateLoyaltyObject(
       config,
-      { customerId: o.customer, businessId: o.business, stamps: o.stamps, target: o.target, scanCode: o.scan_code, rewards },
+      { customerId: o.customer, businessId: o.business, stamps: o.stamps, target: o.target, scanCode: o.scan_code, rewards, ...(await passProgram(db, o.customer)) },
       look.notice,
     );
     if (result === "updated") await finish(o.id, "sent");

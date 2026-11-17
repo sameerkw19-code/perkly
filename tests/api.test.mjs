@@ -1026,6 +1026,20 @@ test("average card: buy 4, the fifth free at the average of the four (capped by 
   assert.equal(after.summary.day.sales_now, 56050);
   assert.equal(after.summary.day.redeemed_now, 1);
   assert.equal(after.summary.day.given_now, 4013);
+
+  // A supermarket: 40 baskets, the 41st free. Long rounds are for the average card only.
+  const longRound = { action: "create_business", forClient: true, name: "Super", reward: "41st free", target: 40, color: "#1F8A4C", market: "il" };
+  assert.equal((await admin.post("/api/loyalty", longRound)).body.code, "bad_details");
+  assert.equal((await admin.post("/api/loyalty", { ...longRound, program: "average", target: 51 })).body.code, "bad_details");
+  const superBiz = (await admin.post("/api/loyalty", { ...longRound, program: "average" })).body.id;
+  assert.ok(superBiz);
+  const shopper = (await admin.act(superBiz, "register_customer", { name: "Michal", phone: "0541112299" })).body;
+  for (const a of ["300", "200"]) await admin.act(superBiz, "stamp", { customer: shopper.id, requestId: id(), amount: a });
+  const page = await fetch(shopper.cardUrl).then((r) => r.text());
+  assert.match(page, /<span>2<\/span><em> \/ (<!-- -->)?40<\/em>/, "the card shows purchases this round over 40");
+  // Switching that business to stamps needs a target of 30 or less.
+  assert.equal((await admin.act(superBiz, "update_business", { name: "Super", reward: "x", target: 40, color: "#1F8A4C", program: "stamps" })).body.code, "bad_details");
+  assert.equal((await admin.post("/api/admin", { action: "update_business", business: superBiz, name: "Super", reward: "x", target: 45 })).status, 200);
 });
 
 test("cashier API: a business key records sales by phone or card code, once per transaction, for every kind of card", async () => {
