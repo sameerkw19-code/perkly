@@ -342,7 +342,7 @@ export function PosKeys({ business, keys, branches, posOnly }: {
       <p className="muted">מפתח שמערכת הקופה משתמשת בו כדי לרשום קניות בכרטיסים של הלקוחות, לפי הטלפון או הקוד שבכרטיס. ההוראות למתכנת של הקופה: <a href="/pos-api" target="_blank" rel="noopener">perkly.shop/pos-api</a></p>
       {made && (
         <div className="pos-made" role="status">
-          <strong>המפתח של "{made.label}". מעתיקים אותו עכשיו: הוא לא יוצג שוב.</strong>
+          <strong>המפתח של „{made.label}“. מעתיקים אותו עכשיו: הוא לא יוצג שוב.</strong>
           <div className="admin-row">
             <input readOnly dir="ltr" value={made.key} onFocus={(e) => e.currentTarget.select()} aria-label="מפתח הקופה" />
             <button type="button" className="btn soft small" onClick={async () => {
