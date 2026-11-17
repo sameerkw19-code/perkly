@@ -55,7 +55,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     db.prepare(
       `SELECT b.id, b.name, b.created, b.suspended, b.comp_until, b.archived, s.status, u.email AS owner_email,
          (SELECT COUNT(*) FROM customers c WHERE c.business = b.id AND c.archived IS NULL) AS customers,
-         (SELECT COUNT(*) FROM events e WHERE e.business = b.id AND e.kind = 'stamp' AND e.created >= ?1) AS stamps30,
+         (SELECT COUNT(*) FROM events e WHERE e.business = b.id AND e.kind IN ('stamp', 'earn') AND e.created >= ?1) AS stamps30,
          (SELECT MAX(version) FROM card_designs d WHERE d.business = b.id) AS published,
          (SELECT MAX(created) FROM events e WHERE e.business = b.id) AS last_activity
        FROM businesses b
@@ -70,7 +70,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
          (SELECT COUNT(*) FROM businesses WHERE created >= ?1) AS businesses7,
          (SELECT COUNT(*) FROM customers WHERE archived IS NULL) AS customers,
          (SELECT COUNT(*) FROM customers WHERE created >= ?2) AS customers30,
-         (SELECT COUNT(*) FROM events WHERE kind = 'stamp' AND created >= ?2) AS stamps30,
+         (SELECT COUNT(*) FROM events WHERE kind IN ('stamp', 'earn') AND created >= ?2) AS stamps30,
          (SELECT COUNT(*) FROM events WHERE kind = 'redeem' AND created >= ?2) AS redeems30,
          (SELECT COUNT(DISTINCT business) FROM events WHERE created >= ?1) AS activeBiz7`,
     ).bind(since7, since30).first<{ businesses: number; businesses7: number; customers: number; customers30: number; stamps30: number; redeems30: number; activeBiz7: number }>(),

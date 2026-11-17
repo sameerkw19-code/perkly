@@ -71,6 +71,8 @@ type Props = {
   t: T;
   /** Optional QR shown inside the card (customer card page only). */
   qr?: React.ReactNode;
+  /** The balance card: the balance as shown, the percentage back, and the owner's minimum to use it (if any). */
+  balance?: { text: string; pct: string; min?: string };
 };
 
 export function cardStyle(design: Design): React.CSSProperties {
@@ -131,7 +133,7 @@ function PassStamp({ design, filled }: { design: Design; filled: boolean }) {
  * Customer card, wallet-pass style. Order (reading direction follows the page language):
  * brand and customer name, reward line, stamp grid, two fields (stamps, rewards), optional QR.
  */
-export function LoyaltyCard({ design, lang, stamps, target, customerName, rewards, qr }: Props) {
+export function LoyaltyCard({ design, lang, stamps, target, customerName, rewards, qr, balance }: Props) {
   // The card speaks the language it is shown in (one the business picked), not the visitor's site language.
   const cl = cardLang(design, lang);
   const t: T = (key, vars) => translate(cl, key, vars);
@@ -168,6 +170,13 @@ export function LoyaltyCard({ design, lang, stamps, target, customerName, reward
 
       <div className="pcard-reward">{text.reward}</div>
 
+      {balance ? (
+        <div className="pcard-balance">
+          <small>{t("balanceWord")}</small>
+          <b><Num>{balance.text}</Num></b>
+          <p className="pcard-hint">{t("cbCardHint", { pct: balance.pct })}{balance.min ? " " + t("cbCardMin", { min: balance.min }) : ""}</p>
+        </div>
+      ) : <>
       {usesPizza(design, target) ? (
         <div className="pcard-pizza"><PizzaProgress design={design} stamps={stamps} target={target} /></div>
       ) : (
@@ -193,9 +202,10 @@ export function LoyaltyCard({ design, lang, stamps, target, customerName, reward
         </div>
       </div>
       <p className="pcard-hint">{full || ready ? t("earnedShort") : t("toGo", { k: Math.max(0, target - stamps) })}</p>
+      <p className="sr-only">{t("stampsOf", { n: stamps, t: target })}</p>
+      </>}
 
       {qr && <div className="pcard-qr">{qr}</div>}
-      <p className="sr-only">{t("stampsOf", { n: stamps, t: target })}</p>
       {/* Shown on every card, for all plans. A link only on the customer's own card (previews stay plain). */}
       {qr ? (
         <a className="pcard-powered" href="https://perkly.shop/?ref=card" target="_blank" rel="noopener" dir="ltr">Powered by <b>Perkly</b></a>
@@ -207,7 +217,7 @@ export function LoyaltyCard({ design, lang, stamps, target, customerName, reward
 }
 
 /** Approximate Apple Wallet store card: logo + header field, strip image with stamps, fields, code. */
-export function ApplePreview({ design, lang, stamps, target, customerName }: Props) {
+export function ApplePreview({ design, lang, stamps, target, customerName, balance }: Props) {
   const cl = cardLang(design, lang);
   const t: T = (key, vars) => translate(cl, key, vars);
   const text = textsFor(design, cl);
@@ -220,12 +230,19 @@ export function ApplePreview({ design, lang, stamps, target, customerName }: Pro
         <div className="ap-logo">{design.logo ? <Logo design={design} title={text.title} className="card-logo small" /> : design.showTitle && <b>{text.title}</b>}</div>
         {design.showCustomerName && customerName && <div className="ap-f"><small style={label}>{t("customerName")}</small><b>{customerName}</b></div>}
       </div>
-      <div className="ap-strip">
-        <StampGrid design={design} stamps={stamps} target={target} giftLabel={text.gift} />
+      {/* The balance card's strip is the banner image (no stamp grid), and its field is the balance. */}
+      <div className="ap-strip" style={balance && (design.walletHero ?? design.hero) ? { backgroundImage: `url(${assetUrl((design.walletHero ?? design.hero)!)})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}>
+        {!balance && <StampGrid design={design} stamps={stamps} target={target} giftLabel={text.gift} />}
       </div>
       <div className="ap-row">
-        <div><small style={label}>{t("stampsWord")}</small><b><Num>{stamps}/{target}</Num></b></div>
-        <div className="end"><small style={label}>{t("rewardsWord")}</small><b><Num>{ready}</Num></b></div>
+        {balance ? (
+          <div><small style={label}>{t("balanceWord")}</small><b><Num>{balance.text}</Num></b></div>
+        ) : (
+          <>
+            <div><small style={label}>{t("stampsWord")}</small><b><Num>{stamps}/{target}</Num></b></div>
+            <div className="end"><small style={label}>{t("rewardsWord")}</small><b><Num>{ready}</Num></b></div>
+          </>
+        )}
       </div>
       <div className="fake-qr">QR</div>
     </div>
@@ -233,7 +250,7 @@ export function ApplePreview({ design, lang, stamps, target, customerName }: Pro
 }
 
 /** Approximate Google Wallet loyalty card: round logo, fixed header, rows, code, hero image. */
-export function GooglePreview({ design, lang, stamps, target, customerName }: Props) {
+export function GooglePreview({ design, lang, stamps, target, customerName, balance }: Props) {
   const cl = cardLang(design, lang);
   const t: T = (key, vars) => translate(cl, key, vars);
   const text = textsFor(design, cl);
@@ -247,13 +264,15 @@ export function GooglePreview({ design, lang, stamps, target, customerName }: Pr
         {text.promo && <div className="gw-promo">{text.promo}</div>}
         <div className="gw-row">
           {design.showCustomerName && customerName && <div><small>{t("customerName")}</small><b>{customerName}</b></div>}
-          <div><small>{t("stampsWord")}</small><b><Num>{stamps}/{target}</Num></b></div>
+          {balance
+            ? <div><small>{t("balanceWord")}</small><b><Num>{balance.text}</Num></b></div>
+            : <div><small>{t("stampsWord")}</small><b><Num>{stamps}/{target}</Num></b></div>}
           <div><small>{t("reward")}</small><b>{text.reward}</b></div>
         </div>
         <div className="fake-qr">QR</div>
       </div>
       <div className="gw-hero" style={banner ? { backgroundImage: `url(${assetUrl(banner)})` } : undefined}>
-        <StampGrid design={design} stamps={stamps} target={target} giftLabel={text.gift} />
+        {!balance && <StampGrid design={design} stamps={stamps} target={target} giftLabel={text.gift} />}
       </div>
     </div>
   );

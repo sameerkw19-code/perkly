@@ -4,6 +4,7 @@ import { errorText, useLang } from "../../../lib/i18n";
 import { post } from "../../../lib/api";
 import { LangSwitch } from "../../../components/lang-switch";
 import { LoyaltyCard } from "../../../components/loyalty-card";
+import { formatMoney, pctLabel } from "../../../lib/cashback.ts";
 import { BirthdayFields } from "../../../components/birthday-fields";
 import { birthdayFromParts } from "../../../lib/birthday";
 
@@ -11,7 +12,7 @@ import type { Design } from "../../../lib/design";
 import { textsFor } from "../../../lib/design";
 import { Brand } from "../../../components/brand";
 
-type Business = { name: string; target: number; design: Design; birthdays: boolean };
+type Business = { name: string; target: number; design: Design; birthdays: boolean; cashback?: { bp: number; min: number; currency: "ILS" | "USD" } | null };
 
 // The card link is kept on this phone after joining, so a customer who left before keeping it can get back.
 // Browser storage can be missing (private mode, blocked): then this simply finds nothing.
@@ -70,7 +71,8 @@ export default function JoinForm({ code, business }: { code: string; business: B
               <a className="btn primary small" href={myCard}>{t("joinOpenCard")}</a>
             </div>
           )}
-          <LoyaltyCard design={business.design} lang={lang} stamps={0} target={business.target} t={t} />
+          <LoyaltyCard design={business.design} lang={lang} stamps={0} target={business.target} t={t}
+            balance={business.cashback ? { text: formatMoney(0, business.cashback.currency, lang), pct: pctLabel(business.cashback.bp), min: business.cashback.min > 0 ? formatMoney(business.cashback.min, business.cashback.currency, lang) : undefined } : undefined} />
           <label>{t("name")}<input name="name" required maxLength={80} autoComplete="name" /></label>
           <label>{t("phone")}<input name="phone" type="tel" required maxLength={20} autoComplete="tel" dir="ltr" placeholder={t("phoneHint")} /></label>
           {business.birthdays && <BirthdayFields t={t} />}

@@ -1,5 +1,6 @@
 // Apple Wallet store cards for customers: the pass content, its images, and the per-pass token the
 // iPhone uses to fetch updates from the web service (app/api/wallet/apple-ws).
+import { passBalance } from "./balance-pass";
 import { env } from "cloudflare:workers";
 import { appleStampPicture, cardLang, textsFor, walletStampPicture, type Lang } from "../design";
 import { buildPkpass, rgb, type Bytes } from "./apple-pass";
@@ -9,25 +10,25 @@ import { passToken, type AppleConfig } from "./apple-token";
 
 export { appleConfig, passToken, validToken, type AppleConfig } from "./apple-token";
 
-const LABELS: Record<Lang, { stamps: string; reward: string; customer: string; ready: string; readyChanged: string; offer: string; changed: string; about: string }> = {
-  he: { stamps: "חותמות", reward: "ההטבה", customer: "שם", ready: "הטבות מוכנות", readyChanged: "הטבות מוכנות: %@", offer: "מבצע", changed: "חותמות: %@", about: "כרטיס נאמנות דיגיטלי של Perkly. מציגים את הקוד בקופה." },
-  ar: { stamps: "الأختام", reward: "المكافأة", customer: "الاسم", ready: "مكافآت جاهزة", readyChanged: "مكافآت جاهزة: %@", offer: "عرض", changed: "الأختام: %@", about: "بطاقة ولاء رقمية من Perkly. اعرضوا الرمز عند الصندوق." },
-  en: { stamps: "Stamps", reward: "Reward", customer: "Name", ready: "Rewards ready", readyChanged: "Rewards ready: %@", offer: "Offer", changed: "Stamps: %@", about: "A Perkly digital loyalty card. Show the code at the counter." },
-  ru: { stamps: "Штампы", reward: "Награда", customer: "Имя", ready: "Готовые награды", readyChanged: "Готовые награды: %@", offer: "Акция", changed: "Штампы: %@", about: "Цифровая карта лояльности Perkly. Покажите код на кассе." },
-  de: { stamps: "Stempel", reward: "Prämie", customer: "Name", ready: "Prämien bereit", readyChanged: "Prämien bereit: %@", offer: "Angebot", changed: "Stempel: %@", about: "Eine digitale Treuekarte von Perkly. Zeigen Sie den Code an der Kasse." },
-  fr: { stamps: "Tampons", reward: "Récompense", customer: "Nom", ready: "Récompenses prêtes", readyChanged: "Récompenses prêtes : %@", offer: "Offre", changed: "Tampons : %@", about: "Une carte de fidélité numérique Perkly. Montrez le code en caisse." },
+const LABELS: Record<Lang, { stamps: string; reward: string; customer: string; ready: string; readyChanged: string; offer: string; changed: string; about: string; balance: string; balanceChanged: string }> = {
+  he: { stamps: "חותמות", reward: "ההטבה", customer: "שם", ready: "הטבות מוכנות", readyChanged: "הטבות מוכנות: %@", offer: "מבצע", changed: "חותמות: %@", about: "כרטיס נאמנות דיגיטלי של Perkly. מציגים את הקוד בקופה.", balance: "יתרה", balanceChanged: "היתרה: %@" },
+  ar: { stamps: "الأختام", reward: "المكافأة", customer: "الاسم", ready: "مكافآت جاهزة", readyChanged: "مكافآت جاهزة: %@", offer: "عرض", changed: "الأختام: %@", about: "بطاقة ولاء رقمية من Perkly. اعرضوا الرمز عند الصندوق.", balance: "الرصيد", balanceChanged: "الرصيد: %@" },
+  en: { stamps: "Stamps", reward: "Reward", customer: "Name", ready: "Rewards ready", readyChanged: "Rewards ready: %@", offer: "Offer", changed: "Stamps: %@", about: "A Perkly digital loyalty card. Show the code at the counter.", balance: "Balance", balanceChanged: "Balance: %@" },
+  ru: { stamps: "Штампы", reward: "Награда", customer: "Имя", ready: "Готовые награды", readyChanged: "Готовые награды: %@", offer: "Акция", changed: "Штампы: %@", about: "Цифровая карта лояльности Perkly. Покажите код на кассе.", balance: "Баланс", balanceChanged: "Баланс: %@" },
+  de: { stamps: "Stempel", reward: "Prämie", customer: "Name", ready: "Prämien bereit", readyChanged: "Prämien bereit: %@", offer: "Angebot", changed: "Stempel: %@", about: "Eine digitale Treuekarte von Perkly. Zeigen Sie den Code an der Kasse.", balance: "Guthaben", balanceChanged: "Guthaben: %@" },
+  fr: { stamps: "Tampons", reward: "Récompense", customer: "Nom", ready: "Récompenses prêtes", readyChanged: "Récompenses prêtes : %@", offer: "Offre", changed: "Tampons : %@", about: "Une carte de fidélité numérique Perkly. Montrez le code en caisse.", balance: "Solde", balanceChanged: "Solde : %@" },
 };
 
 type CustomerRow = {
   id: string; business: string; name: string; stamps: number; target: number; scan_code: string; created: string;
-  business_name: string; reward: string; color: string; rewards: number;
+  business_name: string; reward: string; color: string; rewards: number; balance: number; program: string; currency: string;
 };
 
 /** The customer behind a pass serial (the customer id), or null when it was removed. */
 export async function customerForPass(db: D1Database, serial: string): Promise<CustomerRow | null> {
   return db
     .prepare(
-      `SELECT c.id, c.business, c.name, c.stamps, c.target, c.scan_code, c.created, b.name AS business_name, b.reward, b.color,
+      `SELECT c.id, c.business, c.name, c.stamps, c.target, c.scan_code, c.created, c.balance, b.program, b.currency, b.name AS business_name, b.reward, b.color,
          (SELECT COUNT(*) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2))
            + (CASE WHEN b.reward_mode = 'block' AND c.stamps >= c.target THEN 1 ELSE 0 END) AS rewards
        FROM customers c JOIN businesses b ON b.id = c.business WHERE c.id = ?1 AND c.archived IS NULL AND b.archived IS NULL`,
@@ -114,8 +115,10 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
   }
   // The strip under the logo: the stamp grid for this many stamps (made by the editor when publishing).
   // Cards published before it existed: the Google Wallet stamp banner, the wallet banner or the background image.
-  const grid = appleStampPicture(design, c.stamps, c.target);
-  const strip = await passImage(db, c.business, grid ?? walletStampPicture(design, c.stamps, c.target) ?? design.walletHero ?? design.hero, "strip2");
+  // The balance card has no stamp grid: its strip is the wallet banner or the background image.
+  const balance = passBalance(c, c.balance);
+  const grid = balance === undefined ? appleStampPicture(design, c.stamps, c.target) : null;
+  const strip = await passImage(db, c.business, grid ?? (balance === undefined ? walletStampPicture(design, c.stamps, c.target) : null) ?? design.walletHero ?? design.hero, "strip2");
   if (strip) {
     files["strip@2x.png"] = strip;
     files["strip@3x.png"] = strip;
@@ -142,7 +145,7 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
       // Logo and the customer's name on top, the stamps as a picture, then the stamp count and the rewards ready.
       headerFields: design.showCustomerName ? [name] : [],
       primaryFields: [],
-      secondaryFields: [stamps, ready],
+      secondaryFields: balance === undefined ? [stamps, ready] : [{ key: "balance", label: L.balance, value: balance, changeMessage: L.balanceChanged }],
       ...(strip ? {} : { auxiliaryFields: [{ key: "reward", label: L.reward, value: reward }] }),
       backFields: [
         { key: "rewardBack", label: L.reward, value: reward },

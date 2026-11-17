@@ -56,7 +56,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
          (SELECT COUNT(*) FROM customers WHERE business = ?1 AND archived IS NULL) AS customers,
          (SELECT COUNT(*) FROM customers WHERE business = ?1 AND created >= ?2) AS customers30,
          (SELECT COUNT(*) FROM customers WHERE business = ?1 AND source = 'self' AND archived IS NULL) AS selfJoined,
-         (SELECT COUNT(*) FROM events WHERE business = ?1 AND kind = 'stamp' AND created >= ?2) AS stamps30,
+         (SELECT COUNT(*) FROM events WHERE business = ?1 AND kind IN ('stamp', 'earn') AND created >= ?2) AS stamps30,
          (SELECT COUNT(*) FROM events WHERE business = ?1 AND kind = 'redeem' AND created >= ?2) AS redeems30,
          (SELECT MAX(version) FROM card_designs WHERE business = ?1) AS published`,
     ).bind(id, since30).first<{ customers: number; customers30: number; selfJoined: number; stamps30: number; redeems30: number; published: number | null }>(),

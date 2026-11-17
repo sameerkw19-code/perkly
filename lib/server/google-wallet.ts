@@ -36,6 +36,8 @@ export type LoyaltyCard = {
   scanCode: string;
   /** Rewards the customer can use now. */
   rewards?: number;
+  /** The balance card: the balance as shown ("12.40 ₪"). Replaces the stamp count. */
+  balance?: string;
   /** The business's own look on the pass (see passLook). */
   look?: PassLook;
 };
@@ -70,6 +72,15 @@ function label(en: string, he: string, ar: string, others: [ru: string, de: stri
 
 /** The fields that change with every stamp. Used both when saving and when updating a pass. */
 function liveFields(card: LoyaltyCard) {
+  if (card.balance !== undefined) {
+    return {
+      loyaltyPoints: {
+        label: "Balance",
+        localizedLabel: label("Balance", "יתרה", "الرصيد", ["Баланс", "Guthaben", "Solde"]),
+        balance: { string: card.balance },
+      },
+    };
+  }
   return {
     loyaltyPoints: {
       label: "Stamps",

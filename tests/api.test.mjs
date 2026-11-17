@@ -926,3 +926,62 @@ test("phones: an owner's contact phone, a worker's counter phone, and a customer
   assert.equal((await new Client().post("/api/auth", { action: "worker_login", phone: newPhone, birthDate: "02021992" })).status, 200);
   assert.equal((await new Client().post("/api/auth", { action: "worker_login", phone: wPhone, birthDate: "02021992" })).status, 401);
 });
+
+test("balance card: purchases add the percentage, uses take from the balance, the owner's minimum applies, retries never count twice", async () => {
+  // Only Perkly picks the kind of card when building a business; an owner's own create ignores it.
+  const own = new Client();
+  await signup(own, "cbowner");
+  const plain = (await own.post("/api/loyalty", { action: "create_business", name: "Plain", reward: "x", target: 5, color: "#123456", program: "cashback" })).body.id;
+  assert.equal((await own.get(`/api/loyalty?business=${plain}`)).body.business.program, "stamps");
+
+  const built = await admin.post("/api/loyalty", { action: "create_business", forClient: true, name: "Cash", reward: "2% back", target: 9, color: "#123456", program: "cashback", cashbackBp: 250, cashbackMin: 1000, market: "il" });
+  assert.equal(built.status, 200, JSON.stringify(built.body));
+  const biz = built.body.id;
+  const view = (await admin.get(`/api/loyalty?business=${biz}`)).body;
+  assert.equal(view.business.program, "cashback");
+  assert.equal(view.business.cashback_bp, 250);
+  const cust = (await admin.act(biz, "register_customer", { name: "Noa", phone: "0581112233" })).body.id;
+
+  // Stamp actions do not apply to a balance card, and balance actions do not apply to a stamp card.
+  assert.equal((await admin.act(biz, "stamp", { customer: cust, requestId: id() })).body.code, "wrong_program");
+  assert.equal((await own.act(plain, "purchase", { customer: "x", requestId: id(), amount: "10" })).body.code, "wrong_program");
+
+  assert.equal((await admin.act(biz, "purchase", { customer: cust, requestId: id(), amount: "abc" })).body.code, "bad_amount");
+  const rid = id();
+  const buy = await admin.act(biz, "purchase", { customer: cust, requestId: rid, amount: "120.40" });
+  assert.equal(buy.status, 200, JSON.stringify(buy.body));
+  assert.equal(buy.body.earned, 301); // 2.5% of 120.40 = 3.01
+  assert.equal(buy.body.card.balance, 301);
+  // The same request again (a retry after a network error) changes nothing.
+  const again = await admin.act(biz, "purchase", { customer: cust, requestId: rid, amount: "120.40" });
+  assert.equal(again.body.replayed, true);
+  assert.equal(again.body.card.balance, 301);
+
+  // Below the owner's minimum (10.00) the balance cannot be used yet.
+  assert.equal((await admin.act(biz, "spend", { customer: cust, requestId: id(), amount: "1" })).body.code, "below_minimum");
+  await admin.act(biz, "purchase", { customer: cust, requestId: id(), amount: 40000 }); // 400.00 → +10.00
+  const card = (await admin.act(biz, "lookup", { query: "Noa" })).body.results[0];
+  assert.equal(card.balance, 1301);
+  assert.equal((await admin.act(biz, "spend", { customer: cust, requestId: id(), amount: "20" })).body.code, "not_enough_balance");
+  const use = await admin.act(biz, "spend", { customer: cust, requestId: id(), amount: "13.01" });
+  assert.equal(use.status, 200, JSON.stringify(use.body));
+  assert.equal(use.body.card.balance, 0);
+
+  // A correction needs a reason and cannot take the balance below zero.
+  assert.equal((await admin.act(biz, "adjust_balance", { customer: cust, requestId: id(), delta: 500 })).body.code, "note_required");
+  assert.equal((await admin.act(biz, "adjust_balance", { customer: cust, requestId: id(), delta: -1, note: "x" })).body.code, "not_enough_balance");
+  assert.equal((await admin.act(biz, "adjust_balance", { customer: cust, requestId: id(), delta: 500, note: "missed purchase" })).body.card.balance, 500);
+
+  // The reports count the purchases, their total, the credit given and the balance used.
+  const after = (await admin.get(`/api/loyalty?business=${biz}`)).body;
+  assert.equal(after.summary.day.purchases_now, 2);
+  assert.equal(after.summary.day.sales_now, 52040);
+  assert.equal(after.summary.day.credit_now, 1301);
+  assert.equal(after.summary.day.used_now, 1301);
+  assert.equal(after.stats.open_balance, 500);
+  assert.equal(after.customers.find((c) => c.id === cust).balance, 500);
+
+  // Settings: percentage and minimum are checked.
+  assert.equal((await admin.act(biz, "update_business", { name: "Cash", reward: "x", target: 9, color: "#123456", cashbackBp: 0 })).body.code, "bad_details");
+  assert.equal((await admin.act(biz, "update_business", { name: "Cash", reward: "x", target: 9, color: "#123456", cashbackBp: 300, cashbackMin: 0 })).status, 200);
+});
