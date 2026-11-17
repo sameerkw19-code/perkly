@@ -1,7 +1,7 @@
 // The balance card (cashback): shared helpers for the server, the station and the customer's card.
 // Amounts are integers in minor units (agorot or cents), so sums never drift.
 
-export type Program = "stamps" | "cashback";
+export type Program = "stamps" | "cashback" | "average";
 export type CashbackCurrency = "ILS" | "USD";
 
 /** Basis points allowed for the percentage back: 0.1% to 50%. */
@@ -37,4 +37,10 @@ export function formatMoney(minor: number, currency: CashbackCurrency, lang: str
 export function pctLabel(bp: number): string {
   const v = bp / 100;
   return `${Number.isInteger(v) ? v : v.toFixed(v * 10 === Math.round(v * 10) ? 1 : 2)}%`;
+}
+
+/** The "average" card: the free purchase is worth the average of the round's purchases, capped by the owner (0 = no cap). */
+export function averageReward(total: number, purchases: number, cap: number): number {
+  const avg = purchases > 0 ? Math.round(total / purchases) : 0;
+  return cap > 0 ? Math.min(avg, cap) : avg;
 }

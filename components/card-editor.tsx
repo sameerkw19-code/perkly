@@ -101,10 +101,12 @@ function PaidTag({ t }: { t: T }) {
   return <span className="paid-tag"><Lock size={11} aria-hidden="true" />{t("paidTag")}</span>;
 }
 
-export function CardEditor({ businessId, target, editor, t, lang, notify, reload, paid = true, upgradeHref, setup, specialDays = true, cashback }: {
+export function CardEditor({ businessId, target, editor, t, lang, notify, reload, paid = true, upgradeHref, setup, specialDays = true, cashback, average = false }: {
   businessId: string; target: number; editor: Editor; t: T; lang: Lang;
   /** The balance card: the preview shows a sample balance instead of stamps. */
   cashback?: { bp: number; currency: "ILS" | "USD" } | null;
+  /** The "average" card: the preview explains the free purchase's value. */
+  average?: boolean;
   /** Special-day messages are sent by Perkly: hidden for an owner who edits the design. */
   specialDays?: boolean;
   notify: (s: string, bad?: boolean) => void; reload: () => void;
@@ -304,6 +306,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
   const preview = {
     design, lang: textLang, stamps: demo, target, customerName: pt("sampleCustomer"), t: pt,
     balance: cashback ? { text: formatMoney(demo * 490, cashback.currency, textLang), pct: pctLabel(cashback.bp) } : undefined,
+    average: average ? {} : undefined,
   };
   const previewDir = isRtl(textLang) ? "rtl" : "ltr";
   const locale = lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB";

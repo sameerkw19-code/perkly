@@ -29,13 +29,14 @@ export default async function CardPage({ params }: { params: Promise<{ secret: s
     secret.length <= 100
       ? await db
           .prepare(
-            `SELECT c.name, c.stamps, c.target, c.scan_code, c.balance, b.program, b.cashback_bp, b.cashback_min, b.currency, b.id AS business_id, b.name AS business, b.reward, b.color, b.reward_mode, b.social,
+            `SELECT c.name, c.stamps, c.target, c.scan_code, c.balance, c.round_total, b.program, b.cashback_bp, b.cashback_min, b.currency, b.id AS business_id, b.name AS business, b.reward, b.color, b.reward_mode, b.social,
                (SELECT COUNT(*) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2)) AS saved,
-               (SELECT MIN(expires) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2)) AS next_expiry
+               (SELECT MIN(expires) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2)) AS next_expiry,
+               (SELECT value FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2) ORDER BY earned, id LIMIT 1) AS next_value
              FROM customers c JOIN businesses b ON b.id = c.business WHERE c.card_hash = ?1 AND c.archived IS NULL AND b.archived IS NULL`,
           )
           .bind(await sha256(secret), new Date().toISOString())
-          .first<{ name: string; stamps: number; target: number; scan_code: string; balance: number; program: string; cashback_bp: number; cashback_min: number; currency: string; business_id: string; business: string; reward: string; color: string; reward_mode: string; social: string | null; saved: number; next_expiry: string | null }>()
+          .first<{ name: string; stamps: number; target: number; scan_code: string; balance: number; round_total: number; next_value: number | null; program: string; cashback_bp: number; cashback_min: number; currency: string; business_id: string; business: string; reward: string; color: string; reward_mode: string; social: string | null; saved: number; next_expiry: string | null }>()
       : null;
   if (!row) return <CardView card={null} secret={secret} googleWallet={false} appleWallet={false} isIOS={false} />;
   const design = await liveDesign(db, { id: row.business_id, name: row.business, reward: row.reward, color: row.color });
@@ -49,7 +50,8 @@ export default async function CardPage({ params }: { params: Promise<{ secret: s
   return (
     <CardView
       card={{ name: row.name, stamps: row.stamps, target: row.target, scan_code: row.scan_code, design, rewards, nextExpiry: row.next_expiry, business: row.business, links: socialLinks(parseSocial(row.social)),
-        cashback: row.program === "cashback" ? { balance: row.balance, bp: row.cashback_bp, min: row.cashback_min, currency: row.currency === "USD" ? "USD" : "ILS" } : null }}
+        cashback: row.program === "cashback" ? { balance: row.balance, bp: row.cashback_bp, min: row.cashback_min, currency: row.currency === "USD" ? "USD" : "ILS" } : null,
+        average: row.program === "average" ? { roundTotal: row.round_total, ready: row.next_value, currency: row.currency === "USD" ? "USD" : "ILS" } : null }}
       secret={secret}
       googleWallet={googleWallet}
       appleWallet={appleWallet}

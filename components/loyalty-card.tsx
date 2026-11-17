@@ -73,6 +73,8 @@ type Props = {
   qr?: React.ReactNode;
   /** The balance card: the balance as shown, the percentage back, and the owner's minimum to use it (if any). */
   balance?: { text: string; pct: string; min?: string };
+  /** The "average" card: the average so far this round, and the value of a reward ready to use. */
+  average?: { soFar?: string; ready?: string };
 };
 
 export function cardStyle(design: Design): React.CSSProperties {
@@ -133,7 +135,7 @@ function PassStamp({ design, filled }: { design: Design; filled: boolean }) {
  * Customer card, wallet-pass style. Order (reading direction follows the page language):
  * brand and customer name, reward line, stamp grid, two fields (stamps, rewards), optional QR.
  */
-export function LoyaltyCard({ design, lang, stamps, target, customerName, rewards, qr, balance }: Props) {
+export function LoyaltyCard({ design, lang, stamps, target, customerName, rewards, qr, balance, average }: Props) {
   // The card speaks the language it is shown in (one the business picked), not the visitor's site language.
   const cl = cardLang(design, lang);
   const t: T = (key, vars) => translate(cl, key, vars);
@@ -202,6 +204,11 @@ export function LoyaltyCard({ design, lang, stamps, target, customerName, reward
         </div>
       </div>
       <p className="pcard-hint">{full || ready ? t("earnedShort") : t("toGo", { k: Math.max(0, target - stamps) })}</p>
+      {average && (
+        <p className="pcard-hint pcard-avg">
+          {average.ready ? t("avgCardReady", { amount: average.ready }) : <>{t("avgCardHint")}{average.soFar ? " " + t("avgCardSoFar", { amount: average.soFar }) : ""}</>}
+        </p>
+      )}
       <p className="sr-only">{t("stampsOf", { n: stamps, t: target })}</p>
       </>}
 

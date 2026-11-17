@@ -17,5 +17,6 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
       : null;
   const design = business ? await liveDesign(db, business) : null;
   return <JoinForm code={code} business={business && design ? { name: business.name, target: business.target, design, birthdays: !!business.birthdays,
+    average: business.program === "average",
     cashback: business.program === "cashback" ? { bp: business.cashback_bp, min: business.cashback_min, currency: business.currency === "USD" ? "USD" : "ILS" } : null } : null} />;
 }

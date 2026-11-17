@@ -729,3 +729,4 @@ html,body{overflow-x:clip}
 .pcard-balance small{font-size:calc(13px*var(--c-ts,1));opacity:.8}
 .pcard-balance b{font-size:calc(44px*var(--c-ts,1));line-height:1.1;font-variant-numeric:tabular-nums}
 @media(max-width:760px){.head-actions{flex-wrap:wrap;justify-content:flex-start}}
+.avg-form{display:grid;gap:8px}

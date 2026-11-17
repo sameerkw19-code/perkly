@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { RefreshCw, Wallet } from "lucide-react";
 import { useLang, translate } from "../../../lib/i18n";
 import { LoyaltyCard } from "../../../components/loyalty-card";
-import { formatMoney, pctLabel } from "../../../lib/cashback.ts";
+import { averageReward, formatMoney, pctLabel } from "../../../lib/cashback.ts";
 import { QrImage } from "../../../components/qr";
 
 import { cardLang, noticeText, textsFor, type Design } from "../../../lib/design";
@@ -14,7 +14,9 @@ import { Brand } from "../../../components/brand";
 
 type Card = { name: string; stamps: number; target: number; scan_code: string; design: Design; rewards: number; nextExpiry: string | null; business: string; links: { key: SocialKey; label: string; url: string }[];
   /** The balance card: balance and minimum in minor units, basis points back. */
-  cashback?: { balance: number; bp: number; min: number; currency: "ILS" | "USD" } | null };
+  cashback?: { balance: number; bp: number; min: number; currency: "ILS" | "USD" } | null;
+  /** The "average" card: this round's total and the value of the next reward (minor units). */
+  average?: { roundTotal: number; ready: number | null; currency: "ILS" | "USD" } | null };
 
 export default function CardView({ card, secret, googleWallet, appleWallet = false, isIOS }: { card: Card | null; secret: string; googleWallet: boolean; appleWallet?: boolean; isIOS: boolean }) {
   // The page's own chrome follows the visitor's site language; the card follows its business's languages.
@@ -79,6 +81,10 @@ export default function CardView({ card, secret, googleWallet, appleWallet = fal
             balance={card.cashback ? {
               text: formatMoney(card.cashback.balance, card.cashback.currency, lang), pct: pctLabel(card.cashback.bp),
               min: card.cashback.min > 0 ? formatMoney(card.cashback.min, card.cashback.currency, lang) : undefined,
+            } : undefined}
+            average={card.average ? {
+              soFar: card.stamps > 0 ? formatMoney(averageReward(card.average.roundTotal, card.stamps, 0), card.average.currency, lang) : undefined,
+              ready: card.average.ready != null ? formatMoney(card.average.ready, card.average.currency, lang) : undefined,
             } : undefined}
             t={t}
             qr={<QrImage text={"perkly:" + card.scan_code} size={336} label={t("showQr")} />}

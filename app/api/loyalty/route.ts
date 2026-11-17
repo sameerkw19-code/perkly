@@ -8,7 +8,7 @@ import { formatPhone, maskPhone, normalizePhone } from "../../../lib/phone";
 import { assetIds, defaultDesign, designChecks, is3d, sanitizeDesign } from "../../../lib/design";
 import { assetMeta, liveDesign, ownsAssets, passLook, publishedDesign } from "../../../lib/server/designs";
 import { originalPhone, releaseArchivedPhone } from "../../../lib/server/customers";
-import { AMOUNT_MAX, BP_MAX, BP_MIN, earnFor, parseAmount, type Program } from "../../../lib/cashback.ts";
+import { AMOUNT_MAX, BP_MAX, BP_MIN, averageReward, earnFor, parseAmount, type Program } from "../../../lib/cashback.ts";
 import { businessAccess, freeLimitReached, hasPaidDesign } from "../../../lib/server/billing";
 import { formatBirthday, parseBirthday, upcomingKeys } from "../../../lib/birthday";
 import { syncGoogleWallet } from "../../../lib/server/wallet-sync";
@@ -21,8 +21,8 @@ import { isKind, startDesign } from "../../../lib/start-design";
 
 export const dynamic = "force-dynamic";
 
-type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust: number; reward_mode: "bank" | "block"; reward_expiry_days: number; birthdays: number; social: Social; owner_designs: number; program: Program; cashback_bp: number; cashback_min: number; currency: string };
-type Customer = { id: string; business: string; name: string; phone: string; stamps: number; target: number; scan_code: string; google_wallet?: string | null; balance: number };
+type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust: number; reward_mode: "bank" | "block"; reward_expiry_days: number; birthdays: number; social: Social; owner_designs: number; program: Program; cashback_bp: number; cashback_min: number; currency: string; avg_cap: number };
+type Customer = { id: string; business: string; name: string; phone: string; stamps: number; target: number; scan_code: string; google_wallet?: string | null; balance: number; round_total: number };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const COLOR = /^#[0-9a-fA-F]{6}$/;
@@ -36,7 +36,7 @@ function validTarget(v: unknown): v is number {
 
 async function loadBusiness(db: D1Database, id: string) {
   const row = await db
-    .prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays, social, owner_designs, program, cashback_bp, cashback_min, currency FROM businesses WHERE id = ?")
+    .prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays, social, owner_designs, program, cashback_bp, cashback_min, currency, avg_cap FROM businesses WHERE id = ?")
     .bind(id)
     .first<Omit<Business, "social"> & { social: string | null }>();
   return row ? { ...row, social: parseSocial(row.social) } : null;
@@ -44,17 +44,27 @@ async function loadBusiness(db: D1Database, id: string) {
 
 /** Saved rewards that can be used now, and the nearest expiry. */
 async function savedRewards(db: D1Database, customerId: string) {
+  const now = new Date().toISOString();
   const row = await db
-    .prepare("SELECT COUNT(*) AS n, MIN(expires) AS next_expiry FROM rewards WHERE customer = ? AND redeemed IS NULL AND (expires IS NULL OR expires > ?)")
-    .bind(customerId, new Date().toISOString())
-    .first<{ n: number; next_expiry: string | null }>();
-  return { n: row?.n ?? 0, nextExpiry: row?.next_expiry ?? null };
+    .prepare(
+      `SELECT COUNT(*) AS n, MIN(expires) AS next_expiry,
+         -- The value of the reward that would be used next (oldest first), on the "average" card.
+         (SELECT value FROM rewards WHERE customer = ?1 AND redeemed IS NULL AND (expires IS NULL OR expires > ?2) ORDER BY earned, id LIMIT 1) AS next_value
+       FROM rewards WHERE customer = ?1 AND redeemed IS NULL AND (expires IS NULL OR expires > ?2)`,
+    )
+    .bind(customerId, now)
+    .first<{ n: number; next_expiry: string | null; next_value: number | null }>();
+  return { n: row?.n ?? 0, nextExpiry: row?.next_expiry ?? null, nextValue: row?.next_value ?? null };
 }
 
 async function cardState(db: D1Database, c: Customer, mode: Business["reward_mode"]) {
   const saved = await savedRewards(db, c.id);
   const rewards = saved.n + (mode === "block" && c.stamps >= c.target ? 1 : 0);
-  return { id: c.id, name: c.name, stamps: c.stamps, target: c.target, rewards, rewardReady: rewards > 0, nextExpiry: saved.nextExpiry, mode, balance: c.balance ?? 0 };
+  return {
+    id: c.id, name: c.name, stamps: c.stamps, target: c.target, rewards, rewardReady: rewards > 0, nextExpiry: saved.nextExpiry, mode, balance: c.balance ?? 0,
+    // The "average" card: what this round's purchases add up to, and the value of the next reward to use.
+    roundTotal: c.round_total ?? 0, rewardValue: saved.nextValue,
+  };
 }
 
 type Branch = { id: string; name: string; address: string | null };
@@ -185,8 +195,11 @@ export async function GET(request: Request) {
          -- Balance card: purchases, their total, the credit given and the balance used (minor units).
          COALESCE(SUM(e.kind = 'earn' AND e.created >= ?2), 0) AS purchases_now,
          COALESCE(SUM(e.kind = 'earn' AND e.created < ?2), 0) AS purchases_prev,
-         COALESCE(SUM(CASE WHEN e.kind = 'earn' AND e.created >= ?2 THEN e.amount ELSE 0 END), 0) AS sales_now,
-         COALESCE(SUM(CASE WHEN e.kind = 'earn' AND e.created < ?2 THEN e.amount ELSE 0 END), 0) AS sales_prev,
+         COALESCE(SUM(CASE WHEN e.kind IN ('earn', 'stamp') AND e.created >= ?2 THEN e.amount ELSE 0 END), 0) AS sales_now,
+         COALESCE(SUM(CASE WHEN e.kind IN ('earn', 'stamp') AND e.created < ?2 THEN e.amount ELSE 0 END), 0) AS sales_prev,
+         -- The "average" card: the value of the free purchases given.
+         COALESCE(SUM(CASE WHEN e.kind = 'redeem' AND e.created >= ?2 THEN e.amount ELSE 0 END), 0) AS given_now,
+         COALESCE(SUM(CASE WHEN e.kind = 'redeem' AND e.created < ?2 THEN e.amount ELSE 0 END), 0) AS given_prev,
          COALESCE(SUM(CASE WHEN e.kind = 'earn' AND e.created >= ?2 THEN e.delta ELSE 0 END), 0) AS credit_now,
          COALESCE(SUM(CASE WHEN e.kind = 'earn' AND e.created < ?2 THEN e.delta ELSE 0 END), 0) AS credit_prev,
          COALESCE(SUM(CASE WHEN e.kind = 'spend' AND e.created >= ?2 THEN e.amount ELSE 0 END), 0) AS used_now,
@@ -355,13 +368,14 @@ export async function POST(request: Request) {
     const currency = forClient ? (p.market === "intl" ? "USD" : "ILS") : region.currency;
     const cardLang = forClient || region.israel ? (p.lang === "en" ? "en" : "he") : "en";
     // The kind of card: stamps (default) or a balance card with a percentage back (Perkly picks it for a client).
-    const program: Program = forClient && p.program === "cashback" ? "cashback" : "stamps";
+    const program: Program = forClient && (p.program === "cashback" || p.program === "average") ? p.program : "stamps";
+    const avgCap = program === "average" && Number.isInteger(p.avgCap) && (p.avgCap as number) >= 0 && (p.avgCap as number) <= AMOUNT_MAX ? (p.avgCap as number) : 0;
     const bp = program === "cashback" && Number.isInteger(p.cashbackBp) && (p.cashbackBp as number) >= BP_MIN && (p.cashbackBp as number) <= BP_MAX ? (p.cashbackBp as number) : 200;
     const minUse = program === "cashback" && Number.isInteger(p.cashbackMin) && (p.cashbackMin as number) >= 0 && (p.cashbackMin as number) <= AMOUNT_MAX ? (p.cashbackMin as number) : 0;
     await db.batch([
       // The currency follows where the owner signs up: shekels in Israel, dollars abroad.
-      db.prepare("INSERT INTO businesses(id, owner, name, reward, target, color, created, join_code, reward_mode, currency, program, cashback_bp, cashback_min) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .bind(id, user.id, name, reward, p.target, p.color, now, randomCode(10), mode, currency, program, bp, minUse),
+      db.prepare("INSERT INTO businesses(id, owner, name, reward, target, color, created, join_code, reward_mode, currency, program, cashback_bp, cashback_min, avg_cap) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .bind(id, user.id, name, reward, p.target, p.color, now, randomCode(10), program === "average" ? "bank" : mode, currency, program, bp, minUse, avgCap),
       // The starting card: the example look for the business type, in the sign-up language (English abroad).
       // After this, only Perkly (a platform admin) changes the design.
       db.prepare("INSERT INTO card_designs(id, business, version, data, published, published_by) VALUES(?, ?, 1, ?, ?, ?)")
@@ -446,14 +460,16 @@ export async function POST(request: Request) {
       }
       const socialJson = Object.keys(social).length ? JSON.stringify(social) : null;
       // The kind of card, the percentage back and the minimum balance to use it (the balance card).
-      const program: Program = p.program === "cashback" || p.program === "stamps" ? p.program : business.program;
+      const program: Program = p.program === "cashback" || p.program === "stamps" || p.program === "average" ? p.program : business.program;
+      const avgCap = p.avgCap === undefined ? business.avg_cap : p.avgCap;
+      if (!Number.isInteger(avgCap) || (avgCap as number) < 0 || (avgCap as number) > AMOUNT_MAX) return fail("bad_details", 400, "Invalid cap");
       const bp = p.cashbackBp === undefined ? business.cashback_bp : p.cashbackBp;
       if (!Number.isInteger(bp) || (bp as number) < BP_MIN || (bp as number) > BP_MAX) return fail("bad_details", 400, "Invalid percentage");
       const minUse = p.cashbackMin === undefined ? business.cashback_min : p.cashbackMin;
       if (!Number.isInteger(minUse) || (minUse as number) < 0 || (minUse as number) > AMOUNT_MAX) return fail("bad_details", 400, "Invalid minimum");
       const statements = [
-        db.prepare("UPDATE businesses SET name = ?, reward = ?, target = ?, color = ?, staff_adjust = ?, reward_mode = ?, reward_expiry_days = ?, birthdays = ?, social = ?, program = ?, cashback_bp = ?, cashback_min = ? WHERE id = ?")
-          .bind(name, reward, p.target, p.color, staffAdjust, mode, expiry, birthdaysOn, socialJson, program, bp, minUse, business.id),
+        db.prepare("UPDATE businesses SET name = ?, reward = ?, target = ?, color = ?, staff_adjust = ?, reward_mode = ?, reward_expiry_days = ?, birthdays = ?, social = ?, program = ?, cashback_bp = ?, cashback_min = ?, avg_cap = ? WHERE id = ?")
+          .bind(name, reward, p.target, p.color, staffAdjust, program === "average" ? "bank" : mode, expiry, birthdaysOn, socialJson, program, bp, minUse, avgCap, business.id),
       ];
       if (business.reward_mode === "block" && mode === "bank") {
         // Switching to collect mode: cards that are full now become a saved reward and start a new round.
@@ -639,6 +655,42 @@ export async function POST(request: Request) {
         return refuseBalance("not_enough_balance");
       }
 
+      if (p.action === "stamp" && business.program === "average") {
+        // Buy N, the next one free at the average: each purchase is one stamp with its amount. A full round saves a
+        // reward worth the round's average (capped by the owner) and starts the next round.
+        const amount = parseAmount(p.amount);
+        if (!amount) return fail("bad_amount", 400, "Invalid amount");
+        for (let attempt = 0; attempt < STAMP_ATTEMPTS; attempt++) {
+          if (attempt > 0) await new Promise((r) => setTimeout(r, Math.random() * Math.min(250, 8 * 2 ** attempt)));
+          const full = c.stamps + 1 >= c.target;
+          const value = full ? averageReward(c.round_total + amount, c.target, business.avg_cap) : 0;
+          const expires = business.reward_expiry_days > 0 ? new Date(Date.now() + business.reward_expiry_days * 86_400_000).toISOString() : null;
+          const statements = [
+            db.prepare(
+              `UPDATE customers SET stamps = ?, target = ?, round_total = ? WHERE id = ? AND business = ? AND stamps = ? AND target = ? AND round_total = ?
+               AND NOT EXISTS(SELECT 1 FROM events WHERE id = ?)`,
+            ).bind(full ? 0 : c.stamps + 1, full ? business.target : c.target, full ? 0 : c.round_total + amount, c.id, business.id, c.stamps, c.target, c.round_total, requestId),
+            db.prepare(
+              `INSERT INTO events(id, customer, actor, kind, delta, created, business, branch, actor_role, stamps_after, note, amount)
+               SELECT ?, ?, ?, 'stamp', 1, ?, ?, ?, ?, (SELECT stamps FROM customers WHERE id = ?), NULL, ? WHERE changes() = 1`,
+            ).bind(requestId, c.id, user.id, now, business.id, branch, role, c.id, amount),
+          ];
+          if (full) {
+            statements.push(
+              db.prepare(
+                `INSERT OR IGNORE INTO rewards(id, business, customer, earned, earned_event, expires, value)
+                 SELECT ?, ?, ?, ?, ?, ?, ? WHERE EXISTS(SELECT 1 FROM events WHERE id = ? AND created = ?)`,
+              ).bind(`${requestId}:0`, business.id, c.id, now, requestId, expires, value, requestId, now),
+            );
+          }
+          const result = await db.batch(statements);
+          if (result[0].meta.changes) return done({ earned: full ? 1 : 0, rewardValue: full ? value : null }, 1, full ? 1 : 0);
+          if (await replayed()) return done({ replayed: true });
+          c = (await db.prepare("SELECT * FROM customers WHERE id = ?").bind(c.id).first<Customer>())!;
+        }
+        return refuse("busy_retry");
+      }
+
       if (p.action === "stamp") {
         // Several purchases at once (e.g. 3 coffees) are one action and one history entry.
         const count = p.count === undefined ? 1 : p.count;
@@ -708,9 +760,14 @@ export async function POST(request: Request) {
           ).bind(now, requestId, c.id, business.id, now, requestId),
           event("redeem", 0, null),
         ]);
-        if (result[0].meta.changes) return done();
+        if (result[0].meta.changes) {
+          // The "average" card: the discount to give is the reward's value.
+          const used = await db.prepare("SELECT value FROM rewards WHERE redeem_event = ?").bind(requestId).first<{ value: number | null }>();
+          if (used?.value != null) await db.prepare("UPDATE events SET amount = ? WHERE id = ?").bind(used.value, requestId).run();
+          return done({ rewardValue: used?.value ?? null });
+        }
         if (await replayed()) return done({ replayed: true });
-        if (business.reward_mode === "block") {
+        if (business.reward_mode === "block" && business.program !== "average") {
           // Redeem-first mode: the full card itself is the reward; the next round uses the current program.
           const r2 = await db.batch([
             db.prepare(

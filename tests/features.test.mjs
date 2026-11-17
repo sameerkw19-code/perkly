@@ -636,7 +636,7 @@ test("staff station: find → card → stamps → done, back to the start by its
   // A full card in "block" mode cannot be stamped before the reward is used.
   assert.match(station, /disabled=\{full \|\| busy\} onClick=\{\(\) => setStep\("stamp"\)\}/);
   // One stamp is one tap on the customer's card; it is offered only when the card is not full.
-  assert.match(station, /\{!full && \(\s*<button[^>]*onClick=\{\(\) => act\("stamp", true\)\}/);
+  assert.match(station, /\{!full && !average && \(\s*<button[^>]*onClick=\{\(\) => act\("stamp", true\)\}/);
   const i18n = readFileSync(new URL("../lib/i18n.ts", import.meta.url), "utf8");
   for (const k of ["sxFind", "sxScan", "sxRegister", "sxNoRewards", "sxAddStamps", "sxReturning"]) assert.match(i18n, new RegExp(`  ${k}: \\[`), k);
 });

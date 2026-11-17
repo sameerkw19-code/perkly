@@ -985,3 +985,45 @@ test("balance card: purchases add the percentage, uses take from the balance, th
   assert.equal((await admin.act(biz, "update_business", { name: "Cash", reward: "x", target: 9, color: "#123456", cashbackBp: 0 })).body.code, "bad_details");
   assert.equal((await admin.act(biz, "update_business", { name: "Cash", reward: "x", target: 9, color: "#123456", cashbackBp: 300, cashbackMin: 0 })).status, 200);
 });
+
+test("average card: buy 4, the fifth free at the average of the four (capped by the owner); retries never count twice", async () => {
+  const built = await admin.post("/api/loyalty", { action: "create_business", forClient: true, name: "Avg", reward: "4+1", target: 4, color: "#123456", program: "average", avgCap: 0, market: "il" });
+  assert.equal(built.status, 200, JSON.stringify(built.body));
+  const biz = built.body.id;
+  assert.equal((await admin.get(`/api/loyalty?business=${biz}`)).body.business.program, "average");
+  const cust = (await admin.act(biz, "register_customer", { name: "Avi", phone: "0591112233" })).body.id;
+
+  // A purchase needs its amount.
+  assert.equal((await admin.act(biz, "stamp", { customer: cust, requestId: id() })).body.code, "bad_amount");
+  const first = id();
+  assert.equal((await admin.act(biz, "stamp", { customer: cust, requestId: first, amount: "30" })).body.card.roundTotal, 3000);
+  // A retry of the same purchase changes nothing.
+  const again = await admin.act(biz, "stamp", { customer: cust, requestId: first, amount: "30" });
+  assert.equal(again.body.replayed, true);
+  assert.equal(again.body.card.stamps, 1);
+  await admin.act(biz, "stamp", { customer: cust, requestId: id(), amount: "40" });
+  await admin.act(biz, "stamp", { customer: cust, requestId: id(), amount: "50" });
+  const fourth = await admin.act(biz, "stamp", { customer: cust, requestId: id(), amount: "40.50" });
+  assert.equal(fourth.body.earned, 1);
+  assert.equal(fourth.body.rewardValue, 4013); // (30 + 40 + 50 + 40.50) / 4 = 40.125 → 40.13
+  assert.equal(fourth.body.card.stamps, 0);
+  assert.equal(fourth.body.card.roundTotal, 0);
+  assert.equal(fourth.body.card.rewards, 1);
+  assert.equal(fourth.body.card.rewardValue, 4013);
+
+  const used = await admin.act(biz, "redeem", { customer: cust, requestId: id() });
+  assert.equal(used.status, 200, JSON.stringify(used.body));
+  assert.equal(used.body.rewardValue, 4013);
+  assert.equal(used.body.card.rewards, 0);
+
+  // The owner's cap: 35.00.
+  assert.equal((await admin.act(biz, "update_business", { name: "Avg", reward: "4+1", target: 4, color: "#123456", program: "average", avgCap: 3500 })).status, 200);
+  for (const a of ["100", "100", "100"]) await admin.act(biz, "stamp", { customer: cust, requestId: id(), amount: a });
+  assert.equal((await admin.act(biz, "stamp", { customer: cust, requestId: id(), amount: "100" })).body.rewardValue, 3500);
+
+  const after = (await admin.get(`/api/loyalty?business=${biz}`)).body;
+  assert.equal(after.summary.day.stamps_now, 8);
+  assert.equal(after.summary.day.sales_now, 56050);
+  assert.equal(after.summary.day.redeemed_now, 1);
+  assert.equal(after.summary.day.given_now, 4013);
+});
