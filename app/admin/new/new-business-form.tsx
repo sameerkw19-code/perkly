@@ -29,6 +29,9 @@ export default function NewBusinessForm() {
   const [target, setTarget] = useState(9);
   const [market, setMarket] = useState<"il" | "intl">("il");
   const [cardLang, setCardLang] = useState<"he" | "en">("he");
+  // The kind of card: stamps, or a balance card with a percentage of each purchase back.
+  const [program, setProgram] = useState<"stamps" | "cashback" | "average">("stamps");
+  const [pct, setPct] = useState(2);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const design = useMemo(() => startDesign(kind, name || "שם העסק", reward || "ההטבה", cardLang), [kind, name, reward, cardLang]);
@@ -42,6 +45,7 @@ export default function NewBusinessForm() {
     const r = await post<{ id: string }>("/api/loyalty", {
       action: "create_business", forClient: true, kind, name: name.trim(), reward: reward.trim(), target, color: design.colors.bg, rewardMode: "bank",
       lang: cardLang, market, setupDays: Number(f.get("setupDays")),
+      program, cashbackBp: Math.round(pct * 100), cashbackMin: Math.round(Number(f.get("cashbackMin") || 0) * 100), avgCap: Math.round(Number(f.get("avgCap") || 0) * 100),
       branchName: String(f.get("branchName") ?? "").trim() || name.trim(), branchAddress: String(f.get("branchAddress") ?? "").trim(),
     });
     if (r.ok && r.data?.id) {
@@ -62,9 +66,24 @@ export default function NewBusinessForm() {
             <button key={k.key} type="button" className={"btn small " + (kind === k.key ? "primary" : "soft")} aria-pressed={kind === k.key} onClick={() => setKind(k.key)}>{k.label}</button>
           ))}
         </fieldset>
+        <fieldset className="admin-kinds">
+          <legend>סוג הכרטיס</legend>
+          <button type="button" className={"btn small " + (program === "stamps" ? "primary" : "soft")} aria-pressed={program === "stamps"} onClick={() => setProgram("stamps")}>כרטיס חותמות</button>
+          <button type="button" className={"btn small " + (program === "cashback" ? "primary" : "soft")} aria-pressed={program === "cashback"}
+            onClick={() => { setProgram("cashback"); if (!reward.trim()) setReward(`${pct}% מכל קנייה חוזרים אליכם ליתרה`); }}>כרטיס יתרה (אחוז מכל קנייה)</button>
+          <button type="button" className={"btn small " + (program === "average" ? "primary" : "soft")} aria-pressed={program === "average"}
+            onClick={() => { setProgram("average"); setTarget(4); if (!reward.trim()) setReward("קונים 4, החמישית עלינו לפי ממוצע הקניות"); }}>קנה X, הבאה חינם לפי ממוצע</button>
+        </fieldset>
+        {program === "cashback" && (
+          <div className="admin-new-row">
+            <label>אחוז חזרה (%)<input type="number" inputMode="decimal" min={0.1} max={50} step={0.1} required dir="ltr" value={pct} onChange={(e) => setPct(Number(e.target.value))} /></label>
+            <label>יתרה מינימלית לשימוש<input name="cashbackMin" type="number" inputMode="decimal" min={0} step={0.01} dir="ltr" defaultValue={0} /></label>
+          </div>
+        )}
         <label>שם העסק<input required maxLength={80} value={name} onChange={(e) => setName(e.target.value)} /></label>
-        <label>ההטבה<input required maxLength={160} value={reward} onChange={(e) => setReward(e.target.value)} placeholder="למשל: קפה חינם" /></label>
-        <label>חותמות להטבה<input type="number" required min={2} max={30} value={target} onChange={(e) => setTarget(Number(e.target.value))} /></label>
+        <label>{program === "cashback" ? "תיאור ההטבה בכרטיס" : "ההטבה"}<input required maxLength={160} value={reward} onChange={(e) => setReward(e.target.value)} placeholder="למשל: קפה חינם" /></label>
+        {program !== "cashback" && <label>{program === "average" ? "כמה קניות בסבב (למשל 4 = הקנייה החמישית חינם)" : "חותמות להטבה"}<input type="number" required min={2} max={30} value={target} onChange={(e) => setTarget(Number(e.target.value))} /></label>}
+        {program === "average" && <label>תקרה להטבה (0 = בלי תקרה)<input name="avgCap" type="number" inputMode="decimal" min={0} step={0.01} dir="ltr" defaultValue={0} /></label>}
         <label>שם הסניף<input name="branchName" maxLength={60} placeholder="ריק = שם העסק" /></label>
         <label>כתובת הסניף<input name="branchAddress" maxLength={160} placeholder="רחוב, מספר ועיר" /></label>
         <div className="admin-new-row">

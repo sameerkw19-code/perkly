@@ -316,3 +316,97 @@ export function OwnerLink({ business, name, shekels }: { business: string; name:
     </div>
   );
 }
+
+/**
+ * Cashier connection: an API key the cashier system (Hyp or another) uses to record sales on customers' cards.
+ * The key is shown once when it is made; after that only its name and last use are shown.
+ */
+export function PosKeys({ business, keys, branches, posOnly }: {
+  business: string;
+  posOnly: boolean;
+  keys: { id: string; label: string; created: string; last_used: string | null; branch: string | null }[];
+  branches: { id: string; name: string }[];
+}) {
+  const [list, setList] = useState(keys);
+  const [label, setLabel] = useState("");
+  const [branch, setBranch] = useState("");
+  const [made, setMade] = useState<{ key: string; label: string } | null>(null);
+  const [ask, setAsk] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [only, setOnly] = useState(posOnly);
+  const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" }) : "עוד לא");
+  return (
+    <div className="admin-action pos-keys">
+      <p className="muted">מפתח שמערכת הקופה משתמשת בו כדי לרשום קניות בכרטיסים של הלקוחות, לפי הטלפון או הקוד שבכרטיס. ההוראות למתכנת של הקופה: <a href="/pos-api" target="_blank" rel="noopener">perkly.shop/pos-api</a></p>
+      {made && (
+        <div className="pos-made" role="status">
+          <strong>המפתח של „{made.label}“. מעתיקים אותו עכשיו: הוא לא יוצג שוב.</strong>
+          <div className="admin-row">
+            <input readOnly dir="ltr" value={made.key} onFocus={(e) => e.currentTarget.select()} aria-label="מפתח הקופה" />
+            <button type="button" className="btn soft small" onClick={async () => {
+              try { await navigator.clipboard.writeText(made.key); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {}
+            }}>{copied ? "הועתק ✓" : "העתקה"}</button>
+          </div>
+          <small className="muted">שולחים את המפתח רק למתכנת של הקופה, לא בקבוצות ולא במייל פתוח.</small>
+        </div>
+      )}
+      {list.length > 0 && (
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>שם</th><th>סניף</th><th>נוצר</th><th>שימוש אחרון</th><th></th></tr></thead>
+            <tbody>
+              {list.map((k) => (
+                <tr key={k.id}>
+                  <td>{k.label}</td><td>{k.branch ?? "כל הסניפים"}</td><td>{day(k.created)}</td><td>{day(k.last_used)}</td>
+                  <td>
+                    <button type="button" className="btn soft small" disabled={busy} onClick={async () => {
+                      if (ask !== k.id) { setAsk(k.id); return; }
+                      setBusy(true); setError("");
+                      const r = await post("/api/admin", { action: "pos_key_revoke", business, key: k.id });
+                      setBusy(false); setAsk(null);
+                      if (r.ok) setList(list.filter((x) => x.id !== k.id)); else setError("לא הצלחנו לבטל. נסו שוב.");
+                    }}>{ask === k.id ? "לחצו שוב לביטול" : "ביטול המפתח"}</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <form className="admin-row" onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true); setError("");
+        const r = await post<{ id: string; key: string; label: string }>("/api/admin", { action: "pos_key_create", business, label: label.trim(), branch: branch || undefined });
+        setBusy(false);
+        if (r.ok && r.data) {
+          setMade({ key: r.data.key, label: r.data.label });
+          if (list.length === 0) setOnly(true);
+          setList([...list, { id: r.data.id, label: r.data.label, created: new Date().toISOString(), last_used: null, branch: branches.find((x) => x.id === branch)?.name ?? null }]);
+          setLabel("");
+        } else setError("לא הצלחנו ליצור מפתח. נסו שוב.");
+      }}>
+        <input value={label} maxLength={60} placeholder="שם, למשל: קופה ראשית" aria-label="שם המפתח" onChange={(e) => setLabel(e.target.value)} />
+        {branches.length > 1 && (
+          <select value={branch} aria-label="סניף" onChange={(e) => setBranch(e.target.value)}>
+            <option value="">כל הסניפים</option>
+            {branches.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+          </select>
+        )}
+        <button className="btn primary small" disabled={busy}>{busy ? "יוצר..." : "יצירת מפתח לקופה"}</button>
+      </form>
+      <label className="admin-check">
+        <input type="checkbox" checked={only} disabled={busy} onChange={async (e) => {
+          const on = e.currentTarget.checked;
+          setBusy(true); setError("");
+          const r = await post("/api/admin", { action: "pos_only", business, on });
+          setBusy(false);
+          if (r.ok) setOnly(on); else setError("לא הצלחנו לשמור. נסו שוב.");
+        }} />
+        <span>הכרטיסים משתנים רק דרך הקופה (בעל העסק עדיין יכול לתקן עם סיבה)</span>
+      </label>
+      {error && <p className="form-error" role="alert">{error}</p>}
+    </div>
+  );
+}

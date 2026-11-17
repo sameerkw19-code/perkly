@@ -6,6 +6,7 @@ import { allow } from "../../../../../lib/server/rate-limit";
 import { getSettings } from "../../../../../lib/server/settings";
 import { ensureBusinessClass, saveUrl, walletConfig } from "../../../../../lib/server/google-wallet";
 import { passLook } from "../../../../../lib/server/designs";
+import { passBalance } from "../../../../../lib/server/balance-pass";
 import { queueWelcome } from "../../../../../lib/server/customer-messages";
 
 export const dynamic = "force-dynamic";
@@ -27,13 +28,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ secr
   }
   const row = await db
     .prepare(
-      `SELECT c.id AS customer_id, c.business AS business_id, c.stamps, c.target, c.scan_code,
+      `SELECT c.id AS customer_id, c.business AS business_id, c.stamps, c.target, c.scan_code, c.balance,
          (SELECT COUNT(*) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2))
            + (CASE WHEN b.reward_mode = 'block' AND c.stamps >= c.target THEN 1 ELSE 0 END) AS rewards
        FROM customers c JOIN businesses b ON b.id = c.business WHERE c.card_hash = ?1 AND c.archived IS NULL AND b.archived IS NULL`,
     )
     .bind(await sha256(secret), new Date().toISOString())
-    .first<{ customer_id: string; business_id: string; stamps: number; target: number; scan_code: string; rewards: number }>();
+    .first<{ customer_id: string; business_id: string; stamps: number; target: number; scan_code: string; rewards: number; balance: number }>();
   if (!row) return fail("unknown_card", 404, "Card not found");
   // From now on, stamps for this customer are pushed to Google (see lib/server/wallet-sync.ts).
   if (!(await getSettings(db)).maintenance) {
@@ -45,14 +46,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ secr
   // One shared class for now (GOOGLE_WALLET_CLASS_ID): Perkly's logo and color. Each pass adds the
   // business's name, reward and banner image. Per-business classes can come later.
   const origin = new URL(request.url).origin;
-  const business = await db.prepare("SELECT id, name, reward, color FROM businesses WHERE id = ?").bind(row.business_id)
-    .first<{ id: string; name: string; reward: string; color: string }>();
-  const look = business ? await passLook(db, business, origin, { stamps: row.stamps, target: row.target }).catch(() => undefined) : undefined;
+  const business = await db.prepare("SELECT id, name, reward, color, program, currency FROM businesses WHERE id = ?").bind(row.business_id)
+    .first<{ id: string; name: string; reward: string; color: string; program: string; currency: string }>();
+  const balance = business ? passBalance(business, row.balance) : undefined;
+  const look = business ? await passLook(db, business, origin, balance === undefined ? { stamps: row.stamps, target: row.target } : undefined).catch(() => undefined) : undefined;
   // The business's own class (name, color, logo) when it has a PNG/JPEG logo; otherwise the shared class.
   const classId = await ensureBusinessClass(config, row.business_id, look?.classLook ?? null);
   const url = await saveUrl(
     classId ? { ...config, classId } : config,
-    { customerId: row.customer_id, businessId: row.business_id, stamps: row.stamps, target: row.target, scanCode: row.scan_code, rewards: row.rewards, look },
+    { customerId: row.customer_id, businessId: row.business_id, stamps: row.stamps, target: row.target, scanCode: row.scan_code, rewards: row.rewards, balance, look },
     origin,
   );
   return new Response(null, { status: 302, headers: { Location: url, "Cache-Control": "no-store" } });

@@ -719,3 +719,16 @@ html,body{overflow-x:clip}
 .admin-new-preview{position:sticky;top:16px}
 @media(max-width:860px){.admin-new{grid-template-columns:1fr}.admin-new-preview{position:static}}
 .account-sub{font-size:15px;margin:10px 0 0}
+/* Balance card: amount fields at the counter */
+.cb-amount{display:flex;align-items:center;gap:8px;border:1.5px solid var(--line);border-radius:14px;padding:4px 14px;background:var(--surface,#fff)}
+.cb-amount:focus-within{border-color:var(--brand,#7558E8);box-shadow:0 0 0 3px rgba(117,88,232,.18)}
+.cb-amount input{border:0;outline:0;background:transparent;font-size:28px;font-weight:700;width:100%;min-width:0;padding:8px 0;font-variant-numeric:tabular-nums}
+.cb-amount span{font-size:22px;font-weight:700;color:var(--muted,#6b6880)}
+.cb-use-row{display:flex;gap:8px;align-items:stretch}.cb-use-row .cb-amount{flex:1;min-width:0}
+.pcard-balance{display:grid;gap:4px;justify-items:center;text-align:center;padding:18px 12px;margin:6px 0;border-radius:18px;background:color-mix(in srgb,var(--c-fill,#7558E8) 12%,transparent)}
+.pcard-balance small{font-size:calc(13px*var(--c-ts,1));opacity:.8}
+.pcard-balance b{font-size:calc(44px*var(--c-ts,1));line-height:1.1;font-variant-numeric:tabular-nums}
+@media(max-width:760px){.head-actions{flex-wrap:wrap;justify-content:flex-start}}
+.avg-form{display:grid;gap:8px}
+.pos-made{background:#fff8e6;border-radius:12px;padding:12px 14px;display:grid;gap:8px;margin:8px 0}.pos-made input{font-family:ui-monospace,monospace;flex:1;min-width:0}
+.pos-note{background:#eef6ff;color:#1d4a7a;border-radius:12px;padding:12px 14px;margin:0;font-size:14px;line-height:1.5}

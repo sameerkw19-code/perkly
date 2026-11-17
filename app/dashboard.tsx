@@ -8,6 +8,7 @@ import {
   Phone,
 } from "lucide-react";
 import type { Design } from "../lib/design";
+import { averageReward, earnFor, formatMoney, parseAmount, pctLabel } from "../lib/cashback.ts";
 import { CardEditor } from "../components/card-editor";
 import jsQR from "jsqr";
 import { errorText, useLang } from "../lib/i18n";
@@ -23,8 +24,8 @@ import { weekChange } from "../lib/weekly";
 import { Brand } from "../components/brand";
 
 type Role = "owner" | "staff";
-type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social };
-type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; rewards?: number; nextExpiry?: string | null; phone?: string };
+type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social; program?: "stamps" | "cashback" | "average"; cashback_bp?: number; cashback_min?: number; currency?: string; avg_cap?: number; pos_only?: number };
+type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; rewards?: number; nextExpiry?: string | null; phone?: string; balance?: number; roundTotal?: number; rewardValue?: number | null };
 type Data = {
   me: { name: string; email: string };
   /** Perkly (a platform admin): manages the card, settings and team of any business. */
@@ -51,7 +52,7 @@ type Data = {
   range?: number | "all";
   customers?: any[];
   events?: any[];
-  stats?: { customers: number; new_customers: number; rewards_ready: number; stamps: number; redemptions: number };
+  stats?: { customers: number; new_customers: number; rewards_ready: number; stamps: number; redemptions: number; open_balance?: number };
   /** Last day, week and month against the same length before it. */
   summary?: Record<Period, Record<string, number>>;
   team?: any[];
@@ -280,8 +281,10 @@ export default function Dashboard() {
   function exportCSV() {
     const safe = (s: unknown) => '"' + String(s ?? "").replace(/^[=+@\-\t\r]/, "'$&").replaceAll('"', '""') + '"';
     const withBirthday = b?.birthdays !== 0;
-    const rows = [["Name", "Phone", "Stamps", "Target", ...(withBirthday ? ["Birthday (DD/MM)"] : []), "Marketing consent", "Joined", "Source", "Last visit"],
-      ...listed.map((c) => [c.name, c.phone, c.stamps, c.target, ...(withBirthday ? [formatBirthday(c.birthday)] : []), c.consent_marketing ? "yes" : "no", c.created, c.source, c.last_visit ?? ""])];
+    // The balance card exports the balance (in major units) instead of the stamps.
+    const cash = b?.program === "cashback";
+    const rows = [["Name", "Phone", ...(cash ? ["Balance"] : ["Stamps", "Target"]), ...(withBirthday ? ["Birthday (DD/MM)"] : []), "Marketing consent", "Joined", "Source", "Last visit"],
+      ...listed.map((c) => [c.name, c.phone, ...(cash ? [((c.balance ?? 0) / 100).toFixed(2)] : [c.stamps, c.target]), ...(withBirthday ? [formatBirthday(c.birthday)] : []), c.consent_marketing ? "yes" : "no", c.created, c.source, c.last_visit ?? ""])];
     const csv = "﻿" + rows.map((r) => r.map(safe).join(",")).join("\r\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
@@ -382,7 +385,7 @@ export default function Dashboard() {
           {view === "overview" && isOwner && (
             <>
               <div className="page-head">
-                <div><h1>{t("repTitle")}</h1><p className="muted">{t("repSubtitle")}</p></div>
+                <div><h1>{t("repTitle")}</h1><p className="muted">{t(b.program === "cashback" ? "repSubtitleCb" : "repSubtitle")}</p></div>
                 <div className="head-actions">
                   {(data.branches?.length ?? 0) > 1 && (
                     <select aria-label={t("branch")} value={branchView} onChange={(e) => setBranchView(e.target.value)}>
@@ -395,7 +398,8 @@ export default function Dashboard() {
                   <button className="btn soft" onClick={() => setModal({ type: "staffLink" })}><UserPlus size={18} />{t("staffLinkButton")}</button>
                 </div>
               </div>
-              {data.summary && <Summary summary={data.summary} totals={{ customers: data.stats!.customers, ready: data.stats!.rewards_ready }} breakdown={data.breakdown} hasBranches={(data.branches?.length ?? 0) > 1} t={t} />}
+              {data.summary && <Summary summary={data.summary} totals={{ customers: data.stats!.customers, ready: data.stats!.rewards_ready, openBalance: data.stats!.open_balance }} breakdown={data.breakdown} hasBranches={(data.branches?.length ?? 0) > 1} t={t}
+                money={b.program === "cashback" || b.program === "average" ? (n) => formatMoney(n, b.currency === "USD" ? "USD" : "ILS", lang) : undefined} average={b.program === "average"} />}
               {!!data.alerts?.length && <Alerts alerts={data.alerts} t={t} />}
               <section className="overview-grid">
                 <div className="panel card-panel join-panel">
@@ -417,7 +421,7 @@ export default function Dashboard() {
                 </div>
                 <div className="panel activity-panel">
                   <div className="section-head"><h2>{t("history")}</h2></div>
-                  <EventList events={data.events ?? []} t={t} lang={lang} />
+                  <EventList events={data.events ?? []} t={t} lang={lang} currency={b.currency} />
                 </div>
               </section>
             </>
@@ -450,11 +454,13 @@ export default function Dashboard() {
                           <td><span className="customer-avatar">{c.name.charAt(0)}</span><strong>{c.name}</strong></td>
                           <td dir="ltr" className="start">{c.phone}</td>
                           <td>
+                            {b.program === "cashback" ? <Num>{formatMoney(c.balance ?? 0, b.currency === "USD" ? "USD" : "ILS", lang)}</Num> : (
                             <div className="progress-cell">
                               <span className="progress-track"><i style={{ width: Math.min(100, (c.stamps / c.target) * 100) + "%" }} /></span>
                               <Num>{c.stamps}/{c.target}</Num>
                               {c.rewards > 0 && <span className="pill ready-pill"><Gift size={11} /> <Num>{c.rewards}</Num></span>}
                             </div>
+                            )}
                           </td>
                           <td><LastVisit iso={c.last_visit} t={t} /></td>
                           {b.birthdays !== 0 && <td><Num>{formatBirthday(c.birthday) || "—"}</Num></td>}
@@ -529,7 +535,8 @@ export default function Dashboard() {
             <>
               <div className="page-head"><div><h1>{t("design")}</h1><p className="muted">{t("designNoBalance")}</p></div></div>
               <CardEditor key={b.id + ":" + data.editor.publishedVersion} businessId={b.id} target={b.target} editor={data.editor} t={t} lang={lang} notify={notify} reload={load}
-                paid={!!data.access?.ok && !data.access.free} upgradeHref={`/start?b=${encodeURIComponent(b.id)}`} specialDays={manage} />
+                paid={!!data.access?.ok && !data.access.free} upgradeHref={`/start?b=${encodeURIComponent(b.id)}`} specialDays={manage}
+                cashback={b.program === "cashback" ? { bp: b.cashback_bp ?? 200, currency: b.currency === "USD" ? "USD" : "ILS" } : null} average={b.program === "average"} />
             </>
           )}
 
@@ -761,18 +768,24 @@ function groupEvents(events: any[]): any[] {
   return out;
 }
 
-function EventList({ events, t, lang }: { events: any[]; t: any; lang: string }) {
+function EventList({ events, t, lang, currency = "ILS" }: { events: any[]; t: any; lang: string; currency?: string }) {
+  const fmt = (minor: number) => formatMoney(Math.abs(minor), currency === "USD" ? "USD" : "ILS", lang);
+  // Balance card entries: the purchase and what it added, the amount used, or a correction.
+  const money = (e: { kind: string; amount?: number | null; delta: number }) =>
+    e.kind === "earn" ? t("evEarn", { amount: fmt(e.amount ?? 0), earned: fmt(e.delta) })
+    : e.kind === "spend" ? t("evSpend", { amount: fmt(e.amount ?? -e.delta) })
+    : t("evBalanceFix", { delta: (e.delta < 0 ? "−" : "+") + fmt(e.delta) });
   if (!events.length) return <div className="activity-empty"><Activity /><p>{t("empty")}</p></div>;
   const locale = lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB";
   return (
     <div>
       {groupEvents(events).slice(0, 8).map((e: any, i: number) => (
         <div className="activity-row" key={e.id ?? i}>
-          <span className={"activity-icon" + (e.kind === "redeem" ? " reward-icon" : "")}>{e.kind === "redeem" ? <Gift size={16} /> : e.kind === "adjust" ? <Activity size={16} /> : <Plus size={16} />}</span>
+          <span className={"activity-icon" + (e.kind === "redeem" || e.kind === "spend" ? " reward-icon" : "")}>{e.kind === "redeem" || e.kind === "spend" ? <Gift size={16} /> : e.kind === "adjust" || e.kind === "balance_adjust" ? <Activity size={16} /> : <Plus size={16} />}</span>
           <div>
             <strong>{e.customer}</strong>
             <small>
-              {t("ev_" + e.kind)} <Num>{e.delta > 0 ? "+" + e.delta : e.delta}</Num>
+              {e.kind === "earn" || e.kind === "spend" || e.kind === "balance_adjust" ? <Num>{money(e)}</Num> : <>{t("ev_" + e.kind)} <Num>{e.delta > 0 ? "+" + e.delta : e.delta}</Num></>}
               {e.actor_name ? " · " + t("by", { name: e.actor_name }) : ""}
               {e.branch_name ? " · " + e.branch_name : ""}
               {e.rewards_earned ? " · 🎁 " + t("rewardEarnedEv") + (e.rewards_earned > 1 ? " ×" + e.rewards_earned : "") : ""}
@@ -805,7 +818,7 @@ const SOCIAL_PLACEHOLDER: Record<string, string> = {
 
 function BusinessForm({ t, busy, initial, submitLabel, onSubmit, onInvalid }: {
   t: any; busy: boolean; initial?: Business; submitLabel: string;
-  onSubmit: (v: { name: string; reward: string; target: number; color: string; staffAdjust?: boolean; birthdays?: boolean; rewardMode?: string; rewardExpiryDays?: number; social?: Social }) => void;
+  onSubmit: (v: { name: string; reward: string; target: number; color: string; staffAdjust?: boolean; birthdays?: boolean; rewardMode?: string; rewardExpiryDays?: number; social?: Social; program?: string; cashbackBp?: number; cashbackMin?: number; avgCap?: number }) => void;
   onInvalid?: (message: string) => void;
 }) {
   return (
@@ -826,7 +839,11 @@ function BusinessForm({ t, busy, initial, submitLabel, onSubmit, onInvalid }: {
       }
       onSubmit({
         name: String(f.get("name")), reward: String(f.get("reward")), target: Number(f.get("target")), color: String(f.get("color")),
-        ...(initial ? { staffAdjust: f.get("staffAdjust") === "on", birthdays: f.get("birthdays") === "on", rewardMode: String(f.get("rewardMode")), rewardExpiryDays: Number(f.get("rewardExpiryDays")), social } : {}),
+        ...(initial ? {
+          staffAdjust: f.get("staffAdjust") === "on", birthdays: f.get("birthdays") === "on", rewardMode: String(f.get("rewardMode")), rewardExpiryDays: Number(f.get("rewardExpiryDays")), social,
+          program: String(f.get("program") || "stamps"), cashbackBp: Math.round(Number(f.get("cashbackPct")) * 100), cashbackMin: Math.round(Number(f.get("cashbackMin") || 0) * 100),
+          avgCap: Math.round(Number(f.get("avgCap") || 0) * 100),
+        } : {}),
       });
     }}>
       <label>{t("businessName")}<input name="name" required maxLength={80} defaultValue={initial?.name} /></label>
@@ -837,6 +854,18 @@ function BusinessForm({ t, busy, initial, submitLabel, onSubmit, onInvalid }: {
       </div>
       {initial && (
         <>
+          <fieldset className="mode-set">
+            <legend>{t("programLabel")}</legend>
+            <label className="check"><input type="radio" name="program" value="stamps" defaultChecked={initial.program !== "cashback"} /><span>{t("programStamps")}</span></label>
+            <label className="check"><input type="radio" name="program" value="cashback" defaultChecked={initial.program === "cashback"} /><span>{t("programCashback")}</span></label>
+            <label className="check"><input type="radio" name="program" value="average" defaultChecked={initial.program === "average"} /><span>{t("programAverage")}</span></label>
+            <div className="form-row">
+              <label>{t("cashbackPct")}<input name="cashbackPct" type="number" inputMode="decimal" min={0.1} max={50} step={0.1} required dir="ltr" defaultValue={(initial.cashback_bp ?? 200) / 100} /></label>
+              <label>{t("cashbackMin")}<input name="cashbackMin" type="number" inputMode="decimal" min={0} step={0.01} dir="ltr" defaultValue={(initial.cashback_min ?? 0) / 100} /></label>
+            </div>
+            <label>{t("avgCap")}<input name="avgCap" type="number" inputMode="decimal" min={0} step={0.01} dir="ltr" defaultValue={(initial.avg_cap ?? 0) / 100} /></label>
+            <small className="form-hint">{t("programHint")}</small>
+          </fieldset>
           <fieldset className="mode-set">
             <legend>{t("rewardModeLabel")}</legend>
             <label className="check"><input type="radio" name="rewardMode" value="bank" defaultChecked={initial.reward_mode !== "block"} /><span>{t("modeBank")}</span></label>
@@ -907,9 +936,26 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
   const [result, setResult] = useState<{ text: string; reward: boolean } | null>(null);
   const [countdown, setCountdown] = useState(0);
   const DONE_SECONDS = 4;
+  // The balance card (cashback): the purchase amount, the amount to use, and the balance correction.
+  const cashback = business.program === "cashback";
+  const currency = business.currency === "USD" ? "USD" : "ILS";
+  const bp = business.cashback_bp ?? 200;
+  const minUse = business.cashback_min ?? 0;
+  const fmt = (minor: number) => formatMoney(minor, currency, lang);
+  const [buyText, setBuyText] = useState("");
+  const [useText, setUseText] = useState("");
+  const [useAsk, setUseAsk] = useState(false);
+  const [balanceFix, setBalanceFix] = useState<{ value: string; note: string } | null>(null);
+  // The "average" card: buy N, the next one free at the average of those purchases.
+  const average = business.program === "average";
+  // Connected to the cashier: cards change only through the cashier; here staff see the card (owners can still correct).
+  const posOnly = !!business.pos_only;
+  const mayFix = canFix && (!posOnly || owner);
+  const [avgText, setAvgText] = useState("");
   // Showing a new customer: reset the quantity and clear the search.
   function choose(c: CardState) {
     setSelected(c);
+    setBuyText(""); setUseText(""); setUseAsk(false); setBalanceFix(null); setAvgText("");
     setStep("customer");
     setPending(null);
     setQty(1);
@@ -1011,7 +1057,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
     }
   }
 
-  async function act(kind: "stamp" | "redeem", one = false) {
+  async function act(kind: "stamp" | "redeem", one = false, purchase?: number) {
     if (!selected || busy) return;
     if (branches.length > 1 && !myBranch && !branch) { notify(t("err_branch_required"), true); return; }
     // Two taps instead of a browser confirm() box: some phones and home-screen apps block confirm() silently.
@@ -1019,19 +1065,24 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
     setRedeemAsk(false);
     // `one`: a single stamp straight from the customer screen, whatever the quantity screen was left on.
     const amount = one ? 1 : qty;
-    const key = kind + ":" + (kind === "stamp" ? amount : "");
+    const key = kind + ":" + (kind === "stamp" ? amount : "") + (purchase ? ":" + purchase : "");
     const requestId = pending && pending.kind === key && pending.customer === selected.id ? pending.requestId : crypto.randomUUID();
     setPending({ kind: key, customer: selected.id, requestId });
     setBusy(true);
     const count = kind === "stamp" ? amount : undefined;
-    const r = await post("/api/loyalty", { action: kind, business: business.id, customer: selected.id, requestId, count, branch: myBranch ? undefined : branch || undefined });
+    const r = await post("/api/loyalty", { action: kind, business: business.id, customer: selected.id, requestId, count: average ? undefined : count, amount: purchase, branch: myBranch ? undefined : branch || undefined });
     setBusy(false);
     if (r.ok) {
       setPending(null);
       setSelected({ ...selected, ...r.data.card });
       setQty(1);
       const earned = r.data.earned as number | undefined;
+      setAvgText("");
+      const value = r.data.rewardValue as number | null | undefined;
       const message = r.data.replayed ? t("replayed")
+        : average && kind === "redeem" && value != null ? t("avgRedeemed", { amount: fmt(value) })
+        : average && earned && value != null ? t("avgEarned", { amount: fmt(value) })
+        : average && kind === "stamp" ? t("avgRecorded", { amount: fmt(purchase ?? 0) })
         : earned ? (earned === 1 ? t("earnedSaved") : t("earnedSavedN", { n: earned }))
         : kind === "stamp" ? (count === 1 ? t("stampOk") : t("stampsOk", { n: count! })) : t("redeemOk");
       setResult({ text: message, reward: !!earned || kind === "redeem" });
@@ -1045,6 +1096,52 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
       if (r.data?.card) setSelected({ ...selected, ...r.data.card });
       notify(errorText(lang, r.code), true);
     }
+  }
+
+  /** Balance card: a purchase adds the percentage back; a use takes from the balance. Same safe retry as stamps. */
+  async function actBalance(kind: "purchase" | "spend", amount: number) {
+    if (!selected || busy) return;
+    if (branches.length > 1 && !myBranch && !branch) { notify(t("err_branch_required"), true); return; }
+    if (kind === "spend" && !useAsk) { setUseAsk(true); return; }
+    setUseAsk(false);
+    const key = kind + ":" + amount;
+    const requestId = pending && pending.kind === key && pending.customer === selected.id ? pending.requestId : crypto.randomUUID();
+    setPending({ kind: key, customer: selected.id, requestId });
+    setBusy(true);
+    const r = await post("/api/loyalty", { action: kind, business: business.id, customer: selected.id, requestId, amount, branch: myBranch ? undefined : branch || undefined });
+    setBusy(false);
+    if (r.ok) {
+      setPending(null);
+      setSelected({ ...selected, ...r.data.card });
+      setBuyText(""); setUseText("");
+      const text = r.data.replayed ? t("replayed")
+        : kind === "purchase" ? t("cbEarned", { earned: fmt(r.data.earned), amount: fmt(amount) })
+        : t("cbUsed", { amount: fmt(amount) });
+      setResult({ text, reward: kind === "spend" });
+      setCountdown(DONE_SECONDS);
+      setStep("done");
+      onDone();
+    } else if (r.network) {
+      notify(t("err_network"), true);
+    } else {
+      setPending(null);
+      if (r.data?.card) setSelected({ ...selected, ...r.data.card });
+      notify(errorText(lang, r.code), true);
+    }
+  }
+
+  async function saveBalanceFix() {
+    if (!selected || !balanceFix || busy) return;
+    const target = balanceFix.value.trim() === "0" ? 0 : parseAmount(balanceFix.value);
+    if (target === null) { notify(t("err_bad_amount"), true); return; }
+    const delta = target - (selected.balance ?? 0);
+    if (!delta) { setBalanceFix(null); return; }
+    if (branches.length > 1 && !myBranch && !branch) { notify(t("err_branch_required"), true); return; }
+    setBusy(true);
+    const r = await post("/api/loyalty", { action: "adjust_balance", business: business.id, customer: selected.id, delta, note: balanceFix.note, requestId: crypto.randomUUID(), branch: myBranch ? undefined : branch || undefined });
+    setBusy(false);
+    if (r.ok) { setSelected({ ...selected, ...r.data.card }); setBalanceFix(null); notify(t("fixSaved")); onDone(); }
+    else { if (r.data?.card) setSelected({ ...selected, ...r.data.card }); notify(r.network ? t("err_network") : errorText(lang, r.code), true); }
   }
 
   const retrying = pending && selected && pending.customer === selected.id;
@@ -1090,7 +1187,8 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
   );
   const redeemButton = (
     <button className="btn lime big sx-wide" disabled={busy} onClick={() => act("redeem")}>
-      <Gift size={18} />{busy ? t("sending") : retrying && pending?.kind.startsWith("redeem") ? t("retry") : redeemAsk ? t("redeemAgain") : t("redeem")}
+      <Gift size={18} />{busy ? t("sending") : retrying && pending?.kind.startsWith("redeem") ? t("retry") : redeemAsk ? t("redeemAgain")
+        : average && selected?.rewardValue != null ? t("avgRedeem", { amount: fmt(selected.rewardValue) }) : t("redeem")}
     </button>
   );
 
@@ -1137,11 +1235,15 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
                   <button key={c.id} role="option" aria-selected={false} className="customer-result" onClick={() => choose(c)}>
                     <span className="st-avatar" aria-hidden="true">{c.name.charAt(0)}</span>
                     <span className="st-result-who"><strong>{c.name}</strong><small dir="ltr">{c.phone}</small></span>
+                    {cashback ? (
+                      <span className="st-result-count"><Num>{fmt(c.balance ?? 0)}</Num></span>
+                    ) : (
                     <span className="st-result-count">
                       {ready && <span className="pill ready-pill"><Gift size={11} /></span>}
                       <span className="st-mini-track" aria-hidden="true"><i style={{ width: Math.min(100, (c.stamps / c.target) * 100) + "%" }} /></span>
                       <Num>{c.stamps}/{c.target}</Num>
                     </span>
+                    )}
                   </button>
                 );
               })}
@@ -1154,14 +1256,103 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
           {!!myRecent?.length && (
             <div className="sx-recent">
               <h2>{t("myRecent")}</h2>
-              <EventList events={myRecent} t={t} lang={lang} />
+              <EventList events={myRecent} t={t} lang={lang} currency={business.currency} />
             </div>
           )}
         </section>
       )}
 
       {/* 2. The customer's card */}
-      {selected && step === "customer" && (
+      {/* 2b. The balance card: record a purchase, use the balance */}
+      {selected && cashback && step === "customer" && (() => {
+        const balance = selected.balance ?? 0;
+        const buy = parseAmount(buyText);
+        const use = parseAmount(useText);
+        const canUse = balance > 0 && balance >= minUse;
+        return (
+          <section className="sx-screen" aria-label={selected.name}>
+            {who}
+            <div className="sx-chips">
+              <span className="sx-chip"><Num>{fmt(balance)}</Num> {t("cbBalanceLabel")}</span>
+              <span className="sx-chip">{t("cbBackChip", { pct: pctLabel(bp) })}</span>
+              {branchControl}
+            </div>
+            {posOnly && <p className="pos-note" role="note">{t("posOnlyNote")}</p>}
+            {!posOnly && <>
+            <form className="sx-box" onSubmit={(e) => { e.preventDefault(); if (buy) actBalance("purchase", buy); }}>
+              <div className="sx-box-head">
+                <span className="sx-box-icon" aria-hidden="true"><Plus size={18} /></span>
+                <strong>{t("cbPurchase")}</strong>
+              </div>
+              <label className="cb-amount">
+                <span className="sr-only">{t("cbPurchaseAmount")}</span>
+                <input id="cbBuy" inputMode="decimal" autoComplete="off" dir="ltr" placeholder={t("cbAmountPh")} value={buyText}
+                  aria-describedby="cbBuyHint" onChange={(e) => { setBuyText(e.target.value); setPending(null); }} />
+                <span aria-hidden="true">{currency === "USD" ? "$" : "₪"}</span>
+              </label>
+              <small id="cbBuyHint" className="form-hint">{buy ? t("cbWillEarn", { earned: fmt(earnFor(buy, bp)) }) : t("cbPurchaseHint", { pct: pctLabel(bp) })}</small>
+              <button className="btn primary big sx-wide" disabled={busy || !buy}>
+                <Check size={18} />{busy ? t("sending") : retrying && pending?.kind.startsWith("purchase") ? t("retry") : t("cbRecord")}
+              </button>
+            </form>
+            <form className="sx-box" onSubmit={(e) => { e.preventDefault(); if (use) actBalance("spend", use); }}>
+              <div className="sx-box-head">
+                <span className="sx-box-icon" aria-hidden="true"><Gift size={18} /></span>
+                <strong>{t("cbUse")}</strong>
+              </div>
+              {canUse ? (
+                <>
+                  <div className="cb-use-row">
+                    <label className="cb-amount">
+                      <span className="sr-only">{t("cbUseAmount")}</span>
+                      <input id="cbUse" inputMode="decimal" autoComplete="off" dir="ltr" placeholder={t("cbAmountPh")} value={useText}
+                        onChange={(e) => { setUseText(e.target.value); setUseAsk(false); setPending(null); }} />
+                      <span aria-hidden="true">{currency === "USD" ? "$" : "₪"}</span>
+                    </label>
+                    <button type="button" className="btn soft" onClick={() => { setUseText((balance / 100).toFixed(2).replace(/\.00$/, "")); setUseAsk(false); }}>{t("cbAll")}</button>
+                  </div>
+                  {use !== null && use > balance && <small className="form-error" role="alert">{t("err_not_enough_balance")}</small>}
+                  <button className="btn lime big sx-wide" disabled={busy || !use || use > balance}>
+                    <Gift size={18} />{busy ? t("sending") : useAsk ? t("cbUseAgain", { amount: fmt(use ?? 0) }) : t("cbUseConfirm")}
+                  </button>
+                </>
+              ) : (
+                <small className="form-hint">{balance <= 0 ? t("cbNoBalance") : t("cbMinHint", { min: fmt(minUse) })}</small>
+              )}
+            </form>
+            </>}
+            {balanceFix ? (
+              <div className="fix-panel">
+                <h3>{t("cbFixTitle")}</h3>
+                <label className="cb-amount">
+                  <span className="sr-only">{t("cbFixValue")}</span>
+                  <input id="cbFix" inputMode="decimal" autoComplete="off" dir="ltr" value={balanceFix.value} onChange={(e) => setBalanceFix({ ...balanceFix, value: e.target.value })} />
+                  <span aria-hidden="true">{currency === "USD" ? "$" : "₪"}</span>
+                </label>
+                <label className="fix-reason">{t("reason")}
+                  <input id="cbFixNote" value={balanceFix.note} maxLength={200} onChange={(e) => setBalanceFix({ ...balanceFix, note: e.target.value })} />
+                </label>
+                <p className="form-hint">{t("cbFixHint")}</p>
+                <div className="form-actions">
+                  <button className="btn primary" disabled={busy || !balanceFix.note.trim()} onClick={saveBalanceFix}>{busy ? t("sending") : t("saveFix")}</button>
+                  <button className="btn soft" onClick={() => setBalanceFix(null)}>{t("cancel")}</button>
+                </div>
+              </div>
+            ) : (mayFix || owner) && (
+              <div className="row-actions center-row st-more">
+                {mayFix && <button className="btn soft small" onClick={() => setBalanceFix({ value: (balance / 100).toFixed(2).replace(/\.00$/, ""), note: "" })}><Activity size={14} />{t("cbFixTitle")}</button>}
+                {owner && <button className="text-btn" style={{ color: "#b4413a" }} disabled={busy} onClick={() => archiveCustomer(false)}>{archiveAsk ? t("archiveAgain") : t("archiveCustomer")}</button>}
+                {owner && archiveAsk && <button className="text-btn" style={{ color: "#b4413a" }} disabled={busy} onClick={() => archiveCustomer(true)}>{t("eraseCustomer")}</button>}
+              </div>
+            )}
+            <div className="sx-bar">
+              <button className="btn soft" onClick={next}><ChevronRight size={16} className="sx-back" />{t("sxBack")}</button>
+            </div>
+          </section>
+        );
+      })()}
+
+      {selected && !cashback && step === "customer" && (
         <section className="sx-screen" aria-label={selected.name}>
           {who}
           <div className="sx-chips">
@@ -1175,12 +1366,37 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
               <strong>{selected.rewards ? (selected.rewards === 1 ? t("sxRewardReady1") : t("sxRewardReadyN", { n: selected.rewards })) : full ? t("sxRewardReady1") : t("sxNoRewards")}</strong>
             </div>
             {!!selected.rewards && selected.nextExpiry && <small className="form-hint">{t("expiresOnShort", { d: new Date(selected.nextExpiry).toLocaleDateString(lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB", { timeZone: "Asia/Jerusalem" }) })}</small>}
-            {(!!selected.rewards || full) && redeemButton}
-            {!full && (
+            {posOnly && <p className="pos-note" role="note">{t("posOnlyNote")}</p>}
+            {!posOnly && (!!selected.rewards || full) && redeemButton}
+            {!posOnly && !full && !average && (
               <button className={"btn big sx-wide " + (selected.rewards ? "soft" : "primary")} disabled={busy} onClick={() => act("stamp", true)}>
                 <Plus size={18} />{busy ? t("sending") : retrying && pending?.kind.startsWith("stamp") ? t("retry") : t("sxOneStamp")}
               </button>
             )}
+            {!posOnly && average && (() => {
+              const amount = parseAmount(avgText);
+              const total = (selected.roundTotal ?? 0) + (amount ?? 0);
+              const n = selected.stamps + (amount ? 1 : 0);
+              const willFill = !!amount && n >= selected.target;
+              return (
+                <form className="avg-form" onSubmit={(e) => { e.preventDefault(); if (amount) act("stamp", true, amount); }}>
+                  <label className="cb-amount">
+                    <span className="sr-only">{t("cbPurchaseAmount")}</span>
+                    <input id="avgBuy" inputMode="decimal" autoComplete="off" dir="ltr" placeholder={t("cbAmountPh")} value={avgText}
+                      onChange={(e) => { setAvgText(e.target.value); setPending(null); }} />
+                    <span aria-hidden="true">{currency === "USD" ? "$" : "₪"}</span>
+                  </label>
+                  <small className="form-hint">
+                    {willFill ? t("avgWillFill", { amount: fmt(averageReward(total, selected.target, business.avg_cap ?? 0)) })
+                      : selected.stamps > 0 ? t("avgSoFar", { amount: fmt(averageReward(selected.roundTotal ?? 0, selected.stamps, 0)) })
+                      : t("avgHint", { n: selected.target })}
+                  </small>
+                  <button className={"btn big sx-wide " + (selected.rewards ? "soft" : "primary")} disabled={busy || !amount}>
+                    <Plus size={18} />{busy ? t("sending") : retrying && pending?.kind.startsWith("stamp") ? t("retry") : t("cbRecord")}
+                  </button>
+                </form>
+              );
+            })()}
             {full && <small className="form-hint">{t("sxFullFirst")}</small>}
           </div>
           <h2 className="sx-label">{t("sxPunchCards")}</h2>
@@ -1209,22 +1425,22 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
                 <button className="btn soft" onClick={() => setFixing(null)}>{t("cancel")}</button>
               </div>
             </div>
-          ) : (canFix || owner) && (
+          ) : (mayFix || owner) && (
             <div className="row-actions center-row st-more">
-              {canFix && <button className="btn soft small" onClick={() => setFixing({ value: selected.stamps, note: "" })}><Activity size={14} />{t("fixCount")}</button>}
+              {mayFix && <button className="btn soft small" onClick={() => setFixing({ value: selected.stamps, note: "" })}><Activity size={14} />{t("fixCount")}</button>}
               {owner && <button className="text-btn" style={{ color: "#b4413a" }} disabled={busy} onClick={() => archiveCustomer(false)}>{archiveAsk ? t("archiveAgain") : t("archiveCustomer")}</button>}
               {owner && archiveAsk && <button className="text-btn" style={{ color: "#b4413a" }} disabled={busy} onClick={() => archiveCustomer(true)}>{t("eraseCustomer")}</button>}
             </div>
           )}
           <div className="sx-bar">
             <button className="btn soft" onClick={next}><ChevronRight size={16} className="sx-back" />{t("sxBack")}</button>
-            <button className="btn soft" disabled={full || busy} onClick={() => setStep("stamp")}>{t("sxManyStamps")}<ChevronRight size={16} className="sx-fwd" /></button>
+            {!average && !posOnly && <button className="btn soft" disabled={full || busy} onClick={() => setStep("stamp")}>{t("sxManyStamps")}<ChevronRight size={16} className="sx-fwd" /></button>}
           </div>
         </section>
       )}
 
       {/* 3. Add stamps */}
-      {selected && step === "stamp" && (
+      {selected && !cashback && step === "stamp" && (
         <section className="sx-screen" aria-label={t("sxAddStamps")}>
           {who}
           <h2 className="sx-label">{t("sxPunchCards")}</h2>
@@ -1255,10 +1471,16 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
         <section className="sx-screen sx-done" role="status" aria-live="polite">
           <span className={"sx-done-icon" + (result.reward ? " reward" : "")}>{result.reward ? <Gift size={34} /> : <Check size={34} />}</span>
           <h2>{result.text}</h2>
-          <p className="muted">{selected.name} · <Num>{t("sxOf", { s: selected.stamps, t: selected.target })}</Num></p>
-          <div className="sx-box sx-done-box">
-            <strong>{selected.rewards ? (selected.rewards === 1 ? t("sxRewardReady1") : t("sxRewardReadyN", { n: selected.rewards })) : t("sxToUnlock", { k: remaining })}</strong>
-          </div>
+          {cashback ? (
+            <p className="muted">{selected.name} · {t("cbBalanceNow", { balance: fmt(selected.balance ?? 0) })}</p>
+          ) : (
+            <>
+              <p className="muted">{selected.name} · <Num>{t("sxOf", { s: selected.stamps, t: selected.target })}</Num></p>
+              <div className="sx-box sx-done-box">
+                <strong>{selected.rewards ? (selected.rewards === 1 ? t("sxRewardReady1") : t("sxRewardReadyN", { n: selected.rewards })) : t("sxToUnlock", { k: remaining })}</strong>
+              </div>
+            </>
+          )}
           <button className="btn primary big sx-wide" onClick={next}>{t("nextCustomer")}<ChevronRight size={16} className="sx-fwd" /></button>
           <div className="sx-countdown" aria-hidden="true"><i style={{ animationDuration: DONE_SECONDS + "s" }} /></div>
           <small className="form-hint">{t("sxReturning", { s: countdown })}</small>
@@ -1430,6 +1652,24 @@ const SUMMARY_ROWS = [
   ["redeemed", "sumRedeemed"],
   ["joined", "sumJoined"],
 ] as const;
+/** The balance card's summary: purchases and their total, the credit given and the balance used (money in minor units). */
+const CASHBACK_ROWS: readonly (readonly [string, string, boolean])[] = [
+  ["purchases", "sumPurchases", false],
+  ["sales", "sumSales", true],
+  ["credit", "sumCredit", true],
+  ["used", "sumUsed", true],
+  ["returning", "sumReturning", false],
+  ["joined", "sumJoined", false],
+];
+/** The "average" card's summary: purchases (stamps) and their total, free purchases and what they were worth. */
+const AVERAGE_ROWS: readonly (readonly [string, string, boolean])[] = [
+  ["stamps", "sumPurchases", false],
+  ["sales", "sumSales", true],
+  ["redeemed", "sumRedeemed", false],
+  ["given", "sumGiven", true],
+  ["returning", "sumReturning", false],
+  ["joined", "sumJoined", false],
+];
 
 /** Unusual activity, calm: the first three, the rest one click away. */
 function Alerts({ alerts, t }: { alerts: { type: "customer" | "staff" | "staffFix"; name: string; count: number }[]; t: (k: string, v?: Record<string, string | number>) => string }) {
@@ -1449,25 +1689,32 @@ function Alerts({ alerts, t }: { alerts: { type: "customer" | "staff" | "staffFi
 
 /** Summary for the owner: this day, week or month against the one before. */
 type BreakdownRow = { id: string | null; name: string | null } & Record<string, number | string | null>;
-function Summary({ summary, totals, breakdown, hasBranches, t }: {
-  summary: Record<Period, Record<string, number>>; totals: { customers: number; ready: number };
+function Summary({ summary, totals, breakdown, hasBranches, t, money, average = false }: {
+  summary: Record<Period, Record<string, number>>; totals: { customers: number; ready: number; openBalance?: number };
   breakdown?: { staff: BreakdownRow[]; branches: BreakdownRow[] }; hasBranches?: boolean;
   t: (k: string, v?: Record<string, string | number>) => string;
+  /** Set for the balance and "average" cards: formats an amount in minor units. */
+  money?: (minor: number) => string;
+  /** The "average" card: stamp counts plus purchase totals and the value of free purchases. */
+  average?: boolean;
 }) {
   const [period, setPeriod] = useState<Period>("week");
+  const cash = !!money && !average;
+  // The two columns of the per-staff and per-branch tables: stamps and rewards, or purchases and their total.
+  const [colA, colB] = cash ? ["purchases_", "sales_"] : ["stamps_", "redeemed_"];
   const rows = (list: BreakdownRow[] | undefined) =>
-    (list ?? []).filter((r) => Number(r["stamps_" + period]) || Number(r["redeemed_" + period]))
-      .sort((a, b) => Number(b["stamps_" + period]) - Number(a["stamps_" + period]));
+    (list ?? []).filter((r) => Number(r[colA + period]) || Number(r[colB + period]))
+      .sort((a, b) => Number(b[colA + period]) - Number(a[colA + period]));
   const table = (title: string, column: string, list: BreakdownRow[], fallback: string) => (
     <div className="report-table">
       <h3>{title}</h3>
       {!list.length ? <p className="form-hint">{t("repNone")}</p> : (
         <div className="table-wrap">
           <table>
-            <thead><tr><th>{column}</th><th>{t("sumStamps")}</th><th>{t("sumRedeemed")}</th></tr></thead>
+            <thead><tr><th>{column}</th><th>{t(cash ? "sumPurchases" : "sumStamps")}</th><th>{t(cash ? "sumSales" : "sumRedeemed")}</th></tr></thead>
             <tbody>
               {list.map((r, i) => (
-                <tr key={String(r.id ?? i)}><td><strong>{r.name || fallback}</strong></td><td><Num>{Number(r["stamps_" + period])}</Num></td><td><Num>{Number(r["redeemed_" + period])}</Num></td></tr>
+                <tr key={String(r.id ?? i)}><td><strong>{r.name || fallback}</strong></td><td><Num>{Number(r[colA + period])}</Num></td><td><Num>{cash ? money!(Number(r[colB + period])) : Number(r[colB + period])}</Num></td></tr>
               ))}
             </tbody>
           </table>
@@ -1488,23 +1735,26 @@ function Summary({ summary, totals, breakdown, hasBranches, t }: {
       </div>
       <p className="summary-totals">
         <span><Users size={15} /><Num>{totals.customers}</Num> {t("statCustomers")}</span>
-        <span><Gift size={15} /><Num>{totals.ready}</Num> {t("statReady")}</span>
+        {cash
+          ? <span><Gift size={15} /><Num>{money!(totals.openBalance ?? 0)}</Num> {t("statOpenBalance")}</span>
+          : <span><Gift size={15} /><Num>{totals.ready}</Num> {t("statReady")}</span>}
       </p>
       <p className="form-hint">{t("sumNote_" + period)}</p>
       <div className="summary-grid">
-        {SUMMARY_ROWS.map(([key, label]) => {
+        {(cash ? CASHBACK_ROWS : average ? AVERAGE_ROWS : SUMMARY_ROWS.map(([k, l]) => [k, l, false] as const)).map(([key, label, isMoney]) => {
           const now = Number(s?.[key + "_now"] ?? 0), prev = Number(s?.[key + "_prev"] ?? 0);
+          const show = (n: number) => (isMoney ? money!(n) : n);
           const c = weekChange(now, prev);
           return (
             <article key={key} className="summary-item">
               <span className="stat-label">{t(label)}</span>
-              <strong><Num>{now}</Num></strong>
+              <strong><Num>{show(now)}</Num></strong>
               <small>
                 <span className={"change " + c.dir}>
                   {c.dir === "up" ? "▲" : c.dir === "down" ? "▼" : "•"}{" "}
-                  <Num>{c.pct !== null ? `${c.diff > 0 ? "+" : ""}${c.pct}%` : c.diff > 0 ? `+${c.diff}` : c.diff === 0 ? "0" : String(c.diff)}</Num>
+                  <Num>{c.pct !== null ? `${c.diff > 0 ? "+" : ""}${c.pct}%` : isMoney ? (c.diff === 0 ? "0" : (c.diff > 0 ? "+" : "−") + money!(Math.abs(c.diff))) : c.diff > 0 ? `+${c.diff}` : c.diff === 0 ? "0" : String(c.diff)}</Num>
                 </span>{" "}
-                {t("sumBefore", { n: prev })}
+                {t("sumBefore", { n: String(show(prev)) })}
               </small>
             </article>
           );

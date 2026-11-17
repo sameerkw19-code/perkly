@@ -1,4 +1,5 @@
 "use client";
+import { formatMoney, pctLabel } from "../lib/cashback.ts";
 import { useMemo, useState, type ReactNode } from "react";
 import { ChevronDown, ImagePlus, Lock, MessageCircle, Shuffle, Trash2, UploadCloud } from "lucide-react";
 import {
@@ -100,8 +101,12 @@ function PaidTag({ t }: { t: T }) {
   return <span className="paid-tag"><Lock size={11} aria-hidden="true" />{t("paidTag")}</span>;
 }
 
-export function CardEditor({ businessId, target, editor, t, lang, notify, reload, paid = true, upgradeHref, setup, specialDays = true }: {
+export function CardEditor({ businessId, target, editor, t, lang, notify, reload, paid = true, upgradeHref, setup, specialDays = true, cashback, average = false }: {
   businessId: string; target: number; editor: Editor; t: T; lang: Lang;
+  /** The balance card: the preview shows a sample balance instead of stamps. */
+  cashback?: { bp: number; currency: "ILS" | "USD" } | null;
+  /** The "average" card: the preview explains the free purchase's value. */
+  average?: boolean;
   /** Special-day messages are sent by Perkly: hidden for an owner who edits the design. */
   specialDays?: boolean;
   notify: (s: string, bad?: boolean) => void; reload: () => void;
@@ -297,7 +302,12 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
   // The preview shows the card in the language being edited, with that language's direction
   // (Hebrew and Arabic right to left, English left to right) and its own labels.
   const pt: T = (key, vars) => translate(textLang, key, vars);
-  const preview = { design, lang: textLang, stamps: demo, target, customerName: pt("sampleCustomer"), t: pt };
+  // A balance card shows a sample balance that grows with the demo slider.
+  const preview = {
+    design, lang: textLang, stamps: demo, target, customerName: pt("sampleCustomer"), t: pt,
+    balance: cashback ? { text: formatMoney(demo * 490, cashback.currency, textLang), pct: pctLabel(cashback.bp) } : undefined,
+    average: average ? {} : undefined,
+  };
   const previewDir = isRtl(textLang) ? "rtl" : "ltr";
   const locale = lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB";
 
