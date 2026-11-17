@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { ArrowRight, KeyRound, LogOut, Trash2, UserRound } from "lucide-react";
+import { ArrowRight, KeyRound, LogOut, Mail, Trash2, UserRound } from "lucide-react";
 import { errorText, useLang } from "../../lib/i18n";
 import { post } from "../../lib/api";
 import { LangSwitch } from "../../components/lang-switch";
@@ -12,6 +12,37 @@ export default function AccountView({ name, email, staffIn = [] }: { name: strin
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [workerSaved, setWorkerSaved] = useState("");
+  const [myEmail, setMyEmail] = useState(email);
+  const [emailStep, setEmailStep] = useState<{ challenge: string; sentTo: string } | null>(null);
+  const [emailMsg, setEmailMsg] = useState("");
+  const [emailError, setEmailError] = useState("");
+
+  async function startEmailChange(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (busy) return;
+    const form = e.currentTarget;
+    const data = new FormData(form);
+    setBusy(true);
+    setEmailError("");
+    setEmailMsg("");
+    const r = await post("/api/auth", { action: "change_email_start", email: data.get("newEmail"), password: data.get("emailPassword") });
+    if (r.ok && r.data.changed) { setMyEmail(r.data.email); setEmailMsg(t("emailChanged", { email: r.data.email })); form.reset(); }
+    else if (r.ok) setEmailStep({ challenge: r.data.challenge, sentTo: r.data.sentTo });
+    else setEmailError(errorText(lang, r.code));
+    setBusy(false);
+  }
+
+  async function confirmEmailChange(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (busy || !emailStep) return;
+    const data = new FormData(e.currentTarget);
+    setBusy(true);
+    setEmailError("");
+    const r = await post("/api/auth", { action: "change_email_confirm", challenge: emailStep.challenge, code: data.get("emailCode") });
+    if (r.ok) { setMyEmail(r.data.email); setEmailMsg(t("emailChanged", { email: r.data.email })); setEmailStep(null); }
+    else setEmailError(errorText(lang, r.code));
+    setBusy(false);
+  }
 
   async function saveWorkerLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -57,7 +88,7 @@ export default function AccountView({ name, email, staffIn = [] }: { name: strin
       <main id="main" className="auth-card panel account-card">
         <span className="modal-icon"><UserRound /></span>
         <h1>{t("accountTitle")}</h1>
-        <p><strong>{name}</strong><br /><span dir="ltr">{email}</span></p>
+        <p><strong>{name}</strong><br /><span dir="ltr">{myEmail}</span></p>
 
         {staffIn.length > 0 && (
           <section aria-labelledby="sec-worker">
@@ -72,6 +103,27 @@ export default function AccountView({ name, email, staffIn = [] }: { name: strin
             {workerSaved && <p className="form-hint" role="status">{t("workerLoginSaved", { phone: workerSaved })}</p>}
           </section>
         )}
+
+        <section aria-labelledby="sec-email">
+          <h2 id="sec-email">{t("emailTitle")}</h2>
+          <p className="form-hint">{t("emailHint")}</p>
+          {!emailStep ? (
+            <form className="stack-form" onSubmit={startEmailChange}>
+              <label>{t("newEmail")}<input id="newEmail" name="newEmail" type="email" required maxLength={200} autoComplete="email" dir="ltr" /></label>
+              <label>{t("currentPassword")}<input id="emailPassword" name="emailPassword" type="password" required maxLength={200} autoComplete="current-password" dir="ltr" /></label>
+              <button className="btn soft" disabled={busy}><Mail size={14} />{busy ? t("sending") : t("sendEmailCode")}</button>
+            </form>
+          ) : (
+            <form className="stack-form" onSubmit={confirmEmailChange}>
+              <p className="form-hint" role="status">{t("emailCodeSent", { to: emailStep.sentTo })}</p>
+              <label>{t("emailCode")}<input id="emailCode" name="emailCode" required inputMode="numeric" autoComplete="one-time-code" maxLength={6} pattern="[0-9]{6}" dir="ltr" className="code-input" autoFocus /></label>
+              <button className="btn primary" disabled={busy}>{busy ? t("sending") : t("confirmEmail")}</button>
+              <button type="button" className="text-btn" onClick={() => { setEmailStep(null); setEmailError(""); }}>{t("cancel")}</button>
+            </form>
+          )}
+          {emailError && <p className="form-error" role="alert">{emailError}</p>}
+          {emailMsg && <p className="form-hint" role="status">{emailMsg}</p>}
+        </section>
 
         <section aria-labelledby="sec-devices">
           <h2 id="sec-devices">{t("accountDevices")}</h2>

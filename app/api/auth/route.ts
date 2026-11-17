@@ -16,6 +16,7 @@ import { getSettings } from "../../../lib/server/settings";
 import { normalizeBirthDate, workerLoginFields, type WorkerLoginInput } from "../../../lib/server/worker-login";
 import { formatPhone, normalizePhone } from "../../../lib/phone";
 import { maskEmail, mailReady, sendMail, simpleMail } from "../../../lib/server/mailer";
+import { OPERATOR } from "../../legal/operator";
 import { CODE_MAX_ATTEMPTS, CODE_MAX_SENDS, CODE_TTL_MS, deviceTrusted, hashCode, newCode, trustDevice } from "../../../lib/server/login-code";
 
 /** The sign-in code email. */
@@ -410,6 +411,85 @@ export async function POST(request: Request) {
     }
 
     // A worker sets (or changes) their counter sign-in: phone + date of birth. Needs their password.
+    // Changing the sign-in email. Step 1: the current password and the new address; a code goes to the new address.
+    // Without email sending (local runs), the change happens right away after the password check.
+    case "change_email_start": {
+      const user = await getUser(db, request.headers.get("cookie"));
+      if (!user) return fail("signin", 401, "Sign in required");
+      if (!(await allow(db, `email-change:${user.id}`, 5, 3600)) || !(await allow(db, `email-change-ip:${ip}`, 20, 3600))) {
+        return fail("rate_limited", 429, "Too many attempts. Try again later.");
+      }
+      const me = await db.prepare("SELECT email, pass_hash FROM users WHERE id = ?").bind(user.id).first<{ email: string; pass_hash: string }>();
+      const password = typeof body.password === "string" ? body.password.slice(0, 200) : "";
+      if (!me || !(await verifyPassword(password, me.pass_hash))) return fail("bad_password", 401, "Wrong password");
+      const email = normalizeEmail(body.email);
+      if (!email) return fail("bad_email", 400, "Invalid email");
+      if (email === me.email) return fail("same_email", 400, "This is already your email");
+      if (await db.prepare("SELECT 1 FROM users WHERE email = ?").bind(email).first()) return fail("email_in_use", 409, "This email belongs to another account");
+      const now = new Date();
+      if (!mailReady(env)) {
+        const done = await db.prepare("UPDATE users SET email = ? WHERE id = ? AND NOT EXISTS (SELECT 1 FROM users WHERE email = ?)").bind(email, user.id, email).run();
+        if (!done.meta.changes) return fail("email_in_use", 409, "This email belongs to another account");
+        return json({ ok: true, changed: true, email });
+      }
+      const id = randomToken(18);
+      const code = newCode();
+      await db.batch([
+        // One open request at a time: a new one cancels the earlier ones.
+        db.prepare("UPDATE email_changes SET used = ? WHERE user = ? AND used IS NULL").bind(now.toISOString(), user.id),
+        db.prepare("INSERT INTO email_changes(id, user, new_email, code_hash, created, expires) VALUES(?, ?, ?, ?, ?, ?)")
+          .bind(id, user.id, email, await hashCode(id, code), now.toISOString(), new Date(now.getTime() + CODE_TTL_MS).toISOString()),
+      ]);
+      const sent = await sendMail(env, simpleMail(
+        email,
+        `קוד לאישור האימייל החדש ב-Perkly: ${code}`,
+        ["זה הקוד לאישור האימייל החדש שלך ב-Perkly. הוא בתוקף ל-10 דקות.", "לא ביקשת להחליף אימייל? אפשר להתעלם מההודעה."],
+        ["Your code to confirm your new Perkly email. It is valid for 10 minutes. If you didn't ask for this, ignore this email."],
+        { text: code },
+      ));
+      if (!sent) {
+        await db.prepare("DELETE FROM email_changes WHERE id = ?").bind(id).run();
+        return fail("mail_unavailable", 503, "Could not send the code");
+      }
+      return json({ ok: true, challenge: id, sentTo: maskEmail(email) });
+    }
+
+    // Step 2: the code from the new address. The email changes, and the old address gets a notice.
+    case "change_email_confirm": {
+      const user = await getUser(db, request.headers.get("cookie"));
+      if (!user) return fail("signin", 401, "Sign in required");
+      if (!(await allow(db, `code-ip:${ip}`, 30, 600))) return fail("rate_limited", 429, "Too many attempts. Try again in 10 minutes.");
+      const challenge = typeof body.challenge === "string" && body.challenge.length <= 64 ? body.challenge : "";
+      const code = typeof body.code === "string" ? body.code.replace(/\D/g, "").slice(0, 6) : "";
+      const now = new Date().toISOString();
+      const row = challenge
+        ? await db.prepare("SELECT id, new_email, code_hash, attempts, expires, used FROM email_changes WHERE id = ? AND user = ?")
+            .bind(challenge, user.id).first<{ id: string; new_email: string; code_hash: string; attempts: number; expires: string; used: string | null }>()
+        : null;
+      if (!row || row.used || row.expires <= now || row.attempts >= CODE_MAX_ATTEMPTS) return fail("code_invalid", 401, "The code is wrong or has expired");
+      if (code.length !== 6 || !(await sameText(await hashCode(challenge, code), row.code_hash))) {
+        await db.prepare("UPDATE email_changes SET attempts = attempts + 1 WHERE id = ?").bind(challenge).run();
+        return fail("code_invalid", 401, "The code is wrong or has expired");
+      }
+      const old = await db.prepare("SELECT email FROM users WHERE id = ?").bind(user.id).first<{ email: string }>();
+      const claimed = await db.prepare("UPDATE email_changes SET used = ? WHERE id = ? AND used IS NULL").bind(now, challenge).run();
+      if (!claimed.meta.changes) return fail("code_invalid", 401, "The code is wrong or has expired");
+      const done = await db
+        .prepare("UPDATE users SET email = ?, email_verified = ? WHERE id = ? AND NOT EXISTS (SELECT 1 FROM users WHERE email = ?)")
+        .bind(row.new_email, now, user.id, row.new_email)
+        .run();
+      if (!done.meta.changes) return fail("email_in_use", 409, "This email belongs to another account");
+      if (old?.email) {
+        waitUntil(sendMail(env, simpleMail(
+          old.email,
+          "האימייל בחשבון Perkly שלך הוחלף",
+          [`האימייל לכניסה לחשבון הוחלף ל-${maskEmail(row.new_email)}.`, `לא אתם? כתבו לנו מיד: ${OPERATOR.email}`],
+          [`The sign-in email of your Perkly account was changed to ${maskEmail(row.new_email)}. If this wasn't you, write to us right away: ${OPERATOR.email}`],
+        )).then(() => undefined));
+      }
+      return json({ ok: true, email: row.new_email });
+    }
+
     case "set_worker_login": {
       const user = await getUser(db, request.headers.get("cookie"));
       if (!user) return fail("signin", 401, "Sign in required");

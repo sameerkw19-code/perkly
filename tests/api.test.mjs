@@ -863,3 +863,30 @@ test("Perkly builds a business for a client, then hands it over with a single-us
   const ownView = (await stranger.get(`/api/loyalty?business=${own.body.id}`)).body;
   assert.ok(!ownView.setup || ownView.setup.until < new Date(Date.now() + 60 * 86_400_000).toISOString(), "no 90-day setup for a normal owner");
 });
+
+test("change the sign-in email: needs the current password, refuses a taken or same address", async () => {
+  const a = new Client();
+  await signup(a, "mover");
+  const other = new Client();
+  await signup(other, "taken");
+  const oldEmail = `mover-${run}@test.perkly`;
+  const newEmail = `moved-${run}@test.perkly`;
+  assert.equal((await new Client().post("/api/auth", { action: "change_email_start", email: newEmail, password: "correct horse 1" })).status, 401);
+  assert.equal((await a.post("/api/auth", { action: "change_email_start", email: newEmail, password: "wrong pass 123" })).body.code, "bad_password");
+  assert.equal((await a.post("/api/auth", { action: "change_email_start", email: "not an email", password: "correct horse 1" })).body.code, "bad_email");
+  assert.equal((await a.post("/api/auth", { action: "change_email_start", email: oldEmail, password: "correct horse 1" })).body.code, "same_email");
+  assert.equal((await a.post("/api/auth", { action: "change_email_start", email: `taken-${run}@test.perkly`, password: "correct horse 1" })).body.code, "email_in_use");
+  // Without email sending (tests), the change happens after the password check; with it, a code goes to the new address first.
+  const r = await a.post("/api/auth", { action: "change_email_start", email: newEmail.toUpperCase(), password: "correct horse 1" });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  if (r.body.changed) {
+    assert.equal(r.body.email, newEmail);
+    assert.equal((await new Client().post("/api/auth", { action: "login", email: newEmail, password: "correct horse 1" })).status, 200);
+    assert.equal((await new Client().post("/api/auth", { action: "login", email: oldEmail, password: "correct horse 1" })).status, 401);
+  } else {
+    assert.ok(r.body.challenge);
+    assert.equal((await a.post("/api/auth", { action: "change_email_confirm", challenge: r.body.challenge, code: "000000" })).body.code, "code_invalid");
+  }
+  // A code from someone else's request does not work for this account.
+  assert.equal((await other.post("/api/auth", { action: "change_email_confirm", challenge: "x".repeat(24), code: "123456" })).body.code, "code_invalid");
+});
