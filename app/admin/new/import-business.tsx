@@ -8,7 +8,7 @@ export default function ImportBusiness() {
   return (
     <section className="panel">
       <h2>ייבוא עסק מקובץ</h2>
-      <p className="muted">עסק שבנית באתר הבדיקה: מורידים אותו שם בדף העסק ("ייצוא העסק לקובץ") ומעלים את הקובץ כאן. ההגדרות, העיצוב, התמונות והסניפים עוברים. העסק נפתח תחת Perkly עם תקופת הקמה, ומשם שולחים לבעל העסק קישור מסירה.</p>
+      <p className="muted">עסק שבנית באתר הבדיקה: מורידים אותו שם בדף העסק, בכפתור ייצוא העסק לקובץ, ומעלים את הקובץ כאן. ההגדרות, העיצוב, התמונות והסניפים עוברים. העסק נפתח תחת Perkly עם תקופת הקמה, ומשם שולחים לבעל העסק קישור מסירה.</p>
       <label className="btn soft" style={{ display: "inline-flex", cursor: busy ? "wait" : "pointer" }}>
         {busy ? "מייבא..." : "בחירת קובץ"}
         <input type="file" accept="application/json,.json" hidden disabled={busy} onChange={async (e) => {

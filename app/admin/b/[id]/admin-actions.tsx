@@ -421,7 +421,7 @@ export function ExportBusiness({ business, name }: { business: string; name: str
   return (
     <div className="admin-action">
       <h3>העברה לאתר אחר</h3>
-      <p className="muted">מורידים קובץ עם ההגדרות, העיצוב, התמונות והסניפים, ומייבאים אותו באתר השני בדף "בניית עסק חדש". לקוחות, צוות, היסטוריה ותשלומים לא עוברים.</p>
+      <p className="muted">מורידים קובץ עם ההגדרות, העיצוב, התמונות והסניפים, ומייבאים אותו באתר השני, בדף בניית עסק חדש. לקוחות, צוות, היסטוריה ותשלומים לא עוברים.</p>
       <button type="button" className="btn soft small" disabled={busy} onClick={async () => {
         setBusy(true); setOut("");
         try {
