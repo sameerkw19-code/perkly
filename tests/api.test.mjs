@@ -409,6 +409,8 @@ test("moving a business between Perkly sites: export a file, import it as a new 
   const kept = await admin.post("/api/admin/transfer", { ...file, sourceId: fresh });
   assert.equal(kept.body.id, fresh);
   assert.equal(kept.body.subscription, null, "no Polar here");
+  // Linking a Polar subscription by id needs Polar (not set up on the test server) and a valid id.
+  assert.equal((await admin.post("/api/admin", { action: "polar_link", business: fresh, subscription: crypto.randomUUID() })).body.code, "billing_off");
 });
 
 test("design: staff and other businesses cannot edit or borrow images", async () => {

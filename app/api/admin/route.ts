@@ -6,7 +6,7 @@ import { fail, json, readJson, sameOrigin, str } from "../../../lib/server/http"
 import { normalizeEmail } from "../../../lib/server/auth";
 import { randomToken, sha256, verifyPassword } from "../../../lib/server/crypto";
 import { allow } from "../../../lib/server/rate-limit";
-import { cancelAtPeriodEnd, findSubscription, polarConfigured } from "../../../lib/server/polar";
+import { cancelAtPeriodEnd, findSubscription, getSubscription, polarConfigured } from "../../../lib/server/polar";
 import { storeSubscription } from "../../../lib/server/subscription-store";
 import { applePushReady, pushTokens } from "../../../lib/server/apple-push";
 import { customerForPass } from "../../../lib/server/apple-wallet";
@@ -107,6 +107,30 @@ export async function POST(request: Request) {
       await db.batch([storeSubscription(db, row, row.changedAt), log("polar_sync", `${row.status} ${row.externalSubscription}`)]);
       const now = await db.prepare("SELECT status FROM subscriptions WHERE business = ?").bind(businessId).first<{ status: string }>();
       return json({ ok: true, found: true, status: row.status, stored: now?.status ?? null });
+    }
+    case "polar_link": {
+      // Attaches an existing Polar subscription (by its id, from the Polar dashboard) to this business: for a
+      // subscription paid for the same business on another site. Later webhooks follow this link.
+      if (!polarConfigured(env)) return fail("billing_off", 503, "Billing is not set up");
+      const subId = str(body.subscription, 64);
+      if (!subId || !/^[0-9a-f-]{36}$/i.test(subId)) return fail("bad_request", 400, "A Polar subscription id is required");
+      const taken = await db.prepare("SELECT business FROM subscriptions WHERE external_subscription = ? AND business != ?").bind(subId, businessId).first<{ business: string }>();
+      if (taken) return fail("subscription_taken", 409, "This subscription belongs to another business here");
+      let row;
+      try {
+        row = await getSubscription(env, subId);
+      } catch (e) {
+        return fail("polar_error", 502, String((e as Error).message).slice(0, 80));
+      }
+      if (!row) return fail("not_found", 404, "No such subscription in Polar");
+      row.business = businessId;
+      await db.batch([
+        // Linking by hand overrides what is stored for this business.
+        db.prepare("DELETE FROM subscriptions WHERE business = ?").bind(businessId),
+        storeSubscription(db, row, row.changedAt),
+        log("polar_link", `${row.externalSubscription} ${row.status}`),
+      ]);
+      return json({ ok: true, status: row.status, periodEnd: row.currentPeriodEnd });
     }
     case "owner_link": {
       // A business Perkly built for a client: a personal, single-use link (14 days) that opens an account for the

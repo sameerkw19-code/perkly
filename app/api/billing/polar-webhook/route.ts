@@ -30,6 +30,13 @@ export async function POST(request: Request) {
   }
   const row = subscriptionRow(event);
   if (row) {
+    // A subscription an admin linked to another business (paid on staging, then the business moved here):
+    // its metadata still names the old id, so follow the stored link.
+    const known = await getD1().prepare("SELECT 1 FROM businesses WHERE id = ?").bind(row.business).first();
+    if (!known && row.externalSubscription) {
+      const linked = await getD1().prepare("SELECT business FROM subscriptions WHERE external_subscription = ?").bind(row.externalSubscription).first<{ business: string }>();
+      if (linked) row.business = linked.business;
+    }
     const before = await getD1()
       .prepare("SELECT s.status, b.name FROM businesses b LEFT JOIN subscriptions s ON s.business = b.id WHERE b.id = ?")
       .bind(row.business)

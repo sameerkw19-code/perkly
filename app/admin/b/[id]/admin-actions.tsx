@@ -459,6 +459,17 @@ export function PolarSync({ business }: { business: string }) {
         setOut(`ב־Polar: ${r.data.status}. נשמר: ${r.data.stored ?? "—"}. רעננו את הדף.`);
       }}>{busy ? "בודק..." : "סנכרון מ־Polar"}</button>
       {out && <small className="muted" style={{ marginInlineStart: 8 }} role="status">{out}</small>}
+      <form style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }} onSubmit={async (e) => {
+        e.preventDefault();
+        const field = e.currentTarget.elements.namedItem("sub") as HTMLInputElement;
+        setBusy(true); setOut("");
+        const r = await post<{ status: string }>("/api/admin", { action: "polar_link", business, subscription: field.value.trim() });
+        setBusy(false);
+        setOut(r.ok && r.data ? `המנוי חובר (${r.data.status}). רעננו את הדף.` : "החיבור נכשל: בדקו את מזהה המנוי.");
+      }}>
+        <input name="sub" dir="ltr" placeholder="מזהה מנוי מ־Polar" required pattern="[0-9a-fA-F-]{36}" style={{ minWidth: 0, flex: "1 1 220px" }} />
+        <button className="btn soft small" disabled={busy}>חיבור מנוי קיים</button>
+      </form>
     </span>
   );
 }
