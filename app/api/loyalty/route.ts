@@ -9,7 +9,7 @@ import { assetIds, defaultDesign, designChecks, is3d, sanitizeDesign } from "../
 import { assetMeta, liveDesign, ownsAssets, passLook, publishedDesign } from "../../../lib/server/designs";
 import { originalPhone, releaseArchivedPhone } from "../../../lib/server/customers";
 import { AMOUNT_MAX, AVG_TARGET_MAX, BP_MAX, BP_MIN, type Program } from "../../../lib/cashback.ts";
-import { businessAccess, freeLimitReached, hasPaidDesign } from "../../../lib/server/billing";
+import { START_DAYS, businessAccess, freeLimitReached, hasPaidDesign } from "../../../lib/server/billing";
 import { formatBirthday, parseBirthday, upcomingKeys } from "../../../lib/birthday";
 import { pushAppleBusiness } from "../../../lib/server/apple-push";
 import { ensureBusinessClass, walletConfig } from "../../../lib/server/google-wallet";
@@ -330,7 +330,9 @@ export async function POST(request: Request) {
     // The free trial is for an owner's first business only (a second business would otherwise reset it).
     const earlier = await db.prepare("SELECT COUNT(*) AS n FROM businesses WHERE owner = ?").bind(user.id).first<{ n: number }>();
     const setupDays = Number.isInteger(p.setupDays) && (p.setupDays as number) >= 0 && (p.setupDays as number) <= 90 ? (p.setupDays as number) : 30;
-    const trialDays = forClient ? setupDays : earlier?.n ? 0 : sys.trialDays;
+    // An owner's first business works with everything (own design, logo and pictures, any number of customers)
+    // for at least START_DAYS before a subscription is needed; the admin setting can make it longer.
+    const trialDays = forClient ? setupDays : earlier?.n ? 0 : Math.max(sys.trialDays, START_DAYS);
     const region = regionFrom(request.headers);
     const currency = forClient ? (p.market === "intl" ? "USD" : "ILS") : region.currency;
     const cardLang = forClient || region.israel ? (p.lang === "en" ? "en" : "he") : "en";
@@ -361,9 +363,9 @@ export async function POST(request: Request) {
               .bind(trialDays > 0 ? new Date(Date.now() + trialDays * 86_400_000).toISOString() : null, id),
           ]
         : []),
-      // A business Perkly builds gets its setup period whether or not subscriptions are required.
-      ...(forClient && !sys.requireSubscription && setupDays > 0
-        ? [db.prepare("UPDATE businesses SET comp_until = ? WHERE id = ?").bind(new Date(Date.now() + setupDays * 86_400_000).toISOString(), id)]
+      // The start period (a business Perkly builds: its setup period) applies whether or not subscriptions are required.
+      ...(!sys.requireSubscription && trialDays > 0
+        ? [db.prepare("UPDATE businesses SET comp_until = ? WHERE id = ?").bind(new Date(Date.now() + trialDays * 86_400_000).toISOString(), id)]
         : []),
     ]);
     return json({ id });

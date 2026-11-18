@@ -31,6 +31,8 @@ export const TRIAL_DAYS = 14;
 
 /** Customers a business may have before it subscribes (QR and stamps work up to this number). */
 export const FREE_CUSTOMERS = 10;
+/** A new owner works without limits (full design, any number of customers) for this many days, then subscribes. */
+export const START_DAYS = 30;
 
 /** `free` is set while the business has no subscription and is within the free customer limit. */
 export type Access =

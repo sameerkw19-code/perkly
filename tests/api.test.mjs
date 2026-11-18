@@ -829,6 +829,9 @@ test("owners design their own card by default; Perkly can switch it off and on",
   const on = await o.get(`/api/loyalty?business=${biz}`);
   assert.equal(on.body.canDesign, true);
   assert.ok(on.body.editor, "the owner gets the editor");
+  // A new owner starts without limits (no free-tier caps) for 30 days, then subscribes.
+  assert.equal(on.body.access.ok, true);
+  assert.equal(on.body.access.free, undefined, "no free-tier limits in the start period");
   assert.equal((await upload(o, biz, "logo", PNG_1x1)).status, 200, "and uploads card images");
   assert.equal((await o.act(biz, "save_design", { design: on.body.editor.draft })).status, 200);
   assert.equal((await o.act(biz, "publish_design")).status, 200);
