@@ -33,7 +33,7 @@ const T = {
     kitAfter: "ערכת הקופה תישלח אחרי החיוב הראשון.", kitIncluded: "ערכת הקופה כלולה במנוי.", kitAddress: "שלחו לנו כתובת למשלוח בוואטסאפ",
     kitText: (name: string) => `היי, זו כתובת המשלוח לערכת הקופה של ${name}:`, kitSent: "ערכת הקופה נשלחה.",
     next: "החיוב הבא", comp: "גישה ללא מנוי", forever: "ללא הגבלת זמן", until: "עד",
-    opening: "פותח דף תשלום...", start: (plan: string) => `הפעלת מנוי ${plan}`, failed: "לא הצלחנו לפתוח את דף התשלום. נסה שוב.",
+    opening: "פותח דף תשלום...", start: (plan: string) => `הפעלת מנוי ${plan}`, failed: "לא הצלחנו לפתוח את דף התשלום. נסה שוב.", testSite: "זה אתר הבדיקה. תשלום אמיתי עושים רק ב־perkly.shop.",
     locale: "he-IL",
   },
   en: {
@@ -52,7 +52,7 @@ const T = {
     kitAfter: "The counter kit ships after the first charge.", kitIncluded: "The counter kit is included.", kitAddress: "Send us a shipping address on WhatsApp",
     kitText: (name: string) => `Hi, here is the shipping address for the ${name} counter kit:`, kitSent: "The counter kit has shipped.",
     next: "Next charge", comp: "Access without a subscription", forever: "no end date", until: "until",
-    opening: "Opening the payment page...", start: (plan: string) => `Start the ${plan.toLowerCase()} plan`, failed: "We couldn't open the payment page. Please try again.",
+    opening: "Opening the payment page...", start: (plan: string) => `Start the ${plan.toLowerCase()} plan`, failed: "We couldn't open the payment page. Please try again.", testSite: "This is the test site. Real payments are taken only on perkly.shop.",
     locale: "en-US",
   },
 };
@@ -94,12 +94,12 @@ export default function BillingView({ businesses, configured, yearly = false, cu
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ business: businessId, plan: chosen }),
       });
-      const data = (await response.json().catch(() => null)) as { url?: string } | null;
+      const data = (await response.json().catch(() => null)) as { url?: string; code?: string } | null;
       if (response.ok && data?.url) {
         window.location.assign(data.url);
         return;
       }
-      setError(t.failed);
+      setError(data?.code === "billing_test_site" ? t.testSite : t.failed);
     } catch {
       setError(t.failed);
     }

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getD1 } from "../../../../db";
 import { liveDesign } from "../../../../lib/server/designs";
 import { STATUS_LABEL, adminStatus, requireAdminPage, shortDate, shortDateTime } from "../../../../lib/server/admin";
-import { AdminActions, ExportBusiness, OwnerLink, PaymentLink, PosKeys, AdminCardPreview, ApplePushTest, GoogleSyncTest, KitSentButton, OwnerDesignSwitch } from "./admin-actions";
+import { AdminActions, ExportBusiness, PolarSync, OwnerLink, PaymentLink, PosKeys, AdminCardPreview, ApplePushTest, GoogleSyncTest, KitSentButton, OwnerDesignSwitch } from "./admin-actions";
 import { env } from "cloudflare:workers";
 import { planOf } from "../../../../lib/server/billing";
 import { isPlatformAdmin } from "../../../../lib/server/auth";
@@ -126,6 +126,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
               <dt>ערכת קופה</dt><dd>{b.kit_sent ? `נשלחה ${shortDate(b.kit_sent)}` : b.kit_due ? <>מגיעה מאז {shortDate(b.kit_due)} <KitSentButton business={b.id} /></> : "—"}</dd>
               <dt>סוף תקופה</dt><dd>{shortDate(b.current_period_end)}</dd>
               <dt>מזהה מנוי</dt><dd dir="ltr"><code>{b.external_subscription ?? "—"}</code></dd>
+              <dt>Polar</dt><dd><PolarSync business={b.id} /></dd>
               <dt>עדכון אחרון</dt><dd>{shortDateTime(b.sub_updated)}</dd>
               <dt>גישה חינם</dt><dd>{b.comp_until && b.comp_until > nowIso ? (b.comp_until.startsWith("9999") ? "ללא הגבלת זמן" : `עד ${shortDate(b.comp_until)}`) : "לא"}</dd>
             </dl>

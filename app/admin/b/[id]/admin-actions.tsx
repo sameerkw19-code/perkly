@@ -443,3 +443,22 @@ export function ExportBusiness({ business, name }: { business: string; name: str
     </div>
   );
 }
+
+/** Reads the business's subscription from Polar now (a payment whose webhook never arrived here). */
+export function PolarSync({ business }: { business: string }) {
+  const [busy, setBusy] = useState(false);
+  const [out, setOut] = useState("");
+  return (
+    <span>
+      <button type="button" className="btn soft small" disabled={busy} onClick={async () => {
+        setBusy(true); setOut("");
+        const r = await post<{ found: boolean; status?: string; stored?: string }>("/api/admin", { action: "polar_sync", business });
+        setBusy(false);
+        if (!r.ok || !r.data) return setOut("הבדיקה מול Polar נכשלה.");
+        if (!r.data.found) return setOut("אין ב־Polar מנוי לעסק הזה.");
+        setOut(`ב־Polar: ${r.data.status}. נשמר: ${r.data.stored ?? "—"}. רעננו את הדף.`);
+      }}>{busy ? "בודק..." : "סנכרון מ־Polar"}</button>
+      {out && <small className="muted" style={{ marginInlineStart: 8 }} role="status">{out}</small>}
+    </span>
+  );
+}

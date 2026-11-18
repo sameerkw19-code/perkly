@@ -79,3 +79,12 @@ test("average card wallet strip: a 1125×432 PNG whose bar fills from the right 
   assert.equal(passAverage({ program: "average", currency: "ILS", avg_cap: 25000 }, { stamps: 2, round_total: 60000 }, null).worth.replace(/\s/g, " "), "250 ₪");
   assert.equal(passAverage({ program: "average", currency: "ILS" }, { stamps: 0 }, 30300).ready, true);
 });
+
+test("real Polar payments only on the live site; any site with the sandbox", async () => {
+  const { liveCheckoutAllowed } = await import("../lib/server/polar.ts");
+  assert.equal(liveCheckoutAllowed({}, "perkly.shop"), true);
+  assert.equal(liveCheckoutAllowed({}, "www.perkly.shop"), true);
+  assert.equal(liveCheckoutAllowed({}, "perkly-staging.perklysameer.workers.dev"), false);
+  assert.equal(liveCheckoutAllowed({ POLAR_SANDBOX: "1" }, "perkly-staging.perklysameer.workers.dev"), true);
+  assert.equal(liveCheckoutAllowed({}, "localhost:8787"), true);
+});

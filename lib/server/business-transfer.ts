@@ -33,6 +33,8 @@ export type TransferFile = {
   version: number;
   exported: string;
   from: string;
+  /** The business id on the site it came from. Kept on import (when free), so a payment made there still points at it. */
+  sourceId?: string;
   business: Omit<BusinessRow, "id" | "design_draft" | "owner_email">;
   ownerEmail: string | null;
   design: Design | null;
@@ -86,7 +88,7 @@ export async function exportBusiness(db: D1Database, businessId: string, from: s
     .all<{ name: string; address: string | null }>();
   const { id: _id, design_draft: _draft, owner_email, ...business } = b;
   return {
-    format: TRANSFER_FORMAT, version: TRANSFER_VERSION, exported: new Date().toISOString(), from,
+    format: TRANSFER_FORMAT, version: TRANSFER_VERSION, exported: new Date().toISOString(), from, sourceId: b.id,
     business, ownerEmail: owner_email, design, draft: draft && JSON.stringify(draft) !== JSON.stringify(design) ? draft : null,
     branches: branches.results, assets,
   };
@@ -142,7 +144,10 @@ export async function importBusiness(db: D1Database, adminId: string, input: unk
   const design = remap(f.design);
   const draft = remap(f.draft);
 
-  const id = crypto.randomUUID();
+  // The same id as on the site it came from, when it is free here: a Polar subscription paid there carries this id.
+  const wanted = typeof f.sourceId === "string" && UUID.test(f.sourceId) ? f.sourceId : null;
+  const taken = wanted ? await db.prepare("SELECT 1 FROM businesses WHERE id = ?").bind(wanted).first() : null;
+  const id = wanted && !taken ? wanted : crypto.randomUUID();
   const now = new Date().toISOString();
   const sys = await getSettings(db);
   const setupUntil = new Date(Date.now() + 30 * 86_400_000).toISOString();

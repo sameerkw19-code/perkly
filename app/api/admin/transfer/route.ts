@@ -4,6 +4,8 @@ import { getUser, isPlatformAdmin } from "../../../../lib/server/auth";
 import { fail, json, sameOrigin, str } from "../../../../lib/server/http";
 import { allow } from "../../../../lib/server/rate-limit";
 import { exportBusiness, importBusiness } from "../../../../lib/server/business-transfer";
+import { findSubscription, polarConfigured } from "../../../../lib/server/polar";
+import { storeSubscription } from "../../../../lib/server/subscription-store";
 
 export const dynamic = "force-dynamic";
 
@@ -45,5 +47,18 @@ export async function POST(request: Request) {
   if (!result.ok) return fail(result.code, 400, result.code === "bad_file" ? "Not a Perkly business file" : "Invalid business details");
   await db.prepare("INSERT INTO admin_log(id, admin, business, action, detail, created) VALUES(?, ?, ?, ?, ?, ?)")
     .bind(crypto.randomUUID(), user.email, result.id, "import", `from ${String(body.from ?? "?").slice(0, 80)}, ${result.pictures} pictures`, new Date().toISOString()).run();
-  return json(result);
+  // The owner may already have paid on the other site: pick up that Polar subscription now.
+  let subscription: string | null = null;
+  if (polarConfigured(env)) {
+    try {
+      const row = await findSubscription(env, result.id);
+      if (row) {
+        await storeSubscription(db, row, row.changedAt).run();
+        subscription = row.status;
+      }
+    } catch {
+      subscription = null;
+    }
+  }
+  return json({ ...result, subscription });
 }

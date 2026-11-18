@@ -6,7 +6,8 @@ import { fail, json, readJson, sameOrigin, str } from "../../../lib/server/http"
 import { normalizeEmail } from "../../../lib/server/auth";
 import { randomToken, sha256, verifyPassword } from "../../../lib/server/crypto";
 import { allow } from "../../../lib/server/rate-limit";
-import { cancelAtPeriodEnd } from "../../../lib/server/polar";
+import { cancelAtPeriodEnd, findSubscription, polarConfigured } from "../../../lib/server/polar";
+import { storeSubscription } from "../../../lib/server/subscription-store";
 import { applePushReady, pushTokens } from "../../../lib/server/apple-push";
 import { customerForPass } from "../../../lib/server/apple-wallet";
 import { AVG_TARGET_MAX } from "../../../lib/cashback.ts";
@@ -91,6 +92,21 @@ export async function POST(request: Request) {
         .all<{ push_token: string }>();
       const results = applePushReady() ? await pushTokens(db, rows.results.map((r) => r.push_token)) : [];
       return json({ ok: true, ready: applePushReady(), devices: rows.results.length, results });
+    }
+    case "polar_sync": {
+      // Reads this business's subscription from Polar and stores it: for a payment whose webhook never arrived
+      // (e.g. paid on staging, then the business moved here).
+      if (!polarConfigured(env)) return fail("billing_off", 503, "Billing is not set up");
+      let row;
+      try {
+        row = await findSubscription(env, businessId);
+      } catch (e) {
+        return fail("polar_error", 502, String((e as Error).message).slice(0, 80));
+      }
+      if (!row) return json({ ok: true, found: false });
+      await db.batch([storeSubscription(db, row, row.changedAt), log("polar_sync", `${row.status} ${row.externalSubscription}`)]);
+      const now = await db.prepare("SELECT status FROM subscriptions WHERE business = ?").bind(businessId).first<{ status: string }>();
+      return json({ ok: true, found: true, status: row.status, stored: now?.status ?? null });
     }
     case "owner_link": {
       // A business Perkly built for a client: a personal, single-use link (14 days) that opens an account for the
