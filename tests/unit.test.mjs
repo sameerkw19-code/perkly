@@ -88,3 +88,15 @@ test("real Polar payments only on the live site; any site with the sandbox", asy
   assert.equal(liveCheckoutAllowed({ POLAR_SANDBOX: "1" }, "perkly-staging.perklysameer.workers.dev"), true);
   assert.equal(liveCheckoutAllowed({}, "localhost:8787"), true);
 });
+
+// Apple Wallet health check: a key that does not belong to the certificate is caught.
+import { appleHealth } from "../lib/server/apple-check.ts";
+test("apple health: no key, wrong key", async () => {
+  assert.deepEqual(await appleHealth({}), { configured: false });
+  const { privateKey } = await crypto.subtle.generateKey({ name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" }, true, ["sign", "verify"]);
+  const der = Buffer.from(await crypto.subtle.exportKey("pkcs8", privateKey)).toString("base64");
+  const h = await appleHealth({ APPLE_PASS_KEY: `-----BEGIN PRIVATE KEY-----\n${der}\n-----END PRIVATE KEY-----` });
+  assert.equal(h.configured, true);
+  assert.equal(h.keyMatches, false);
+  assert.equal(h.certExpires, "2027-12-05T16:16:13Z");
+});

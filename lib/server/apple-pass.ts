@@ -94,6 +94,27 @@ export function issuerAndSerial(certDer: Bytes): Bytes {
   return seq(certDer.slice(alg.next, issuer.next), serial);
 }
 
+/** The public key (SubjectPublicKeyInfo DER) and expiry of an X.509 certificate. */
+export function certInfo(certDer: Bytes): { spki: Bytes; notAfter: string | null } {
+  const cert = readTlv(certDer, 0);
+  const tbs = readTlv(certDer, cert.start);
+  let field = readTlv(certDer, tbs.start);
+  if (field.tag === 0xa0) field = readTlv(certDer, field.next); // explicit version
+  const alg = readTlv(certDer, field.next); // after the serial
+  const issuer = readTlv(certDer, alg.next);
+  const validity = readTlv(certDer, issuer.next);
+  const subject = readTlv(certDer, validity.next);
+  const spki = readTlv(certDer, subject.next);
+  const notBefore = readTlv(certDer, validity.start);
+  const after = readTlv(certDer, notBefore.next);
+  const t = new TextDecoder().decode(certDer.slice(after.start, after.end));
+  // UTCTime YYMMDDHHMMSSZ or GeneralizedTime YYYYMMDDHHMMSSZ.
+  const m = /^(\d{2}|\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})Z$/.exec(t);
+  const year = m ? (m[1].length === 2 ? 2000 + Number(m[1]) : Number(m[1])) : 0;
+  const notAfter = m ? `${year}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}Z` : null;
+  return { spki: certDer.slice(subject.next, spki.next), notAfter };
+}
+
 export function pemToDer(pem: string): Bytes {
   const b64 = pem.replace(/-----[^-]+-----/g, "").replace(/\s+/g, "");
   const bin = atob(b64);
