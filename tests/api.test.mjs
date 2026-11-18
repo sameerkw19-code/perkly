@@ -382,6 +382,28 @@ test("design: upload, draft, publish checks, live card uses the published design
   assert.equal(pub2.body.version, 3, "every publish is a new kept version");
 });
 
+test("moving a business between Perkly sites: export a file, import it as a new business", async () => {
+  assert.equal((await ownerA.post("/api/admin/transfer", { action: "export", business: bizA })).status, 404, "admins only");
+  const file = (await admin.post("/api/admin/transfer", { action: "export", business: bizA })).body;
+  assert.equal(file.format, "perkly-business");
+  assert.ok(file.design.logo, "the published design comes along");
+  assert.ok(file.assets.some((a) => a.id === file.design.logo), "with its pictures");
+  assert.ok(file.branches.length >= 1);
+  assert.equal("customers" in file, false, "no customers move");
+
+  assert.equal((await admin.post("/api/admin/transfer", { hello: 1 })).body.code, "bad_file");
+  const made = await admin.post("/api/admin/transfer", file);
+  assert.equal(made.status, 200, JSON.stringify(made.body));
+  assert.notEqual(made.body.id, bizA);
+  const view = (await admin.get(`/api/loyalty?business=${made.body.id}&days=all`)).body;
+  assert.equal(view.business.name, file.business.name);
+  const logo = view.editor.draft.logo;
+  assert.ok(logo && logo !== file.design.logo, "pictures get new ids");
+  assert.equal((await fetch(`${BASE}/api/asset/${logo}`)).status, 200);
+  assert.match(JSON.stringify(view.editor), /פיצה של רמי/);
+  assert.equal(view.customers?.length ?? 0, 0, "it starts without customers");
+});
+
 test("design: staff and other businesses cannot edit or borrow images", async () => {
   const s2 = new Client();
   const inv = await admin.act(bizA, "invite_staff", { label: "Cashier", email: `cash-${run}@test.perkly` });
