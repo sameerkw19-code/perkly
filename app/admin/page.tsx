@@ -223,6 +223,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                   <tr key={r.id}>
                     <td>
                       <a href={`/admin/b/${r.id}`}><strong>{r.name}</strong></a>
+                      {!r.archived && <a className="admin-mini" href={`/?business=${encodeURIComponent(r.id)}#design`}>עיצוב</a>}
                       <small dir="ltr" className="admin-email admin-sub">{r.owner_email ?? "—"}</small>
                     </td>
                     <td>

@@ -23,7 +23,7 @@ const ACTION_LABEL: Record<string, string> = {
   update_business: "עריכת פרטים", owner_link: "קישור לבעל העסק", transfer_owner: "העברת בעלות", archive: "סגירה (ארכוב)", restore: "שחזור", export: "ייצוא",
   import: "ייבוא מאתר אחר", reset_data: "איפוס נתונים", kit_sent: "ערכת קופה נשלחה", owner_designs: "עיצוב על ידי בעל העסק",
   pos_key_create: "מפתח קופה נוצר", pos_key_revoke: "מפתח קופה בוטל", pos_only: "שינוי רק דרך הקופה",
-  polar_sync: "סנכרון מ־Polar", polar_link: "חיבור מנוי מ־Polar", polar_unlink: "ניתוק מנוי",
+  polar_sync: "סנכרון מ־Polar", polar_link: "חיבור מנוי מ־Polar", polar_unlink: "ניתוק מנוי", delete_business: "מחיקה לצמיתות",
 };
 const POLAR_LABEL: Record<string, string> = {
   active: "פעיל (משלם)", trialing: "בניסיון", past_due: "תשלום נכשל", unpaid: "לא שולם", canceled: "בוטל", incomplete: "לא הושלם", none: "אין מנוי",
@@ -113,7 +113,8 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
           {!b.archived && (
             <div className="head-actions">
               {/* The business's own dashboard, with the screens only Perkly manages: design, settings and team. */}
-              <a className="btn primary" href={`/?business=${encodeURIComponent(b.id)}`}>פתיחת לוח העסק</a>
+              <a className="btn primary" href={`/?business=${encodeURIComponent(b.id)}#design`}>עריכת העיצוב</a>
+              <a className="btn soft" href={`/?business=${encodeURIComponent(b.id)}`}>לוח העסק</a>
             </div>
           )}
         </div>
@@ -236,9 +237,10 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
         <details className="panel admin-danger">
           <summary>
             <h2>פעולות רגישות</h2>
-            <span className="muted">השהיה, סגירה, ייצוא, העברה לאתר אחר ואיפוס נתונים</span>
+            <span className="muted">{b.archived ? "שחזור, ייצוא ומחיקה לצמיתות" : "השהיה, סגירה, ייצוא, העברה לאתר אחר ואיפוס נתונים"}</span>
           </summary>
-          <AdminActions business={b.id} suspended={!!b.suspended} compUntil={b.comp_until} biz={biz} parts={b.archived ? ["archive"] : ["suspend", "archive", "reset"]} />
+          <AdminActions business={b.id} suspended={!!b.suspended} compUntil={b.comp_until} biz={biz} parts={b.archived ? ["archive", "delete"] : ["suspend", "archive", "reset"]} />
+          {!b.archived && <p className="form-hint">מחיקה לצמיתות מופיעה כאן אחרי שסוגרים את העסק.</p>}
           {!b.archived && <ExportBusiness business={b.id} name={b.name} />}
         </details>
       </main>

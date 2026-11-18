@@ -778,3 +778,4 @@ html,body{overflow-x:clip}
 .admin .admin-chips{margin:4px 0 12px}
 @media(max-width:860px){.admin-layout{grid-template-columns:1fr}.admin-todo li small{margin-inline-start:0;width:100%}}
 .admin-dl{margin-bottom:16px}.admin-col .panel>.admin-action,.admin-col .panel>div>h3{margin-top:4px}
+.admin-mini{margin-inline-start:8px;font-size:12px;padding:2px 8px;border-radius:999px;background:#f0ecfc;color:#5a3fc4}

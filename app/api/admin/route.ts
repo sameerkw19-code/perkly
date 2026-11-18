@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 
   const businessId = str(body.business, 64);
   if (!businessId) return fail("bad_request", 400);
-  const business = await db.prepare("SELECT id, owner, name FROM businesses WHERE id = ?").bind(businessId).first<{ id: string; owner: string; name: string }>();
+  const business = await db.prepare("SELECT id, owner, name, archived FROM businesses WHERE id = ?").bind(businessId).first<{ id: string; owner: string; name: string; archived: string | null }>();
   if (!business) return fail("not_found", 404, "Business not found");
 
   const now = new Date();
@@ -327,6 +327,40 @@ export async function POST(request: Request) {
         log("reset_data", `${before?.customers ?? 0} customers, ${before?.events ?? 0} stamp/reward events deleted`),
       ]);
       return json({ ok: true, deleted: before });
+    }
+    case "delete_business": {
+      // Deletes a closed business for good: customers, history, design, pictures, team, branches, keys and its
+      // (no longer live) subscription. Only after it was closed (archived), never with a live subscription,
+      // and with the business name and the admin's own password (5 tries an hour). The admin log keeps the record.
+      if (!business.archived) return fail("not_archived", 409, "Close the business first");
+      if (str(body.confirm, 80) !== business.name) return fail("confirm_mismatch", 400, "Type the business name to confirm");
+      if (!(await allow(db, `delete-business:${user.id}`, 5, 3600))) return fail("rate_limited", 429, "Too many attempts");
+      const me = await db.prepare("SELECT pass_hash FROM users WHERE id = ?").bind(user.id).first<{ pass_hash: string }>();
+      const password = typeof body.password === "string" ? body.password.slice(0, 200) : "";
+      if (!me || !(await verifyPassword(password, me.pass_hash))) return fail("bad_login", 401, "Wrong password");
+      const sub = await db.prepare("SELECT status FROM subscriptions WHERE business = ?").bind(businessId).first<{ status: string }>();
+      if (sub && ["active", "trialing", "past_due"].includes(sub.status)) return fail("subscription_live", 409, "The subscription is live; cancel it in Polar first");
+      const id = businessId;
+      // One batch (a transaction), children before parents because of the foreign keys.
+      await db.batch([
+        db.prepare("DELETE FROM apple_registrations WHERE serial IN (SELECT id FROM customers WHERE business = ?)").bind(id),
+        db.prepare("DELETE FROM wallet_outbox WHERE business = ?").bind(id),
+        db.prepare("DELETE FROM rewards WHERE business = ?").bind(id),
+        db.prepare("DELETE FROM events WHERE business = ?").bind(id),
+        db.prepare("DELETE FROM special_days WHERE business = ?").bind(id),
+        db.prepare("DELETE FROM customers WHERE business = ?").bind(id),
+        db.prepare("DELETE FROM pos_keys WHERE business = ?").bind(id),
+        db.prepare("DELETE FROM invites WHERE business = ?").bind(id),
+        db.prepare("DELETE FROM memberships WHERE business = ?").bind(id),
+        db.prepare("DELETE FROM branches WHERE business = ?").bind(id),
+        db.prepare("DELETE FROM card_designs WHERE business = ?").bind(id),
+        db.prepare("DELETE FROM apple_images WHERE source IN (SELECT id FROM assets WHERE business = ?)").bind(id),
+        db.prepare("DELETE FROM assets WHERE business = ?").bind(id),
+        db.prepare("DELETE FROM subscriptions WHERE business = ?").bind(id),
+        db.prepare("DELETE FROM businesses WHERE id = ?").bind(id),
+        log("delete_business", `${business.name} deleted for good`),
+      ]);
+      return json({ ok: true });
     }
     case "restore": {
       await db.batch([

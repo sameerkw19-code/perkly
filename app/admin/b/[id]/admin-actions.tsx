@@ -87,7 +87,7 @@ export function OwnerDesignSwitch({ business, on }: { business: string; on: bool
 /** Suspend / unsuspend and free-access controls for one business. Reloads the page after each change. */
 type Biz = { id: string; name: string; reward: string; target: number; program?: string; archived: string | null; ownerEmail: string | null; paying: boolean };
 
-type Part = "suspend" | "comp" | "details" | "owner" | "archive" | "reset";
+type Part = "suspend" | "comp" | "details" | "owner" | "archive" | "reset" | "delete";
 
 /** The admin's actions on a business. `parts` picks which ones this block shows (all by default), so the page can group them. */
 export function AdminActions({ business, suspended, compUntil, biz, parts }: { business: string; suspended: boolean; compUntil: string | null; biz: Biz; parts?: Part[] }) {
@@ -115,6 +115,8 @@ export function AdminActions({ business, suspended, compUntil, biz, parts }: { b
         : r.code === "confirm_mismatch" ? "השם שהוקלד לא תואם את שם העסק. לא נמחק כלום."
         : r.code === "bad_login" ? "הסיסמה שגויה. לא נמחק כלום."
         : r.code === "rate_limited" ? "יותר מדי ניסיונות. נסה שוב בעוד שעה."
+        : r.code === "subscription_live" ? "לעסק יש מנוי פעיל ב־Polar. מבטלים אותו קודם, ורק אז מוחקים."
+        : r.code === "not_archived" ? "קודם סוגרים את העסק, ורק אז אפשר למחוק אותו."
         : "הפעולה נכשלה. נסה שוב.",
       );
       return;
@@ -220,6 +222,32 @@ export function AdminActions({ business, suspended, compUntil, biz, parts }: { b
           <label>הקלד את שם העסק: <strong>{biz.name}</strong><input name="confirm" required maxLength={80} autoComplete="off" /></label>
           <label>הסיסמה שלך<input name="password" type="password" required maxLength={200} autoComplete="current-password" dir="ltr" /></label>
           <button className="btn soft small danger" disabled={busy}>איפוס נתונים</button>
+        </form>
+      </div>}
+      {show("delete") && <div className="admin-action">
+        <h3>מחיקה לצמיתות</h3>
+        <p className="muted">מוחק את העסק וכל מה שבו: לקוחות, היסטוריה, עיצוב, תמונות, צוות, סניפים ומפתחות קופה. אי אפשר לבטל. אפשר רק אחרי שהעסק נסגר, ורק כשאין לו מנוי פעיל. היומן של המנהל שומר רשומה.</p>
+        <form className="admin-edit" autoComplete="off" onSubmit={async (e) => {
+          e.preventDefault();
+          const f = new FormData(e.currentTarget);
+          const typed = String(f.get("confirm") ?? "").trim();
+          if (typed !== biz.name) { setError("השם שהוקלד לא תואם את שם העסק. לא נמחק כלום."); return; }
+          if (!confirm(`למחוק את "${biz.name}" לצמיתות? אי אפשר לבטל.`)) return;
+          setBusy(true); setError("");
+          const r = await post("/api/admin", { action: "delete_business", business, confirm: typed, password: String(f.get("password") ?? "") });
+          setBusy(false);
+          if (r.ok) { window.location.href = "/admin"; return; }
+          setError(
+            r.code === "bad_login" ? "הסיסמה שגויה. לא נמחק כלום."
+            : r.code === "subscription_live" ? "לעסק יש מנוי פעיל ב־Polar. מבטלים אותו קודם, ורק אז מוחקים."
+            : r.code === "not_archived" ? "קודם סוגרים את העסק, ורק אז אפשר למחוק אותו."
+            : r.code === "rate_limited" ? "יותר מדי ניסיונות. נסה שוב בעוד שעה."
+            : "המחיקה נכשלה. לא נמחק כלום.",
+          );
+        }}>
+          <label>הקלד את שם העסק: <strong>{biz.name}</strong><input name="confirm" required maxLength={80} autoComplete="off" /></label>
+          <label>הסיסמה שלך<input name="password" type="password" required maxLength={200} autoComplete="current-password" dir="ltr" /></label>
+          <button className="btn soft small danger" disabled={busy}>מחיקה לצמיתות</button>
         </form>
       </div>}
       {error && <p className="form-error" role="alert">{error}</p>}

@@ -411,6 +411,15 @@ test("moving a business between Perkly sites: export a file, import it as a new 
   assert.equal(kept.body.subscription, null, "no Polar here");
   // Linking a Polar subscription by id needs Polar (not set up on the test server) and a valid id.
   assert.equal((await admin.post("/api/admin", { action: "polar_link", business: fresh, subscription: crypto.randomUUID() })).body.code, "billing_off");
+
+  // Deleting a business for good: only once it is closed, with its name and the admin's password.
+  const del = (extra) => admin.post("/api/admin", { action: "delete_business", business: fresh, confirm: file.business.name, password: "admin pass 12", ...extra });
+  assert.equal((await del()).body.code, "not_archived");
+  assert.equal((await admin.post("/api/admin", { action: "archive", business: fresh, reason: "test" })).status, 200);
+  assert.equal((await del({ confirm: "nope" })).body.code, "confirm_mismatch");
+  assert.equal((await del({ password: "wrong pass 1" })).body.code, "bad_login");
+  assert.equal((await del()).status, 200);
+  assert.equal((await admin.get(`/admin/b/${fresh}`)).status, 404, "the business is gone");
 });
 
 test("design: staff and other businesses cannot edit or borrow images", async () => {
