@@ -138,7 +138,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
           <section className="panel">
             <h2>הכרטיס החי</h2>
             <AdminCardPreview design={design} target={b.target} />
-            <p className="muted">ברירת המחדל: Perkly מעצבת את הכרטיס. אפשר לתת לבעל העסק לערוך אותו בעצמו (רק את העיצוב, לא הגדרות וצוות).</p>
+            <p className="muted">ברירת המחדל: בעל העסק מעצב את הכרטיס בעצמו (רק את העיצוב, לא הגדרות וצוות). אפשר לכבות את זה כאן, ואז רק Perkly מעצבת.</p>
             <OwnerDesignSwitch business={b.id} on={!!b.owner_designs} />
           </section>
 

@@ -341,10 +341,11 @@ export async function POST(request: Request) {
     const minUse = program === "cashback" && Number.isInteger(p.cashbackMin) && (p.cashbackMin as number) >= 0 && (p.cashbackMin as number) <= AMOUNT_MAX ? (p.cashbackMin as number) : 0;
     await db.batch([
       // The currency follows where the owner signs up: shekels in Israel, dollars abroad.
-      db.prepare("INSERT INTO businesses(id, owner, name, reward, target, color, created, join_code, reward_mode, currency, program, cashback_bp, cashback_min, avg_cap) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      // Owners design their own card (owner_designs = 1); Perkly can switch that off per business.
+      db.prepare("INSERT INTO businesses(id, owner, name, reward, target, color, created, join_code, reward_mode, currency, program, cashback_bp, cashback_min, avg_cap, owner_designs) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)")
         .bind(id, user.id, name, reward, p.target, p.color, now, randomCode(10), program === "average" ? "bank" : mode, currency, program, bp, minUse, avgCap),
       // The starting card: the example look for the business type, in the sign-up language (English abroad).
-      // After this, only Perkly (a platform admin) changes the design.
+      // After this the owner (and Perkly) edit it in the design screen.
       db.prepare("INSERT INTO card_designs(id, business, version, data, published, published_by) VALUES(?, ?, 1, ?, ?, ?)")
         .bind(crypto.randomUUID(), id, JSON.stringify(isKind(p.kind) ? startDesign(p.kind, name, reward, cardLang) : defaultDesign({ name, reward, color: p.color }, cardLang)), now, user.id),
       db.prepare("INSERT INTO memberships(id, business, user, role, created) VALUES(?, ?, ?, 'owner', ?)")
