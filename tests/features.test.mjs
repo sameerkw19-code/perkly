@@ -698,3 +698,10 @@ test("launch offer: New2026perkly, 99 ₪ for the first 20, Israel only", () => 
   const copy = readFileSync(new URL("../app/landing/content.ts", import.meta.url), "utf8");
   assert.equal((copy.match(/launch: \{ tag: /g) || []).length, 3, "he, ar and en");
 });
+
+test("a Polar subscription linked by an admin keeps following its business in later webhooks", () => {
+  const src = readFileSync(new URL("../app/api/billing/polar-webhook/route.ts", import.meta.url), "utf8");
+  assert.match(src, /SELECT business FROM subscriptions WHERE external_subscription = \?/);
+  const admin = readFileSync(new URL("../app/api/admin/route.ts", import.meta.url), "utf8");
+  assert.match(admin, /case "polar_link":/);
+});

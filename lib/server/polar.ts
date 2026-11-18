@@ -250,3 +250,17 @@ export function liveCheckoutAllowed(env: PolarEnv, host: string): boolean {
   const h = host.toLowerCase().split(":")[0];
   return h === "perkly.shop" || h.endsWith(".perkly.shop") || h === "localhost" || h === "127.0.0.1";
 }
+
+/** One Polar subscription by its id, as a row (its own `business` metadata, which the caller may override). */
+export async function getSubscription(env: PolarEnv, subscriptionId: string): Promise<SubscriptionRow | null> {
+  if (!env.POLAR_ACCESS_TOKEN) throw new Error("polar_not_configured");
+  const r = await fetch(`${apiBase(env)}/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+    headers: { Authorization: `Bearer ${env.POLAR_ACCESS_TOKEN}`, Accept: "application/json" },
+  });
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(`polar_subscription_${r.status}`);
+  const item = (await r.json()) as Record<string, unknown>;
+  // subscriptionRow needs a business in the metadata; a subscription made elsewhere may have none.
+  const meta = (item.metadata && typeof item.metadata === "object" ? item.metadata : {}) as Record<string, unknown>;
+  return subscriptionRow({ type: "subscription.updated", data: { ...item, metadata: { ...meta, business: meta.business ?? "unknown" } } });
+}
