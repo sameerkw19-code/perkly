@@ -1,3 +1,4 @@
+import { storeSubscription } from "../../../../lib/server/subscription-store";
 import { env, waitUntil } from "cloudflare:workers";
 import { mailReady, sendMail, simpleMail } from "../../../../lib/server/mailer";
 import { getD1 } from "../../../../db";
@@ -39,20 +40,7 @@ export async function POST(request: Request) {
       // Same subscription: only a newer change applies. Another subscription (the owner subscribed
       // again) takes over only when it is live, or when the stored one is no longer live; so a late
       // "canceled" for an old subscription never ends a new paid one.
-      await getD1()
-        .prepare(
-          `INSERT INTO subscriptions(business, status, plan, external_customer, external_subscription, current_period_end, updated, changed_at)
-           VALUES(?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT(business) DO UPDATE SET status = excluded.status, plan = excluded.plan,
-             external_customer = excluded.external_customer, external_subscription = excluded.external_subscription,
-             current_period_end = excluded.current_period_end, updated = excluded.updated, changed_at = excluded.changed_at
-           WHERE (subscriptions.external_subscription IS excluded.external_subscription
-                  AND (subscriptions.changed_at IS NULL OR excluded.changed_at >= subscriptions.changed_at))
-              OR (subscriptions.external_subscription IS NOT excluded.external_subscription
-                  AND (excluded.status IN ('active', 'trialing') OR subscriptions.status NOT IN ('active', 'trialing')))`,
-        )
-        .bind(row.business, row.status, row.plan, row.externalCustomer, row.externalSubscription, row.currentPeriodEnd, new Date().toISOString(), changedAt)
-        .run();
+      await storeSubscription(getD1(), row, changedAt).run();
       const bad = ["past_due", "unpaid", "canceled", "revoked"];
       if (before && bad.includes(row.status) && before.status !== row.status) {
         const now = await getD1().prepare("SELECT status FROM subscriptions WHERE business = ?").bind(row.business).first<{ status: string }>();

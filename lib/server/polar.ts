@@ -218,3 +218,35 @@ export async function cancelAtPeriodEnd(env: PolarEnv, subscriptionId: string): 
   if (!r?.ok) console.warn(`polar cancel failed: HTTP ${r?.status ?? "network"}`);
   return !!r?.ok;
 }
+
+/**
+ * The Polar subscription of one business (by the `business` metadata the checkout set): a live one (active or
+ * trialing) first, otherwise the newest. For when a webhook never reached this site, e.g. a business moved here
+ * from staging after its owner paid. Reads up to 5 pages of 100. Throws "polar_subscriptions_<status>" on an API error.
+ */
+export async function findSubscription(env: PolarEnv, businessId: string): Promise<SubscriptionRow | null> {
+  if (!env.POLAR_ACCESS_TOKEN) throw new Error("polar_not_configured");
+  const found: SubscriptionRow[] = [];
+  for (let page = 1; page <= 5; page++) {
+    const r = await fetch(`${apiBase(env)}/subscriptions/?limit=100&page=${page}&sorting=-started_at`, {
+      headers: { Authorization: `Bearer ${env.POLAR_ACCESS_TOKEN}`, Accept: "application/json" },
+    });
+    if (!r.ok) throw new Error(`polar_subscriptions_${r.status}`);
+    const data = (await r.json()) as { items?: Record<string, unknown>[]; pagination?: { max_page?: number } };
+    for (const item of data.items ?? []) {
+      const row = subscriptionRow({ type: "subscription.updated", data: item });
+      if (row && row.business === businessId) found.push(row);
+    }
+    if (!data.pagination?.max_page || page >= data.pagination.max_page) break;
+  }
+  const live = found.filter((r) => r.status === "active" || r.status === "trialing");
+  const pick = (list: SubscriptionRow[]) => list.sort((a, b) => (b.changedAt ?? "").localeCompare(a.changedAt ?? ""))[0] ?? null;
+  return pick(live) ?? pick(found);
+}
+
+/** Polar takes real payments (not the sandbox): only the live site may open a checkout then. */
+export function liveCheckoutAllowed(env: PolarEnv, host: string): boolean {
+  if (env.POLAR_SANDBOX === "1") return true;
+  const h = host.toLowerCase().split(":")[0];
+  return h === "perkly.shop" || h.endsWith(".perkly.shop") || h === "localhost" || h === "127.0.0.1";
+}

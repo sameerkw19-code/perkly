@@ -402,6 +402,13 @@ test("moving a business between Perkly sites: export a file, import it as a new 
   assert.equal((await fetch(`${BASE}/api/asset/${logo}`)).status, 200);
   assert.match(JSON.stringify(view.editor), /פיצה של רמי/);
   assert.equal(view.customers?.length ?? 0, 0, "it starts without customers");
+
+  // Coming from another site, the business keeps its id (a payment made there points at it); here bizA's id is taken.
+  assert.equal(file.sourceId, bizA);
+  const fresh = crypto.randomUUID();
+  const kept = await admin.post("/api/admin/transfer", { ...file, sourceId: fresh });
+  assert.equal(kept.body.id, fresh);
+  assert.equal(kept.body.subscription, null, "no Polar here");
 });
 
 test("design: staff and other businesses cannot edit or borrow images", async () => {

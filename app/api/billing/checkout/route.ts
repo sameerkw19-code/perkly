@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { getD1 } from "../../../../db";
 import { getMembership, getUser } from "../../../../lib/server/auth";
 import { fail, json, readJson, sameOrigin, str } from "../../../../lib/server/http";
-import { createCheckoutUrl, polarConfigured, yearlyConfigured } from "../../../../lib/server/polar";
+import { createCheckoutUrl, liveCheckoutAllowed, polarConfigured, yearlyConfigured } from "../../../../lib/server/polar";
 import { TRIAL_DAYS } from "../../../../lib/server/billing";
 import { asCurrency } from "../../../../lib/pricing";
 
@@ -22,6 +22,8 @@ export async function POST(request: Request) {
   const membership = await getMembership(db, user.id, business);
   if (!membership || membership.role !== "owner") return fail("forbidden", 403, "Owner permission required");
   if (!polarConfigured(env)) return fail("billing_off", 503, "Billing is not set up yet");
+  // A test site (staging) with real Polar keys would take real payments for businesses perkly.shop never sees.
+  if (!liveCheckoutAllowed(env, new URL(request.url).host)) return fail("billing_test_site", 409, "Payments are taken only on perkly.shop");
   const plan = body.plan === "yearly" ? "yearly" : "monthly";
   const currency = asCurrency((await db.prepare("SELECT currency FROM businesses WHERE id = ?").bind(business).first<{ currency: string }>())?.currency);
   if (plan === "yearly" && !yearlyConfigured(env, currency)) return fail("plan_unavailable", 400, "The yearly plan is not available yet");
