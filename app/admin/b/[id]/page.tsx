@@ -118,6 +118,29 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
             </div>
           )}
         </div>
+        {!b.archived && (
+          <section className="panel admin-manage">
+            <h2>ניהול העסק</h2>
+            <p className="form-hint">כל מסך נפתח בלוח של העסק עם הרשאות מלאות שלך. בעל העסק לא צריך לעשות כלום.</p>
+            <div className="admin-manage-grid">
+              {[
+                ["#design", "עיצוב הכרטיס", "צבעים, לוגו, חותמות, Apple ו־Google Wallet"],
+                ["#settings", "פרטים והגדרות", "שם, הטבה, יעד, סוג כרטיס, רשתות, קוד הצטרפות"],
+                ["#team", "צוות וסניפים", "עובדים, הזמנות לעמדה, סניפים"],
+                ["#customers", "לקוחות", "רשימה, חיפוש, תיקון חותמות"],
+                ["#station", "עמדת עובד", "סריקה, חותמת ומימוש הטבה"],
+                ["", "לוח מעקב", "מה שבעל העסק רואה"],
+              ].map(([hash, title, sub]) => (
+                <a key={title} className="admin-manage-item" href={`/?business=${encodeURIComponent(b.id)}${hash}`}>
+                  <strong>{title}</strong><span>{sub}</span>
+                </a>
+              ))}
+              <a className="admin-manage-item primary" href={`/poster?b=${encodeURIComponent(b.id)}`}>
+                <strong>הדפסת שלט QR</strong><span>שלט A4 או מדבקה 10×10 לקופה</span>
+              </a>
+            </div>
+          </section>
+        )}
 
         {b.archived && <p className="admin-alert">העסק סגור (בארכיון) מאז {shortDateTime(b.archived)}. הבעלים והצוות לא רואים אותו. אפשר לשחזר אותו בתחתית הדף.</p>}
         {b.suspended && <p className="admin-alert">מושהה מאז {shortDateTime(b.suspended)}. סיבה: {b.suspend_reason}</p>}

@@ -779,3 +779,12 @@ html,body{overflow-x:clip}
 @media(max-width:860px){.admin-layout{grid-template-columns:1fr}.admin-todo li small{margin-inline-start:0;width:100%}}
 .admin-dl{margin-bottom:16px}.admin-col .panel>.admin-action,.admin-col .panel>div>h3{margin-top:4px}
 .admin-mini{margin-inline-start:8px;font-size:12px;padding:2px 8px;border-radius:999px;background:#f0ecfc;color:#5a3fc4}
+
+/* Admin: every screen of a business, one tap away. */
+.admin-manage { margin-top: 16px; }
+.admin-manage-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; margin-top: 12px; }
+.admin-manage-item { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; text-decoration: none; color: inherit; background: #fff; }
+.admin-manage-item:hover, .admin-manage-item:focus-visible { border-color: var(--purple); }
+.admin-manage-item strong { font-size: 15px; }
+.admin-manage-item span { font-size: 13px; opacity: .72; }
+.admin-manage-item.primary { border-color: var(--purple); background: color-mix(in srgb, var(--purple) 8%, transparent); }

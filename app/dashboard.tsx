@@ -77,8 +77,11 @@ export default function Dashboard() {
   const [days] = useState<string>("30");
   const [branchView, setBranchView] = useState<string>("");
   const [view, setView] = useState("overview");
-  // "/#design" opens the card editor (link from the sign-up flow).
-  useEffect(() => { if (window.location.hash === "#design") setView("design"); }, []);
+  // "/#design" opens the card editor (link from the sign-up flow); the admin control center links to every screen.
+  useEffect(() => {
+    const h = window.location.hash.slice(1);
+    if (h === "design" || h === "settings" || h === "team" || h === "customers" || h === "station") setView(h);
+  }, []);
   const [modal, setModal] = useState<Modal | null>(null);
   const [toast, setToast] = useState<{ text: string; bad?: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
