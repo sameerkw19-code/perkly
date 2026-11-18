@@ -132,6 +132,18 @@ export async function POST(request: Request) {
       ]);
       return json({ ok: true, status: row.status, periodEnd: row.currentPeriodEnd });
     }
+    case "polar_unlink": {
+      // Forgets a subscription that is no longer live (e.g. canceled before it was ever paid), so the owner's
+      // billing page does not show "canceled" and a new checkout starts clean. A live one is never removed here.
+      const sub = await db.prepare("SELECT status, external_subscription FROM subscriptions WHERE business = ?").bind(businessId).first<{ status: string; external_subscription: string | null }>();
+      if (!sub) return json({ ok: true, removed: false });
+      if (["active", "trialing", "past_due"].includes(sub.status)) return fail("subscription_live", 409, "The subscription is live; cancel it in Polar first");
+      await db.batch([
+        db.prepare("DELETE FROM subscriptions WHERE business = ?").bind(businessId),
+        log("polar_unlink", `${sub.external_subscription ?? "—"} ${sub.status}`),
+      ]);
+      return json({ ok: true, removed: true });
+    }
     case "owner_link": {
       // A business Perkly built for a client: a personal, single-use link (14 days) that opens an account for the
       // client and makes them the owner. A new link cancels the earlier unused ones.

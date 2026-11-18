@@ -87,7 +87,11 @@ export function OwnerDesignSwitch({ business, on }: { business: string; on: bool
 /** Suspend / unsuspend and free-access controls for one business. Reloads the page after each change. */
 type Biz = { id: string; name: string; reward: string; target: number; program?: string; archived: string | null; ownerEmail: string | null; paying: boolean };
 
-export function AdminActions({ business, suspended, compUntil, biz }: { business: string; suspended: boolean; compUntil: string | null; biz: Biz }) {
+type Part = "suspend" | "comp" | "details" | "owner" | "archive" | "reset";
+
+/** The admin's actions on a business. `parts` picks which ones this block shows (all by default), so the page can group them. */
+export function AdminActions({ business, suspended, compUntil, biz, parts }: { business: string; suspended: boolean; compUntil: string | null; biz: Biz; parts?: Part[] }) {
+  const show = (p: Part) => !parts || parts.includes(p);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [reason, setReason] = useState("");
@@ -123,7 +127,7 @@ export function AdminActions({ business, suspended, compUntil, biz }: { business
 
   return (
     <div className="admin-actions">
-      <div className="admin-action">
+      {show("suspend") && <div className="admin-action">
         <h3>השהיית עסק</h3>
         {suspended ? (
           <>
@@ -137,9 +141,9 @@ export function AdminActions({ business, suspended, compUntil, biz }: { business
             <button className="btn soft small danger" disabled={busy || !reason.trim()} onClick={() => run("suspend", { reason }, "להשהות את העסק?")}>השהיה</button>
           </>
         )}
-      </div>
+      </div>}
 
-      <div className="admin-action">
+      {show("comp") && <div className="admin-action">
         <h3>גישה חינם</h3>
         <p className="muted">
           {compForever
@@ -158,8 +162,8 @@ export function AdminActions({ business, suspended, compUntil, biz }: { business
           {!compForever && <button className="btn soft small" disabled={busy} onClick={() => run("grant_comp", { forever: true }, "לתת לעסק גישה חינם ללא הגבלת זמן?")}>ללא הגבלת זמן</button>}
           {compActive && <button className="btn soft small" disabled={busy} onClick={() => run("clear_comp", {}, "לבטל את הגישה החינמית?")}>ביטול</button>}
         </div>
-      </div>
-      <div className="admin-action">
+      </div>}
+      {show("details") && <div className="admin-action">
         <h3>פרטי העסק</h3>
         <form className="admin-edit" onSubmit={(e) => {
           e.preventDefault();
@@ -172,9 +176,9 @@ export function AdminActions({ business, suspended, compUntil, biz }: { business
           <button className="btn soft small" disabled={busy}>שמירה</button>
         </form>
         <small className="form-hint">מספר חותמות חדש חל על כרטיסים חדשים, ועל קיימים מהסבב הבא.</small>
-      </div>
+      </div>}
 
-      <div className="admin-action">
+      {show("owner") && <div className="admin-action">
         <h3>העברת בעלות</h3>
         <p className="muted">בעלים נוכחי: <span dir="ltr">{biz.ownerEmail ?? "—"}</span>. הבעלים הקודם יישאר בצוות כעובד.</p>
         <form className="admin-row" onSubmit={(e) => {
@@ -185,10 +189,10 @@ export function AdminActions({ business, suspended, compUntil, biz }: { business
           <input name="email" type="email" dir="ltr" placeholder="מייל של משתמש קיים" required />
           <button className="btn soft small" disabled={busy}>העברה</button>
         </form>
-      </div>
+      </div>}
 
-      <div className="admin-action">
-        <h3>ייצוא וארכוב</h3>
+      {show("archive") && <div className="admin-action">
+        <h3>סגירת העסק (ארכוב) וייצוא נתונים</h3>
         <div className="admin-row">
           <a className="btn soft small" href={`/api/admin/export?business=${encodeURIComponent(business)}`}>ייצוא נתונים (JSON)</a>
           {biz.archived ? (
@@ -202,8 +206,8 @@ export function AdminActions({ business, suspended, compUntil, biz }: { business
           )}
         </div>
         <small className="form-hint">בייצוא, מספרי הטלפון של הלקוחות מוסתרים חוץ מ-4 הספרות האחרונות. כל ייצוא נרשם ביומן.</small>
-      </div>
-      <div className="admin-action">
+      </div>}
+      {show("reset") && <div className="admin-action">
         <h3>איפוס נתונים</h3>
         <p className="muted">מוחק לצמיתות את כל הלקוחות, היסטוריית החותמות, ההטבות וההודעות ליום מיוחד. העיצוב, הלוגו, הצוות, המנוי וקישור ההצטרפות נשארים. כרטיסים ששמורים בארנקים יפסיקו להתעדכן. אי אפשר לבטל.</p>
         <form className="admin-edit" autoComplete="off" onSubmit={(e) => {
@@ -217,7 +221,7 @@ export function AdminActions({ business, suspended, compUntil, biz }: { business
           <label>הסיסמה שלך<input name="password" type="password" required maxLength={200} autoComplete="current-password" dir="ltr" /></label>
           <button className="btn soft small danger" disabled={busy}>איפוס נתונים</button>
         </form>
-      </div>
+      </div>}
       {error && <p className="form-error" role="alert">{error}</p>}
     </div>
   );
@@ -470,6 +474,13 @@ export function PolarSync({ business }: { business: string }) {
         <input name="sub" dir="ltr" placeholder="מזהה מנוי מ־Polar" required pattern="[0-9a-fA-F-]{36}" style={{ minWidth: 0, flex: "1 1 220px" }} />
         <button className="btn soft small" disabled={busy}>חיבור מנוי קיים</button>
       </form>
+      <button type="button" className="btn soft small danger" style={{ marginTop: 8 }} disabled={busy} onClick={async () => {
+        if (!confirm("לנתק מהעסק מנוי שכבר לא פעיל (למשל מנוי שבוטל)? מנוי פעיל לא ינותק.")) return;
+        setBusy(true); setOut("");
+        const r = await post<{ removed: boolean }>("/api/admin", { action: "polar_unlink", business });
+        setBusy(false);
+        setOut(r.ok ? (r.data?.removed ? "המנוי נותק. רעננו את הדף." : "אין מנוי לנתק.") : r.code === "subscription_live" ? "המנוי פעיל: מבטלים אותו קודם ב־Polar." : "הניתוק נכשל.");
+      }}>ניתוק מנוי שבוטל</button>
     </span>
   );
 }
