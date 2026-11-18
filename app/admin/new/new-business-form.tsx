@@ -49,8 +49,8 @@ export default function NewBusinessForm() {
       branchName: String(f.get("branchName") ?? "").trim() || name.trim(), branchAddress: String(f.get("branchAddress") ?? "").trim(),
     });
     if (r.ok && r.data?.id) {
-      // Straight to the card design of the new business.
-      window.location.href = `/?business=${encodeURIComponent(r.data.id)}#design`;
+      // To the business's build steps: design, branches, the QR sign, the owner and the staff.
+      window.location.href = `/admin/b/${encodeURIComponent(r.data.id)}`;
       return;
     }
     setError((!r.ok && ERRORS[r.code ?? ""]) || "לא הצלחנו לבנות את העסק. נסו שוב.");

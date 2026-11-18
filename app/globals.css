@@ -780,11 +780,29 @@ html,body{overflow-x:clip}
 .admin-dl{margin-bottom:16px}.admin-col .panel>.admin-action,.admin-col .panel>div>h3{margin-top:4px}
 .admin-mini{margin-inline-start:8px;font-size:12px;padding:2px 8px;border-radius:999px;background:#f0ecfc;color:#5a3fc4}
 
-/* Admin: every screen of a business, one tap away. */
-.admin-manage { margin-top: 16px; }
-.admin-manage-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; margin-top: 12px; }
-.admin-manage-item { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; text-decoration: none; color: inherit; background: #fff; }
-.admin-manage-item:hover, .admin-manage-item:focus-visible { border-color: var(--purple); }
-.admin-manage-item strong { font-size: 15px; }
-.admin-manage-item span { font-size: 13px; opacity: .72; }
-.admin-manage-item.primary { border-color: var(--purple); background: color-mix(in srgb, var(--purple) 8%, transparent); }
+/* Admin: building a business for a client, step by step. */
+.build { margin-top: 16px; }
+.build-head p { margin: 4px 0 0; }
+.build-list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 12px; counter-reset: none; }
+.build-step { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 14px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+.build-step.is-done { background: #f6fbf4; border-color: #cfe8c8; }
+.build-num { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 17px; background: #f1edfd; color: var(--purple); }
+.build-step.is-done .build-num { background: #2f6b2a; color: #fff; }
+.build-body { min-width: 0; }
+.build-body h3 { margin: 0; font-size: 17px; }
+.build-status { margin: 4px 0 0; color: var(--ink); line-height: 1.5; overflow-wrap: anywhere; }
+.build-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; align-items: flex-end; }
+.build-actions > .btn { min-height: 44px; }
+.build-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; width: 100%; }
+.build-form label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; font-weight: 600; flex: 1 1 200px; min-width: 0; }
+.build-form input, .build-form select { min-height: 44px; font-size: 16px; }
+.build-form .btn { min-height: 44px; }
+.build-form .form-error, .build-form .form-hint { flex-basis: 100%; margin: 0; }
+.build-people { list-style: none; margin: 0; padding: 0; width: 100%; display: grid; gap: 6px; }
+.build-people li { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 12px; border-radius: 10px; background: #faf9fc; overflow-wrap: anywhere; }
+.build-people li.is-pending { background: #fff8e8; }
+.build-sent { width: 100%; padding: 12px; border-radius: 10px; background: #eaf0ff; }
+.build-sent p { margin: 0 0 8px; }
+.build-sent input { min-height: 44px; flex: 1 1 220px; min-width: 0; font-size: 16px; }
+.build-sent .btn { min-height: 44px; }
+.manage-bar .btn { margin-inline-start: auto; }

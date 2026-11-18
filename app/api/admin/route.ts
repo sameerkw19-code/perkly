@@ -4,6 +4,7 @@ import { getD1 } from "../../../db";
 import { getUser, isPlatformAdmin } from "../../../lib/server/auth";
 import { fail, json, readJson, sameOrigin, str } from "../../../lib/server/http";
 import { normalizeEmail } from "../../../lib/server/auth";
+import { mailReady, sendMail, simpleMail } from "../../../lib/server/mailer";
 import { randomToken, sha256, verifyPassword } from "../../../lib/server/crypto";
 import { allow } from "../../../lib/server/rate-limit";
 import { cancelAtPeriodEnd, findSubscription, getSubscription, polarConfigured } from "../../../lib/server/polar";
@@ -156,6 +157,61 @@ export async function POST(request: Request) {
         log("owner_link", `until ${expires.slice(0, 10)}`),
       ]);
       return json({ ok: true, url: `${new URL(request.url).origin}/invite/${token}`, expires });
+    }
+    case "owner_invite": {
+      // Handing a business Perkly built to its owner: an invite that works only for this email (14 days), sent by
+      // email when mail is connected. The owner opens it, sets a password, and the business becomes theirs.
+      const email = normalizeEmail(body.email);
+      if (!email) return fail("bad_details", 400, "Invalid email");
+      if (!(await allow(db, `admin-invite:${user.id}`, 60, 86_400))) return fail("rate_limited", 429);
+      const token = randomToken(24);
+      const expires = new Date(now.getTime() + 14 * 86_400_000).toISOString();
+      await db.batch([
+        db.prepare("UPDATE invites SET revoked = ? WHERE business = ? AND role = 'owner' AND used IS NULL AND revoked IS NULL").bind(nowIso, businessId),
+        db.prepare("INSERT INTO invites(id, business, role, label, created_by, created, expires, branch, email) VALUES(?, ?, 'owner', ?, ?, ?, ?, NULL, ?)")
+          .bind(await sha256(token), businessId, "owner", user.id, nowIso, expires, email),
+        log("owner_invite", `${email} until ${expires.slice(0, 10)}`),
+      ]);
+      const url = `${new URL(request.url).origin}/invite/${token}`;
+      const emailed = mailReady(env) && (await sendMail(env, simpleMail(
+        email,
+        `${business.name} ב-Perkly: הכרטיס שלכם מוכן`,
+        [`בנינו לכם את כרטיס הנאמנות הדיגיטלי של ${business.name}.`, "לוחצים על הכפתור, בוחרים סיסמה, ונכנסים ללוח של העסק.", "הקישור אישי, לשימוש אחד, ותקף 14 יום."],
+        [`We built the ${business.name} digital loyalty card for you.`, "Tap the button, choose a password, and open your business dashboard.", "The link is personal, works once, and is valid for 14 days."],
+        { text: "כניסה ובחירת סיסמה", href: url },
+      )));
+      return json({ ok: true, url, expires, emailed });
+    }
+    case "staff_invite": {
+      // A worker added by Perkly: an invite for their email (7 days), sent by email. They choose a password and
+      // give a phone and date of birth for signing in at the counter.
+      if (business.archived) return fail("archived", 409);
+      const email = normalizeEmail(body.email);
+      const name = str(body.name, 60);
+      if (!email || !name) return fail("bad_details", 400, "Name and email are required");
+      if (!(await allow(db, `admin-invite:${user.id}`, 60, 86_400))) return fail("rate_limited", 429);
+      const branches = (await db.prepare("SELECT id FROM branches WHERE business = ? AND archived IS NULL").bind(businessId).all<{ id: string }>()).results;
+      let branch: string | null = branches.length === 1 ? branches[0].id : null;
+      if (branches.length > 1) {
+        if (typeof body.branch !== "string" || !branches.some((b) => b.id === body.branch)) return fail("branch_required", 400, "Choose a branch");
+        branch = body.branch;
+      }
+      const token = randomToken(24);
+      const expires = new Date(now.getTime() + 7 * 86_400_000).toISOString();
+      await db.batch([
+        db.prepare("INSERT INTO invites(id, business, role, label, created_by, created, expires, branch, email) VALUES(?, ?, 'staff', ?, ?, ?, ?, ?, ?)")
+          .bind(await sha256(token), businessId, name, user.id, nowIso, expires, branch, email),
+        log("staff_invite", email),
+      ]);
+      const url = `${new URL(request.url).origin}/invite/${token}`;
+      const emailed = mailReady(env) && (await sendMail(env, simpleMail(
+        email,
+        `הוזמנת לעמדת העובד של ${business.name}`,
+        [`שלום ${name}, הוזמנת לעבוד עם כרטיס הנאמנות של ${business.name} ב-Perkly.`, "לוחצים על הכפתור, בוחרים סיסמה, ומקבלים את עמדת העובד: סריקת לקוחות, חותמות ומימוש הטבות.", "הקישור אישי ותקף 7 ימים."],
+        [`Hi ${name}, you're invited to the ${business.name} loyalty card on Perkly.`, "Tap the button, choose a password, and get the staff station: scan customers, give stamps and redeem rewards.", "The link is personal and valid for 7 days."],
+        { text: "הצטרפות לעמדת העובד", href: url },
+      )));
+      return json({ ok: true, url, expires, emailed });
     }
     case "pos_key_create": {
       // A cashier key for this business (optionally for one branch). Shown once; only its hash is kept.

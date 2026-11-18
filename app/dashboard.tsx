@@ -78,7 +78,10 @@ export default function Dashboard() {
   const [branchView, setBranchView] = useState<string>("");
   const [view, setView] = useState("overview");
   // "/#design" opens the card editor (link from the sign-up flow); the admin control center links to every screen.
+  // Opened from the admin's build steps: a link back to them on every screen.
+  const [fromAdmin, setFromAdmin] = useState(false);
   useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("from") === "admin") setFromAdmin(true);
     const h = window.location.hash.slice(1);
     if (h === "design" || h === "settings" || h === "team" || h === "customers" || h === "station") setView(h);
   }, []);
@@ -375,8 +378,9 @@ export default function Dashboard() {
 
         <main id="main" tabIndex={-1}>
           {(view === "customers" || view === "team" || view === "settings") && <h1 className="sr-only">{t(view)}</h1>}
-          {manage && data.ownsBusiness === false && (
-            <div className="away-bar manage-bar" role="status"><Settings size={16} /><span>{t("managingAs", { b: b.name })}</span></div>
+          {(fromAdmin || (manage && data.ownsBusiness === false)) && (
+            <div className="away-bar manage-bar" role="status"><Settings size={16} /><span>{t("managingAs", { b: b.name })}</span>
+              <a className="btn soft small" href={`/admin/b/${encodeURIComponent(b.id)}`}>← חזרה לבניית העסק</a></div>
           )}
           {view === "overview" && isOwner && away.length > 0 && (
             <div className="away-bar" role="status">

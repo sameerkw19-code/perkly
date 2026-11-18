@@ -908,6 +908,45 @@ test("Perkly builds a business for a client, then hands it over with a single-us
   assert.ok(!ownView.setup || ownView.setup.until < new Date(Date.now() + 60 * 86_400_000).toISOString(), "no 90-day setup for a normal owner");
 });
 
+test("build steps: the owner invite works only for the owner's email; the admin adds a worker by email", async () => {
+  const built = await admin.post("/api/loyalty", { action: "create_business", forClient: true, kind: "cafe", name: "Steps", reward: "Free coffee", target: 8, color: "#123456", setupDays: 30, branchName: "Main" });
+  assert.equal(built.status, 200, JSON.stringify(built.body));
+  const biz = built.body.id;
+  const ownerEmail = `steps-owner-${run}@test.perkly`;
+  const stranger = new Client();
+  await signup(stranger, "steps-stranger");
+  assert.equal((await stranger.post("/api/admin", { action: "owner_invite", business: biz, email: ownerEmail })).status, 404);
+  assert.equal((await admin.post("/api/admin", { action: "owner_invite", business: biz, email: "not an email" })).status, 400);
+  const inv = await admin.post("/api/admin", { action: "owner_invite", business: biz, email: ownerEmail });
+  assert.equal(inv.status, 200, JSON.stringify(inv.body));
+  assert.equal(typeof inv.body.emailed, "boolean");
+  const token = inv.body.url.split("/invite/")[1];
+  // Another email cannot take the business.
+  const wrong = await new Client().post("/api/auth", { action: "accept_invite", token, name: "X", email: `steps-x-${run}@test.perkly`, password: "owner pass 123" });
+  assert.equal(wrong.status, 403);
+  const owner = new Client();
+  const took = await owner.post("/api/auth", { action: "accept_invite", token, name: "Owner", email: ownerEmail, password: "owner pass 123" });
+  assert.equal(took.status, 200, JSON.stringify(took.body));
+  const mine = (await owner.get(`/api/loyalty?business=${biz}`)).body;
+  assert.equal(mine.role, "owner");
+  assert.equal(mine.ownsBusiness, true);
+  // A worker added by the admin: the invite is for their email only.
+  assert.equal((await admin.post("/api/admin", { action: "staff_invite", business: biz, name: "", email: "w@x.y" })).status, 400);
+  const workerEmail = `steps-worker-${run}@test.perkly`;
+  const w = await admin.post("/api/admin", { action: "staff_invite", business: biz, name: "Dana", email: workerEmail });
+  assert.equal(w.status, 200, JSON.stringify(w.body));
+  const wt = w.body.url.split("/invite/")[1];
+  assert.equal((await new Client().post("/api/auth", { action: "accept_invite", token: wt, name: "Y", email: `steps-y-${run}@test.perkly`, password: "worker pass 123" })).status, 403);
+  const worker = new Client();
+  const joined = await worker.post("/api/auth", { action: "accept_invite", token: wt, name: "Dana", email: workerEmail, password: "worker pass 123" });
+  assert.equal(joined.status, 200, JSON.stringify(joined.body));
+  assert.equal((await worker.get(`/api/loyalty?business=${biz}`)).body.role, "staff");
+  // The admin's business page shows the build steps.
+  const page = await admin.get(`/admin/b/${biz}`);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /בניית העסק/);
+});
+
 test("change the sign-in email: needs the current password, refuses a taken or same address", async () => {
   const a = new Client();
   await signup(a, "mover");

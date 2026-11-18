@@ -3,11 +3,13 @@ import { notFound } from "next/navigation";
 import { getD1 } from "../../../../db";
 import { liveDesign } from "../../../../lib/server/designs";
 import { STATUS_LABEL, adminStatus, requireAdminPage, shortDate, shortDateTime } from "../../../../lib/server/admin";
-import { AdminActions, ExportBusiness, PolarSync, OwnerLink, PaymentLink, PosKeys, AdminCardPreview, ApplePushTest, GoogleSyncTest, KitSentButton, OwnerDesignSwitch } from "./admin-actions";
+import { AdminActions, ExportBusiness, PolarSync, PaymentLink, PosKeys, AdminCardPreview, ApplePushTest, GoogleSyncTest, KitSentButton, OwnerDesignSwitch } from "./admin-actions";
 import { env } from "cloudflare:workers";
 import { planOf } from "../../../../lib/server/billing";
 import { isPlatformAdmin } from "../../../../lib/server/auth";
 import { formatPhone } from "../../../../lib/phone";
+import { mailReady } from "../../../../lib/server/mailer";
+import { BuildSteps } from "./build-steps";
 
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false }, title: "Perkly · ניהול עסק" };
@@ -20,7 +22,7 @@ const ACTOR_LABEL: Record<string, string> = { owner: "בעלים", staff: "עו�
 const ROLE_LABEL: Record<string, string> = { owner: "בעלים", staff: "עובד" };
 const ACTION_LABEL: Record<string, string> = {
   suspend: "השהיה", unsuspend: "החזרה לפעילות", grant_comp: "גישה חינם", clear_comp: "ביטול גישה חינם",
-  update_business: "עריכת פרטים", owner_link: "קישור לבעל העסק", transfer_owner: "העברת בעלות", archive: "סגירה (ארכוב)", restore: "שחזור", export: "ייצוא",
+  update_business: "עריכת פרטים", owner_link: "קישור לבעל העסק", owner_invite: "הזמנה לבעל העסק", staff_invite: "הזמנת עובד", transfer_owner: "העברת בעלות", archive: "סגירה (ארכוב)", restore: "שחזור", export: "ייצוא",
   import: "ייבוא מאתר אחר", reset_data: "איפוס נתונים", kit_sent: "ערכת קופה נשלחה", owner_designs: "עיצוב על ידי בעל העסק",
   pos_key_create: "מפתח קופה נוצר", pos_key_revoke: "מפתח קופה בוטל", pos_only: "שינוי רק דרך הקופה",
   polar_sync: "סנכרון מ־Polar", polar_link: "חיבור מנוי מ־Polar", polar_unlink: "ניתוק מנוי", delete_business: "מחיקה לצמיתות",
@@ -57,10 +59,10 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
 
   const [team, counts, recent, log, design, posKeys, branchList] = await Promise.all([
     db.prepare(
-      `SELECT u.email, u.name, m.role, m.created, m.revoked, br.name AS branch
+      `SELECT m.user, u.email, u.name, m.role, m.created, m.revoked, br.name AS branch
        FROM memberships m JOIN users u ON u.id = m.user LEFT JOIN branches br ON br.id = m.branch
        WHERE m.business = ? ORDER BY m.revoked IS NOT NULL, m.role = 'staff', m.created`,
-    ).bind(id).all<{ email: string; name: string; role: string; created: string; revoked: string | null; branch: string | null }>(),
+    ).bind(id).all<{ user: string; email: string; name: string; role: string; created: string; revoked: string | null; branch: string | null }>(),
     db.prepare(
       `SELECT
          (SELECT COUNT(*) FROM customers WHERE business = ?1 AND archived IS NULL) AS customers,
@@ -85,6 +87,11 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
     ).bind(id).all<{ id: string; label: string; created: string; last_used: string | null; branch: string | null }>(),
     db.prepare("SELECT id, name FROM branches WHERE business = ? AND archived IS NULL ORDER BY created").bind(id).all<{ id: string; name: string }>(),
   ]);
+  // Invites still waiting to be opened: the owner's and the workers'.
+  const invites = await db
+    .prepare("SELECT id, role, label, email, expires FROM invites WHERE business = ? AND used IS NULL AND revoked IS NULL AND expires > ? ORDER BY created")
+    .bind(id, nowIso)
+    .all<{ id: string; role: string; label: string | null; email: string | null; expires: string }>();
 
   const st = adminStatus(b, nowIso);
   // Built by Perkly and not handed over yet: the business is still under an admin's account.
@@ -95,6 +102,22 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
   const biz = { id: b.id, name: b.name, reward: b.reward, target: b.target, program: b.program, archived: b.archived, ownerEmail: b.owner_email, paying: live };
   const compForever = !!b.comp_until?.startsWith("9999");
   const compActive = !!b.comp_until && b.comp_until > nowIso;
+  const ownerInvite = [...invites.results].reverse().find((i) => i.role === "owner") ?? null;
+  const build = {
+    id: b.id, name: b.name,
+    details: `${b.reward} · ${b.target} ${b.program === "average" ? "קניות בסבב" : b.program === "cashback" ? "(כרטיס יתרה)" : "חותמות להטבה"}`,
+    designVersion: c.published,
+    // A logo, or any design published after the starting one.
+    designDone: !!design.logo || (c.published ?? 0) >= 2,
+    branches: branchList.results,
+    withPerkly,
+    ownerEmail: b.owner_email,
+    ownerInvite: ownerInvite ? { email: ownerInvite.email, expires: ownerInvite.expires } : null,
+    staff: team.results.filter((m) => m.role === "staff" && !m.revoked).map((m) => ({ user: m.user, name: m.name, email: m.email, branch: m.branch })),
+    staffInvites: invites.results.filter((i) => i.role === "staff").map((i) => ({ id: i.id, name: i.label, email: i.email, expires: i.expires })),
+    mail: mailReady(env),
+  };
+  const dash = (hash = "") => `/?business=${encodeURIComponent(b.id)}&from=admin${hash}`;
   const access = compActive ? (compForever ? "גישה חינם ללא הגבלת זמן" : `גישה חינם עד ${shortDate(b.comp_until)}`) : live ? "מנוי פעיל" : "בלי גישה חינם ובלי מנוי";
 
   return (
@@ -112,35 +135,12 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
           </div>
           {!b.archived && (
             <div className="head-actions">
-              {/* The business's own dashboard, with the screens only Perkly manages: design, settings and team. */}
-              <a className="btn primary" href={`/?business=${encodeURIComponent(b.id)}#design`}>עריכת העיצוב</a>
-              <a className="btn soft" href={`/?business=${encodeURIComponent(b.id)}`}>לוח העסק</a>
+              <a className="btn soft" href={dash()}>לוח העסק</a>
+              <a className="btn soft" href={dash("#station")}>עמדת עובד</a>
             </div>
           )}
         </div>
-        {!b.archived && (
-          <section className="panel admin-manage">
-            <h2>ניהול העסק</h2>
-            <p className="form-hint">כל מסך נפתח בלוח של העסק עם הרשאות מלאות שלך. בעל העסק לא צריך לעשות כלום.</p>
-            <div className="admin-manage-grid">
-              {[
-                ["#design", "עיצוב הכרטיס", "צבעים, לוגו, חותמות, Apple ו־Google Wallet"],
-                ["#settings", "פרטים והגדרות", "שם, הטבה, יעד, סוג כרטיס, רשתות, קוד הצטרפות"],
-                ["#team", "צוות וסניפים", "עובדים, הזמנות לעמדה, סניפים"],
-                ["#customers", "לקוחות", "רשימה, חיפוש, תיקון חותמות"],
-                ["#station", "עמדת עובד", "סריקה, חותמת ומימוש הטבה"],
-                ["", "לוח מעקב", "מה שבעל העסק רואה"],
-              ].map(([hash, title, sub]) => (
-                <a key={title} className="admin-manage-item" href={`/?business=${encodeURIComponent(b.id)}${hash}`}>
-                  <strong>{title}</strong><span>{sub}</span>
-                </a>
-              ))}
-              <a className="admin-manage-item primary" href={`/poster?b=${encodeURIComponent(b.id)}`}>
-                <strong>הדפסת שלט QR</strong><span>שלט A4 או מדבקה 10×10 לקופה</span>
-              </a>
-            </div>
-          </section>
-        )}
+        {!b.archived && <BuildSteps data={build} />}
 
         {b.archived && <p className="admin-alert">העסק סגור (בארכיון) מאז {shortDateTime(b.archived)}. הבעלים והצוות לא רואים אותו. אפשר לשחזר אותו בתחתית הדף.</p>}
         {b.suspended && <p className="admin-alert">מושהה מאז {shortDateTime(b.suspended)}. סיבה: {b.suspend_reason}</p>}
@@ -164,7 +164,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
                 {(b.kit_due || b.kit_sent) && <><dt>ערכת קופה</dt><dd>{b.kit_sent ? `נשלחה ${shortDate(b.kit_sent)}` : <>מגיעה מאז {shortDate(b.kit_due)} <KitSentButton business={b.id} /></>}</dd></>}
               </dl>
               {!b.archived && (withPerkly
-                ? <OwnerLink business={b.id} name={b.name} shekels={b.currency !== "USD"} />
+                ? <p className="form-hint">קישור התשלום יופיע כאן אחרי המסירה לבעל העסק (שלב 5).</p>
                 : !live && <PaymentLink business={b.id} name={b.name} shekels={b.currency !== "USD"} defaultPhone={b.owner_phone ? formatPhone(b.owner_phone) : ""} />)}
               {!b.archived && <AdminActions business={b.id} suspended={!!b.suspended} compUntil={b.comp_until} biz={biz} parts={["comp"]} />}
               <details className="admin-more">
@@ -179,8 +179,13 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
 
             <section className="panel">
               <h2>פרטים, בעלות וצוות</h2>
-              {!b.archived && <AdminActions business={b.id} suspended={!!b.suspended} compUntil={b.comp_until} biz={biz} parts={["details", "owner"]} />}
-              <h3 className="admin-h3">צוות</h3>
+              {!b.archived && (
+                <details className="admin-more">
+                  <summary>עריכה מהירה של הפרטים והעברת בעלות לחשבון קיים</summary>
+                  <AdminActions business={b.id} suspended={!!b.suspended} compUntil={b.comp_until} biz={biz} parts={["details", "owner"]} />
+                </details>
+              )}
+              <h3 className="admin-h3">כל הצוות (כולל מי שהוסר)</h3>
               <div className="table-wrap">
                 <table>
                   <thead><tr><th>שם</th><th>מייל</th><th>תפקיד</th><th>סניף</th><th>הצטרף</th></tr></thead>
