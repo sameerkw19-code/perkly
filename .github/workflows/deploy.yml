@@ -1,6 +1,7 @@
-# Tests every change, then deploys:
-#   push to main            -> staging    (https://perkly-staging.<your-subdomain>.workers.dev)
-#   "Run workflow" button   -> production (https://perkly.<your-subdomain>.workers.dev)
+# Tests every change, then deploys it to production (perkly.shop):
+#   push to main            -> production
+#   "Run workflow" button   -> production again, or "staging" once to deploy the retired staging site
+#                              (it only redirects to perkly.shop; see PERKLY_RETIRED_TO in wrangler.jsonc)
 # Needs GitHub secret CLOUDFLARE_API_TOKEN (and optionally CLOUDFLARE_ACCOUNT_ID,
 # PERKLY_ADMIN_EMAILS). Never put these values in the code. Sign-up is open; a SIGNUP_CODE, if ever needed, is set in Cloudflare.
 name: Test and deploy
@@ -13,8 +14,8 @@ on:
       target:
         description: "Where to deploy"
         type: choice
-        options: [staging, production]
-        default: staging
+        options: [production, staging]
+        default: production
 
 concurrency:
   group: deploy-${{ github.ref }}
@@ -49,9 +50,9 @@ jobs:
   deploy:
     needs: test
     runs-on: ubuntu-latest
-    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'staging' }}
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'production' }}
     env:
-      TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'staging' }}
+      TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'production' }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:

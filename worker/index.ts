@@ -37,8 +37,19 @@ async function rangeResponse(request: Request, response: Response, headers: Head
   return new Response(body.slice(start, end + 1), { status: 206, headers });
 }
 
+/**
+ * A retired site (staging): every page sends visitors to the live site's home page, so old links and
+ * bookmarks land on perkly.shop. Its data stays in its own database and is not used any more.
+ */
+function retiredTo(env: Cloudflare.Env): string | null {
+  const to = (env as unknown as { PERKLY_RETIRED_TO?: string }).PERKLY_RETIRED_TO;
+  return to && /^https:\/\/[a-z0-9.-]+$/i.test(to) ? to : null;
+}
+
 export default {
   async fetch(request: Request, env: Cloudflare.Env, ctx: ExecutionContext) {
+    const retired = retiredTo(env);
+    if (retired) return new Response(null, { status: 301, headers: { Location: `${retired}/`, "Cache-Control": "no-store" } });
     const path = new URL(request.url).pathname;
     // Videos come straight from the static files (full file), then get sliced for Range requests.
     const assets = (env as unknown as { ASSETS?: Fetcher }).ASSETS;
@@ -71,6 +82,7 @@ export default {
 
   // Cron (see "triggers" in wrangler.jsonc): welcome, birthday and special-day messages.
   async scheduled(_controller: ScheduledController, env: Cloudflare.Env, ctx: ExecutionContext) {
+    if (retiredTo(env)) return; // a retired site sends no messages
     // Imported here: the app's modules are set up lazily, and a cron run has no request to do it first.
     const run = import("../lib/server/customer-messages").then(({ runScheduled }) =>
       runScheduled(env.DB, env as unknown as Record<string, string | undefined>),

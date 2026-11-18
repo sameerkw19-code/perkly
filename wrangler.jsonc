@@ -25,15 +25,18 @@
     }
   ],
   "env": {
+    // Retired (Nov 2026): the staging site only sends visitors to perkly.shop and runs no jobs.
+    // Every change now goes straight to production after the tests.
     "staging": {
       "name": "perkly-staging",
       // Keep plain-text variables added in the Cloudflare dashboard (e.g. PLATFORM_ADMIN_EMAILS).
       // Without this, every deploy deletes them. Secrets are never affected.
       "keep_vars": true,
       "observability": { "enabled": true },
-      "triggers": { "crons": ["*/2 * * * *"] },
+      "triggers": { "crons": [] },
       // Not secret: the Google Wallet issuer id is visible in every "save to wallet" link.
       "vars": {
+        "PERKLY_RETIRED_TO": "https://perkly.shop",
         "GOOGLE_WALLET_ISSUER_ID": "3388000000023227862",
         // The console added the issuer id in front of "3388000000023227862.perkly_loyalty".
         "GOOGLE_WALLET_CLASS_ID": "3388000000023227862.3388000000023227862.perkly_loyalty"
