@@ -410,3 +410,36 @@ export function PosKeys({ business, keys, branches, posOnly }: {
     </div>
   );
 }
+
+/**
+ * Downloads the business as a file (settings, card design, pictures, branches) to import on another Perkly site:
+ * a business built on staging moves to perkly.shop without building it twice.
+ */
+export function ExportBusiness({ business, name }: { business: string; name: string }) {
+  const [busy, setBusy] = useState(false);
+  const [out, setOut] = useState("");
+  return (
+    <div className="admin-action">
+      <h3>העברה לאתר אחר</h3>
+      <p className="muted">מורידים קובץ עם ההגדרות, העיצוב, התמונות והסניפים, ומייבאים אותו באתר השני, בדף בניית עסק חדש. לקוחות, צוות, היסטוריה ותשלומים לא עוברים.</p>
+      <button type="button" className="btn soft small" disabled={busy} onClick={async () => {
+        setBusy(true); setOut("");
+        try {
+          const r = await fetch("/api/admin/transfer", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "export", business }) });
+          if (!r.ok) throw new Error(String(r.status));
+          const file = await r.blob();
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(file);
+          a.download = `perkly-${name.replace(/[\\/:*?"<>|]+/g, "").trim() || "business"}.json`;
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+          setOut(`הקובץ ירד (${Math.max(1, Math.round(file.size / 1024))} KB).`);
+        } catch {
+          setOut("ההורדה נכשלה. נסו שוב.");
+        }
+        setBusy(false);
+      }}>{busy ? "מכין קובץ..." : "ייצוא העסק לקובץ"}</button>
+      {out && <small className="muted" style={{ marginInlineStart: 8 }} role="status">{out}</small>}
+    </div>
+  );
+}

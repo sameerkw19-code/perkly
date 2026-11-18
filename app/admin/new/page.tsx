@@ -1,6 +1,7 @@
 import { AdminHeader } from "../admin-header";
 import { requireAdminPage } from "../../../lib/server/admin";
 import NewBusinessForm from "./new-business-form";
+import ImportBusiness from "./import-business";
 
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false }, title: "Perkly · בניית עסק חדש" };
@@ -15,6 +16,7 @@ export default async function NewBusinessPage() {
       <main id="main" tabIndex={-1}>
         <h1>בניית עסק חדש</h1>
         <p className="muted">ממלאים את פרטי העסק, ומשם עוברים ישר לעיצוב הכרטיס. כשהכרטיס מוכן, שולחים לבעל העסק קישור אישי מדף העסק, והוא פותח חשבון ומקבל את העסק.</p>
+        <ImportBusiness />
         <NewBusinessForm />
       </main>
     </div>

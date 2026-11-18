@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getD1 } from "../../../../db";
 import { liveDesign } from "../../../../lib/server/designs";
 import { STATUS_LABEL, adminStatus, requireAdminPage, shortDate, shortDateTime } from "../../../../lib/server/admin";
-import { AdminActions, OwnerLink, PaymentLink, PosKeys, AdminCardPreview, ApplePushTest, GoogleSyncTest, KitSentButton, OwnerDesignSwitch } from "./admin-actions";
+import { AdminActions, ExportBusiness, OwnerLink, PaymentLink, PosKeys, AdminCardPreview, ApplePushTest, GoogleSyncTest, KitSentButton, OwnerDesignSwitch } from "./admin-actions";
 import { env } from "cloudflare:workers";
 import { planOf } from "../../../../lib/server/billing";
 import { isPlatformAdmin } from "../../../../lib/server/auth";
@@ -139,6 +139,11 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
             <AdminCardPreview design={design} target={b.target} />
             <p className="muted">ברירת המחדל: Perkly מעצבת את הכרטיס. אפשר לתת לבעל העסק לערוך אותו בעצמו (רק את העיצוב, לא הגדרות וצוות).</p>
             <OwnerDesignSwitch business={b.id} on={!!b.owner_designs} />
+          </section>
+
+          <section className="panel">
+            <h2>העברה לאתר אחר</h2>
+            <ExportBusiness business={b.id} name={b.name} />
           </section>
 
           <section className="panel">
