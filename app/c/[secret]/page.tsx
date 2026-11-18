@@ -43,7 +43,8 @@ export default async function CardPage({ params }: { params: Promise<{ secret: s
   const rewards = row.saved + (row.reward_mode === "block" && row.stamps >= row.target ? 1 : 0);
   // Google Wallet does not run on iPhone, so the Google button is shown only to non-iOS devices.
   const ua = (await headers()).get("user-agent") ?? "";
-  const isIOS = /iPhone|iPad|iPod/i.test(ua);
+  // iPads ask for desktop sites and say "Macintosh": Safari on a Mac UA is an Apple device too (Mac Safari also adds passes).
+  const isIOS = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/i.test(ua) && /Safari/i.test(ua) && !/Chrome|Chromium|CriOS|Edg|Firefox|FxiOS|OPR/i.test(ua));
   const googleWallet = !isIOS && walletConfig(env) !== null;
   // Apple Wallet on iPhone and iPad, once the pass signing key is set.
   const appleWallet = isIOS && appleConfig(env) !== null;

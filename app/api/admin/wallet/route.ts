@@ -3,6 +3,8 @@ import { getD1 } from "../../../../db";
 import { getUser, isPlatformAdmin } from "../../../../lib/server/auth";
 import { fail, json, readJson, sameOrigin } from "../../../../lib/server/http";
 import { getClassStatus, listClassIds, submitClassForReview, walletConfig } from "../../../../lib/server/google-wallet";
+import { appleHealth } from "../../../../lib/server/apple-check";
+import { applePushReady } from "../../../../lib/server/apple-push";
 
 export const dynamic = "force-dynamic";
 
@@ -12,18 +14,20 @@ async function admin(request: Request) {
   return user && isPlatformAdmin(user, env) ? { db, user } : null;
 }
 
-// GET: the Google Wallet class status. POST {action:"submit_review"}: ask Google to review the class.
+// GET: the Google Wallet class status and the Apple Wallet health check. POST {action:"submit_review"}: ask Google to review the class.
 export async function GET(request: Request) {
   if (!(await admin(request))) return fail("not_found", 404);
+  const health = await appleHealth(env);
+  const apple = { ...health, pushReady: applePushReady() };
   const config = walletConfig(env);
-  if (!config) return json({ configured: false });
+  if (!config) return json({ configured: false, apple });
   try {
     const status = await getClassStatus(config);
     // When our class id is not found, list what Google has, to spot an id mismatch.
     const classes = status.status === "missing" ? await listClassIds(config).catch((e) => [`(${(e as Error).message})`]) : undefined;
-    return json({ configured: true, ...status, classes });
+    return json({ configured: true, ...status, classes, apple });
   } catch (e) {
-    return json({ configured: true, status: "error", error: (e as Error).message }, 502);
+    return json({ configured: true, status: "error", error: (e as Error).message, apple });
   }
 }
 
