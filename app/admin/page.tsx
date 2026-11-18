@@ -25,8 +25,14 @@ const WEEKS = 8;
 type Row = {
   id: string; name: string; created: string; owner_email: string | null;
   suspended: string | null; comp_until: string | null; archived: string | null; status: string | null;
+  current_period_end: string | null;
   customers: number; stamps30: number; published: number | null; last_activity: string | null;
 };
+
+/** Days from now until an ISO date (rounded up; 0 = today or past). */
+function daysUntil(iso: string, nowMs: number): number {
+  return Math.max(0, Math.ceil((new Date(iso).getTime() - nowMs) / 86_400_000));
+}
 
 function one(v: string | string[] | undefined): string {
   return (Array.isArray(v) ? v[0] : v) ?? "";
@@ -38,6 +44,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const q = one(params.q).trim().slice(0, 80);
   const statusRaw = one(params.status);
   const statusFilter = (Object.hasOwn(STATUS_LABEL, statusRaw) ? statusRaw : "") as AdminStatus | "";
+  // Closed (archived) businesses are hidden unless asked for.
+  const showArchived = one(params.archived) === "1";
   // Only whitelisted keys reach the ORDER BY clause.
   const sort: SortKey = Object.hasOwn(SORTS, one(params.sort)) ? (one(params.sort) as SortKey) : "created";
 
@@ -53,7 +61,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   const [list, totals, weeklyBiz, weeklyCust, statusRows] = await Promise.all([
     db.prepare(
-      `SELECT b.id, b.name, b.created, b.suspended, b.comp_until, b.archived, s.status, u.email AS owner_email,
+      `SELECT b.id, b.name, b.created, b.suspended, b.comp_until, b.archived, s.status, s.current_period_end, u.email AS owner_email,
          (SELECT COUNT(*) FROM customers c WHERE c.business = b.id AND c.archived IS NULL) AS customers,
          (SELECT COUNT(*) FROM events e WHERE e.business = b.id AND e.kind IN ('stamp', 'earn') AND e.created >= ?1) AS stamps30,
          (SELECT MAX(version) FROM card_designs d WHERE d.business = b.id) AS published,
@@ -66,7 +74,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     ).bind(since30, q, like).all<Row>(),
     db.prepare(
       `SELECT
-         (SELECT COUNT(*) FROM businesses) AS businesses,
+         (SELECT COUNT(*) FROM businesses WHERE archived IS NULL) AS businesses,
          (SELECT COUNT(*) FROM businesses WHERE created >= ?1) AS businesses7,
          (SELECT COUNT(*) FROM customers WHERE archived IS NULL) AS customers,
          (SELECT COUNT(*) FROM customers WHERE created >= ?2) AS customers30,
@@ -84,11 +92,31 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     ).bind(nowIso, sinceWeeks).all<{ w: number; n: number }>(),
     // Status counts and revenue always cover every business, whatever the search or filter.
     db.prepare(
-      `SELECT b.suspended, b.comp_until, b.currency, s.status, s.plan FROM businesses b LEFT JOIN subscriptions s ON s.business = b.id`,
+      `SELECT b.suspended, b.comp_until, b.currency, s.status, s.plan FROM businesses b LEFT JOIN subscriptions s ON s.business = b.id WHERE b.archived IS NULL`,
     ).all<{ suspended: string | null; comp_until: string | null; currency: string; status: string | null; plan: string | null }>(),
   ]);
 
-  const all = list.results.map((r) => ({ ...r, st: adminStatus(r, nowIso) }));
+  const everything = list.results.map((r) => ({ ...r, st: adminStatus(r, nowIso) }));
+  const archivedCount = everything.filter((r) => r.archived).length;
+  const all = everything.filter((r) => (showArchived ? !!r.archived : !r.archived));
+  // What needs a look: failed payments, suspended businesses, and free access or trials that end within 7 days.
+  const nowMs = now.getTime();
+  const attention = everything
+    .filter((r) => !r.archived)
+    .map((r) => {
+      if (r.st === "past_due") return { r, why: "התשלום נכשל", tone: "bad" };
+      if (r.st === "suspended") return { r, why: "מושהה", tone: "bad" };
+      if (r.st === "comp" && !r.comp_until!.startsWith("9999") && daysUntil(r.comp_until!, nowMs) <= 7) {
+        const d = daysUntil(r.comp_until!, nowMs);
+        return { r, why: d === 0 ? "הגישה החינמית נגמרת היום" : `הגישה החינמית נגמרת בעוד ${d} ימים`, tone: "warn" };
+      }
+      if (r.st === "trialing" && r.current_period_end && daysUntil(r.current_period_end, nowMs) <= 7) {
+        const d = daysUntil(r.current_period_end, nowMs);
+        return { r, why: d === 0 ? "תקופת הניסיון נגמרת היום" : `תקופת הניסיון נגמרת בעוד ${d} ימים`, tone: "warn" };
+      }
+      return null;
+    })
+    .filter((x): x is { r: (typeof everything)[number]; why: string; tone: string } => !!x);
   const counts = statusRows.results.map((r) => adminStatus(r, nowIso)).reduce<Record<AdminStatus, number>>(
     (acc, st) => ((acc[st] = (acc[st] ?? 0) + 1), acc),
     { suspended: 0, comp: 0, active: 0, trialing: 0, past_due: 0, canceled: 0, none: 0 },
@@ -110,7 +138,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const maxCust = Math.max(1, ...weeks.map((x) => x.cust));
 
   const qs = (patch: Record<string, string>) => {
-    const p = new URLSearchParams({ ...(q ? { q } : {}), ...(statusFilter ? { status: statusFilter } : {}), sort, ...patch });
+    const p = new URLSearchParams({ ...(q ? { q } : {}), ...(statusFilter ? { status: statusFilter } : {}), ...(showArchived ? { archived: "1" } : {}), sort, ...patch });
     for (const [k, v] of [...p.entries()]) if (!v) p.delete(k);
     return "?" + p.toString();
   };
@@ -121,56 +149,60 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
       <main id="main" tabIndex={-1}>
         <div className="page-head">
-          <h1>סקירת מערכת</h1>
+          <div>
+            <h1>סקירת מערכת</h1>
+            <p className="muted">נכון ל־{shortDateTime(nowIso)} · עסקים פעילים בלבד (בלי עסקים סגורים)</p>
+          </div>
           <a className="btn primary" href="/admin/new">＋ בניית עסק חדש</a>
         </div>
-        <p className="muted">נכון ל־{shortDateTime(nowIso)}. פרטי לקוחות (שם, טלפון) לא מוצגים כאן.</p>
-        <p className="form-hint">מזהה המשתמש שלך: <code dir="ltr">{me.id}</code></p>
 
         <section className="stats admin-stats">
-          <Stat label="הכנסה חודשית משוערת" value={`${mrr.toLocaleString("he-IL")} ₪`} hint={`${counts.active} משלמים, מהם ${yearlyCount} שנתיים`} />
-          <Stat label="עסקים" value={t.businesses} hint={`${t.businesses7} חדשים השבוע · ${t.activeBiz7} פעילים השבוע`} />
-          <Stat label="לקוחות פעילים" value={t.customers} hint={`${t.customers30} הצטרפו ב־30 יום (כולל שהוסרו)`} />
+          <Stat label="הכנסה חודשית משוערת" value={`${mrr.toLocaleString("he-IL")} ₪`} hint={`${counts.active} משלמים${yearlyCount ? `, מהם ${yearlyCount} שנתיים` : ""}`} />
+          <Stat label="עסקים פעילים" value={t.businesses} hint={`${t.businesses7} חדשים השבוע · ${t.activeBiz7} עם פעילות השבוע`} />
+          <Stat label="לקוחות" value={t.customers} hint={`${t.customers30} הצטרפו ב־30 יום`} />
           <Stat label="חותמות ב־30 יום" value={t.stamps30} hint={`${t.redeems30} הטבות מומשו`} />
         </section>
 
-        <WalletPanel />
-
-        <section className="panel admin-status">
-          <h2>מנויים</h2>
-          <div className="admin-chips">
-            {(Object.keys(STATUS_LABEL) as AdminStatus[]).map((s) => (
-              <a key={s} href={qs({ status: statusFilter === s ? "" : s })} className={"admin-chip st-" + s} aria-pressed={statusFilter === s}>
-                {STATUS_LABEL[s]} <b>{counts[s]}</b>
-              </a>
-            ))}
+        <section className="panel admin-attention">
+          <div className="section-head">
+            <h2>דורש טיפול</h2>
+            <p>תשלומים שנכשלו, עסקים מושהים, וגישה חינם או ניסיון שנגמרים השבוע</p>
           </div>
+          {attention.length ? (
+            <ul className="admin-todo">
+              {attention.map(({ r, why, tone }) => (
+                <li key={r.id} className={"tone-" + tone}>
+                  <a href={`/admin/b/${r.id}`}><strong>{r.name}</strong></a>
+                  <span>{why}</span>
+                  <small dir="ltr" className="admin-email">{r.owner_email ?? ""}</small>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="admin-ok">✓ אין כרגע שום דבר שדורש טיפול.</p>
+          )}
         </section>
 
         <section className="panel">
           <div className="section-head">
-            <h2>הרשמות לפי שבוע</h2>
-            <p>8 שבועות אחרונים · עסקים / לקוחות</p>
+            <h2>עסקים</h2>
+            <p>{rows.length} {showArchived ? "עסקים סגורים" : "עסקים"}{statusFilter ? ` · ${STATUS_LABEL[statusFilter]}` : ""}</p>
           </div>
-          <div className="admin-chart" role="img" aria-label="הרשמות של עסקים ולקוחות ב־8 השבועות האחרונים">
-            {weeks.map((x) => (
-              <div key={x.w} className="admin-bar">
-                <div className="admin-bar-pair">
-                  <i className="b" style={{ height: `${(x.biz / maxBiz) * 100}%` }} title={`${x.biz} עסקים`} />
-                  <i className="c" style={{ height: `${(x.cust / maxCust) * 100}%` }} title={`${x.cust} לקוחות`} />
-                </div>
-                <small>{x.biz} / {x.cust}</small>
-                <small className="muted">{x.w === 0 ? "השבוע" : `לפני ${x.w}`}</small>
-              </div>
+          <div className="admin-chips" role="group" aria-label="סינון לפי סטטוס">
+            <a href={qs({ status: "", archived: "" })} className="admin-chip" aria-pressed={!statusFilter && !showArchived}>הכול <b>{t.businesses}</b></a>
+            {(Object.keys(STATUS_LABEL) as AdminStatus[]).filter((s) => counts[s] > 0 || statusFilter === s).map((s) => (
+              <a key={s} href={qs({ status: statusFilter === s ? "" : s, archived: "" })} className={"admin-chip st-" + s} aria-pressed={statusFilter === s && !showArchived}>
+                {STATUS_LABEL[s]} <b>{counts[s]}</b>
+              </a>
             ))}
+            {archivedCount > 0 && (
+              <a href={qs({ status: "", archived: showArchived ? "" : "1" })} className="admin-chip st-none" aria-pressed={showArchived}>סגורים <b>{archivedCount}</b></a>
+            )}
           </div>
-          <p className="form-hint"><span className="dot b" /> עסקים חדשים (סקאלה משלהם) · <span className="dot c" /> לקוחות חדשים</p>
-        </section>
-
-        <section className="panel">
           <form className="admin-tools" method="get">
             <input name="q" defaultValue={q} placeholder="חיפוש לפי שם עסק או מייל בעלים" aria-label="חיפוש" />
             {statusFilter && <input type="hidden" name="status" value={statusFilter} />}
+            {showArchived && <input type="hidden" name="archived" value="1" />}
             <select name="sort" defaultValue={sort} aria-label="מיון">
               <option value="created">חדשים קודם</option>
               <option value="activity">פעילות אחרונה</option>
@@ -179,32 +211,62 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               <option value="name">שם</option>
             </select>
             <button className="btn primary small">הצג</button>
-            {(q || statusFilter) && <a className="btn soft small" href="?">ניקוי</a>}
+            {(q || statusFilter || showArchived) && <a className="btn soft small" href="?">ניקוי</a>}
           </form>
-          <p className="form-hint">{rows.length} עסקים{statusFilter ? ` · סינון: ${STATUS_LABEL[statusFilter]}` : ""}</p>
           <div className="table-wrap">
-            <table>
+            <table className="admin-table">
               <thead>
-                <tr><th>עסק</th><th>בעלים</th><th>סטטוס</th><th>לקוחות</th><th>חותמות 30 יום</th><th>עיצוב</th><th>פעילות אחרונה</th><th>נוצר</th></tr>
+                <tr><th>עסק</th><th>סטטוס</th><th>לקוחות</th><th>חותמות 30 יום</th><th>פעילות אחרונה</th><th>נוצר</th></tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id}>
-                    <td><a href={`/admin/b/${r.id}`}><strong>{r.name}</strong></a>{r.archived && <span className="admin-chip small st-none" style={{ marginInlineStart: 6 }}>בארכיון</span>}</td>
-                    <td dir="ltr" className="admin-email">{r.owner_email ?? "—"}</td>
-                    <td><span className={"admin-chip small st-" + r.st}>{STATUS_LABEL[r.st]}</span></td>
+                    <td>
+                      <a href={`/admin/b/${r.id}`}><strong>{r.name}</strong></a>
+                      {!r.archived && <a className="admin-mini" href={`/?business=${encodeURIComponent(r.id)}#design`}>עיצוב</a>}
+                      <small dir="ltr" className="admin-email admin-sub">{r.owner_email ?? "—"}</small>
+                    </td>
+                    <td>
+                      <span className={"admin-chip small st-" + (r.archived ? "none" : r.st)}>{r.archived ? "סגור" : STATUS_LABEL[r.st]}</span>
+                      {!r.archived && r.st === "comp" && r.comp_until && !r.comp_until.startsWith("9999") && <small className="admin-sub muted">עד {shortDate(r.comp_until)}</small>}
+                    </td>
                     <td>{r.customers}</td>
                     <td>{r.stamps30}</td>
-                    <td>{r.published ? `גרסה ${r.published}` : "ברירת מחדל"}</td>
-                    <td>{shortDateTime(r.last_activity)}</td>
+                    <td>{r.last_activity ? shortDateTime(r.last_activity) : <span className="muted">אין</span>}</td>
                     <td>{shortDate(r.created)}</td>
                   </tr>
                 ))}
-                {!rows.length && <tr><td colSpan={8} className="muted">אין עסקים מתאימים.</td></tr>}
+                {!rows.length && <tr><td colSpan={6} className="muted">אין עסקים מתאימים.</td></tr>}
               </tbody>
             </table>
           </div>
         </section>
+
+        <div className="admin-grid">
+          <section className="panel">
+            <div className="section-head">
+              <h2>הרשמות לפי שבוע</h2>
+              <p>8 שבועות אחרונים</p>
+            </div>
+            <div className="admin-chart" role="img" aria-label="הרשמות של עסקים ולקוחות ב־8 השבועות האחרונים">
+              {weeks.map((x) => (
+                <div key={x.w} className="admin-bar">
+                  <div className="admin-bar-pair">
+                    <i className="b" style={{ height: `${(x.biz / maxBiz) * 100}%` }} title={`${x.biz} עסקים`} />
+                    <i className="c" style={{ height: `${(x.cust / maxCust) * 100}%` }} title={`${x.cust} לקוחות`} />
+                  </div>
+                  <small>{x.biz} / {x.cust}</small>
+                  <small className="muted">{x.w === 0 ? "השבוע" : `לפני ${x.w}`}</small>
+                </div>
+              ))}
+            </div>
+            <p className="form-hint"><span className="dot b" /> עסקים חדשים · <span className="dot c" /> לקוחות חדשים (לכל אחד סקאלה משלו)</p>
+          </section>
+          <div className="admin-side">
+            <WalletPanel />
+            <p className="form-hint">מזהה המשתמש שלך: <code dir="ltr">{me.id}</code> · פרטי לקוחות (שם, טלפון) לא מוצגים בניהול.</p>
+          </div>
+        </div>
       </main>
     </div>
   );

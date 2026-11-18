@@ -747,3 +747,62 @@ html,body{overflow-x:clip}
 .ap-avg b span{font-size:38px;line-height:1}
 .ap-avg b em{font-style:normal;font-size:17px;opacity:.75}
 .sx-avgbar{height:8px;border-radius:8px;background:#ecebf1;overflow:hidden;margin-top:4px}.sx-avgbar i{display:block;height:100%;border-radius:8px;background:#4caf50}
+/* Admin: tidier overview and business page */
+.admin-layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:20px;align-items:start;margin-top:20px}
+.admin-col{display:grid;gap:20px;min-width:0}
+.admin-col>.panel,.admin-grid>.panel{margin:0}
+.admin-side{display:grid;gap:12px;align-content:start;min-width:0}
+.admin-crumbs{margin:0 0 6px;font-size:13px}.admin-crumbs a{color:#5a3fc4}
+.page-head h1 .admin-chip{vertical-align:middle;margin-inline-start:8px;font-size:13px}
+.admin-stat-text{font-size:22px}
+.admin-sub{display:block;margin-top:2px;font-size:12px}
+.admin-table td{vertical-align:middle}
+.admin-attention{margin-bottom:20px}
+.admin-todo{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:8px}
+.admin-todo li{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:#faf9fc}
+.admin-todo li.tone-bad{background:#fdf0f0;border-color:#f6c9c9}
+.admin-todo li.tone-warn{background:#fff7e8;border-color:#f3dcae}
+.admin-todo li span{font-size:14px}
+.admin-todo li small{margin-inline-start:auto}
+.admin-ok{margin:8px 0 0;color:#1f7a45;font-weight:600}
+.admin-h3{margin:20px 0 8px;font-size:15px}
+.admin-more{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+.admin-more>summary{cursor:pointer;font-size:13px;font-weight:600;color:#5a3fc4}
+.admin-more[open]>summary{margin-bottom:8px}
+.admin-danger{margin-top:20px}
+.admin-danger>summary{cursor:pointer;display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;list-style:none}
+.admin-danger>summary::-webkit-details-marker{display:none}
+.admin-danger>summary h2{margin:0;color:#a32020}
+.admin-danger>summary::before{content:"▸";color:#a32020}
+.admin-danger[open]>summary::before{content:"▾"}
+.admin .admin-chips{margin:4px 0 12px}
+@media(max-width:860px){.admin-layout{grid-template-columns:1fr}.admin-todo li small{margin-inline-start:0;width:100%}}
+.admin-dl{margin-bottom:16px}.admin-col .panel>.admin-action,.admin-col .panel>div>h3{margin-top:4px}
+.admin-mini{margin-inline-start:8px;font-size:12px;padding:2px 8px;border-radius:999px;background:#f0ecfc;color:#5a3fc4}
+
+/* Admin: building a business for a client, step by step. */
+.build { margin-top: 16px; }
+.build-head p { margin: 4px 0 0; }
+.build-list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 12px; counter-reset: none; }
+.build-step { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 14px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+.build-step.is-done { background: #f6fbf4; border-color: #cfe8c8; }
+.build-num { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 17px; background: #f1edfd; color: var(--purple); }
+.build-step.is-done .build-num { background: #2f6b2a; color: #fff; }
+.build-body { min-width: 0; }
+.build-body h3 { margin: 0; font-size: 17px; }
+.build-status { margin: 4px 0 0; color: var(--ink); line-height: 1.5; overflow-wrap: anywhere; }
+.build-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; align-items: flex-end; }
+.build-actions > .btn { min-height: 44px; }
+.build-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; width: 100%; }
+.build-form label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; font-weight: 600; flex: 1 1 200px; min-width: 0; }
+.build-form input, .build-form select { min-height: 44px; font-size: 16px; }
+.build-form .btn { min-height: 44px; }
+.build-form .form-error, .build-form .form-hint { flex-basis: 100%; margin: 0; }
+.build-people { list-style: none; margin: 0; padding: 0; width: 100%; display: grid; gap: 6px; }
+.build-people li { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 12px; border-radius: 10px; background: #faf9fc; overflow-wrap: anywhere; }
+.build-people li.is-pending { background: #fff8e8; }
+.build-sent { width: 100%; padding: 12px; border-radius: 10px; background: #eaf0ff; }
+.build-sent p { margin: 0 0 8px; }
+.build-sent input { min-height: 44px; flex: 1 1 220px; min-width: 0; font-size: 16px; }
+.build-sent .btn { min-height: 44px; }
+.manage-bar .btn { margin-inline-start: auto; }

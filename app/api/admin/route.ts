@@ -4,6 +4,7 @@ import { getD1 } from "../../../db";
 import { getUser, isPlatformAdmin } from "../../../lib/server/auth";
 import { fail, json, readJson, sameOrigin, str } from "../../../lib/server/http";
 import { normalizeEmail } from "../../../lib/server/auth";
+import { mailReady, sendMail, simpleMail } from "../../../lib/server/mailer";
 import { randomToken, sha256, verifyPassword } from "../../../lib/server/crypto";
 import { allow } from "../../../lib/server/rate-limit";
 import { cancelAtPeriodEnd, findSubscription, getSubscription, polarConfigured } from "../../../lib/server/polar";
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
 
   const businessId = str(body.business, 64);
   if (!businessId) return fail("bad_request", 400);
-  const business = await db.prepare("SELECT id, owner, name FROM businesses WHERE id = ?").bind(businessId).first<{ id: string; owner: string; name: string }>();
+  const business = await db.prepare("SELECT id, owner, name, archived FROM businesses WHERE id = ?").bind(businessId).first<{ id: string; owner: string; name: string; archived: string | null }>();
   if (!business) return fail("not_found", 404, "Business not found");
 
   const now = new Date();
@@ -132,6 +133,18 @@ export async function POST(request: Request) {
       ]);
       return json({ ok: true, status: row.status, periodEnd: row.currentPeriodEnd });
     }
+    case "polar_unlink": {
+      // Forgets a subscription that is no longer live (e.g. canceled before it was ever paid), so the owner's
+      // billing page does not show "canceled" and a new checkout starts clean. A live one is never removed here.
+      const sub = await db.prepare("SELECT status, external_subscription FROM subscriptions WHERE business = ?").bind(businessId).first<{ status: string; external_subscription: string | null }>();
+      if (!sub) return json({ ok: true, removed: false });
+      if (["active", "trialing", "past_due"].includes(sub.status)) return fail("subscription_live", 409, "The subscription is live; cancel it in Polar first");
+      await db.batch([
+        db.prepare("DELETE FROM subscriptions WHERE business = ?").bind(businessId),
+        log("polar_unlink", `${sub.external_subscription ?? "—"} ${sub.status}`),
+      ]);
+      return json({ ok: true, removed: true });
+    }
     case "owner_link": {
       // A business Perkly built for a client: a personal, single-use link (14 days) that opens an account for the
       // client and makes them the owner. A new link cancels the earlier unused ones.
@@ -144,6 +157,61 @@ export async function POST(request: Request) {
         log("owner_link", `until ${expires.slice(0, 10)}`),
       ]);
       return json({ ok: true, url: `${new URL(request.url).origin}/invite/${token}`, expires });
+    }
+    case "owner_invite": {
+      // Handing a business Perkly built to its owner: an invite that works only for this email (14 days), sent by
+      // email when mail is connected. The owner opens it, sets a password, and the business becomes theirs.
+      const email = normalizeEmail(body.email);
+      if (!email) return fail("bad_details", 400, "Invalid email");
+      if (!(await allow(db, `admin-invite:${user.id}`, 60, 86_400))) return fail("rate_limited", 429);
+      const token = randomToken(24);
+      const expires = new Date(now.getTime() + 14 * 86_400_000).toISOString();
+      await db.batch([
+        db.prepare("UPDATE invites SET revoked = ? WHERE business = ? AND role = 'owner' AND used IS NULL AND revoked IS NULL").bind(nowIso, businessId),
+        db.prepare("INSERT INTO invites(id, business, role, label, created_by, created, expires, branch, email) VALUES(?, ?, 'owner', ?, ?, ?, ?, NULL, ?)")
+          .bind(await sha256(token), businessId, "owner", user.id, nowIso, expires, email),
+        log("owner_invite", `${email} until ${expires.slice(0, 10)}`),
+      ]);
+      const url = `${new URL(request.url).origin}/invite/${token}`;
+      const emailed = mailReady(env) && (await sendMail(env, simpleMail(
+        email,
+        `${business.name} ב-Perkly: הכרטיס שלכם מוכן`,
+        [`בנינו לכם את כרטיס הנאמנות הדיגיטלי של ${business.name}.`, "לוחצים על הכפתור, בוחרים סיסמה, ונכנסים ללוח של העסק.", "הקישור אישי, לשימוש אחד, ותקף 14 יום."],
+        [`We built the ${business.name} digital loyalty card for you.`, "Tap the button, choose a password, and open your business dashboard.", "The link is personal, works once, and is valid for 14 days."],
+        { text: "כניסה ובחירת סיסמה", href: url },
+      )));
+      return json({ ok: true, url, expires, emailed });
+    }
+    case "staff_invite": {
+      // A worker added by Perkly: an invite for their email (7 days), sent by email. They choose a password and
+      // give a phone and date of birth for signing in at the counter.
+      if (business.archived) return fail("archived", 409);
+      const email = normalizeEmail(body.email);
+      const name = str(body.name, 60);
+      if (!email || !name) return fail("bad_details", 400, "Name and email are required");
+      if (!(await allow(db, `admin-invite:${user.id}`, 60, 86_400))) return fail("rate_limited", 429);
+      const branches = (await db.prepare("SELECT id FROM branches WHERE business = ? AND archived IS NULL").bind(businessId).all<{ id: string }>()).results;
+      let branch: string | null = branches.length === 1 ? branches[0].id : null;
+      if (branches.length > 1) {
+        if (typeof body.branch !== "string" || !branches.some((b) => b.id === body.branch)) return fail("branch_required", 400, "Choose a branch");
+        branch = body.branch;
+      }
+      const token = randomToken(24);
+      const expires = new Date(now.getTime() + 7 * 86_400_000).toISOString();
+      await db.batch([
+        db.prepare("INSERT INTO invites(id, business, role, label, created_by, created, expires, branch, email) VALUES(?, ?, 'staff', ?, ?, ?, ?, ?, ?)")
+          .bind(await sha256(token), businessId, name, user.id, nowIso, expires, branch, email),
+        log("staff_invite", email),
+      ]);
+      const url = `${new URL(request.url).origin}/invite/${token}`;
+      const emailed = mailReady(env) && (await sendMail(env, simpleMail(
+        email,
+        `הוזמנת לעמדת העובד של ${business.name}`,
+        [`שלום ${name}, הוזמנת לעבוד עם כרטיס הנאמנות של ${business.name} ב-Perkly.`, "לוחצים על הכפתור, בוחרים סיסמה, ומקבלים את עמדת העובד: סריקת לקוחות, חותמות ומימוש הטבות.", "הקישור אישי ותקף 7 ימים."],
+        [`Hi ${name}, you're invited to the ${business.name} loyalty card on Perkly.`, "Tap the button, choose a password, and get the staff station: scan customers, give stamps and redeem rewards.", "The link is personal and valid for 7 days."],
+        { text: "הצטרפות לעמדת העובד", href: url },
+      )));
+      return json({ ok: true, url, expires, emailed });
     }
     case "pos_key_create": {
       // A cashier key for this business (optionally for one branch). Shown once; only its hash is kept.
@@ -315,6 +383,40 @@ export async function POST(request: Request) {
         log("reset_data", `${before?.customers ?? 0} customers, ${before?.events ?? 0} stamp/reward events deleted`),
       ]);
       return json({ ok: true, deleted: before });
+    }
+    case "delete_business": {
+      // Deletes a closed business for good: customers, history, design, pictures, team, branches, keys and its
+      // (no longer live) subscription. Only after it was closed (archived), never with a live subscription,
+      // and with the business name and the admin's own password (5 tries an hour). The admin log keeps the record.
+      if (!business.archived) return fail("not_archived", 409, "Close the business first");
+      if (str(body.confirm, 80) !== business.name) return fail("confirm_mismatch", 400, "Type the business name to confirm");
+      if (!(await allow(db, `delete-business:${user.id}`, 5, 3600))) return fail("rate_limited", 429, "Too many attempts");
+      const me = await db.prepare("SELECT pass_hash FROM users WHERE id = ?").bind(user.id).first<{ pass_hash: string }>();
+      const password = typeof body.password === "string" ? body.password.slice(0, 200) : "";
+      if (!me || !(await verifyPassword(password, me.pass_hash))) return fail("bad_login", 401, "Wrong password");
+      const sub = await db.prepare("SELECT status FROM subscriptions WHERE business = ?").bind(businessId).first<{ status: string }>();
+      if (sub && ["active", "trialing", "past_due"].includes(sub.status)) return fail("subscription_live", 409, "The subscription is live; cancel it in Polar first");
+      const id = businessId;
+      // One batch (a transaction), children before parents because of the foreign keys.
+      await db.batch([
+        db.prepare("DELETE FROM apple_registrations WHERE serial IN (SELECT id FROM customers WHERE business = ?)").bind(id),
+        db.prepare("DELETE FROM wallet_outbox WHERE business = ?").bind(id),
+        db.prepare("DELETE FROM rewards WHERE business = ?").bind(id),
+        db.prepare("DELETE FROM events WHERE business = ?").bind(id),
+        db.prepare("DELETE FROM special_days WHERE business = ?").bind(id),
+        db.prepare("DELETE FROM customers WHERE business = ?").bind(id),
+        db.prepare("DELETE FROM pos_keys WHERE business = ?").bind(id),
+        db.prepare("DELETE FROM invites WHERE business = ?").bind(id),
+        db.prepare("DELETE FROM memberships WHERE business = ?").bind(id),
+        db.prepare("DELETE FROM branches WHERE business = ?").bind(id),
+        db.prepare("DELETE FROM card_designs WHERE business = ?").bind(id),
+        db.prepare("DELETE FROM apple_images WHERE source IN (SELECT id FROM assets WHERE business = ?)").bind(id),
+        db.prepare("DELETE FROM assets WHERE business = ?").bind(id),
+        db.prepare("DELETE FROM subscriptions WHERE business = ?").bind(id),
+        db.prepare("DELETE FROM businesses WHERE id = ?").bind(id),
+        log("delete_business", `${business.name} deleted for good`),
+      ]);
+      return json({ ok: true });
     }
     case "restore": {
       await db.batch([
