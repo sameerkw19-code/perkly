@@ -738,6 +738,8 @@ test("Perkly manages the card, settings and team; the owner gets reports, custom
   const o = new Client();
   await signup(o, "managed");
   const biz = (await o.post("/api/loyalty", { action: "create_business", name: "Managed", reward: "Free tea", target: 6, color: "#2F2A4A", kind: "cafe", lang: "he" })).body.id;
+  // Owners design their own card by default; Perkly switched it off for this one.
+  assert.equal((await admin.post("/api/admin", { action: "owner_designs", business: biz, on: false })).status, 200);
   // The owner: no card editor, and every management action is refused.
   const view = await o.get(`/api/loyalty?business=${biz}`);
   assert.equal(view.body.role, "owner");
@@ -820,26 +822,28 @@ test("staff link: one link per worker, tied to a branch; counter sign-in with ph
   assert.equal((await o.act(biz, "revoke_member", { user: "x" })).body.code, "admin_only");
 });
 
-test("Perkly can let one owner edit their own design (and turn it off again)", async () => {
+test("owners design their own card by default; Perkly can switch it off and on", async () => {
   const o = new Client();
   await signup(o, "designer");
   const biz = (await o.post("/api/loyalty", { action: "create_business", name: "Self", reward: "Free", target: 5, color: "#123456" })).body.id;
-  const before = await o.get(`/api/loyalty?business=${biz}`);
-  assert.equal(before.body.canDesign, false);
-  assert.equal((await o.act(biz, "publish_design")).body.code, "admin_only");
-  // Only a platform admin turns it on.
-  assert.equal((await o.post("/api/admin", { action: "owner_designs", business: biz, on: true })).status, 404);
-  assert.equal((await admin.post("/api/admin", { action: "owner_designs", business: biz, on: true })).status, 200);
   const on = await o.get(`/api/loyalty?business=${biz}`);
   assert.equal(on.body.canDesign, true);
   assert.ok(on.body.editor, "the owner gets the editor");
+  // A new owner starts without limits (no free-tier caps) for 30 days, then subscribes.
+  assert.equal(on.body.access.ok, true);
+  assert.equal(on.body.access.free, undefined, "no free-tier limits in the start period");
+  assert.equal((await upload(o, biz, "logo", PNG_1x1)).status, 200, "and uploads card images");
   assert.equal((await o.act(biz, "save_design", { design: on.body.editor.draft })).status, 200);
   assert.equal((await o.act(biz, "publish_design")).status, 200);
   // Settings and team stay with Perkly.
   assert.equal((await o.act(biz, "update_business", { name: "X", reward: "x", target: 5, color: "#000000" })).body.code, "admin_only");
+  // Only a platform admin switches it.
+  assert.equal((await o.post("/api/admin", { action: "owner_designs", business: biz, on: false })).status, 404);
   assert.equal((await admin.post("/api/admin", { action: "owner_designs", business: biz, on: false })).status, 200);
   assert.equal((await o.act(biz, "publish_design")).body.code, "admin_only");
   assert.equal((await o.get(`/api/loyalty?business=${biz}`)).body.editor, null);
+  assert.equal((await admin.post("/api/admin", { action: "owner_designs", business: biz, on: true })).status, 200);
+  assert.equal((await o.act(biz, "publish_design")).status, 200);
 });
 
 test("setup period: the owner sees until when free access runs, and the payment link signs in to /start?b=", async () => {

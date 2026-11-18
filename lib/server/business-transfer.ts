@@ -168,7 +168,7 @@ export async function importBusiness(db: D1Database, adminId: string, input: unk
       program === "average" ? "bank" : s.reward_mode === "block" ? "block" : "bank",
       int(s.reward_expiry_days, 0, 3650, 0), s.staff_adjust === 0 ? 0 : 1,
       social ? JSON.stringify(social) : null, s.birthdays === 0 ? 0 : 1,
-      s.currency === "USD" ? "USD" : "ILS", s.owner_designs === 1 ? 1 : 0, program,
+      s.currency === "USD" ? "USD" : "ILS", s.owner_designs === 0 ? 0 : 1, program,
       int(s.cashback_bp, BP_MIN, BP_MAX, 200), int(s.cashback_min, 0, AMOUNT_MAX, 0), int(s.avg_cap, 0, AMOUNT_MAX, 0),
       setupUntil, draft ? JSON.stringify(draft) : null,
     ),

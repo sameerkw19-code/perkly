@@ -154,7 +154,7 @@ export async function POST(request: Request) {
       return json({ ok: true, on: !!on });
     }
     case "owner_designs": {
-      // Lets this business's owner edit their own card design (Perkly designs by default).
+      // Whether this business's owner edits their own card design (on by default; Perkly can switch it off).
       const on = body.on === true ? 1 : 0;
       await db.batch([
         db.prepare("UPDATE businesses SET owner_designs = ? WHERE id = ?").bind(on, businessId),
