@@ -80,7 +80,8 @@ export async function passLook(db: D1Database, business: BusinessLike, origin: s
   // The business's own Wallet class needs its logo as PNG or JPEG (not WebP).
   let classLook: { name: string; color: string; logoUrl: string } | null = null;
   // The wallet version of the logo (white background removed, centred in a square) when the editor made one.
-  const logoId = design.googleLogo ?? design.logo;
+  // The notification icon, when the business uploaded one, is made for exactly this round spot.
+  const logoId = design.notifyIcon ?? design.googleLogo ?? design.logo;
   if (logoId) {
     const logo = await db.prepare("SELECT mime FROM assets WHERE id = ? AND business = ?").bind(logoId, business.id).first<{ mime: string }>();
     if (logo && (logo.mime === "image/png" || logo.mime === "image/jpeg")) {

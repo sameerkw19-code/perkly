@@ -146,3 +146,13 @@ test("near text: the stamp's emoji for the automatic line; emojis are never spli
   const long = "א".repeat(119) + "☕☕";
   assert.equal(fillNearText(long, { reward: "x", business: "y" }), "א".repeat(119) + "☕");
 });
+
+import { sanitizeDesign, assetIds, defaultDesign } from "../lib/design.ts";
+test("notification icon: kept by the design and counted as one of its pictures", () => {
+  const id = "11111111-2222-3333-4444-555555555555";
+  const base = defaultDesign({ name: "X", reward: "R", color: "#123456", target: 8 });
+  const d = sanitizeDesign({ ...base, notifyIcon: id });
+  assert.equal(d.notifyIcon, id);
+  assert.ok(assetIds(d).includes(id));
+  assert.equal(sanitizeDesign({ ...base, notifyIcon: "nope" }).notifyIcon, null);
+});
