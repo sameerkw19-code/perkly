@@ -13,6 +13,7 @@ import { START_DAYS, businessAccess, freeLimitReached, hasPaidDesign } from "../
 import { formatBirthday, parseBirthday, upcomingKeys } from "../../../lib/birthday";
 import { pushAppleBusiness } from "../../../lib/server/apple-push";
 import { resolvePlace } from "../../../lib/server/geo";
+import { NEAR_TEXT_MAX } from "../../../lib/near-text";
 import { ensureBusinessClass, walletConfig } from "../../../lib/server/google-wallet";
 import { getSettings } from "../../../lib/server/settings";
 import { normalizeSocial, parseSocial } from "../../../lib/social";
@@ -33,7 +34,7 @@ function validTarget(v: unknown, program?: string): v is number {
 
 async function loadBusiness(db: D1Database, id: string) {
   const row = await db
-    .prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays, social, owner_designs, program, cashback_bp, cashback_min, currency, avg_cap, pos_only FROM businesses WHERE id = ?")
+    .prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays, social, owner_designs, program, cashback_bp, cashback_min, currency, avg_cap, pos_only, near_text FROM businesses WHERE id = ?")
     .bind(id)
     .first<Omit<Business, "social"> & { social: string | null }>();
   return row ? { ...row, social: parseSocial(row.social) } : null;
@@ -684,6 +685,15 @@ export async function POST(request: Request) {
       return json({ ok: true });
     }
 
+    case "set_near_text": {
+      // The business's own lock-screen line near a branch; empty goes back to the automatic one.
+      const denied = ownerOnly(); if (denied) return denied;
+      const text = typeof p.text === "string" ? p.text.replace(/\s+/g, " ").trim().slice(0, NEAR_TEXT_MAX) : "";
+      if ((business.near_text ?? "") === text) return json({ ok: true });
+      await db.prepare("UPDATE businesses SET near_text = ?, near_updated = ? WHERE id = ?").bind(text || null, now, business.id).run();
+      pushAppleBusiness(db, business.id);
+      return json({ ok: true });
+    }
     case "create_branch": {
       const denied = adminOnly(); if (denied) return denied;
       const name = str(p.name, 60);

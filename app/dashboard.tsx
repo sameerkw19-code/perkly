@@ -2,10 +2,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SOCIAL_KEYS, SOCIAL_LABEL, normalizeSocial, socialDisplay, type Social } from "../lib/social";
 import { SocialIcon } from "../lib/social-icon";
+import { fillNearText, NEAR_TAG_NAMES, type NearTag } from "../lib/near-text";
 import {
   Activity, AlertTriangle, Trash2, Cake, Check, Copy, CreditCard, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode,
   ChevronRight, History, Palette, RefreshCw, RotateCcw, ScanLine, Search, Settings, Share2, Store, UserPlus, Users, UserRound, X,
-  Phone,
+  Phone, MapPin,
 } from "lucide-react";
 import type { Design } from "../lib/design";
 import { averageReward, earnFor, formatMoney, parseAmount, pctLabel } from "../lib/cashback.ts";
@@ -24,7 +25,7 @@ import { weekChange } from "../lib/weekly";
 import { Brand } from "../components/brand";
 
 type Role = "owner" | "staff";
-type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social; program?: "stamps" | "cashback" | "average"; cashback_bp?: number; cashback_min?: number; currency?: string; avg_cap?: number; pos_only?: number };
+type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social; program?: "stamps" | "cashback" | "average"; cashback_bp?: number; cashback_min?: number; currency?: string; avg_cap?: number; pos_only?: number; near_text?: string | null };
 type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; rewards?: number; nextExpiry?: string | null; phone?: string; balance?: number; roundTotal?: number; rewardValue?: number | null };
 type Data = {
   me: { name: string; email: string };
@@ -583,6 +584,7 @@ export default function Dashboard() {
                 )}
               </section>
               <Branches branches={data.branches ?? []} t={t} busy={busy} call={call} reload={load} />
+              <NearText business={b} t={t} lang={lang} busy={busy} call={call} reload={load} />
               <section className="panel">
                 <button className="btn soft" onClick={() => setModal({ type: "business" })}><Store size={16} />{t("newBusiness")}</button>
               </section>
@@ -1623,7 +1625,7 @@ function Branches({ branches, t, busy, call, reload }: {
               <span><strong>{br.name}</strong><small className={br.address ? "" : "form-error"}>{br.address || t("branchNoAddress")}</small>
                 <small className={br.lat != null ? "branch-on-map" : "muted"}>{br.lat != null ? <>📍 {t("branchOnMap")}</> : t("branchNoPlace")}</small></span>
               <div className="row-actions">
-                <button className="btn soft small" onClick={() => setEditing(br.id)}>{t("rename")}</button>
+                <button className="btn soft small" onClick={() => setEditing(br.id)}>{t("branchEditPlace")}</button>
                 <button className="btn soft small danger" disabled={busy} onClick={async () => {
                   if (!confirm(t("archiveConfirm", { b: br.name }))) return;
                   if (await call({ action: "archive_branch", branch: br.id })) reload();
@@ -1641,8 +1643,52 @@ function Branches({ branches, t, busy, call, reload }: {
       }}>
         <input name="name" required maxLength={60} placeholder={t("branchName")} aria-label={t("branchName")} />
         <input name="address" required maxLength={160} placeholder={t("branchAddress")} aria-label={t("branchAddress")} />
-        <input name="location" dir="auto" maxLength={2000} inputMode="url" autoComplete="off" placeholder={t("branchPlace")} aria-label={t("branchPlace")} />
+        <input name="location" maxLength={2000} inputMode="url" autoComplete="off" placeholder={t("branchPlace")} aria-label={t("branchPlace")} />
         <button className="btn primary small" disabled={busy}><Plus size={14} />{t("addBranch")}</button>
+      </form>
+    </section>
+  );
+}
+
+/** The business's own lock-screen line near a branch (Apple Wallet), with tags for the customer's numbers. */
+function NearText({ business, t, lang, busy, call, reload }: { business: Business; t: any; lang: string; busy: boolean; call: (b: Record<string, unknown>) => Promise<any>; reload: () => void }) {
+  const [text, setText] = useState(business.near_text ?? "");
+  const [saved, setSaved] = useState(false);
+  const ref = useRef<HTMLInputElement>(null);
+  const cash = business.program === "cashback";
+  const tags: [NearTag, string][] = cash
+    ? [["balance", "nearTagBalance"], ["business", "nearTagBusiness"]]
+    : [["missing", "nearTagMissing"], ["reward", "nearTagReward"], ["business", "nearTagBusiness"]];
+  const li = lang === "he" ? 0 : lang === "ar" ? 1 : 2;
+  const add = (key: NearTag) => {
+    const tag = NEAR_TAG_NAMES[key][li];
+    const el = ref.current;
+    const at = el?.selectionStart ?? text.length;
+    const next = (text.slice(0, at) + `{${tag}}` + text.slice(at)).slice(0, 120);
+    setText(next); setSaved(false);
+    requestAnimationFrame(() => { el?.focus(); const pos = Math.min(next.length, at + tag.length + 2); el?.setSelectionRange(pos, pos); });
+  };
+  const preview = fillNearText(text, { missing: 3, reward: business.reward, business: business.name, balance: business.currency === "USD" ? "$20" : "₪20" });
+  const save = async (value: string) => {
+    if (await call({ action: "set_near_text", text: value })) { setSaved(true); reload(); }
+  };
+  return (
+    <section className="panel near-text">
+      <div className="section-head"><h2><MapPin size={18} /> {t("nearTitle")}</h2></div>
+      <p className="form-hint">{t("nearHint")}</p>
+      <form className="near-form" onSubmit={(e) => { e.preventDefault(); save(text); }}>
+        <label className="sr-only" htmlFor="near-text">{t("nearTitle")}</label>
+        <input id="near-text" ref={ref} value={text} maxLength={120} onChange={(e) => { setText(e.target.value); setSaved(false); }} placeholder={t("nearPlaceholder")} />
+        <div className="near-tags" role="group" aria-label={t("nearAdd")}>
+          <span>{t("nearAdd")}</span>
+          {tags.map(([tag, label]) => <button type="button" key={tag} className="chip" onClick={() => add(tag)}>{t(label)}</button>)}
+        </div>
+        <p className="near-preview" aria-live="polite">{text.trim() ? <><b>{t("nearPreview")}</b> {preview}</> : t("nearAutoNow")}</p>
+        <div className="admin-row">
+          <button className="btn primary small" disabled={busy || text.trim() === (business.near_text ?? "")}>{t("save")}</button>
+          {business.near_text && <button type="button" className="btn soft small" disabled={busy} onClick={() => { setText(""); save(""); }}>{t("nearAuto")}</button>}
+        </div>
+        {saved && <p className="form-hint" role="status">{t("nearSaved")}</p>}
       </form>
     </section>
   );

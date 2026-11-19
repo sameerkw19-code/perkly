@@ -7,6 +7,7 @@ import { appleStampPicture, cardLang, textsFor, walletStampPicture, type Lang } 
 import { buildPkpass, rgb, type Bytes } from "./apple-pass";
 import { PASS_ICONS } from "./apple-pass-icons";
 import { businessPlaces, liveDesign } from "./designs";
+import { fillNearText } from "../near-text";
 import { passToken, type AppleConfig } from "./apple-token";
 
 export { appleConfig, passToken, validToken, type AppleConfig } from "./apple-token";
@@ -33,14 +34,14 @@ const NEAR: Record<Lang, { reward: (b: string, r: string) => string; stamps: (b:
 type CustomerRow = {
   id: string; business: string; name: string; stamps: number; target: number; scan_code: string; created: string;
   business_name: string; reward: string; color: string; rewards: number; balance: number; program: string; currency: string;
-  round_total: number; avg_cap: number; ready_value: number | null;
+  round_total: number; avg_cap: number; ready_value: number | null; near_text?: string | null;
 };
 
 /** The customer behind a pass serial (the customer id), or null when it was removed. */
 export async function customerForPass(db: D1Database, serial: string): Promise<CustomerRow | null> {
   return db
     .prepare(
-      `SELECT c.id, c.business, c.name, c.stamps, c.target, c.scan_code, c.created, c.balance, c.round_total, b.program, b.currency, b.avg_cap, b.name AS business_name, b.reward, b.color,
+      `SELECT c.id, c.business, c.name, c.stamps, c.target, c.scan_code, c.created, c.balance, c.round_total, b.program, b.currency, b.avg_cap, b.near_text, b.name AS business_name, b.reward, b.color,
          (SELECT value FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2) ORDER BY earned, id LIMIT 1) AS ready_value,
          (SELECT COUNT(*) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2))
            + (CASE WHEN b.reward_mode = 'block' AND c.stamps >= c.target THEN 1 ELSE 0 END) AS rewards
@@ -58,6 +59,7 @@ export async function passUpdated(db: D1Database, customer: { id: string; busine
          SELECT MAX(created) AS t FROM events WHERE customer = ?1
          UNION ALL SELECT MAX(published) FROM card_designs WHERE business = ?2
          UNION ALL SELECT MAX(located) FROM branches WHERE business = ?2
+         UNION ALL SELECT near_updated FROM businesses WHERE id = ?2
          UNION ALL SELECT ?3 UNION ALL SELECT ?4)`,
     )
     .bind(customer.id, customer.business, customer.created, PASS_FORMAT)
@@ -154,7 +156,9 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
   const name = { key: "customer", label: L.customer, value: c.name.slice(0, 40), textAlignment: "PKTextAlignmentRight" };
   // Near a branch, the iPhone shows the card on the lock screen with what is waiting for the customer there.
   const N = NEAR[lang] ?? NEAR.en;
-  const nearText = (average
+  const missing = average ? Math.max(0, c.target - Math.min(c.stamps, c.target)) : balance === undefined ? Math.max(0, c.target - c.stamps) : null;
+  const own = c.near_text?.trim() ? fillNearText(c.near_text, { missing, reward, business: title, balance: balance ?? null }) : "";
+  const nearText = own || (average
     ? average.ready ? N.reward(title, reward) : N.round(title, Math.min(c.stamps, c.target), c.target)
     : balance !== undefined ? N.balance(title, balance)
     : c.rewards > 0 ? N.reward(title, reward)
