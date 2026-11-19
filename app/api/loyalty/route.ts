@@ -61,8 +61,13 @@ export async function GET(request: Request) {
   const wanted = url.searchParams.get("business");
   // A platform admin can open any business (from the control center) to manage its card, settings and team.
   const admin = isPlatformAdmin(user, env);
-  const managed = admin && wanted && !memberships.some((m) => m.business === wanted) ? await adminMembership(db, wanted) : null;
-  if (managed) memberships.push(managed);
+  // An admin who is also on a business's team (say, as staff after handing it over) still manages it in full.
+  const managed = admin && wanted && !memberships.some((m) => m.business === wanted && m.role === "owner") ? await adminMembership(db, wanted) : null;
+  if (managed) {
+    const own = memberships.findIndex((m) => m.business === wanted);
+    if (own >= 0) memberships.splice(own, 1);
+    memberships.push(managed);
+  }
   const membership = memberships.find((m) => m.business === wanted) ?? memberships[0];
   // The admin control center is not linked from the site, so nothing here says who is an admin.
   const me = { name: user.name, email: user.email };
@@ -378,7 +383,9 @@ export async function POST(request: Request) {
   // Every other action: the server checks the user's role in this business.
   // A platform admin (Perkly) manages every business with the owner's permissions and more.
   const admin = isPlatformAdmin(user, env);
-  const membership = (await getMembership(db, user.id, p.business)) ?? (admin ? await adminMembership(db, p.business) : null);
+  const own = await getMembership(db, user.id, p.business);
+  // Never less than an owner for an admin, even when they are also on the team as staff.
+  const membership = admin && own?.role !== "owner" ? ((await adminMembership(db, p.business)) ?? own) : own;
   if (!membership) return fail("not_found", 404, "Business not found");
   const role = membership.role;
   const business = (await loadBusiness(db, p.business as string))!;

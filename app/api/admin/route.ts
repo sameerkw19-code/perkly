@@ -330,8 +330,10 @@ export async function POST(request: Request) {
       if (next.blocked) return fail("user_blocked", 409, "This user is blocked");
       if (next.id === business.owner) return fail("already_owner", 409, "Already the owner");
       await db.batch([
-        // The previous owner stays on the team as staff; the new owner can remove them.
-        db.prepare("UPDATE memberships SET role = 'staff' WHERE business = ? AND role = 'owner' AND user != ?").bind(businessId, next.id),
+        // Perkly (the admin handing the business over) leaves the team; it still manages the business as an admin.
+        db.prepare("UPDATE memberships SET revoked = ? WHERE business = ? AND user = ? AND user != ? AND revoked IS NULL").bind(nowIso, businessId, user.id, next.id),
+        // Any other previous owner stays on the team as staff; the new owner can remove them.
+        db.prepare("UPDATE memberships SET role = 'staff' WHERE business = ? AND role = 'owner' AND user != ? AND user != ?").bind(businessId, next.id, user.id),
         db.prepare("INSERT OR IGNORE INTO memberships(id, business, user, role, created) VALUES(?, ?, ?, 'owner', ?)")
           .bind(crypto.randomUUID(), businessId, next.id, nowIso),
         db.prepare("UPDATE memberships SET role = 'owner', revoked = NULL, branch = NULL WHERE business = ? AND user = ?").bind(businessId, next.id),

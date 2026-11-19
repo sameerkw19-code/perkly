@@ -947,6 +947,23 @@ test("build steps: the owner invite works only for the owner's email; the admin 
   assert.match(page.text, /בניית העסק/);
 });
 
+test("after handing a business to an account, the admin still has every owner screen, and is not on the team", async () => {
+  const built = await admin.post("/api/loyalty", { action: "create_business", forClient: true, kind: "cafe", name: "Handed", reward: "Free coffee", target: 8, color: "#123456", setupDays: 30, branchName: "Main" });
+  const biz = built.body.id;
+  const next = new Client();
+  await signup(next, "handed-owner");
+  const moved = await admin.post("/api/admin", { action: "transfer_owner", business: biz, email: `handed-owner-${run}@test.perkly` });
+  assert.equal(moved.status, 200, JSON.stringify(moved.body));
+  const view = (await admin.get(`/api/loyalty?business=${biz}`)).body;
+  assert.equal(view.role, "owner");
+  assert.ok(view.stats && view.team, "reports and team, not the staff screen");
+  const team = (await next.get(`/api/loyalty?business=${biz}`)).body.team ?? [];
+  assert.ok(!team.some((m) => m.email === "admin@test.perkly" && !m.revoked), "Perkly left the team");
+  // An admin who is still on a team as staff (handed over before this change) gets the owner screens too.
+  const ownerView = (await next.get(`/api/loyalty?business=${biz}`)).body;
+  assert.equal(ownerView.role, "owner");
+});
+
 test("change the sign-in email: needs the current password, refuses a taken or same address", async () => {
   const a = new Client();
   await signup(a, "mover");
