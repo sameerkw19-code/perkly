@@ -9,6 +9,16 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # Not until the Next.js lint plugins support them (typescript-eslint needs TypeScript < 6.1;
+      # eslint-plugin-import, jsx-a11y and react stop at ESLint 9).
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
+      - dependency-name: eslint
+        update-types: [version-update:semver-major]
+      # Types follow the Node version the site and CI run on (22).
+      - dependency-name: "@types/node"
+        update-types: [version-update:semver-major]
   - package-ecosystem: github-actions
     directory: /
     schedule:
