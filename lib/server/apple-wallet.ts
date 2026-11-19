@@ -58,17 +58,22 @@ export async function passUpdated(db: D1Database, customer: { id: string; busine
          SELECT MAX(created) AS t FROM events WHERE customer = ?1
          UNION ALL SELECT MAX(published) FROM card_designs WHERE business = ?2
          UNION ALL SELECT MAX(located) FROM branches WHERE business = ?2
-         UNION ALL SELECT ?3)`,
+         UNION ALL SELECT ?3 UNION ALL SELECT ?4)`,
     )
-    .bind(customer.id, customer.business, customer.created)
+    .bind(customer.id, customer.business, customer.created, PASS_FORMAT)
     .first<{ t: string | null }>();
   return row?.t ?? customer.created;
 }
+
+/** When the pass itself last changed shape (say, the business's logo as the icon): iPhones fetch it again after a push. */
+const PASS_FORMAT = "2026-11-20T00:00:00.000Z";
 
 /** Wallet picture sizes (pixels, @3x). The strip sits under the logo row; a store card shows it at 375×144 points. */
 const SPEC = {
   strip2: { width: 1125, height: 432, fit: "cover" },
   logo: { width: 480, height: 150, fit: "scale-down" },
+  // The square icon iOS shows next to the pass's notifications and on the lock screen: the logo on white.
+  icon: { width: 114, height: 114, fit: "pad", background: "#FFFFFF" },
 } as const;
 
 type ImageKind = keyof typeof SPEC;
@@ -91,7 +96,7 @@ async function passImage(db: D1Database, business: string, id: string | null | u
       const spec = SPEC[kind];
       const out = await images
         .input(new Blob([original]).stream())
-        .transform({ width: spec.width, height: spec.height, fit: spec.fit })
+        .transform({ width: spec.width, height: spec.height, fit: spec.fit, ...("background" in spec ? { background: spec.background } : {}) })
         .output({ format: "image/png" });
       const png = new Uint8Array(await out.response().arrayBuffer());
       if (png.length > 8 && png[0] === 0x89 && png[1] === 0x50) {
@@ -119,7 +124,9 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
   const title = (text.title || c.business_name).slice(0, 60);
   const reward = (text.reward || c.reward).slice(0, 120);
   const files: Record<string, Bytes> = {};
-  for (const [name, b64] of Object.entries(PASS_ICONS)) files[name] = b64bytes(b64);
+  // The icon on the pass's notifications: the business's logo, or Perkly's when it has none (or it can't be converted).
+  const icon = await passImage(db, c.business, design.logo ?? design.walletLogo, "icon");
+  for (const [name, b64] of Object.entries(PASS_ICONS)) files[name] = icon ?? b64bytes(b64);
   // The wallet version of the logo (white background removed, trimmed) when the editor made one.
   const logo = await passImage(db, c.business, design.walletLogo ?? design.logo, "logo");
   if (logo) {

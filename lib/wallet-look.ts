@@ -60,7 +60,8 @@ export type ClassLook = { name: string; color: string; logoUrl: string };
 export function classBody(id: string, look: ClassLook) {
   return {
     id,
-    issuerName: "Perkly",
+    // Shown as the sender of the pass's notifications: the business, not Perkly.
+    issuerName: look.name.slice(0, 60),
     programName: look.name.slice(0, 60),
     hexBackgroundColor: /^#[0-9a-fA-F]{6}$/.test(look.color) ? look.color.toUpperCase() : "#1E1B2E",
     programLogo: {

@@ -118,3 +118,11 @@ test("branch place: links, coordinates, and the Google nearby field", () => {
   assert.deepEqual(lookFields({ ...base, places: [] }).merchantLocations, []);
   assert.equal(lookFields(base).merchantLocations, undefined);
 });
+
+// A business's Google Wallet class names the business as the issuer (the sender of its notifications).
+import { classBody } from "../lib/wallet-look.ts";
+test("google class: the issuer is the business, not Perkly", () => {
+  const body = classBody("1.biz_x", { name: "תפוח", color: "#6a4de3", logoUrl: "https://perkly.shop/x.png" });
+  assert.equal(body.issuerName, "תפוח");
+  assert.equal(body.programName, "תפוח");
+});

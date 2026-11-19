@@ -124,7 +124,7 @@ export function loyaltyObject(config: WalletConfig, card: LoyaltyCard) {
     classId: config.classId,
     state: "ACTIVE",
     accountId: safeId(card.customerId),
-    accountName: "Perkly",
+    accountName: (card.look?.title ?? "Perkly").slice(0, 60),
     ...liveFields(card),
     ...(card.look ? lookFields(card.look) : {}),
     barcode: { type: "QR_CODE", value: card.scanCode, alternateText: "" },
