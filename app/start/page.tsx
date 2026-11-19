@@ -2,19 +2,19 @@ import { env } from "cloudflare:workers";
 import type { Metadata } from "next";
 import { getD1 } from "../../db";
 import { getMemberships } from "../../lib/server/auth";
-import { businessAccess, isEntitled } from "../../lib/server/billing";
+import { TRIAL_DAYS, businessAccess, isEntitled } from "../../lib/server/billing";
 import { currentUser } from "../../lib/server/page-session";
 import { polarConfigured, yearlyConfigured } from "../../lib/server/polar";
 import StartFlow, { type StartBusiness } from "./start-flow";
 import SiteAnalytics from "../../components/site-analytics";
-import { asCurrency, type Currency } from "../../lib/pricing";
+import { PRICES, asCurrency, money, type Currency } from "../../lib/pricing";
 import { visitorRegion } from "../../lib/server/region";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Perkly | פתיחת חשבון",
   description:
-    "פותחים חשבון, מעצבים כרטיס נאמנות ומתחילים לעבוד. 14 ימי ניסיון חינם, ואחר כך 99 ₪ לחודש, בלי התחייבות.",
+    `פותחים חשבון, מעצבים כרטיס נאמנות ומתחילים לעבוד. ${TRIAL_DAYS} ימי ניסיון חינם, ואחר כך ${money(PRICES.ILS.monthly, "ILS", "he")} לחודש, בלי התחייבות.`,
   alternates: { canonical: "/start" },
 };
 
