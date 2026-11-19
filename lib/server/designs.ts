@@ -49,6 +49,15 @@ export type PassNotice = { header: string; body: string; language: string; trans
  * `card`: the customer's stamps and target, for the stamp banner (one picture per stamp count).
  * `card.notice`: what just happened, when the business turned on wallet notifications.
  */
+/** Where the business's open branches are on the map (Apple and Google Wallet take 10 at most). */
+export async function businessPlaces(db: D1Database, businessId: string): Promise<{ lat: number; lng: number; name: string }[]> {
+  const rows = await db
+    .prepare("SELECT lat, lng, name FROM branches WHERE business = ? AND archived IS NULL AND lat IS NOT NULL AND lng IS NOT NULL ORDER BY created LIMIT 10")
+    .bind(businessId)
+    .all<{ lat: number; lng: number; name: string }>();
+  return rows.results;
+}
+
 export async function passLook(db: D1Database, business: BusinessLike, origin: string, card?: { stamps: number; target: number; notice?: StampNotice }) {
   const design = await liveDesign(db, business);
   const first = cardLang(design);
@@ -101,5 +110,7 @@ export async function passLook(db: D1Database, business: BusinessLike, origin: s
     language: GOOGLE_TAG[first],
     translations,
     classLook,
+    // Google shows the pass on the phone near these places.
+    places: (await businessPlaces(db, business.id)).map(({ lat, lng }) => ({ lat, lng })),
   };
 }

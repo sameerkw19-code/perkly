@@ -806,3 +806,9 @@ html,body{overflow-x:clip}
 .build-sent input { min-height: 44px; flex: 1 1 220px; min-width: 0; font-size: 16px; }
 .build-sent .btn { min-height: 44px; }
 .manage-bar .btn { margin-inline-start: auto; }
+
+/* Branch place on the map (wallet "nearby" alerts). */
+.branch-place { display: flex; flex-direction: column; gap: 4px; flex: 1 1 100%; font-size: 14px; font-weight: 600; }
+.branch-place input { min-height: 44px; font-size: 16px; }
+.branch-place .form-hint { font-weight: 400; }
+.branch-on-map { color: #2f6b2a; }

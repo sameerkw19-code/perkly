@@ -1592,7 +1592,7 @@ function Team({ data, t, lang, busy, call, reload, showLink }: {
 // ---------- Branches (owner) ----------
 
 function Branches({ branches, t, busy, call, reload }: {
-  branches: { id: string; name: string; address?: string | null }[]; t: any; busy: boolean; call: (b: Record<string, unknown>) => Promise<any>; reload: () => void;
+  branches: { id: string; name: string; address?: string | null; lat?: number | null; lng?: number | null }[]; t: any; busy: boolean; call: (b: Record<string, unknown>) => Promise<any>; reload: () => void;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
   return (
@@ -1606,16 +1606,22 @@ function Branches({ branches, t, busy, call, reload }: {
             <form className="inline-form" onSubmit={async (e) => {
               e.preventDefault();
               const f = new FormData(e.currentTarget);
-              if (await call({ action: "rename_branch", branch: br.id, name: f.get("name"), address: f.get("address") })) { setEditing(null); reload(); }
+              if (await call({ action: "rename_branch", branch: br.id, name: f.get("name"), address: f.get("address"), location: f.get("location") ?? "" })) { setEditing(null); reload(); }
             }}>
               <input name="name" defaultValue={br.name} required maxLength={60} autoFocus aria-label={t("branchName")} />
               <input name="address" defaultValue={br.address ?? ""} maxLength={160} placeholder={t("branchAddress")} aria-label={t("branchAddress")} />
+              <label className="branch-place">{t("branchPlace")}
+                <input name="location" dir="ltr" maxLength={2000} inputMode="url" autoComplete="off" placeholder="https://maps.app.goo.gl/…"
+                  defaultValue={br.lat != null && br.lng != null ? `${br.lat}, ${br.lng}` : ""} />
+                <small className="form-hint">{t("branchPlaceHint")}</small>
+              </label>
               <button className="btn primary small" disabled={busy}>{t("save")}</button>
               <button type="button" className="btn soft small" onClick={() => setEditing(null)}>{t("cancel")}</button>
             </form>
           ) : (
             <>
-              <span><strong>{br.name}</strong><small className={br.address ? "" : "form-error"}>{br.address || t("branchNoAddress")}</small></span>
+              <span><strong>{br.name}</strong><small className={br.address ? "" : "form-error"}>{br.address || t("branchNoAddress")}</small>
+                <small className={br.lat != null ? "branch-on-map" : "muted"}>{br.lat != null ? <>📍 {t("branchOnMap")}</> : t("branchNoPlace")}</small></span>
               <div className="row-actions">
                 <button className="btn soft small" onClick={() => setEditing(br.id)}>{t("rename")}</button>
                 <button className="btn soft small danger" disabled={busy} onClick={async () => {
@@ -1631,10 +1637,11 @@ function Branches({ branches, t, busy, call, reload }: {
         e.preventDefault();
         const form = e.currentTarget;
         const f = new FormData(form);
-        if (await call({ action: "create_branch", name: f.get("name"), address: f.get("address") })) { form.reset(); reload(); }
+        if (await call({ action: "create_branch", name: f.get("name"), address: f.get("address"), location: f.get("location") ?? "" })) { form.reset(); reload(); }
       }}>
         <input name="name" required maxLength={60} placeholder={t("branchName")} aria-label={t("branchName")} />
         <input name="address" required maxLength={160} placeholder={t("branchAddress")} aria-label={t("branchAddress")} />
+        <input name="location" dir="auto" maxLength={2000} inputMode="url" autoComplete="off" placeholder={t("branchPlace")} aria-label={t("branchPlace")} />
         <button className="btn primary small" disabled={busy}><Plus size={14} />{t("addBranch")}</button>
       </form>
     </section>

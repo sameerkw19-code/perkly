@@ -40,9 +40,9 @@ export async function cardState(db: D1Database, c: Customer, mode: Business["rew
   };
 }
 
-export type Branch = { id: string; name: string; address: string | null };
+export type Branch = { id: string; name: string; address: string | null; lat?: number | null; lng?: number | null };
 export async function activeBranches(db: D1Database, businessId: string) {
-  return (await db.prepare("SELECT id, name, address FROM branches WHERE business = ? AND archived IS NULL ORDER BY created").bind(businessId).all<Branch>()).results;
+  return (await db.prepare("SELECT id, name, address, lat, lng FROM branches WHERE business = ? AND archived IS NULL ORDER BY created").bind(businessId).all<Branch>()).results;
 }
 
 
