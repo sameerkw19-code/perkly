@@ -156,3 +156,16 @@ test("notification icon: kept by the design and counted as one of its pictures",
   assert.ok(assetIds(d).includes(id));
   assert.equal(sanitizeDesign({ ...base, notifyIcon: "nope" }).notifyIcon, null);
 });
+
+import { trialDaysFor } from "../lib/server/polar.ts";
+test("trial: the standard trial for a first subscription, and never a charge while free access lasts", () => {
+  const now = Date.parse("2026-11-20T00:00:00Z");
+  assert.equal(trialDaysFor(true, null, 14, now), 14);
+  assert.equal(trialDaysFor(false, null, 14, now), 0);
+  assert.equal(trialDaysFor(true, "2026-12-18T19:47:12Z", 14, now), 29);
+  assert.equal(trialDaysFor(false, "2026-12-18T19:47:12Z", 14, now), 29);
+  assert.equal(trialDaysFor(true, "2026-11-25T00:00:00Z", 14, now), 14);
+  assert.equal(trialDaysFor(true, "2027-12-01T00:00:00Z", 14, now), 90);
+  assert.equal(trialDaysFor(true, "9999-12-31T00:00:00Z", 14, now), 14);
+  assert.equal(trialDaysFor(true, "2026-11-01T00:00:00Z", 14, now), 14);
+});
