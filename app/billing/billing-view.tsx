@@ -42,6 +42,7 @@ const T = {
     pastDue: "החיוב האחרון נכשל. עדכנו את כרטיס האשראי כדי שהכרטיסים ימשיכו לעבוד.",
     firstCharge: "אם תפעילו עכשיו, החיוב הראשון יהיה ב־{d}.",
     allSet: "המנוי פעיל. אין צורך לעשות כלום: החיוב מתחדש לבד.",
+    invoices: "החשבוניות (PDF) נמצאות ב\"ניהול המנוי\". לפני ההורדה אפשר להוסיף שם חברה, כתובת ומספר עוסק או ח.פ.: אחרי שהחשבונית נוצרת הפרטים לא משתנים. החשבונית מונפקת על ידי Polar, חברה זרה שגובה את התשלום, בלי מע״מ ישראלי. כדאי לבדוק עם רואה החשבון איך לרשום אותה.",
     locale: "he-IL",
   },
   en: {
@@ -65,6 +66,7 @@ const T = {
     pastDue: "The last charge failed. Update your card so the loyalty cards keep working.",
     firstCharge: "If you start now, the first charge is on {d}.",
     allSet: "Your subscription is active. Nothing to do: it renews on its own.",
+    invoices: "Invoices (PDF) are under \"Manage subscription\". Before downloading you can add a company name, address and tax ID; once an invoice is created its details can't change. Invoices are issued by Polar, the company that takes the payment.",
     locale: "en-US",
   },
 };
@@ -193,6 +195,7 @@ export default function BillingView({ businesses, configured, yearly = false, cu
             )}
             {b.manage && configured && (
               <div style={{ marginTop: 8 }}>
+                <p className="muted" style={{ fontSize: 13, margin: "0 0 8px", lineHeight: 1.5 }}>{t.invoices}</p>
                 <button className={"btn " + (b.status === "past_due" ? "primary" : "soft")} disabled={busy === "m" + b.id} onClick={() => manage(b.id)}>
                   {busy === "m" + b.id ? t.managing : t.manage}
                 </button>
