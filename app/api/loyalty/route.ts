@@ -688,7 +688,7 @@ export async function POST(request: Request) {
     case "set_near_text": {
       // The business's own lock-screen line near a branch; empty goes back to the automatic one.
       const denied = ownerOnly(); if (denied) return denied;
-      const text = typeof p.text === "string" ? p.text.replace(/\s+/g, " ").trim().slice(0, NEAR_TEXT_MAX) : "";
+      const text = typeof p.text === "string" ? [...p.text.replace(/\s+/g, " ").trim()].slice(0, NEAR_TEXT_MAX).join("") : "";
       if ((business.near_text ?? "") === text) return json({ ok: true });
       await db.prepare("UPDATE businesses SET near_text = ?, near_updated = ? WHERE id = ?").bind(text || null, now, business.id).run();
       pushAppleBusiness(db, business.id);

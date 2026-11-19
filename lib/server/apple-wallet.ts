@@ -7,7 +7,7 @@ import { appleStampPicture, cardLang, textsFor, walletStampPicture, type Lang } 
 import { buildPkpass, rgb, type Bytes } from "./apple-pass";
 import { PASS_ICONS } from "./apple-pass-icons";
 import { businessPlaces, liveDesign } from "./designs";
-import { fillNearText } from "../near-text";
+import { fillNearText, stampEmoji } from "../near-text";
 import { passToken, type AppleConfig } from "./apple-token";
 
 export { appleConfig, passToken, validToken, type AppleConfig } from "./apple-token";
@@ -158,12 +158,16 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
   const N = NEAR[lang] ?? NEAR.en;
   const missing = average ? Math.max(0, c.target - Math.min(c.stamps, c.target)) : balance === undefined ? Math.max(0, c.target - c.stamps) : null;
   const own = c.near_text?.trim() ? fillNearText(c.near_text, { missing, reward, business: title, balance: balance ?? null }) : "";
+  // The automatic line ends with an emoji: 🎁 when a reward is waiting, else the business's stamp (☕, 🍕, ✂️…).
+  const emoji = stampEmoji(design.stamp?.icon);
   const nearText = own || (average
-    ? average.ready ? N.reward(title, reward) : N.round(title, Math.min(c.stamps, c.target), c.target)
-    : balance !== undefined ? N.balance(title, balance)
-    : c.rewards > 0 ? N.reward(title, reward)
-    : N.stamps(title, Math.max(1, c.target - c.stamps), reward)).slice(0, 120);
-  const locations = (await businessPlaces(db, c.business)).map((p) => ({ latitude: p.lat, longitude: p.lng, relevantText: nearText }));
+    ? average.ready ? `${N.reward(title, reward)} 🎁` : `${N.round(title, Math.min(c.stamps, c.target), c.target)} ${emoji}`
+    : balance !== undefined ? `${N.balance(title, balance)} 💰`
+    : c.rewards > 0 ? `${N.reward(title, reward)} 🎁`
+    : `${N.stamps(title, Math.max(1, c.target - c.stamps), reward)} ${emoji}`);
+  // At most 120 characters, cut between whole characters so an emoji is never split.
+  const line = [...nearText].length > 120 ? [...nearText].slice(0, 119).join("") + "…" : nearText;
+  const locations = (await businessPlaces(db, c.business)).map((p) => ({ latitude: p.lat, longitude: p.lng, relevantText: line }));
   const pass = {
     ...(locations.length ? { locations } : {}),
     formatVersion: 1,

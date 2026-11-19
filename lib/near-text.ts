@@ -20,5 +20,21 @@ export function fillNearText(template: string, v: { missing?: number | null; rew
   for (const tag of Object.keys(NEAR_TAG_NAMES) as NearTag[]) {
     for (const name of NEAR_TAG_NAMES[tag]) out = out.split(`{${name}}`).join(value[tag]);
   }
-  return out.replace(/\s{2,}/g, " ").trim().slice(0, NEAR_TEXT_MAX);
+  // Cut between whole characters, so an emoji at the end is never split in half.
+  return [...out.replace(/\s{2,}/g, " ").trim()].slice(0, NEAR_TEXT_MAX).join("");
+}
+
+/** The emoji for the business's stamp, for the automatic line (the stamp the card shows; ⭐ when unknown). */
+const STAMP_EMOJI: Record<string, string> = {
+  coffee: "☕", bean: "☕", coffeebean: "☕", tea: "🍵", beer: "🍺", cocktail: "🍸", mojito: "🍹", tropical: "🍹", shot: "🥃",
+  bubbletea: "🧋", cup: "🥤", wine: "🍷", pizza: "🍕", burger: "🍔", sandwich: "🥪", taco: "🌮", fries: "🍟", sushi: "🍣",
+  hotdog: "🌭", plate: "🍽️", utensils: "🍽️", falafel: "🧆", croissant: "🥐", cake: "🍰", shortcake: "🍰", donut: "🍩",
+  icecream: "🍦", cookie: "🍪", cupcake: "🧁", bagel: "🥯", scissors: "✂️", barber: "💈", nails: "💅", lipstick: "💄",
+  sparkle: "✨", sparkles: "✨", bouquet: "💐", bag: "🛍️", bags: "🛍️", gift: "🎁", star: "⭐", glowstar: "🌟",
+  heart: "❤️", crown: "👑", gem: "💎", paws: "🐾",
+};
+
+export function stampEmoji(icon: string | null | undefined): string {
+  const name = (icon ?? "").replace(/^3d-/, "");
+  return STAMP_EMOJI[name] ?? "⭐";
 }
