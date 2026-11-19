@@ -126,3 +126,14 @@ test("google class: the issuer is the business, not Perkly", () => {
   assert.equal(body.issuerName, "תפוח");
   assert.equal(body.programName, "תפוח");
 });
+
+// The business's own lock-screen line, with the customer's numbers filled in.
+import { fillNearText } from "../lib/near-text.ts";
+test("near text: tags are filled, unknown ones left, length capped", () => {
+  assert.equal(fillNearText("עובר ליד? עוד {missing} ל{reward} ב{business}", { missing: 3, reward: "קפה", business: "תפוח" }), "עובר ליד? עוד 3 לקפה בתפוח");
+  assert.equal(fillNearText("עוד {חסר} ל{הטבה} ב{עסק}", { missing: 2, reward: "קפה", business: "תפוח" }), "עוד 2 לקפה בתפוח");
+  assert.equal(fillNearText("باقي {باقي}", { missing: 4, reward: "x", business: "y" }), "باقي 4");
+  assert.equal(fillNearText("Balance {balance}", { reward: "x", business: "y", balance: "₪20" }), "Balance ₪20");
+  assert.equal(fillNearText("{missing} left", { missing: null, reward: "x", business: "y" }), "left");
+  assert.equal(fillNearText("a".repeat(200), { reward: "x", business: "y" }).length, 120);
+});

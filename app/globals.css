@@ -812,3 +812,11 @@ html,body{overflow-x:clip}
 .branch-place input { min-height: 44px; font-size: 16px; }
 .branch-place .form-hint { font-weight: 400; }
 .branch-on-map { color: #2f6b2a; }
+
+/* The business's own lock-screen line near a branch. */
+.near-form { display: grid; gap: 10px; }
+.near-form input { min-height: 44px; font-size: 16px; width: 100%; }
+.near-tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; }
+.near-tags .chip { min-height: 36px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: #fff; cursor: pointer; font: inherit; }
+.near-tags .chip:hover, .near-tags .chip:focus-visible { border-color: var(--purple); }
+.near-preview { margin: 0; padding: 10px 12px; border-radius: 10px; background: #f5f3fb; overflow-wrap: anywhere; }

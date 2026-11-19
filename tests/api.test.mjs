@@ -983,6 +983,16 @@ test("branch place on the map: a Google Maps link or coordinates; a bad one is r
   assert.equal(b.lat, null);
 });
 
+test("near text: the owner sets the lock-screen line; empty goes back to automatic; staff can't", async () => {
+  const built = await admin.post("/api/loyalty", { action: "create_business", forClient: true, kind: "cafe", name: "Line", reward: "Free coffee", target: 8, color: "#123456", setupDays: 30, branchName: "Main" });
+  const biz = built.body.id;
+  const set = await admin.act(biz, "set_near_text", { text: "  Passing by?   {missing} to go  " });
+  assert.equal(set.status, 200);
+  assert.equal((await admin.get(`/api/loyalty?business=${biz}`)).body.business.near_text, "Passing by? {missing} to go");
+  await admin.act(biz, "set_near_text", { text: "" });
+  assert.equal((await admin.get(`/api/loyalty?business=${biz}`)).body.business.near_text, null);
+});
+
 test("change the sign-in email: needs the current password, refuses a taken or same address", async () => {
   const a = new Client();
   await signup(a, "mover");
