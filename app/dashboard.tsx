@@ -1614,10 +1614,11 @@ function Branches({ branches, t, busy, call, reload }: {
               <input name="name" defaultValue={br.name} required maxLength={60} autoFocus aria-label={t("branchName")} />
               <input name="address" defaultValue={br.address ?? ""} maxLength={160} placeholder={t("branchAddress")} aria-label={t("branchAddress")} />
               <label className="branch-place">{t("branchPlace")}
-                <input name="location" dir="ltr" maxLength={2000} inputMode="url" autoComplete="off" placeholder="https://maps.app.goo.gl/…"
+                <input name="location" id={`place-${br.id}`} dir="ltr" maxLength={2000} inputMode="url" autoComplete="off" placeholder="https://maps.app.goo.gl/…"
                   defaultValue={br.lat != null && br.lng != null ? `${br.lat}, ${br.lng}` : ""} />
                 <small className="form-hint">{t("branchPlaceHint")}</small>
               </label>
+              <HereButton input={`place-${br.id}`} t={t} />
               <button className="btn primary small" disabled={busy}>{t("save")}</button>
               <button type="button" className="btn soft small" onClick={() => setEditing(null)}>{t("cancel")}</button>
             </form>
@@ -1644,10 +1645,49 @@ function Branches({ branches, t, busy, call, reload }: {
       }}>
         <input name="name" required maxLength={60} placeholder={t("branchName")} aria-label={t("branchName")} />
         <input name="address" required maxLength={160} placeholder={t("branchAddress")} aria-label={t("branchAddress")} />
-        <input name="location" maxLength={2000} inputMode="url" autoComplete="off" placeholder={t("branchPlace")} aria-label={t("branchPlace")} />
+        <input name="location" id="place-new" maxLength={2000} inputMode="url" autoComplete="off" placeholder={t("branchPlace")} aria-label={t("branchPlace")} />
+        <HereButton input="place-new" t={t} />
         <button className="btn primary small" disabled={busy}><Plus size={14} />{t("addBranch")}</button>
       </form>
     </section>
+  );
+}
+
+/**
+ * "I'm at the business now": the phone's own location into the place field, with how accurate it is and a
+ * map link to check it. Best from a phone standing inside the business (a computer's location is rough).
+ */
+function HereButton({ input, t }: { input: string; t: any }) {
+  const [state, setState] = useState<{ kind: "busy" | "ok" | "error"; text: string; map?: string } | null>(null);
+  const locate = () => {
+    if (!("geolocation" in navigator)) { setState({ kind: "error", text: t("hereUnsupported") }); return; }
+    setState({ kind: "busy", text: t("hereLooking") });
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude.toFixed(6);
+        const lng = pos.coords.longitude.toFixed(6);
+        const field = document.getElementById(input) as HTMLInputElement | null;
+        if (field) field.value = `${lat}, ${lng}`;
+        const meters = Math.round(pos.coords.accuracy);
+        setState({
+          kind: meters > 100 ? "error" : "ok",
+          text: meters > 100 ? t("hereRough", { m: meters }) : t("hereDone", { m: meters }),
+          map: `https://www.google.com/maps?q=${lat},${lng}`,
+        });
+      },
+      (err) => setState({ kind: "error", text: t(err.code === err.PERMISSION_DENIED ? "hereDenied" : err.code === err.TIMEOUT ? "hereTimeout" : "hereUnavailable") }),
+      { enableHighAccuracy: true, timeout: 20_000, maximumAge: 0 },
+    );
+  };
+  return (
+    <div className="here">
+      <button type="button" className="btn soft small" onClick={locate} disabled={state?.kind === "busy"}><MapPin size={14} />{t("hereButton")}</button>
+      {state && (
+        <small className={state.kind === "error" ? "form-error" : "form-hint"} role="status">
+          {state.text}{state.map && <> · <a href={state.map} target="_blank" rel="noopener noreferrer">{t("hereCheck")}</a></>}
+        </small>
+      )}
+    </div>
   );
 }
 
