@@ -12,6 +12,7 @@ import { AMOUNT_MAX, AVG_TARGET_MAX, BP_MAX, BP_MIN, type Program } from "../../
 import { START_DAYS, businessAccess, freeLimitReached, hasPaidDesign } from "../../../lib/server/billing";
 import { formatBirthday, parseBirthday, upcomingKeys } from "../../../lib/birthday";
 import { pushAppleBusiness } from "../../../lib/server/apple-push";
+import { resolvePlace } from "../../../lib/server/geo";
 import { ensureBusinessClass, walletConfig } from "../../../lib/server/google-wallet";
 import { getSettings } from "../../../lib/server/settings";
 import { normalizeSocial, parseSocial } from "../../../lib/social";
@@ -43,6 +44,22 @@ async function adminMembership(db: D1Database, businessId: unknown) {
   if (typeof businessId !== "string" || !businessId) return null;
   const b = await db.prepare("SELECT id, name FROM businesses WHERE id = ? AND archived IS NULL").bind(businessId).first<{ id: string; name: string }>();
   return b ? { business: b.id, businessName: b.name, role: "owner" as const, branch: null as string | null } : null;
+}
+
+/**
+ * Every saved card of the business gets the new content: Google Wallet passes through the background job
+ * (a batch at a time), iPhones by a push that makes them fetch the pass again.
+ */
+async function refreshPasses(db: D1Database, businessId: string, origin: string, now: string) {
+  await db
+    .prepare(
+      `INSERT INTO wallet_outbox(id, business, customer, kind, not_before, created, origin)
+       SELECT 'sync:' || id, business, id, 'sync', ?1, ?1, ?2 FROM customers WHERE business = ?3 AND google_wallet IS NOT NULL AND archived IS NULL
+       ON CONFLICT(id) DO UPDATE SET done = NULL, result = NULL, attempts = 0, not_before = excluded.not_before, origin = excluded.origin`,
+    )
+    .bind(now, origin, businessId)
+    .run();
+  pushAppleBusiness(db, businessId);
 }
 
 async function newCardSecret() {
@@ -674,8 +691,12 @@ export async function POST(request: Request) {
       const address = str(p.address, 160) || null;
       const count = await db.prepare("SELECT COUNT(*) AS n FROM branches WHERE business = ?").bind(business.id).first<{ n: number }>();
       if ((count?.n ?? 0) >= 50) return fail("rate_limited", 429, "Too many branches");
+      const place = typeof p.location === "string" && p.location.trim() ? await resolvePlace(p.location.slice(0, 2000)) : null;
+      if (typeof p.location === "string" && p.location.trim() && !place) return fail("location_invalid", 400, "Could not read the place");
       const id = crypto.randomUUID();
-      await db.prepare("INSERT INTO branches(id, business, name, address, created) VALUES(?, ?, ?, ?, ?)").bind(id, business.id, name, address, now).run();
+      await db.prepare("INSERT INTO branches(id, business, name, address, created, lat, lng, located) VALUES(?, ?, ?, ?, ?, ?, ?, ?)")
+        .bind(id, business.id, name, address, now, place?.lat ?? null, place?.lng ?? null, place ? now : null).run();
+      if (place) await refreshPasses(db, business.id, new URL(request.url).origin, now);
       return json({ id });
     }
 
@@ -685,14 +706,30 @@ export async function POST(request: Request) {
       if (!name) return fail("bad_details", 400);
       const address = str(p.address, 160) || null;
       const r = await db.prepare("UPDATE branches SET name = ?, address = ? WHERE id = ? AND business = ? AND archived IS NULL").bind(name, address, p.branch ?? "", business.id).run();
-      return r.meta.changes ? json({ ok: true }) : fail("branch_invalid", 404);
+      if (!r.meta.changes) return fail("branch_invalid", 404);
+      // The place on the map: a Google Maps link or coordinates; empty clears it; left out keeps it.
+      if (typeof p.location === "string") {
+        const text = p.location.trim();
+        const place = text ? await resolvePlace(text.slice(0, 2000)) : null;
+        if (text && !place) return fail("location_invalid", 400, "Could not read the place");
+        const was = await db.prepare("SELECT lat, lng FROM branches WHERE id = ?").bind(p.branch).first<{ lat: number | null; lng: number | null }>();
+        if (was?.lat !== (place?.lat ?? null) || was?.lng !== (place?.lng ?? null)) {
+          await db.prepare("UPDATE branches SET lat = ?, lng = ?, located = ? WHERE id = ?").bind(place?.lat ?? null, place?.lng ?? null, now, p.branch).run();
+          await refreshPasses(db, business.id, new URL(request.url).origin, now);
+        }
+      }
+      return json({ ok: true });
     }
 
     case "archive_branch": {
       const denied = adminOnly(); if (denied) return denied;
       // History keeps the branch name; staff tied to it must be moved before they can act again.
-      const r = await db.prepare("UPDATE branches SET archived = ? WHERE id = ? AND business = ? AND archived IS NULL").bind(now, p.branch ?? "", business.id).run();
-      return r.meta.changes ? json({ ok: true }) : fail("branch_invalid", 404);
+      const r = await db.prepare("UPDATE branches SET archived = ?, located = CASE WHEN lat IS NULL THEN located ELSE ? END WHERE id = ? AND business = ? AND archived IS NULL").bind(now, now, p.branch ?? "", business.id).run();
+      if (!r.meta.changes) return fail("branch_invalid", 404);
+      // A closed branch with a place on the map: the cards stop showing it.
+      const placed = await db.prepare("SELECT lat FROM branches WHERE id = ?").bind(p.branch).first<{ lat: number | null }>();
+      if (placed?.lat != null) await refreshPasses(db, business.id, new URL(request.url).origin, now);
+      return json({ ok: true });
     }
 
     case "set_member_branch": {

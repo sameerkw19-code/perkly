@@ -11,6 +11,8 @@ export type BuildData = {
   designVersion: number | null;
   designDone: boolean;
   branches: { id: string; name: string }[];
+  /** Branches with a place on the map (the wallet's nearby alert). */
+  placed: number;
   /** The business is still under Perkly's account (not handed to its owner yet). */
   withPerkly: boolean;
   ownerEmail: string | null;
@@ -131,9 +133,11 @@ export function BuildSteps({ data }: { data: BuildData }) {
           <a className={"btn " + (data.designDone ? "soft" : "primary")} href={dash("#design")}>{data.designDone ? "עריכת העיצוב" : "לעיצוב הכרטיס"}</a>
         </Step>
 
-        <Step n={3} title="סניפים" done={data.branches.length > 0}
-          status={data.branches.length ? `${data.branches.length === 1 ? "סניף אחד" : `${data.branches.length} סניפים`}: ${data.branches.map((b) => b.name).join(", ")}` : "אין סניף."}>
-          <a className="btn soft" href={dash("#settings")}>ניהול סניפים</a>
+        <Step n={3} title="סניפים ומיקום במפה" done={data.branches.length > 0 && data.placed > 0}
+          status={data.branches.length
+            ? `${data.branches.length === 1 ? "סניף אחד" : `${data.branches.length} סניפים`}: ${data.branches.map((b) => b.name).join(", ")}. ${data.placed ? `📍 ${data.placed === data.branches.length ? "כולם על המפה" : `${data.placed} על המפה`}: הכרטיס קופץ ללקוחות שעוברים ליד.` : "עוד אין מיקום במפה: מדביקים קישור מ־Google Maps כדי שהכרטיס יקפוץ ללקוחות שעוברים ליד."}`
+            : "אין סניף."}>
+          <a className={"btn " + (data.placed ? "soft" : "primary")} href={dash("#settings")}>{data.placed ? "ניהול סניפים" : "הוספת מיקום במפה"}</a>
         </Step>
 
         <Step n={4} title="שלט QR לקופה" done={false} status="לקוחות סורקים את השלט ומצטרפים לבד. שלט A4 או מדבקה 10×10 ס״מ.">

@@ -85,7 +85,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
       `SELECT k.id, k.label, k.created, k.last_used, br.name AS branch FROM pos_keys k LEFT JOIN branches br ON br.id = k.branch
        WHERE k.business = ? AND k.revoked IS NULL ORDER BY k.created`,
     ).bind(id).all<{ id: string; label: string; created: string; last_used: string | null; branch: string | null }>(),
-    db.prepare("SELECT id, name FROM branches WHERE business = ? AND archived IS NULL ORDER BY created").bind(id).all<{ id: string; name: string }>(),
+    db.prepare("SELECT id, name, lat IS NOT NULL AS placed FROM branches WHERE business = ? AND archived IS NULL ORDER BY created").bind(id).all<{ id: string; name: string; placed: number }>(),
   ]);
   // Invites still waiting to be opened: the owner's and the workers'.
   const invites = await db
@@ -109,7 +109,8 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
     designVersion: c.published,
     // A logo, or any design published after the starting one.
     designDone: !!design.logo || (c.published ?? 0) >= 2,
-    branches: branchList.results,
+    branches: branchList.results.map(({ id, name }) => ({ id, name })),
+    placed: branchList.results.filter((x) => x.placed).length,
     withPerkly,
     ownerEmail: b.owner_email,
     ownerInvite: ownerInvite ? { email: ownerInvite.email, expires: ownerInvite.expires } : null,

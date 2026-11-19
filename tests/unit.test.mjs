@@ -100,3 +100,21 @@ test("apple health: no key, wrong key", async () => {
   assert.equal(h.keyMatches, false);
   assert.equal(h.certExpires, "2027-12-05T16:16:13Z");
 });
+
+// A branch's place on the map, from a pasted Google Maps link or coordinates.
+import { parsePlace, isShortMapsLink } from "../lib/geo.ts";
+import { lookFields } from "../lib/wallet-look.ts";
+test("branch place: links, coordinates, and the Google nearby field", () => {
+  assert.deepEqual(parsePlace("32.0853, 34.7818"), { lat: 32.0853, lng: 34.7818 });
+  assert.deepEqual(parsePlace("https://www.google.com/maps/place/X/@32.07,34.77,17z/data=!3m1!4m6!3m5!8m2!3d32.0779!4d34.7745"), { lat: 32.0779, lng: 34.7745 });
+  assert.deepEqual(parsePlace("https://maps.google.com/?q=31.7683,35.2137"), { lat: 31.7683, lng: 35.2137 });
+  assert.equal(parsePlace("Herzl 10, Tel Aviv"), null);
+  assert.equal(parsePlace("0, 0"), null);
+  assert.equal(parsePlace("95, 34"), null);
+  assert.equal(isShortMapsLink("https://maps.app.goo.gl/AbC123"), true);
+  assert.equal(isShortMapsLink("https://evil.example/maps"), false);
+  const base = { title: "T", reward: "R", heroUrl: null };
+  assert.deepEqual(lookFields({ ...base, places: [{ lat: 32, lng: 34.5 }] }).merchantLocations, [{ latitude: 32, longitude: 34.5 }]);
+  assert.deepEqual(lookFields({ ...base, places: [] }).merchantLocations, []);
+  assert.equal(lookFields(base).merchantLocations, undefined);
+});

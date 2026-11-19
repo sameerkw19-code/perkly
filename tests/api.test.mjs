@@ -964,6 +964,25 @@ test("after handing a business to an account, the admin still has every owner sc
   assert.equal(ownerView.role, "owner");
 });
 
+test("branch place on the map: a Google Maps link or coordinates; a bad one is refused; empty clears it", async () => {
+  const built = await admin.post("/api/loyalty", { action: "create_business", forClient: true, kind: "cafe", name: "Nearby", reward: "Free coffee", target: 8, color: "#123456", setupDays: 30, branchName: "Main" });
+  const biz = built.body.id;
+  const branch = (await admin.get(`/api/loyalty?business=${biz}`)).body.branches[0];
+  const bad = await admin.act(biz, "rename_branch", { branch: branch.id, name: "Main", location: "somewhere nice" });
+  assert.equal(bad.status, 400);
+  assert.equal(bad.body.code, "location_invalid");
+  const ok = await admin.act(biz, "rename_branch", { branch: branch.id, name: "Main", location: "https://www.google.com/maps/place/X/@32.07,34.77,17z/data=!3d32.0779!4d34.7745" });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  let b = (await admin.get(`/api/loyalty?business=${biz}`)).body.branches[0];
+  assert.equal(b.lat, 32.0779);
+  assert.equal(b.lng, 34.7745);
+  const second = await admin.act(biz, "create_branch", { name: "North", address: "x", location: "32.1, 34.8" });
+  assert.equal(second.status, 200);
+  await admin.act(biz, "rename_branch", { branch: branch.id, name: "Main", location: "" });
+  b = (await admin.get(`/api/loyalty?business=${biz}`)).body.branches.find((x) => x.id === branch.id);
+  assert.equal(b.lat, null);
+});
+
 test("change the sign-in email: needs the current password, refuses a taken or same address", async () => {
   const a = new Client();
   await signup(a, "mover");

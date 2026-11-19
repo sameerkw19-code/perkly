@@ -17,6 +17,8 @@ export type PassLook = {
   translations?: { language: string; title: string; header?: string; reward: string; promo?: string }[];
   /** The business's own class look, when its logo can be used (see passLook). */
   classLook?: ClassLook | null;
+  /** The branches on the map: the phone shows the pass when the customer is near one (10 at most). */
+  places?: { lat: number; lng: number }[];
 };
 
 export function lookFields(look: PassLook) {
@@ -43,6 +45,8 @@ export function lookFields(look: PassLook) {
       ...(look.promo ? [{ id: "promo", body: look.promo, ...promoLocalized }] : []),
     ],
     linksModuleData: { uris: [{ id: "perkly", uri: "https://perkly.shop", description: "Powered by Perkly" }] },
+    // Google's "nearby" notification. An empty list clears places that were removed.
+    ...(look.places ? { merchantLocations: look.places.slice(0, 10).map((p) => ({ latitude: p.lat, longitude: p.lng })) } : {}),
   };
 }
 

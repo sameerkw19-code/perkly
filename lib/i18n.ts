@@ -208,6 +208,10 @@ const words: Record<string, Entry> = {
   staffLinkNote: ["הקישור עובד פעם אחת, לעובד אחד, במשך 3 ימים. שלחו אותו בוואטסאפ או העתיקו.", "الرابط يعمل مرة واحدة لموظف واحد لمدة 3 أيام. أرسله عبر واتساب أو انسخه.", "The link works once, for one worker, for 3 days. Send it on WhatsApp or copy it."],
   branchAddress: ["כתובת הסניף", "عنوان الفرع", "Branch address"],
   branchNoAddress: ["חסרה כתובת", "العنوان ناقص", "Address missing"],
+  branchPlace: ["מיקום במפה (קישור מ־Google Maps)", "الموقع على الخريطة (رابط من Google Maps)", "Place on the map (Google Maps link)"],
+  branchPlaceHint: ["פותחים את העסק ב־Google Maps, לוחצים \"שיתוף\" ומדביקים כאן את הקישור. כשלקוח עובר ליד הסניף, הכרטיס קופץ לו בטלפון.", "افتحوا المكان في Google Maps، اضغطوا \"مشاركة\" والصقوا الرابط هنا. عندما يمر الزبون بجانب الفرع، تظهر البطاقة على هاتفه.", "Open the place in Google Maps, tap Share and paste the link here. When a customer passes by, the card pops up on their phone."],
+  branchOnMap: ["על המפה: הכרטיס קופץ ללקוחות שעוברים ליד", "على الخريطة: تظهر البطاقة للزبائن المارّين", "On the map: the card pops up for customers nearby"],
+  branchNoPlace: ["בלי מיקום: אין התראה כשעוברים ליד", "بدون موقع: لا تنبيه عند المرور", "No place: no alert when passing by"],
   workerSignIn: ["כניסת עובדים", "دخول الموظفين", "Staff sign-in"],
   workerSignInHint: ["מספר הטלפון והסיסמה שלכם.", "رقم هاتفكم وكلمة المرور.", "Your phone number and password."],
   workerUseEmail: ["כניסה עם אימייל וסיסמה", "الدخول بالبريد وكلمة المرور", "Sign in with email and password"],
@@ -671,6 +675,7 @@ Object.assign(words, {
   byBranch: ["לפי סניף", "حسب الفرع", "By branch"],
   noBranch: ["ללא סניף", "بدون فرع", "No branch"],
   err_branch_required: ["בחרו סניף לפני הפעולה.", "اختر فرعاً قبل العملية.", "Choose a branch first."],
+  err_location_invalid: ["לא הצלחנו לקרוא את המיקום. הדביקו קישור מ־Google Maps (כפתור \"שיתוף\") או קואורדינטות כמו 32.0853, 34.7818.", "تعذّرت قراءة الموقع. الصقوا رابطًا من Google Maps (زر \"مشاركة\") أو إحداثيات مثل 32.0853, 34.7818.", "We couldn't read the place. Paste a Google Maps link (Share button) or coordinates like 32.0853, 34.7818."],
   err_branch_invalid: ["הסניף לא פעיל. בקשו מבעל העסק לשייך אתכם לסניף פעיל.", "الفرع غير فعال. اطلب من صاحب المشروع ربطك بفرع فعال.", "That branch isn't active. Ask the owner to assign you to an active branch."],
 } satisfies Record<string, Entry>);
 
