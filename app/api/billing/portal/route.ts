@@ -35,7 +35,9 @@ export async function POST(request: Request) {
     const url = await customerPortalUrl(env, customer, `${new URL(request.url).origin}/billing`);
     return json({ url });
   } catch (e) {
-    console.warn("polar portal failed", String((e as Error).message ?? e));
-    return fail("portal_failed", 502, "Could not open the subscription page");
+    const reason = String((e as Error).message ?? e).slice(0, 80);
+    console.warn("polar portal failed", reason);
+    // The reason (e.g. polar_customer_session_403: the access token lacks customer_sessions:write) helps support.
+    return fail("portal_failed", 502, `Could not open the subscription page (${reason})`);
   }
 }

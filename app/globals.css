@@ -827,3 +827,8 @@ html,body{overflow-x:clip}
 .sp-radio input { width: 20px; height: 20px; margin: 0; accent-color: var(--purple); }
 .sp-confirm { padding: 12px 14px; border-radius: 12px; background: #fff8e8; border: 1px solid #f0d9a8; }
 .sp-confirm p { margin: 0 0 10px; font-weight: 600; }
+
+/* "I'm at the business now": the phone's location for a branch. */
+.here { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: 1 1 100%; }
+.here .btn { min-height: 44px; }
+.here small { flex: 1 1 200px; min-width: 0; }
