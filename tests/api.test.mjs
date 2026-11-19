@@ -993,6 +993,30 @@ test("near text: the owner sets the lock-screen line; empty goes back to automat
   assert.equal((await admin.get(`/api/loyalty?business=${biz}`)).body.business.near_text, null);
 });
 
+test("message to customers: the owner sends now or schedules; staff can't; at most 3 a day", async () => {
+  const owner = new Client();
+  await signup(owner, "msg-owner");
+  const biz = (await owner.post("/api/loyalty", { action: "create_business", name: "Msg", reward: "Free", target: 5, color: "#123456" })).body.id;
+  const list = await owner.get(`/api/special?business=${biz}`);
+  assert.equal(list.status, 200, JSON.stringify(list.body));
+  assert.equal(typeof list.body.reach.total, "number");
+  const now = await owner.post("/api/special", { action: "create", business: biz, text: "Double stamps today, {name}!", now: true });
+  assert.equal(now.status, 200, JSON.stringify(now.body));
+  assert.equal(typeof now.body.recipients, "number");
+  const after = (await owner.get(`/api/special?business=${biz}`)).body.items;
+  assert.equal(after.length, 1);
+  assert.ok(after[0].queued, "sent at once");
+  const later = await owner.post("/api/special", { action: "create", business: biz, text: "Tomorrow", sendAt: new Date(Date.now() + 86_400_000).toISOString() });
+  assert.equal(later.status, 200);
+  assert.equal((await owner.post("/api/special", { action: "create", business: biz, text: "Third", now: true })).status, 200);
+  const fourth = await owner.post("/api/special", { action: "create", business: biz, text: "Fourth", now: true });
+  assert.equal(fourth.status, 429);
+  assert.equal(fourth.body.code, "special_daily");
+  const stranger = new Client();
+  await signup(stranger, "msg-stranger");
+  assert.equal((await stranger.post("/api/special", { action: "create", business: biz, text: "Hi", now: true })).status, 403);
+});
+
 test("change the sign-in email: needs the current password, refuses a taken or same address", async () => {
   const a = new Client();
   await signup(a, "mover");

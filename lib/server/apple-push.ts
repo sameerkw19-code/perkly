@@ -62,15 +62,22 @@ export function pushAppleCustomer(db: D1Database, customer: string): void {
   waitUntil(customerTokens(db, customer).then((t) => pushTokens(db, t)).catch((e) => console.log("apple wallet push error", String(e))));
 }
 
+/** Every Apple Wallet pass of the business fetches itself again; awaitable (the cron job waits for it). */
+export async function pushAppleBusinessNow(db: D1Database, business: string): Promise<void> {
+  if (!applePushReady()) return;
+  try {
+    const rows = await db
+      .prepare("SELECT r.push_token FROM apple_registrations r JOIN customers c ON c.id = r.serial WHERE c.business = ? AND c.archived IS NULL")
+      .bind(business)
+      .all<{ push_token: string }>();
+    await pushTokens(db, rows.results.map((r) => r.push_token));
+  } catch (e) {
+    console.log("apple wallet push error", String(e));
+  }
+}
+
 /** After a new card design is published: refresh every Apple Wallet pass of the business. */
 export function pushAppleBusiness(db: D1Database, business: string): void {
   if (!applePushReady()) return;
-  waitUntil(
-    db
-      .prepare("SELECT r.push_token FROM apple_registrations r JOIN customers c ON c.id = r.serial WHERE c.business = ? AND c.archived IS NULL")
-      .bind(business)
-      .all<{ push_token: string }>()
-      .then((rows) => pushTokens(db, rows.results.map((r) => r.push_token)))
-      .catch((e) => console.log("apple wallet push error", String(e))),
-  );
+  waitUntil(pushAppleBusinessNow(db, business));
 }

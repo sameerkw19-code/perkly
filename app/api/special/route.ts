@@ -5,6 +5,8 @@ import { fail, json, readJson, sameOrigin } from "../../../lib/server/http";
 import { allow } from "../../../lib/server/rate-limit";
 import { getSettings } from "../../../lib/server/settings";
 import { walletConfig } from "../../../lib/server/google-wallet";
+import { applePushReady } from "../../../lib/server/apple-push";
+import { sendSpecial, walletReach } from "../../../lib/server/customer-messages";
 import { SPECIAL_MAX_TEXT } from "../../../lib/design";
 
 export const dynamic = "force-dynamic";
@@ -12,18 +14,19 @@ export const dynamic = "force-dynamic";
 /** How far ahead a message can be scheduled, and how many may wait at once. */
 const MAX_DAYS_AHEAD = 120;
 const MAX_PENDING = 10;
+/** At most this many messages per business in any 24 hours (sent now or scheduled), so customers aren't flooded. */
+const MAX_PER_DAY = 3;
 
 type SpecialRow = { id: string; send_at: string; text: string; queued: string | null; recipients: number | null; canceled: string | null; sent: number };
 
 /**
- * Special-day messages are sent by Perkly (a platform admin) for a business, like the rest of the card.
- * The admin's own businesses, plus the one they opened from the control center.
+ * Messages to a business's customers are sent by its owner, or by Perkly (a platform admin) for any business:
+ * the user's own businesses, plus (for an admin) the one opened from the control center.
  */
 async function ownerBusiness(db: D1Database, user: User, wanted: unknown) {
-  if (!isPlatformAdmin(user, env)) return { owned: [] as Membership[], pick: undefined };
   const owned = (await getMemberships(db, user.id)).filter((m) => m.role === "owner");
   let pick = typeof wanted === "string" && wanted ? owned.find((m) => m.business === wanted) : owned[0];
-  if (!pick && typeof wanted === "string" && wanted) {
+  if (!pick && typeof wanted === "string" && wanted && isPlatformAdmin(user, env)) {
     const b = await db.prepare("SELECT id, name FROM businesses WHERE id = ? AND archived IS NULL").bind(wanted).first<{ id: string; name: string }>();
     if (b) { pick = { business: b.id, businessName: b.name, role: "owner", branch: null }; owned.push(pick); }
   }
@@ -36,7 +39,7 @@ export async function GET(request: Request) {
   const user = await getUser(db, request.headers.get("cookie"));
   if (!user) return fail("signin", 401, "Sign in required");
   const { owned, pick } = await ownerBusiness(db, user, new URL(request.url).searchParams.get("business"));
-  if (!pick) return fail("admin_only", 403, "Managed by Perkly");
+  if (!pick) return fail("forbidden", 403, "Owner permission required");
   const [items, wallet] = await Promise.all([
     db
       .prepare(
@@ -46,14 +49,15 @@ export async function GET(request: Request) {
       )
       .bind(pick.business)
       .all<SpecialRow>(),
-    db.prepare("SELECT COUNT(*) AS n FROM customers WHERE business = ? AND archived IS NULL AND google_wallet IS NOT NULL").bind(pick.business).first<{ n: number }>(),
+    walletReach(db, pick.business),
   ]);
   return json({
     business: { id: pick.business, name: pick.businessName },
     businesses: owned.map((m) => ({ id: m.business, name: m.businessName })),
     items: items.results ?? [],
-    walletCustomers: wallet?.n ?? 0,
-    walletReady: walletConfig(env) !== null,
+    walletCustomers: wallet.total,
+    reach: wallet,
+    walletReady: walletConfig(env) !== null || applePushReady(),
   });
 }
 
@@ -65,7 +69,7 @@ export async function POST(request: Request) {
   const user = await getUser(db, request.headers.get("cookie"));
   if (!user) return fail("signin", 401, "Sign in required");
   if (!body) return fail("bad_request", 400);
-  if (!(await ownerBusiness(db, user, body.business)).pick) return fail("admin_only", 403, "Managed by Perkly");
+  if (!(await ownerBusiness(db, user, body.business)).pick) return fail("forbidden", 403, "Owner permission required");
   const business = body.business as string;
   if ((await getSettings(db)).maintenance) return fail("maintenance", 503, "Maintenance");
   if (!(await allow(db, `special:${user.id}`, 30, 3600))) return fail("rate_limited", 429, "Too many attempts");
@@ -84,7 +88,8 @@ export async function POST(request: Request) {
   if (body.action !== "create") return fail("bad_request", 400, "Unknown action");
   const text = typeof body.text === "string" ? body.text.replace(/[\u0000-\u001f]/g, " ").trim() : "";
   if (!text || text.length > SPECIAL_MAX_TEXT) return fail("special_text", 400, "Write a message (up to 160 characters)");
-  const sendAt = typeof body.sendAt === "string" ? Date.parse(body.sendAt) : NaN;
+  // "Send now", or a date and time.
+  const sendAt = body.now === true ? now : typeof body.sendAt === "string" ? Date.parse(body.sendAt) : NaN;
   // A minute of slack for "now"; at most MAX_DAYS_AHEAD days ahead.
   if (!Number.isFinite(sendAt) || sendAt < now - 60_000 || sendAt > now + MAX_DAYS_AHEAD * 86_400_000) {
     return fail("special_time", 400, "Pick a time from now up to 120 days ahead");
@@ -94,10 +99,21 @@ export async function POST(request: Request) {
     .bind(business)
     .first<{ n: number }>();
   if ((pending?.n ?? 0) >= MAX_PENDING) return fail("special_many", 409, "Up to 10 scheduled messages at a time");
+  const recent = await db
+    .prepare("SELECT COUNT(*) AS n FROM special_days WHERE business = ? AND canceled IS NULL AND created > ?")
+    .bind(business, new Date(now - 86_400_000).toISOString())
+    .first<{ n: number }>();
+  if ((recent?.n ?? 0) >= MAX_PER_DAY) return fail("special_daily", 429, "Up to 3 messages a day");
   const id = crypto.randomUUID();
   await db
     .prepare("INSERT INTO special_days(id, business, send_at, text, created, created_by) VALUES(?, ?, ?, ?, ?, ?)")
     .bind(id, business, new Date(Math.max(sendAt, now)).toISOString(), text, new Date(now).toISOString(), user.id)
     .run();
+  // Sent now: out to Apple Wallet at once; Google Wallet passes within the next couple of minutes.
+  if (body.now === true) {
+    await sendSpecial(db, { id, business, text }, new Date(now).toISOString());
+    const sent = await db.prepare("SELECT recipients FROM special_days WHERE id = ?").bind(id).first<{ recipients: number | null }>();
+    return json({ ok: true, id, recipients: sent?.recipients ?? 0 });
+  }
   return json({ ok: true, id });
 }

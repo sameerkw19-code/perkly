@@ -3,7 +3,7 @@
 import { passAverage, passBalance } from "./balance-pass";
 import { progressStrip } from "./progress-strip";
 import { env } from "cloudflare:workers";
-import { appleStampPicture, cardLang, textsFor, walletStampPicture, type Lang } from "../design";
+import { appleStampPicture, cardLang, noticeText, textsFor, walletStampPicture, type Lang, type Texts } from "../design";
 import { buildPkpass, rgb, type Bytes } from "./apple-pass";
 import { PASS_ICONS } from "./apple-pass-icons";
 import { businessPlaces, liveDesign } from "./designs";
@@ -12,13 +12,13 @@ import { passToken, type AppleConfig } from "./apple-token";
 
 export { appleConfig, passToken, validToken, type AppleConfig } from "./apple-token";
 
-const LABELS: Record<Lang, { stamps: string; reward: string; customer: string; ready: string; readyChanged: string; offer: string; changed: string; about: string; balance: string; balanceChanged: string; round: string; roundChanged: string; worth: string; worthReady: string }> = {
-  he: { stamps: "חותמות", reward: "ההטבה", customer: "שם", ready: "הטבות מוכנות", readyChanged: "הטבות מוכנות: %@", offer: "מבצע", changed: "חותמות: %@", about: "כרטיס נאמנות דיגיטלי של Perkly. מציגים את הקוד בקופה.", balance: "יתרה", balanceChanged: "היתרה: %@", round: "קניות בסבב", roundChanged: "קניות בסבב: %@", worth: "שווי עכשיו", worthReady: "הטבה מוכנה" },
-  ar: { stamps: "الأختام", reward: "المكافأة", customer: "الاسم", ready: "مكافآت جاهزة", readyChanged: "مكافآت جاهزة: %@", offer: "عرض", changed: "الأختام: %@", about: "بطاقة ولاء رقمية من Perkly. اعرضوا الرمز عند الصندوق.", balance: "الرصيد", balanceChanged: "الرصيد: %@", round: "مشتريات الجولة", roundChanged: "مشتريات الجولة: %@", worth: "القيمة الآن", worthReady: "مكافأة جاهزة" },
-  en: { stamps: "Stamps", reward: "Reward", customer: "Name", ready: "Rewards ready", readyChanged: "Rewards ready: %@", offer: "Offer", changed: "Stamps: %@", about: "A Perkly digital loyalty card. Show the code at the counter.", balance: "Balance", balanceChanged: "Balance: %@", round: "Purchases this round", roundChanged: "Purchases this round: %@", worth: "Worth now", worthReady: "Reward ready" },
-  ru: { stamps: "Штампы", reward: "Награда", customer: "Имя", ready: "Готовые награды", readyChanged: "Готовые награды: %@", offer: "Акция", changed: "Штампы: %@", about: "Цифровая карта лояльности Perkly. Покажите код на кассе.", balance: "Баланс", balanceChanged: "Баланс: %@", round: "Покупки в цикле", roundChanged: "Покупки в цикле: %@", worth: "Стоимость сейчас", worthReady: "Награда готова" },
-  de: { stamps: "Stempel", reward: "Prämie", customer: "Name", ready: "Prämien bereit", readyChanged: "Prämien bereit: %@", offer: "Angebot", changed: "Stempel: %@", about: "Eine digitale Treuekarte von Perkly. Zeigen Sie den Code an der Kasse.", balance: "Guthaben", balanceChanged: "Guthaben: %@", round: "Einkäufe dieser Runde", roundChanged: "Einkäufe: %@", worth: "Aktueller Wert", worthReady: "Prämie bereit" },
-  fr: { stamps: "Tampons", reward: "Récompense", customer: "Nom", ready: "Récompenses prêtes", readyChanged: "Récompenses prêtes : %@", offer: "Offre", changed: "Tampons : %@", about: "Une carte de fidélité numérique Perkly. Montrez le code en caisse.", balance: "Solde", balanceChanged: "Solde : %@", round: "Achats de ce cycle", roundChanged: "Achats : %@", worth: "Valeur actuelle", worthReady: "Récompense prête" },
+const LABELS: Record<Lang, { stamps: string; reward: string; customer: string; ready: string; readyChanged: string; offer: string; changed: string; about: string; balance: string; balanceChanged: string; round: string; roundChanged: string; worth: string; worthReady: string; news: string }> = {
+  he: { stamps: "חותמות", reward: "ההטבה", customer: "שם", ready: "הטבות מוכנות", readyChanged: "הטבות מוכנות: %@", offer: "מבצע", changed: "חותמות: %@", about: "כרטיס נאמנות דיגיטלי של Perkly. מציגים את הקוד בקופה.", balance: "יתרה", balanceChanged: "היתרה: %@", round: "קניות בסבב", roundChanged: "קניות בסבב: %@", worth: "שווי עכשיו", worthReady: "הטבה מוכנה", news: "הודעה מהעסק" },
+  ar: { stamps: "الأختام", reward: "المكافأة", customer: "الاسم", ready: "مكافآت جاهزة", readyChanged: "مكافآت جاهزة: %@", offer: "عرض", changed: "الأختام: %@", about: "بطاقة ولاء رقمية من Perkly. اعرضوا الرمز عند الصندوق.", balance: "الرصيد", balanceChanged: "الرصيد: %@", round: "مشتريات الجولة", roundChanged: "مشتريات الجولة: %@", worth: "القيمة الآن", worthReady: "مكافأة جاهزة", news: "رسالة من المحل" },
+  en: { stamps: "Stamps", reward: "Reward", customer: "Name", ready: "Rewards ready", readyChanged: "Rewards ready: %@", offer: "Offer", changed: "Stamps: %@", about: "A Perkly digital loyalty card. Show the code at the counter.", balance: "Balance", balanceChanged: "Balance: %@", round: "Purchases this round", roundChanged: "Purchases this round: %@", worth: "Worth now", worthReady: "Reward ready", news: "Message" },
+  ru: { stamps: "Штампы", reward: "Награда", customer: "Имя", ready: "Готовые награды", readyChanged: "Готовые награды: %@", offer: "Акция", changed: "Штампы: %@", about: "Цифровая карта лояльности Perkly. Покажите код на кассе.", balance: "Баланс", balanceChanged: "Баланс: %@", round: "Покупки в цикле", roundChanged: "Покупки в цикле: %@", worth: "Стоимость сейчас", worthReady: "Награда готова", news: "Сообщение" },
+  de: { stamps: "Stempel", reward: "Prämie", customer: "Name", ready: "Prämien bereit", readyChanged: "Prämien bereit: %@", offer: "Angebot", changed: "Stempel: %@", about: "Eine digitale Treuekarte von Perkly. Zeigen Sie den Code an der Kasse.", balance: "Guthaben", balanceChanged: "Guthaben: %@", round: "Einkäufe dieser Runde", roundChanged: "Einkäufe: %@", worth: "Aktueller Wert", worthReady: "Prämie bereit", news: "Nachricht" },
+  fr: { stamps: "Tampons", reward: "Récompense", customer: "Nom", ready: "Récompenses prêtes", readyChanged: "Récompenses prêtes : %@", offer: "Offre", changed: "Tampons : %@", about: "Une carte de fidélité numérique Perkly. Montrez le code en caisse.", balance: "Solde", balanceChanged: "Solde : %@", round: "Achats de ce cycle", roundChanged: "Achats : %@", worth: "Valeur actuelle", worthReady: "Récompense prête", news: "Message" },
 };
 
 /** The line on the iPhone's lock screen near a branch: what is waiting for the customer there. */
@@ -34,14 +34,14 @@ const NEAR: Record<Lang, { reward: (b: string, r: string) => string; stamps: (b:
 type CustomerRow = {
   id: string; business: string; name: string; stamps: number; target: number; scan_code: string; created: string;
   business_name: string; reward: string; color: string; rewards: number; balance: number; program: string; currency: string;
-  round_total: number; avg_cap: number; ready_value: number | null; near_text?: string | null;
+  round_total: number; avg_cap: number; ready_value: number | null; near_text?: string | null; news_text?: string | null; news_at?: string | null;
 };
 
 /** The customer behind a pass serial (the customer id), or null when it was removed. */
 export async function customerForPass(db: D1Database, serial: string): Promise<CustomerRow | null> {
   return db
     .prepare(
-      `SELECT c.id, c.business, c.name, c.stamps, c.target, c.scan_code, c.created, c.balance, c.round_total, b.program, b.currency, b.avg_cap, b.near_text, b.name AS business_name, b.reward, b.color,
+      `SELECT c.id, c.business, c.name, c.stamps, c.target, c.scan_code, c.created, c.balance, c.round_total, b.program, b.currency, b.avg_cap, b.near_text, b.news_text, b.news_at, b.name AS business_name, b.reward, b.color,
          (SELECT value FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2) ORDER BY earned, id LIMIT 1) AS ready_value,
          (SELECT COUNT(*) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2))
            + (CASE WHEN b.reward_mode = 'block' AND c.stamps >= c.target THEN 1 ELSE 0 END) AS rewards
@@ -60,6 +60,7 @@ export async function passUpdated(db: D1Database, customer: { id: string; busine
          UNION ALL SELECT MAX(published) FROM card_designs WHERE business = ?2
          UNION ALL SELECT MAX(located) FROM branches WHERE business = ?2
          UNION ALL SELECT near_updated FROM businesses WHERE id = ?2
+         UNION ALL SELECT news_at FROM businesses WHERE id = ?2
          UNION ALL SELECT ?3 UNION ALL SELECT ?4)`,
     )
     .bind(customer.id, customer.business, customer.created, PASS_FORMAT)
@@ -168,6 +169,10 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
   // At most 120 characters, cut between whole characters so an emoji is never split.
   const line = [...nearText].length > 120 ? [...nearText].slice(0, 119).join("") + "…" : nearText;
   const locations = (await businessPlaces(db, c.business)).map((p) => ({ latitude: p.lat, longitude: p.lng, relevantText: line }));
+  // A message from the last 30 days, with the customer's name filled in.
+  const news = c.news_text && c.news_at && Date.now() - Date.parse(c.news_at) < 30 * 86_400_000
+    ? noticeText({ ...text, title, reward } as Texts, lang, { kind: "special", name: c.name, text: c.news_text })
+    : "";
   const pass = {
     ...(locations.length ? { locations } : {}),
     formatVersion: 1,
@@ -196,6 +201,8 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
       ...(strip ? {} : { auxiliaryFields: [{ key: "reward", label: L.reward, value: reward }] }),
       backFields: [
         { key: "rewardBack", label: L.reward, value: reward },
+        // The latest message to customers: when it changes, the iPhone shows it as a notification (changeMessage).
+        ...(news ? [{ key: "news", label: L.news, value: news, changeMessage: "%@" }] : []),
         ...(text.promo ? [{ key: "offer", label: L.offer, value: text.promo.slice(0, 200) }] : []),
         { key: "about", label: "Perkly", value: L.about },
       ],

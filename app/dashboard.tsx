@@ -6,7 +6,7 @@ import { fillNearText, NEAR_TAG_NAMES, type NearTag } from "../lib/near-text";
 import {
   Activity, AlertTriangle, Trash2, Cake, Check, Copy, CreditCard, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode,
   ChevronRight, History, Palette, RefreshCw, RotateCcw, ScanLine, Search, Settings, Share2, Store, UserPlus, Users, UserRound, X,
-  Phone, MapPin,
+  Phone, MapPin, Megaphone,
 } from "lucide-react";
 import type { Design } from "../lib/design";
 import { averageReward, earnFor, formatMoney, parseAmount, pctLabel } from "../lib/cashback.ts";
@@ -404,6 +404,7 @@ export default function Dashboard() {
                   <button className="btn primary" onClick={() => { setView("station"); setQuery(""); }}><ScanLine size={18} />{t("station")}</button>
                   <button className="btn soft" onClick={() => setModal({ type: "customer" })}><Plus size={18} />{t("newCustomer")}</button>
                   <button className="btn soft" onClick={() => setModal({ type: "staffLink" })}><UserPlus size={18} />{t("staffLinkButton")}</button>
+                  {(isOwner || manage) && <a className="btn soft" href={`/special?b=${encodeURIComponent(b.id)}`}><Megaphone size={18} />{t("spOpen")}</a>}
                 </div>
               </div>
               {data.summary && <Summary summary={data.summary} totals={{ customers: data.stats!.customers, ready: data.stats!.rewards_ready, openBalance: data.stats!.open_balance }} breakdown={data.breakdown} hasBranches={(data.branches?.length ?? 0) > 1} t={t}
@@ -543,7 +544,7 @@ export default function Dashboard() {
             <>
               <div className="page-head"><div><h1>{t("design")}</h1><p className="muted">{t("designNoBalance")}</p></div></div>
               <CardEditor key={b.id + ":" + data.editor.publishedVersion} businessId={b.id} target={b.target} editor={data.editor} t={t} lang={lang} notify={notify} reload={load}
-                paid={!!data.access?.ok && !data.access.free} upgradeHref={`/start?b=${encodeURIComponent(b.id)}`} specialDays={manage}
+                paid={!!data.access?.ok && !data.access.free} upgradeHref={`/start?b=${encodeURIComponent(b.id)}`} specialDays={isOwner || manage}
                 cashback={b.program === "cashback" ? { bp: b.cashback_bp ?? 200, currency: b.currency === "USD" ? "USD" : "ILS" } : null} average={b.program === "average"} currency={b.currency === "USD" ? "USD" : "ILS"} />
             </>
           )}
