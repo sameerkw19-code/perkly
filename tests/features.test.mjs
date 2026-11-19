@@ -660,7 +660,8 @@ test("owners get reports, customers and the station; Perkly manages the rest", (
   for (const f of ["../app/api/asset/route.ts", "../app/api/asset/banners/route.ts"]) {
     assert.match(readFileSync(new URL(f, import.meta.url), "utf8"), /if \(!isPlatformAdmin\(user, env\) && !\(target\.owner_designs && \(await getRole\(db, user\.id, business\)\) === "owner"\)\) return fail\("admin_only"/);
   }
-  assert.match(readFileSync(new URL("../app/api/special/route.ts", import.meta.url), "utf8"), /if \(!isPlatformAdmin\(user, env\)\)/);
+  // Messages to customers: the owner of the business, or Perkly for any business.
+  assert.match(readFileSync(new URL("../app/api/special/route.ts", import.meta.url), "utf8"), /filter\(\(m\) => m\.role === "owner"\)[\s\S]*&& isPlatformAdmin\(user, env\)\)/);
   const dash = readFileSync(new URL("../app/dashboard.tsx", import.meta.url), "utf8");
   assert.match(dash, /\.\.\.\(manage \? \[\[Palette, "design"\], \[Users, "team"\], \[Settings, "settings"\]\]/);
   // The sign-up no longer saves a design itself: the server builds the starting card.

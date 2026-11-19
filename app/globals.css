@@ -820,3 +820,10 @@ html,body{overflow-x:clip}
 .near-tags .chip { min-height: 36px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: #fff; cursor: pointer; font: inherit; }
 .near-tags .chip:hover, .near-tags .chip:focus-visible { border-color: var(--purple); }
 .near-preview { margin: 0; padding: 10px 12px; border-radius: 10px; background: #f5f3fb; overflow-wrap: anywhere; }
+
+/* Message to customers: send now or schedule. */
+.sp-mode { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 20px; }
+.sp-radio { display: inline-flex !important; flex-direction: row !important; align-items: center; gap: 8px; min-height: 44px; font-weight: 600; cursor: pointer; }
+.sp-radio input { width: 20px; height: 20px; margin: 0; accent-color: var(--purple); }
+.sp-confirm { padding: 12px 14px; border-radius: 12px; background: #fff8e8; border: 1px solid #f0d9a8; }
+.sp-confirm p { margin: 0 0 10px; font-weight: 600; }

@@ -9,6 +9,7 @@ import { walletConfig, updateLoyaltyObject, type WalletConfig } from "./google-w
 import { liveDesign, passLook } from "./designs";
 import { BIRTHDAY_GIFT_DAYS, noticeOn, type Design, type StampNotice } from "../design";
 import { birthdayKeys, israelNow } from "../birthday";
+import { pushAppleBusinessNow } from "./apple-push";
 
 type Env = { GOOGLE_WALLET_SA_KEY?: string; GOOGLE_WALLET_ISSUER_ID?: string; GOOGLE_WALLET_CLASS_ID?: string; WALLET_BATCH?: string };
 
@@ -47,27 +48,52 @@ export async function queueWelcome(db: D1Database, customer: { id: string; busin
 }
 
 /** Special days whose time came: one outbox row per customer with the card in Google Wallet. */
+/**
+ * Sends one message to the business's customers: Google Wallet passes through the outbox (a batch per run),
+ * Apple Wallet passes by setting the business's latest message and pushing every iPhone, which fetches the
+ * pass again and shows the message as a notification. Marked queued first, so it never goes out twice.
+ */
+/** How many customers have the card in Google Wallet, in Apple Wallet, and in at least one of them. */
+export async function walletReach(db: D1Database, business: string): Promise<{ google: number; apple: number; total: number }> {
+  const r = await db
+    .prepare(
+      `SELECT SUM(g) AS google, SUM(a) AS apple, SUM(CASE WHEN g + a > 0 THEN 1 ELSE 0 END) AS total FROM (
+         SELECT (c.google_wallet IS NOT NULL) AS g, EXISTS(SELECT 1 FROM apple_registrations r WHERE r.serial = c.id) AS a
+         FROM customers c WHERE c.business = ? AND c.archived IS NULL)`,
+    )
+    .bind(business)
+    .first<{ google: number | null; apple: number | null; total: number | null }>();
+  return { google: r?.google ?? 0, apple: r?.apple ?? 0, total: r?.total ?? 0 };
+}
+
+export async function sendSpecial(db: D1Database, s: { id: string; business: string; text: string }, nowIso: string): Promise<void> {
+  const claimed = await db.prepare("UPDATE special_days SET queued = ? WHERE id = ? AND queued IS NULL AND canceled IS NULL").bind(nowIso, s.id).run();
+  if (!claimed.meta.changes) return;
+  await db.batch([
+    db
+      .prepare(
+        `INSERT OR IGNORE INTO wallet_outbox(id, business, customer, kind, campaign, not_before, created)
+         SELECT 'sp:' || ? || ':' || id, business, id, 'special', ?, ?, ? FROM customers
+         WHERE business = ? AND archived IS NULL AND google_wallet IS NOT NULL`,
+      )
+      .bind(s.id, s.id, nowIso, nowIso, s.business),
+    db.prepare("UPDATE businesses SET news_text = ?, news_at = ? WHERE id = ?").bind(s.text, nowIso, s.business),
+  ]);
+  // Customers with the card in a wallet (Google, Apple or both), counted once.
+  const reach = await walletReach(db, s.business);
+  await db.prepare("UPDATE special_days SET recipients = ? WHERE id = ?").bind(reach.total, s.id).run();
+  await pushAppleBusinessNow(db, s.business);
+}
+
 async function queueSpecialDays(db: D1Database, nowIso: string): Promise<void> {
   const due = await db
     .prepare(
-      `SELECT s.id, s.business FROM special_days s JOIN businesses b ON b.id = s.business
+      `SELECT s.id, s.business, s.text FROM special_days s JOIN businesses b ON b.id = s.business
        WHERE s.queued IS NULL AND s.canceled IS NULL AND s.send_at <= ? AND b.archived IS NULL AND b.suspended IS NULL LIMIT 20`,
     )
     .bind(nowIso)
-    .all<{ id: string; business: string }>();
-  for (const s of due.results ?? []) {
-    const [insert] = await db.batch([
-      db
-        .prepare(
-          `INSERT OR IGNORE INTO wallet_outbox(id, business, customer, kind, campaign, not_before, created)
-           SELECT 'sp:' || ? || ':' || id, business, id, 'special', ?, ?, ? FROM customers
-           WHERE business = ? AND archived IS NULL AND google_wallet IS NOT NULL`,
-        )
-        .bind(s.id, s.id, nowIso, nowIso, s.business),
-      db.prepare("UPDATE special_days SET queued = ? WHERE id = ?").bind(nowIso, s.id),
-    ]);
-    await db.prepare("UPDATE special_days SET recipients = ? WHERE id = ?").bind(insert.meta.changes ?? 0, s.id).run();
-  }
+    .all<{ id: string; business: string; text: string }>();
+  for (const s of due.results ?? []) await sendSpecial(db, s, nowIso);
 }
 
 /**
