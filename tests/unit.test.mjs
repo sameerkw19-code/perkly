@@ -137,3 +137,12 @@ test("near text: tags are filled, unknown ones left, length capped", () => {
   assert.equal(fillNearText("{missing} left", { missing: null, reward: "x", business: "y" }), "left");
   assert.equal(fillNearText("a".repeat(200), { reward: "x", business: "y" }).length, 120);
 });
+
+import { stampEmoji } from "../lib/near-text.ts";
+test("near text: the stamp's emoji for the automatic line; emojis are never split", () => {
+  assert.equal(stampEmoji("coffee"), "☕");
+  assert.equal(stampEmoji("3d-pizza"), "🍕");
+  assert.equal(stampEmoji("logo"), "⭐");
+  const long = "א".repeat(119) + "☕☕";
+  assert.equal(fillNearText(long, { reward: "x", business: "y" }), "א".repeat(119) + "☕");
+});
