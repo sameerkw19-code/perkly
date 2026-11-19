@@ -21,7 +21,7 @@ type Image = AssetMeta & { kind: string };
 type Editor = { draft: Design; publishedVersion: number; publishedAt: string | null; hasUnpublished: boolean; images: Image[] };
 type T = (key: string, vars?: Record<string, string | number>) => string;
 
-const MAX_SIDE = { logo: 660, hero: 1200, wallet: 1125, stamp: 400, stampEmpty: 400, pizza: 700 } as const;
+const MAX_SIDE = { logo: 660, icon: 1024, hero: 1200, wallet: 1125, stamp: 400, stampEmpty: 400, pizza: 700 } as const;
 // Keep in step with MAX_BYTES in app/api/asset/route.ts (800 KB), with a margin for the request.
 const UPLOAD_CAP = 780_000;
 const SIZES: Size[] = ["s", "m", "l"];
@@ -184,17 +184,18 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
     );
   };
 
-  async function upload(kind: "logo" | "hero" | "wallet" | "stamp" | "stampEmpty" | "pizza", file: File | undefined) {
+  async function upload(kind: "logo" | "hero" | "wallet" | "stamp" | "stampEmpty" | "pizza" | "icon", file: File | undefined) {
     if (!file) return;
     if (!/^image\/(png|jpeg|webp)$/.test(file.type)) { notify(errorText(lang, "image_type"), true); return; }
     setBusy(kind);
     try {
       const photo = kind === "hero" || kind === "wallet" || kind === "pizza";
       // Logos are PNG: Google Wallet needs PNG or JPEG for a business's class logo, and PNG keeps the transparent background.
-      const format = kind === "logo" ? "image/png" : photo ? "image/jpeg" : "image/webp";
-      let blob = await shrink(file, MAX_SIDE[kind], format, !photo && clearWhite);
+      const format = kind === "logo" || kind === "icon" ? "image/png" : photo ? "image/jpeg" : "image/webp";
+      // The notification icon keeps its own background (iOS shows it on a rounded square).
+      let blob = await shrink(file, MAX_SIDE[kind], format, !photo && kind !== "icon" && clearWhite);
       // A PNG is lossless, so a detailed logo can stay large even when small. Shrink again until it fits the upload cap.
-      for (let side = Math.round(MAX_SIDE[kind] * 0.7); kind === "logo" && blob.size > UPLOAD_CAP && side >= 240; side = Math.round(side * 0.7)) {
+      for (let side = Math.round(MAX_SIDE[kind] * 0.7); (kind === "logo" || kind === "icon") && blob.size > UPLOAD_CAP && side >= 240; side = Math.round(side * 0.7)) {
         blob = await shrink(file, side, format, clearWhite);
       }
       if (blob.size > UPLOAD_CAP) { notify(errorText(lang, "image_too_big"), true); return; }
@@ -205,6 +206,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
       if (!r.ok) { notify(errorText(lang, data.code), true); return; }
       setImages((list) => [{ id: data.id, kind, width: data.width, height: data.height }, ...list]);
       if (kind === "logo") set({ logo: data.id });
+      if (kind === "icon") set({ notifyIcon: data.id });
       if (kind === "hero") set({ hero: data.id });
       if (kind === "wallet") set({ walletHero: data.id });
       if (kind === "stamp") setDesign((d) => ({ ...d, stamp: { icon: "image", image: data.id }, look: { ...d.look, progress: "stamps" } }));
@@ -594,8 +596,8 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
             </p>
           )}
           <div className="uploads">
-            {([["logo", "edLogo", "edLogoHint"], ["hero", "edHero", "edHeroHint"], ["wallet", "edWallet", "edWalletHint"]] as const).map(([kind, label, hint]) => {
-              const id = kind === "logo" ? design.logo : kind === "hero" ? design.hero : design.walletHero;
+            {([["logo", "edLogo", "edLogoHint"], ["icon", "edIcon", "edIconHint"], ["hero", "edHero", "edHeroHint"], ["wallet", "edWallet", "edWalletHint"]] as const).map(([kind, label, hint]) => {
+              const id = kind === "logo" ? design.logo : kind === "icon" ? design.notifyIcon ?? null : kind === "hero" ? design.hero : design.walletHero;
               const meta = images.find((i) => i.id === id);
               return (
                 <div className="upload" key={kind} id={"ed-" + kind}>
@@ -603,7 +605,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
                   <div>
                     <b>{t(label)}</b>
                     <small className="form-hint">{t(hint)}</small>
-                    {meta && <small className="form-hint" dir="ltr">{meta.width}×{meta.height}{(kind === "logo" ? Math.min(meta.width, meta.height) : meta.width) < IMAGE_MIN[kind] ? " ⚠" : ""}</small>}
+                    {meta && <small className="form-hint" dir="ltr">{meta.width}×{meta.height}{(kind === "logo" || kind === "icon" ? Math.min(meta.width, meta.height) : meta.width) < IMAGE_MIN[kind] || (kind === "icon" && Math.abs(meta.width - meta.height) > meta.width * 0.05) ? " ⚠" : ""}</small>}
                     <div className="row-actions">
                       {paid ? (
                         <label className="btn soft small">
@@ -616,6 +618,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
                       {id && (
                         <button type="button" className="btn soft small" onClick={() => kind === "logo"
                           ? set({ logo: null, stamp: design.stamp.icon === "logo" ? { icon: "star", image: null } : design.stamp })
+                          : kind === "icon" ? set({ notifyIcon: null })
                           : kind === "hero" ? set({ hero: null }) : set({ walletHero: null })}>
                           <Trash2 size={14} />{t("remove")}
                         </button>

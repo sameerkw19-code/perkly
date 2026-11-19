@@ -77,6 +77,8 @@ const SPEC = {
   logo: { width: 480, height: 150, fit: "scale-down" },
   // The square icon iOS shows next to the pass's notifications and on the lock screen: the logo on white.
   icon: { width: 114, height: 114, fit: "pad", background: "#FFFFFF" },
+  // An icon uploaded for notifications is already square: fill the whole square.
+  notify: { width: 114, height: 114, fit: "cover" },
 } as const;
 
 type ImageKind = keyof typeof SPEC;
@@ -128,7 +130,8 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
   const reward = (text.reward || c.reward).slice(0, 120);
   const files: Record<string, Bytes> = {};
   // The icon on the pass's notifications: the business's logo, or Perkly's when it has none (or it can't be converted).
-  const icon = await passImage(db, c.business, design.logo ?? design.walletLogo, "icon");
+  const icon = (design.notifyIcon ? await passImage(db, c.business, design.notifyIcon, "notify") : null)
+    ?? await passImage(db, c.business, design.logo ?? design.walletLogo, "icon");
   for (const [name, b64] of Object.entries(PASS_ICONS)) files[name] = icon ?? b64bytes(b64);
   // The wallet version of the logo (white background removed, trimmed) when the editor made one.
   const logo = await passImage(db, c.business, design.walletLogo ?? design.logo, "logo");

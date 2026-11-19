@@ -168,6 +168,9 @@ export type Design = {
    *  (Apple Wallet), and the same centred in a square (Google Wallet's round logo). Null without a logo. */
   walletLogo?: string | null;
   googleLogo?: string | null;
+  /** The square icon next to the card's phone notifications (Apple Wallet) and the round logo of the Google Wallet pass.
+   *  Optional: without it the logo is used. */
+  notifyIcon?: string | null;
   /** A phone notification (Google Wallet) after each stamp and when a reward is reached. Off unless the business turns it on. */
   walletNotify: boolean;
   /** A welcome notification right after the customer saves the card to Google Wallet. */
@@ -190,7 +193,7 @@ export const BIRTHDAY_GIFT_DAYS = 7;
 /** Longest special-day message a business can schedule. */
 export const SPECIAL_MAX_TEXT = 160;
 export const WALLET_LIMITS = { title: 24, reward: 36 };
-export const IMAGE_MIN = { logo: 660, hero: 800, stamp: 120, wallet: 1032 };
+export const IMAGE_MIN = { logo: 660, hero: 800, stamp: 120, wallet: 1032, icon: 660 };
 
 export const PALETTES: Record<string, { bg: string; fg: string; stamp: string }> = {
   charcoal: { bg: "#1E1B2E", fg: "#FFFFFF", stamp: "#D9F493" },
@@ -316,6 +319,7 @@ export function sanitizeDesign(input: unknown): Design | null {
     appleStamps: walletStampIds(d.appleStamps),
     walletLogo: asset(d.walletLogo),
     googleLogo: asset(d.googleLogo),
+    notifyIcon: asset(d.notifyIcon),
     walletNotify: d.walletNotify === true,
     walletWelcome: d.walletWelcome === true,
     walletBirthday: d.walletBirthday === true,
@@ -353,7 +357,7 @@ function sanitizeLook(input: unknown, bg: string): CardLook {
 }
 
 export function assetIds(d: Design): string[] {
-  return [d.logo, d.hero, d.walletHero, d.stamp.image, d.stamp.emptyImage, d.progressImage, ...d.walletStamps, ...d.appleStamps, d.walletLogo, d.googleLogo].filter((x): x is string => !!x);
+  return [d.logo, d.hero, d.walletHero, d.stamp.image, d.stamp.emptyImage, d.progressImage, ...d.walletStamps, ...d.appleStamps, d.walletLogo, d.googleLogo, d.notifyIcon].filter((x): x is string => !!x);
 }
 
 /** Most stamps a card can have (see validTarget), so at most 31 banner pictures (0 to 30 stamps). */
