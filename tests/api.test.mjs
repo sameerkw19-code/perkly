@@ -1017,6 +1017,19 @@ test("message to customers: the owner sends now or schedules; staff can't; at mo
   assert.equal((await stranger.post("/api/special", { action: "create", business: biz, text: "Hi", now: true })).status, 403);
 });
 
+test("billing portal: owners only; without Polar or a subscription it says so", async () => {
+  const owner = new Client();
+  await signup(owner, "portal-owner");
+  const biz = (await owner.post("/api/loyalty", { action: "create_business", name: "Portal", reward: "Free", target: 5, color: "#123456" })).body.id;
+  const r = await owner.post("/api/billing/portal", { business: biz });
+  assert.ok([503, 404].includes(r.status), `${r.status} ${JSON.stringify(r.body)}`);
+  const stranger = new Client();
+  await signup(stranger, "portal-stranger");
+  assert.equal((await stranger.post("/api/billing/portal", { business: biz })).status, 403);
+  const page = await owner.get("/billing");
+  assert.equal(page.status, 200);
+});
+
 test("change the sign-in email: needs the current password, refuses a taken or same address", async () => {
   const a = new Client();
   await signup(a, "mover");

@@ -264,3 +264,30 @@ export async function getSubscription(env: PolarEnv, subscriptionId: string): Pr
   const meta = (item.metadata && typeof item.metadata === "object" ? item.metadata : {}) as Record<string, unknown>;
   return subscriptionRow({ type: "subscription.updated", data: { ...item, metadata: { ...meta, business: meta.business ?? "unknown" } } });
 }
+
+/**
+ * A sign-in link to Polar's customer portal for one customer (valid for a short while): there the owner changes the
+ * card, downloads invoices or cancels. Needs the access token's customer_sessions:write scope.
+ */
+export async function customerPortalUrl(env: PolarEnv, customerId: string, returnUrl: string): Promise<string> {
+  if (!env.POLAR_ACCESS_TOKEN) throw new Error("polar_not_configured");
+  const r = await fetch(`${apiBase(env)}/customer-sessions/`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${env.POLAR_ACCESS_TOKEN}`, "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ customer_id: customerId, return_url: returnUrl }),
+  });
+  if (!r.ok) throw new Error(`polar_customer_session_${r.status}`);
+  const data = (await r.json()) as { customer_portal_url?: string };
+  if (!data.customer_portal_url?.startsWith("https://")) throw new Error("polar_customer_session_no_url");
+  return data.customer_portal_url;
+}
+
+/**
+ * Free trial days for a new checkout: through the business's free access (so it is never charged while it still
+ * has it), and at least the standard trial for a first subscription. Polar takes up to 90 days here.
+ */
+export function trialDaysFor(firstTime: boolean, compUntil: string | null, standardDays: number, now = Date.now()): number {
+  const comp = compUntil && !compUntil.startsWith("9999") ? Math.ceil((Date.parse(compUntil) - now) / 86_400_000) : 0;
+  const days = Math.max(firstTime ? standardDays : 0, comp > 0 ? comp : 0);
+  return Math.min(90, days);
+}
