@@ -22,7 +22,7 @@ function savedCard(code: string): string {
 }
 const noSubscribe = () => () => {};
 
-export default function JoinForm({ code, business }: { code: string; business: Business | null }) {
+export default function JoinForm({ code, business, invite = null }: { code: string; business: Business | null; invite?: { ref: string; stamps: number } | null }) {
   const { lang, setLang, t, dir } = useLang();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -42,6 +42,7 @@ export default function JoinForm({ code, business }: { code: string; business: B
       terms: form.get("terms") === "on",
       marketing: form.get("marketing") === "on",
       birthday: business?.birthdays ? birthdayFromParts(form.get("bday"), form.get("bmonth")) : "",
+      ...(invite ? { ref: invite.ref } : {}),
     });
     if (result.ok) {
       try { localStorage.setItem(cardKey(code), String(result.data.cardPath).replace(/\?.*$/, "")); } catch {}
@@ -65,6 +66,7 @@ export default function JoinForm({ code, business }: { code: string; business: B
         <form className="auth-card panel" onSubmit={submit}>
           <h1>{t("joinTitle", { b: textsFor(business.design, lang).title || business.name })}</h1>
           <p className="muted">{t("joinIntro")}</p>
+          {invite && <p className="join-invited" role="note">🎁 {t("joinInvited", { n: invite.stamps })}</p>}
           {myCard && (
             <div className="join-have-card">
               <span>{t("joinHaveCard")}</span>

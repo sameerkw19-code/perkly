@@ -6,7 +6,7 @@ import { Brand } from "../../components/brand";
 import { errorText, useLang } from "../../lib/i18n";
 import { SPECIAL_MAX_TEXT, noticeText, type Texts } from "../../lib/design";
 
-type Item = { id: string; send_at: string; text: string; queued: string | null; recipients: number | null; canceled: string | null; sent: number };
+type Item = { id: string; send_at: string; text: string; queued: string | null; recipients: number | null; canceled: string | null; sent: number; visited?: number; windowDone?: boolean };
 type Data = {
   business: { id: string; name: string }; businesses: { id: string; name: string }[]; items: Item[];
   walletCustomers: number; reach?: { google: number; apple: number; total: number }; walletReady: boolean;
@@ -31,6 +31,7 @@ export default function SpecialView() {
   const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read once from the browser after hydration (the server can't see it)
     setBusiness(new URLSearchParams(window.location.search).get("b") ?? "");
     // Tomorrow at 10:00 as a starting point.
     const d = new Date(Date.now() + 86_400_000);
@@ -41,10 +42,11 @@ export default function SpecialView() {
   const load = useCallback(async () => {
     setError("");
     const r = await fetch(`/api/special?business=${encodeURIComponent(business)}`, { credentials: "same-origin" }).catch(() => null);
-    const body: any = r ? await r.json().catch(() => ({})) : {};
+    const body = (r ? await r.json().catch(() => ({})) : {}) as { code?: string };
     if (!r || !r.ok) return setError(errorText(lang, body.code));
     setData(body as Data);
   }, [business, lang]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loading the list when the business changes
   useEffect(() => { load(); }, [load]);
 
   const sample = useMemo(() => {
@@ -62,7 +64,7 @@ export default function SpecialView() {
       credentials: "same-origin",
       body: JSON.stringify({ business: data!.business.id, ...payload }),
     }).catch(() => null);
-    const body: any = r ? await r.json().catch(() => ({})) : {};
+    const body = (r ? await r.json().catch(() => ({})) : {}) as { code?: string };
     setBusy(false);
     if (!r || !r.ok) { setStatus(errorText(lang, body.code)); return false; }
     await load();
@@ -163,6 +165,11 @@ export default function SpecialView() {
                         <strong>{fmt(i.send_at)}</strong>
                         <p>{i.text}</p>
                         <small className="form-hint">{state(i)}</small>
+                        {i.queued && !i.canceled && (i.recipients ?? 0) > 0 && (
+                          <small className="sp-result">
+                            📈 {t(i.windowDone ? "spResult" : "spResultSoFar", { n: i.visited ?? 0, total: i.recipients ?? 0, pct: Math.round(((i.visited ?? 0) / (i.recipients || 1)) * 100) })}
+                          </small>
+                        )}
                       </div>
                       {!i.queued && !i.canceled && (
                         <button type="button" className="btn soft small" disabled={busy} onClick={() => { if (window.confirm(t("spCancelConfirm"))) post({ action: "cancel", id: i.id }); }}>

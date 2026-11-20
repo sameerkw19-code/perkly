@@ -80,15 +80,15 @@ export default async function AdminBillingPage() {
 
         <section className="stats admin-stats">
           <div className="stat"><span className="stat-label">הכנסה חודשית משוערת</span><strong>{money(mrr, "ILS")}</strong><small>{active} מנויים פעילים, מהם {yearlyActive} שנתיים (שנתי נספר כ־1/12)</small></div>
-          <div className="stat"><span className="stat-label">תשלומים שנכשלו</span><strong>{pastDue.length}</strong><small>עסקים במצב "תשלום נכשל"</small></div>
+          <div className="stat"><span className="stat-label">תשלומים שנכשלו</span><strong>{pastDue.length}</strong><small>עסקים במצב &quot;תשלום נכשל&quot;</small></div>
           <div className="stat"><span className="stat-label">תשלומים שהתקבלו</span><strong>{orders.length}</strong><small>מתוך Polar (עד 300 אחרונים)</small></div>
-          <div className="stat"><span className="stat-label">סה"כ עסקים</span><strong>{subs.results.length}</strong><small>כולל בלי מנוי</small></div>
+          <div className="stat"><span className="stat-label">סה״כ עסקים</span><strong>{subs.results.length}</strong><small>כולל בלי מנוי</small></div>
         </section>
 
         {kitsDue.length > 0 && (
           <section className="panel">
             <h2>ערכות קופה למשלוח</h2>
-            <p className="muted">עסקים במנוי שנתי ששילמו ועוד לא קיבלו ערכה. אחרי המשלוח מסמנים "נשלחה" בדף העסק.</p>
+            <p className="muted">עסקים במנוי שנתי ששילמו ועוד לא קיבלו ערכה. אחרי המשלוח מסמנים &quot;נשלחה&quot; בדף העסק.</p>
             <div className="table-wrap">
               <table>
                 <thead><tr><th>עסק</th><th>בעלים</th><th>מגיעה מאז</th></tr></thead>

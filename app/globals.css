@@ -815,7 +815,14 @@ html,body{overflow-x:clip}
 
 /* The business's own lock-screen line near a branch. */
 .near-form { display: grid; gap: 10px; }
-.near-form input { min-height: 44px; font-size: 16px; width: 100%; }
+.near-form input:not([type="checkbox"]) { min-height: 44px; font-size: 16px; width: 100%; }
+.near-form .check-row { display: flex; align-items: flex-start; gap: 10px; font-weight: 600; }
+.near-form .check-row input { width: 20px; height: 20px; margin-top: 2px; flex: none; }
+.near-form .check-row small { display: block; font-weight: 400; margin-top: 2px; }
+.near-time { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.near-time > label { font-weight: 700; }
+.near-from { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.near-from select { min-height: 36px; padding: 4px 8px; font: inherit; }
 .near-tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; }
 .near-tags .chip { min-height: 36px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: #fff; cursor: pointer; font: inherit; }
 .near-tags .chip:hover, .near-tags .chip:focus-visible { border-color: var(--purple); }
@@ -832,3 +839,11 @@ html,body{overflow-x:clip}
 .here { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: 1 1 100%; }
 .here .btn { min-height: 44px; }
 .here small { flex: 1 1 200px; min-width: 0; }
+
+/* "Bring a friend" on the customer's card and on the join page. */
+.invite-panel h2 { margin: 0 0 6px; font-size: 18px; }
+.invite-panel p { margin: 0 0 12px; line-height: 1.5; }
+.invite-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.invite-actions .btn { min-height: 44px; flex: 1 1 auto; justify-content: center; }
+.join-invited { margin: 0; padding: 10px 12px; border-radius: 10px; background: #fff3d6; color: #5a4300; font-weight: 600; line-height: 1.5; }
+.sp-result { display: block; margin-top: 4px; font-weight: 600; color: #2f6b2a; }

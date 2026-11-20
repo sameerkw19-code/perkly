@@ -73,6 +73,8 @@ export type Texts = {
   notify: string; notifyReward: string;
   /** Welcome message after joining, and the birthday greeting. Empty: the default wording. */
   welcome: string; birthday: string;
+  /** "We miss you" to a customer who hasn't visited for MISS_YOU_DAYS. Empty: the default wording. */
+  missYou: string;
 };
 
 /** Fonts a business can pick. All are free Google Fonts; "system" needs no download. */
@@ -179,6 +181,8 @@ export type Design = {
   walletBirthday: boolean;
   /** On the customer's birthday, a reward is added to the card (valid BIRTHDAY_GIFT_DAYS days). */
   birthdayGift: boolean;
+  /** "We miss you" to a customer who hasn't visited for MISS_YOU_DAYS (Apple and Google Wallet). Off unless turned on. */
+  walletMissYou: boolean;
   /** Languages the card is shown in, in card order. Set by the business; a language not listed never appears. */
   langs: Lang[];
   texts: Record<Lang, Texts>;
@@ -188,7 +192,9 @@ export type Design = {
   look: CardLook;
 };
 
-export const LIMITS = { title: 40, subtitle: 40, reward: 80, gift: 14, promo: 60, notify: 120, notifyReward: 120, welcome: 120, birthday: 120 };
+export const LIMITS = { title: 40, subtitle: 40, reward: 80, gift: 14, promo: 60, notify: 120, notifyReward: 120, welcome: 120, birthday: 120, missYou: 120 };
+/** Days without a visit before the "we miss you" message. */
+export const MISS_YOU_DAYS = 30;
 export const BIRTHDAY_GIFT_DAYS = 7;
 /** Longest special-day message a business can schedule. */
 export const SPECIAL_MAX_TEXT = 160;
@@ -253,7 +259,7 @@ export function cardLang(d: Design, wanted?: string | null): Lang {
 
 /** `lang`: the card's language (English for businesses abroad). */
 export function defaultDesign(b: { name: string; reward: string; color: string }, lang: Lang = "he"): Design {
-  const t = (l: Lang): Texts => ({ title: b.name.slice(0, LIMITS.title), subtitle: "", reward: b.reward.slice(0, LIMITS.reward), gift: GIFT[l], promo: "", notify: "", notifyReward: "", welcome: "", birthday: "" });
+  const t = (l: Lang): Texts => ({ title: b.name.slice(0, LIMITS.title), subtitle: "", reward: b.reward.slice(0, LIMITS.reward), gift: GIFT[l], promo: "", notify: "", notifyReward: "", welcome: "", birthday: "", missYou: "" });
   return {
     v: 1,
     layout: "gradient",
@@ -269,6 +275,7 @@ export function defaultDesign(b: { name: string; reward: string; color: string }
     walletWelcome: false,
     walletBirthday: false,
     birthdayGift: false,
+    walletMissYou: false,
     progressImage: null,
     langs: [lang],
     texts: Object.fromEntries(CARD_LANGS.map((l) => [l, t(l)])) as Record<Lang, Texts>,
@@ -285,6 +292,8 @@ function cleanText(v: unknown, max: number): string {
 /** Strict server-side cleanup. Returns null if the shape is wrong. Asset ownership is checked separately. */
 export function sanitizeDesign(input: unknown): Design | null {
   if (!input || typeof input !== "object") return null;
+  // Untrusted JSON: every field is checked below before use.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const d = input as any;
   const colors = d.colors ?? {};
   if (![colors.bg, colors.fg, colors.stamp].every((c) => typeof c === "string" && HEX.test(c))) return null;
@@ -304,6 +313,7 @@ export function sanitizeDesign(input: unknown): Design | null {
       notifyReward: cleanText(t.notifyReward, LIMITS.notifyReward),
       welcome: cleanText(t.welcome, LIMITS.welcome),
       birthday: cleanText(t.birthday, LIMITS.birthday),
+      missYou: cleanText(t.missYou, LIMITS.missYou),
     };
   }
   return {
@@ -324,6 +334,7 @@ export function sanitizeDesign(input: unknown): Design | null {
     walletWelcome: d.walletWelcome === true,
     walletBirthday: d.walletBirthday === true,
     birthdayGift: d.birthdayGift === true,
+    walletMissYou: d.walletMissYou === true,
     progressImage: asset(d.progressImage),
     langs: sanitizeLangs(d.langs),
     texts,
@@ -337,6 +348,8 @@ export function sanitizeDesign(input: unknown): Design | null {
 function sanitizeLook(input: unknown, bg: string): CardLook {
   const base = defaultLook(bg);
   if (!input || typeof input !== "object") return base;
+  // Untrusted JSON: every field is checked below before use.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const l = input as any;
   const size = (v: unknown, fb: Size): Size => (v === "s" || v === "m" || v === "l" ? v : fb);
   const overlay = Number(l.overlay);
@@ -472,6 +485,7 @@ export function textsFor(d: Design, lang: Lang): Texts {
     notifyReward: d.texts[l].notifyReward ?? "",
     welcome: d.texts[l].welcome ?? "",
     birthday: d.texts[l].birthday ?? "",
+    missYou: d.texts[l].missYou ?? "",
   };
 }
 
@@ -481,6 +495,7 @@ export type StampNotice =
   | { kind: "reward"; name: string }
   | { kind: "welcome"; name: string }
   | { kind: "birthday"; name: string; gift: boolean }
+  | { kind: "missyou"; name: string }
   /** A message the business scheduled for a special day; `text` is its own wording. */
   | { kind: "special"; name: string; text: string };
 
@@ -489,6 +504,7 @@ export function noticeOn(d: Design, kind: StampNotice["kind"]): boolean {
   if (kind === "stamp" || kind === "reward") return d.walletNotify;
   if (kind === "welcome") return d.walletWelcome;
   if (kind === "birthday") return d.walletBirthday;
+  if (kind === "missyou") return d.walletMissYou;
   return true;
 }
 
@@ -509,8 +525,18 @@ const BIRTHDAY_DEFAULTS: Record<Lang, { plain: string; gift: string }> = {
   fr: { plain: "Joyeux anniversaire {name} ! 🎂 Toute l'équipe de {business} vous le souhaite", gift: "Joyeux anniversaire {name} ! 🎂 Un cadeau vous attend chez {business} : {reward}" },
 };
 
-/** The default wording for welcome and birthday messages (shown greyed out in the editor). */
-export function noticeDefault(lang: Lang, kind: "welcome" | "birthday", gift = false): string {
+const MISS_YOU_DEFAULTS: Record<Lang, string> = {
+  he: "התגעגענו אליך {name}! 💜 מחכים לך ב{business}. כל ביקור מקרב אותך ל: {reward}",
+  ar: "اشتقنا لك {name}! 💜 ننتظرك في {business}. كل زيارة تقرّبك من: {reward}",
+  en: "We miss you, {name}! 💜 Come back to {business}: every visit brings you closer to {reward}",
+  ru: "Мы скучаем, {name}! 💜 Ждём вас в {business}. Каждый визит приближает к: {reward}",
+  de: "Wir vermissen dich, {name}! 💜 Komm wieder zu {business}: jeder Besuch bringt dich näher zu {reward}",
+  fr: "Vous nous manquez, {name} ! 💜 Revenez chez {business} : chaque visite vous rapproche de {reward}",
+};
+
+/** The default wording for welcome, birthday and "we miss you" messages (shown greyed out in the editor). */
+export function noticeDefault(lang: Lang, kind: "welcome" | "birthday" | "missyou", gift = false): string {
+  if (kind === "missyou") return MISS_YOU_DEFAULTS[lang] ?? MISS_YOU_DEFAULTS.en;
   return kind === "welcome" ? (WELCOME_DEFAULTS[lang] ?? WELCOME_DEFAULTS.en) : (BIRTHDAY_DEFAULTS[lang] ?? BIRTHDAY_DEFAULTS.en)[gift ? "gift" : "plain"];
 }
 
@@ -531,6 +557,7 @@ export function noticeText(texts: Texts, lang: Lang, notice: StampNotice): strin
     notice.kind === "reward" ? texts.notifyReward || d.reward
     : notice.kind === "welcome" ? texts.welcome || noticeDefault(lang, "welcome")
     : notice.kind === "birthday" ? texts.birthday || noticeDefault(lang, "birthday", notice.gift)
+    : notice.kind === "missyou" ? texts.missYou || noticeDefault(lang, "missyou")
     : notice.kind === "special" ? notice.text
     : texts.notify || (notice.added === 1 ? d.one : d.many);
   const name = notice.name.trim().split(/\s+/)[0] ?? "";

@@ -2,17 +2,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SOCIAL_KEYS, SOCIAL_LABEL, normalizeSocial, socialDisplay, type Social } from "../lib/social";
 import { SocialIcon } from "../lib/social-icon";
-import { fillNearText, NEAR_TAG_NAMES, type NearTag } from "../lib/near-text";
+import { fillNearText, NEAR_TAG_NAMES, nearPhase, type NearTag } from "../lib/near-text";
+import { israelNow } from "../lib/birthday";
 import {
   Activity, AlertTriangle, Trash2, Cake, Check, Copy, CreditCard, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode,
   ChevronRight, History, Palette, RefreshCw, RotateCcw, ScanLine, Search, Settings, Share2, Store, UserPlus, Users, UserRound, X,
   Phone, MapPin, Megaphone,
+  type LucideIcon,
 } from "lucide-react";
 import type { Design } from "../lib/design";
 import { averageReward, earnFor, formatMoney, parseAmount, pctLabel } from "../lib/cashback.ts";
-import { CardEditor } from "../components/card-editor";
+import { CardEditor, type Editor as EditorData } from "../components/card-editor";
 import jsQR from "jsqr";
 import { errorText, useLang } from "../lib/i18n";
+import type { SiteLang } from "../lib/i18n-types";
 import { copyText, post, whatsappLink } from "../lib/api";
 import { LangSwitch } from "../components/lang-switch";
 import { InstallApp } from "../components/install-app";
@@ -25,7 +28,7 @@ import { weekChange } from "../lib/weekly";
 import { Brand } from "../components/brand";
 
 type Role = "owner" | "staff";
-type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social; program?: "stamps" | "cashback" | "average"; cashback_bp?: number; cashback_min?: number; currency?: string; avg_cap?: number; pos_only?: number; near_text?: string | null };
+type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social; program?: "stamps" | "cashback" | "average"; cashback_bp?: number; cashback_min?: number; currency?: string; avg_cap?: number; pos_only?: number; near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number; near_evening_from?: number; referral_stamps?: number };
 type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; rewards?: number; nextExpiry?: string | null; phone?: string; balance?: number; roundTotal?: number; rewardValue?: number | null };
 type Data = {
   me: { name: string; email: string };
@@ -49,26 +52,47 @@ type Data = {
   role: Role | null;
   business: Business | null;
   design?: Design;
-  editor?: any;
+  editor?: EditorData;
   range?: number | "all";
-  customers?: any[];
-  events?: any[];
+  customers?: CustomerRow[];
+  events?: EventRow[];
   stats?: { customers: number; new_customers: number; rewards_ready: number; stamps: number; redemptions: number; open_balance?: number };
   /** Last day, week and month against the same length before it. */
   summary?: Record<Period, Record<string, number>>;
-  team?: any[];
-  invites?: any[];
+  team?: TeamRow[];
+  invites?: InviteRow[];
   alerts?: { type: "customer" | "staff" | "staffFix"; name: string; count: number }[];
-  myRecent?: any[];
+  myRecent?: EventRow[];
 };
+/** One customer in the list (see GET /api/loyalty). */
+type CustomerRow = {
+  id: string; name: string; phone: string; stamps: number; target: number; balance: number; created: string; source: string;
+  consent_marketing: number; birthday: string | null; has_link: boolean; rewards: number; last_visit: string | null;
+};
+/** One entry of the activity history (several entries can be grouped into one). */
+type EventRow = {
+  id?: string; kind: string; delta: number; amount?: number | null; balance_after?: number | null; created: string; actor_role?: string;
+  stamps_after?: number | null; note?: string | null; customer: string; actor_name?: string | null; branch_name?: string | null;
+  rewards_earned?: number; count?: number;
+  /** When grouped: the time of the first entry in the group. */
+  firstCreated?: string;
+};
+type TeamRow = { id: string; name: string; email: string; role: Role; created: string; revoked: string | null; branch: string | null; brought: number };
+type InviteRow = { id: string; label: string | null; role: Role; created: string; expires: string; branch: string | null };
+/** The dashboard's translate function. */
+type T = (key: string, vars?: Record<string, string | number>) => string;
+/** A dashboard action: the reply's data, or null when it failed (the error is shown already). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- each action answers with its own shape
+type Call = (b: Record<string, unknown>) => Promise<any>;
+
 type Modal =
   | { type: "customer" }
   | { type: "staffLink" }
   | { type: "business" }
   | { type: "link"; url: string; title: string; note?: string }
-  | { type: "correct"; customer: any }
-  | { type: "remove"; customer: any }
-  | { type: "phone"; customer: any };
+  | { type: "correct"; customer: CustomerRow | CardState }
+  | { type: "remove"; customer: CustomerRow | CardState }
+  | { type: "phone"; customer: CustomerRow | CardState };
 
 export default function Dashboard() {
   const { lang, setLang, t, dir } = useLang();
@@ -82,6 +106,7 @@ export default function Dashboard() {
   // Opened from the admin's build steps: a link back to them on every screen.
   const [fromAdmin, setFromAdmin] = useState(false);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read once from the browser after hydration (the server can't see it)
     if (new URLSearchParams(window.location.search).get("from") === "admin") setFromAdmin(true);
     const h = window.location.hash.slice(1);
     if (h === "design" || h === "settings" || h === "team" || h === "customers" || h === "station") setView(h);
@@ -93,7 +118,7 @@ export default function Dashboard() {
   // Pop-up windows work from the keyboard: focus moves in, Tab stays inside, Escape closes, focus returns.
   const dialogRef = useRef<HTMLElement>(null);
   const busyRef = useRef(false);
-  busyRef.current = busy;
+  useEffect(() => { busyRef.current = busy; }, [busy]);
   const modalKey = modal ? modal.type : null;
   useEffect(() => {
     if (!modalKey) return;
@@ -153,6 +178,7 @@ export default function Dashboard() {
     const fromUrl = new URLSearchParams(window.location.search).get("business");
     let saved: string | null = null;
     try { saved = localStorage.getItem("perkly-business"); } catch {}
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read once from the browser after hydration (the server can't see it)
     setBusinessId(fromUrl || saved || "");
   }, []);
 
@@ -176,6 +202,7 @@ export default function Dashboard() {
     }
   }, [businessId, days, branchView]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loading the data when what's asked for changes
   useEffect(() => { load(); }, [load]);
   // While the dashboard is open (for example on a tablet at the counter), check every 30 seconds whether
   // someone joined: say so, and refresh the overview or the customer list if that is what's on screen.
@@ -222,7 +249,7 @@ export default function Dashboard() {
     setBusy(false);
     if (!result.ok) {
       notify(errorText(lang, result.code), true);
-      if (result.code === "signin") window.location.href = "/login";
+      if (result.code === "signin") window.location.assign("/login");
       return null;
     }
     return result.data;
@@ -240,7 +267,7 @@ export default function Dashboard() {
   // Owners: reports, customers and the staff station. The card design, settings and team are managed by
   // Perkly (a platform admin), who sees those screens too.
   const manage = !!data?.manage;
-  const nav: [any, string][] = isOwner
+  const nav: [LucideIcon, string][] = isOwner
     ? [[LayoutDashboard, "overview"], [Users, "customers"], [ScanLine, "station"],
        ...(manage ? [[Palette, "design"], [Users, "team"], [Settings, "settings"]] as typeof nav : data?.canDesign ? [[Palette, "design"]] as typeof nav : [])]
     : [[ScanLine, "station"]];
@@ -586,6 +613,7 @@ export default function Dashboard() {
               </section>
               <Branches branches={data.branches ?? []} t={t} busy={busy} call={call} reload={load} />
               <NearText business={b} t={t} lang={lang} busy={busy} call={call} reload={load} />
+              <Referral business={b} t={t} busy={busy} call={call} reload={load} />
               <section className="panel">
                 <button className="btn soft" onClick={() => setModal({ type: "business" })}><Store size={16} />{t("newBusiness")}</button>
               </section>
@@ -748,7 +776,7 @@ export default function Dashboard() {
 
 // ---------- Pieces ----------
 
-function Stat({ icon: Icon, color, label, value, note }: { icon: any; color: string; label: string; value: number; note: string }) {
+function Stat({ icon: Icon, color, label, value, note }: { icon: LucideIcon; color: string; label: string; value: number; note: string }) {
   return (
     <article className="stat">
       <div><span className={"stat-icon " + color}><Icon size={18} /></span><span className="stat-label">{label}</span></div>
@@ -762,11 +790,11 @@ function Stat({ icon: Icon, color, label, value, note }: { icon: any; color: str
  * Consecutive actions of the same kind on the same customer (within 15 minutes) become one line,
  * so three quick stamps read "+3" instead of three identical rows.
  */
-function groupEvents(events: any[]): any[] {
-  const out: any[] = [];
+function groupEvents(events: EventRow[]): EventRow[] {
+  const out: EventRow[] = [];
   for (const e of events) {
     const last = out[out.length - 1];
-    const close = last && Math.abs(Date.parse(last.firstCreated) - Date.parse(e.created)) < 15 * 60_000;
+    const close = last && Math.abs(Date.parse(last.firstCreated ?? last.created) - Date.parse(e.created)) < 15 * 60_000;
     if (last && close && last.kind === e.kind && last.customer === e.customer && e.kind === "stamp" && !e.note && !last.note && last.branch_name === e.branch_name) {
       last.delta += e.delta;
       last.rewards_earned = (last.rewards_earned ?? 0) + (e.rewards_earned ?? 0);
@@ -778,7 +806,7 @@ function groupEvents(events: any[]): any[] {
   return out;
 }
 
-function EventList({ events, t, lang, currency = "ILS" }: { events: any[]; t: any; lang: string; currency?: string }) {
+function EventList({ events, t, lang, currency = "ILS" }: { events: EventRow[]; t: T; lang: string; currency?: string }) {
   const fmt = (minor: number) => formatMoney(Math.abs(minor), currency === "USD" ? "USD" : "ILS", lang);
   // Balance card entries: the purchase and what it added, the amount used, or a correction.
   const money = (e: { kind: string; amount?: number | null; delta: number }) =>
@@ -789,7 +817,7 @@ function EventList({ events, t, lang, currency = "ILS" }: { events: any[]; t: an
   const locale = lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB";
   return (
     <div>
-      {groupEvents(events).slice(0, 8).map((e: any, i: number) => (
+      {groupEvents(events).slice(0, 8).map((e, i) => (
         <div className="activity-row" key={e.id ?? i}>
           <span className={"activity-icon" + (e.kind === "redeem" || e.kind === "spend" ? " reward-icon" : "")}>{e.kind === "redeem" || e.kind === "spend" ? <Gift size={16} /> : e.kind === "adjust" || e.kind === "balance_adjust" ? <Activity size={16} /> : <Plus size={16} />}</span>
           <div>
@@ -809,7 +837,7 @@ function EventList({ events, t, lang, currency = "ILS" }: { events: any[]; t: an
   );
 }
 
-function LinkBox({ url, t, notify }: { url: string; t: any; notify: (s: string, bad?: boolean) => void }) {
+function LinkBox({ url, t, notify }: { url: string; t: T; notify: (s: string, bad?: boolean) => void }) {
   return (
     <div className="link-box">
       <input readOnly value={url} dir="ltr" onFocus={(e) => e.currentTarget.select()} aria-label="Link" />
@@ -827,7 +855,7 @@ const SOCIAL_PLACEHOLDER: Record<string, string> = {
 };
 
 function BusinessForm({ t, busy, initial, submitLabel, onSubmit, onInvalid }: {
-  t: any; busy: boolean; initial?: Business; submitLabel: string;
+  t: T; busy: boolean; initial?: Business; submitLabel: string;
   onSubmit: (v: { name: string; reward: string; target: number; color: string; staffAdjust?: boolean; birthdays?: boolean; rewardMode?: string; rewardExpiryDays?: number; social?: Social; program?: string; cashbackBp?: number; cashbackMin?: number; avgCap?: number }) => void;
   onInvalid?: (message: string) => void;
 }) {
@@ -921,12 +949,14 @@ function BusinessForm({ t, busy, initial, submitLabel, onSubmit, onInvalid }: {
 // ---------- Staff station: scan or search, then confirm. The server is the source of truth. ----------
 
 function Station({ business, branches, myBranch, canFix, owner, t, lang, initial, onDone, notify, onRegister, onStaffLink, myRecent }: {
-  business: Business; design?: Design; branches: { id: string; name: string }[]; myBranch: string | null; canFix: boolean; owner: boolean; t: any; lang: any; initial: CardState | null; onDone: () => void;
-  notify: (s: string, bad?: boolean) => void; onRegister: () => void; onStaffLink?: () => void; myRecent?: any[];
+  business: Business; design?: Design; branches: { id: string; name: string }[]; myBranch: string | null; canFix: boolean; owner: boolean; t: T; lang: SiteLang; initial: CardState | null; onDone: () => void;
+  notify: (s: string, bad?: boolean) => void; onRegister: () => void; onStaffLink?: () => void; myRecent?: EventRow[];
 }) {
   const [selected, setSelected] = useState<CardState | null>(initial);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<CardState[]>([]);
+  // Results belong to a search of 2 characters or more; a shorter query shows none.
+  const shown = query.trim().length < 2 ? [] : results;
   const [scanning, setScanning] = useState(false);
   const [busy, setBusy] = useState(false);
   const [qty, setQty] = useState(1);
@@ -937,6 +967,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
   useEffect(() => {
     let saved = "";
     try { saved = localStorage.getItem("perkly-branch:" + business.id) || ""; } catch {}
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read once from the browser after hydration (the server can't see it)
     setBranch(branches.some((x) => x.id === saved) ? saved : "");
   }, [business.id, branches]);
   function pickBranch(id: string) {
@@ -1015,7 +1046,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
 
   useEffect(() => {
     const q = query.trim();
-    if (q.length < 2) { setResults([]); return; }
+    if (q.length < 2) return; // shorter queries show nothing (see `shown` below)
     const timer = setTimeout(async () => setResults(await lookup({ query: q })), 300);
     return () => clearTimeout(timer);
   }, [query]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1055,7 +1086,9 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
     return () => clearInterval(timer);
   }, [scanning]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { setRedeemAsk(false); setArchiveAsk(false); }, [selected?.id]);
+  // A different customer: close the confirmations that were open for the previous one (adjusted while rendering).
+  const [askedFor, setAskedFor] = useState(selected?.id);
+  if (askedFor !== selected?.id) { setAskedFor(selected?.id); setRedeemAsk(false); setArchiveAsk(false); }
 
   async function archiveCustomer(erase = false) {
     if (!selected || busy) return;
@@ -1102,7 +1135,9 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
         : average && kind === "stamp" ? t("avgRecorded", { amount: fmt(purchase ?? 0) })
         : earned ? (earned === 1 ? t("earnedSaved") : t("earnedSavedN", { n: earned }))
         : kind === "stamp" ? (count === 1 ? t("stampOk") : t("stampsOk", { n: count! })) : t("redeemOk");
-      setResult({ text: message, reward: !!earned || kind === "redeem" });
+      // An invited friend's first visit: the "bring a friend" bonus was added too.
+      const bonus = r.data.referralBonus as number | undefined;
+      setResult({ text: bonus ? `${message} · 🎁 ${t("referralBonusDone", { n: bonus })}` : message, reward: !!earned || kind === "redeem" || !!bonus });
       setCountdown(DONE_SECONDS);
       setStep("done");
       onDone();
@@ -1233,7 +1268,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
             e.preventDefault();
             const q = query.trim();
             if (q.length < 2) { searchRef.current?.focus(); return; }
-            const found = results.length ? results : await lookup({ query: q });
+            const found = shown.length ? shown : await lookup({ query: q });
             if (found.length === 1) choose(found[0]); else setResults(found);
           }}>
             <label className="search st-search">
@@ -1244,9 +1279,9 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
             </label>
             <button type="submit" className="btn soft sx-wide">{t("sxSearch")}<ChevronRight size={16} className="sx-fwd" /></button>
           </form>
-          {(results.length > 0 || query.trim().length >= 2) && (
+          {(shown.length > 0 || query.trim().length >= 2) && (
             <div className="staff-results" role="listbox" aria-label={t("search")}>
-              {results.map((c) => {
+              {shown.map((c) => {
                 const ready = (c.rewards ?? 0) > 0 || c.stamps >= c.target;
                 return (
                   <button key={c.id} role="option" aria-selected={false} className="customer-result" onClick={() => choose(c)}>
@@ -1264,7 +1299,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
                   </button>
                 );
               })}
-              {query.trim().length >= 2 && !results.length && <p className="form-hint st-none">{t("noCustomer")}</p>}
+              {query.trim().length >= 2 && !shown.length && <p className="form-hint st-none">{t("noCustomer")}</p>}
             </div>
           )}
           <button className="btn primary big sx-wide sx-register" onClick={onRegister}><UserPlus size={18} />{t("sxRegister")}</button>
@@ -1516,7 +1551,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
 // ---------- Team: invite staff, revoke access ----------
 
 function Team({ data, t, lang, busy, call, reload, showLink }: {
-  data: Data; t: any; lang: string; busy: boolean; call: (b: Record<string, unknown>) => Promise<any>; reload: () => void; showLink: (url: string) => void;
+  data: Data; t: T; lang: string; busy: boolean; call: Call; reload: () => void; showLink: (url: string) => void;
 }) {
   const locale = lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB";
   return (
@@ -1527,7 +1562,7 @@ function Team({ data, t, lang, busy, call, reload, showLink }: {
         <div className="table-wrap">
           <table>
             <tbody>
-              {(data.team ?? []).map((m: any) => (
+              {(data.team ?? []).map((m) => (
                 <tr key={m.id}>
                   <td><strong>{m.name}</strong><br /><small dir="ltr">{m.email}</small></td>
                   <td>
@@ -1579,7 +1614,7 @@ function Team({ data, t, lang, busy, call, reload, showLink }: {
         {!!data.invites?.length && (
           <>
             <h3 className="sub-head">{t("pendingInvites")}</h3>
-            {data.invites.map((i: any) => (
+            {data.invites.map((i) => (
               <div className="invite-row" key={i.id}>
                 <span><strong>{i.label}</strong><small>{t("expiresOn", { d: new Date(i.expires).toLocaleDateString(locale) })}</small></span>
                 <button className="btn soft small" disabled={busy} onClick={async () => { if (await call({ action: "revoke_invite", invite: i.id })) reload(); }}>{t("cancelInvite")}</button>
@@ -1595,7 +1630,7 @@ function Team({ data, t, lang, busy, call, reload, showLink }: {
 // ---------- Branches (owner) ----------
 
 function Branches({ branches, t, busy, call, reload }: {
-  branches: { id: string; name: string; address?: string | null; lat?: number | null; lng?: number | null }[]; t: any; busy: boolean; call: (b: Record<string, unknown>) => Promise<any>; reload: () => void;
+  branches: { id: string; name: string; address?: string | null; lat?: number | null; lng?: number | null }[]; t: T; busy: boolean; call: Call; reload: () => void;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
   return (
@@ -1657,7 +1692,7 @@ function Branches({ branches, t, busy, call, reload }: {
  * "I'm at the business now": the phone's own location into the place field, with how accurate it is and a
  * map link to check it. Best from a phone standing inside the business (a computer's location is rough).
  */
-function HereButton({ input, t }: { input: string; t: any }) {
+function HereButton({ input, t }: { input: string; t: T }) {
   const [state, setState] = useState<{ kind: "busy" | "ok" | "error"; text: string; map?: string } | null>(null);
   const locate = () => {
     if (!("geolocation" in navigator)) { setState({ kind: "error", text: t("hereUnsupported") }); return; }
@@ -1691,11 +1726,53 @@ function HereButton({ input, t }: { input: string; t: any }) {
   );
 }
 
-/** The business's own lock-screen line near a branch (Apple Wallet), with tags for the customer's numbers. */
-function NearText({ business, t, lang, busy, call, reload }: { business: Business; t: any; lang: string; busy: boolean; call: (b: Record<string, unknown>) => Promise<any>; reload: () => void }) {
+/** "Bring a friend": how many stamps each side gets on the invited friend's first visit (0 = off). */
+function Referral({ business, t, busy, call, reload }: { business: Business; t: T; busy: boolean; call: Call; reload: () => void }) {
+  const [saved, setSaved] = useState(false);
+  const stamps = business.program === "stamps" || !business.program;
+  const value = business.referral_stamps ?? 0;
+  return (
+    <section className="panel">
+      <div className="section-head"><h2><Gift size={18} /> {t("referralTitle")}</h2></div>
+      <p className="form-hint">{t("referralHint")}</p>
+      {!stamps ? <p className="muted">{t("referralStampsOnly")}</p> : (
+        <label className="sr-only" htmlFor="referral-stamps">{t("referralTitle")}</label>
+      )}
+      {stamps && (
+        <select id="referral-stamps" value={value} disabled={busy} onChange={async (e) => {
+          setSaved(false);
+          if (await call({ action: "set_referral", stamps: Number(e.target.value) })) { setSaved(true); reload(); }
+        }}>
+          <option value={0}>{t("referralOff")}</option>
+          <option value={1}>{t("referralOne")}</option>
+          <option value={2}>{t("referralStamps", { n: 2 })}</option>
+          <option value={3}>{t("referralStamps", { n: 3 })}</option>
+        </select>
+      )}
+      {saved && <p className="form-hint" role="status">{t("referralSaved")}</p>}
+    </section>
+  );
+}
+
+/** The hour in Israel now (outside render helpers, so components stay pure). */
+function hourNow(): number {
+  return israelNow().hour;
+}
+
+const HOURS = Array.from({ length: 24 }, (_, h) => h);
+
+/** The business's own lock-screen line near a branch (Apple Wallet), with tags for the customer's numbers; optionally another line for the evening. */
+function NearText({ business, t, lang, busy, call, reload }: { business: Business; t: T; lang: string; busy: boolean; call: Call; reload: () => void }) {
   const [text, setText] = useState(business.near_text ?? "");
+  const [evening, setEvening] = useState(business.near_text_evening ?? "");
+  const [byTime, setByTime] = useState(!!business.near_text_evening);
+  const [morningFrom, setMorningFrom] = useState(business.near_morning_from ?? 6);
+  const [eveningFrom, setEveningFrom] = useState(business.near_evening_from ?? 16);
   const [saved, setSaved] = useState(false);
   const ref = useRef<HTMLInputElement>(null);
+  const eveRef = useRef<HTMLInputElement>(null);
+  // Tags go into the field the owner was last typing in.
+  const [target, setTarget] = useState<"main" | "evening">("main");
   const cash = business.program === "cashback";
   const tags: [NearTag, string][] = cash
     ? [["balance", "nearTagBalance"], ["business", "nearTagBusiness"]]
@@ -1703,32 +1780,67 @@ function NearText({ business, t, lang, busy, call, reload }: { business: Busines
   const li = lang === "he" ? 0 : lang === "ar" ? 1 : 2;
   const add = (key: NearTag) => {
     const tag = NEAR_TAG_NAMES[key][li];
-    const el = ref.current;
-    const at = el?.selectionStart ?? text.length;
-    const next = (text.slice(0, at) + `{${tag}}` + text.slice(at)).slice(0, 120);
-    setText(next); setSaved(false);
+    const eve = byTime && target === "evening";
+    const el = eve ? eveRef.current : ref.current;
+    const cur = eve ? evening : text;
+    const at = el?.selectionStart ?? cur.length;
+    const next = (cur.slice(0, at) + `{${tag}}` + cur.slice(at)).slice(0, 120);
+    if (eve) setEvening(next); else setText(next);
+    setSaved(false);
     requestAnimationFrame(() => { el?.focus(); const pos = Math.min(next.length, at + tag.length + 2); el?.setSelectionRange(pos, pos); });
   };
-  const preview = fillNearText(text, { missing: 3, reward: business.reward, business: business.name, balance: business.currency === "USD" ? "$20" : "₪20" });
-  const save = async (value: string) => {
-    if (await call({ action: "set_near_text", text: value })) { setSaved(true); reload(); }
+  const fill = (v: string) => fillNearText(v, { missing: 3, reward: business.reward, business: business.name, balance: business.currency === "USD" ? "$20" : "₪20" });
+  const eveningOut = byTime ? evening.trim() : "";
+  const hoursBad = byTime && morningFrom >= eveningFrom;
+  const unchanged = text.trim() === (business.near_text ?? "") && eveningOut === (business.near_text_evening ?? "")
+    && morningFrom === (business.near_morning_from ?? 6) && eveningFrom === (business.near_evening_from ?? 16);
+  const save = async (main: string, eve: string) => {
+    if (await call({ action: "set_near_text", text: main, evening: eve, morningFrom, eveningFrom })) { setSaved(true); reload(); }
   };
+  const nowWhich = business.near_text_evening ? t(nearPhase(hourNow(), business.near_morning_from ?? 6, business.near_evening_from ?? 16) === "evening" ? "nearEvening" : "nearMorning") : "";
+  const hourSelect = (id: string, value: number, set: (h: number) => void) => (
+    <select id={id} value={value} onChange={(e) => { set(Number(e.target.value)); setSaved(false); }}>
+      {HOURS.map((h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}
+    </select>
+  );
   return (
     <section className="panel near-text">
       <div className="section-head"><h2><MapPin size={18} /> {t("nearTitle")}</h2></div>
       <p className="form-hint">{t("nearHint")}</p>
-      <form className="near-form" onSubmit={(e) => { e.preventDefault(); save(text); }}>
-        <label className="sr-only" htmlFor="near-text">{t("nearTitle")}</label>
-        <input id="near-text" ref={ref} value={text} maxLength={120} onChange={(e) => { setText(e.target.value); setSaved(false); }} placeholder={t("nearPlaceholder")} />
+      <form className="near-form" onSubmit={(e) => { e.preventDefault(); if (!hoursBad) save(text, eveningOut); }}>
+        {byTime && (
+          <div className="near-time">
+            <label htmlFor="near-text">{t("nearMorning")}</label>
+            <span className="near-from"><label htmlFor="near-morning-from">{t("nearFrom")}</label>{hourSelect("near-morning-from", morningFrom, setMorningFrom)}</span>
+          </div>
+        )}
+        {!byTime && <label className="sr-only" htmlFor="near-text">{t("nearTitle")}</label>}
+        <input id="near-text" ref={ref} value={text} maxLength={120} onFocus={() => setTarget("main")} onChange={(e) => { setText(e.target.value); setSaved(false); }} placeholder={t("nearPlaceholder")} />
+        <p className="near-preview" aria-live="polite">{text.trim() ? <><b>{t("nearPreview")}</b> {fill(text)}</> : byTime ? t("nearEveningEmpty") : t("nearAutoNow")}</p>
+        <label className="check-row">
+          <input type="checkbox" checked={byTime} onChange={(e) => { setByTime(e.target.checked); setSaved(false); if (!e.target.checked) setTarget("main"); }} />
+          <span>{t("nearByTime")}<small className="form-hint">{t("nearByTimeHint")}</small></span>
+        </label>
+        {byTime && (
+          <>
+            <div className="near-time">
+              <label htmlFor="near-evening">{t("nearEvening")}</label>
+              <span className="near-from"><label htmlFor="near-evening-from">{t("nearFrom")}</label>{hourSelect("near-evening-from", eveningFrom, setEveningFrom)}</span>
+            </div>
+            <input id="near-evening" ref={eveRef} value={evening} maxLength={120} onFocus={() => setTarget("evening")} onChange={(e) => { setEvening(e.target.value); setSaved(false); }} placeholder={t("nearEveningPlaceholder")} />
+            {evening.trim() && <p className="near-preview" aria-live="polite"><b>{t("nearPreview")}</b> {fill(evening)}</p>}
+            {hoursBad && <p className="form-hint form-error" role="alert">{t("nearHoursBad")}</p>}
+          </>
+        )}
         <div className="near-tags" role="group" aria-label={t("nearAdd")}>
           <span>{t("nearAdd")}</span>
           {tags.map(([tag, label]) => <button type="button" key={tag} className="chip" onClick={() => add(tag)}>{t(label)}</button>)}
         </div>
-        <p className="near-preview" aria-live="polite">{text.trim() ? <><b>{t("nearPreview")}</b> {preview}</> : t("nearAutoNow")}</p>
         <div className="admin-row">
-          <button className="btn primary small" disabled={busy || text.trim() === (business.near_text ?? "")}>{t("save")}</button>
-          {business.near_text && <button type="button" className="btn soft small" disabled={busy} onClick={() => { setText(""); save(""); }}>{t("nearAuto")}</button>}
+          <button className="btn primary small" disabled={busy || unchanged || hoursBad || (byTime && !evening.trim())}>{t("save")}</button>
+          {(business.near_text || business.near_text_evening) && <button type="button" className="btn soft small" disabled={busy} onClick={() => { setText(""); setEvening(""); setByTime(false); save("", ""); }}>{t("nearAuto")}</button>}
         </div>
+        {nowWhich && <p className="form-hint">{t("nearNowShows", { which: nowWhich })}</p>}
         {saved && <p className="form-hint" role="status">{t("nearSaved")}</p>}
       </form>
     </section>

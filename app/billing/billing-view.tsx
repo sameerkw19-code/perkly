@@ -86,6 +86,7 @@ export default function BillingView({ businesses, configured, yearly = false, cu
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("ok") !== "1") return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read once from the browser after hydration (the server can't see it)
     setReturned(true);
     const active = businesses.some((b) => ["active", "trialing"].includes(b.status));
     if (active) return;

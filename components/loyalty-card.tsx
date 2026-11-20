@@ -1,6 +1,7 @@
 import {
   Bean, Beer, Cake, Coffee, Croissant, CupSoda, Gift, GlassWater, Hamburger, Heart, IceCreamCone, Martini,
   Pizza, Sandwich, Scissors, ShoppingBag, Sparkles, Star, Utensils,
+  type LucideIcon,
 } from "lucide-react";
 import { assetUrl, cardFont, cardLang, fontHref, is3d, onColor, stamp3dUrl, textsFor, type Design, type PresetIcon } from "../lib/design";
 import { translate } from "../lib/i18n";
@@ -9,7 +10,7 @@ import { usesPizza } from "../lib/pizza";
 import { PizzaProgress } from "./pizza-progress";
 import { isRtl, type Lang } from "../lib/i18n-types";
 
-export const ICONS: Record<PresetIcon, any> = {
+export const ICONS: Record<PresetIcon, LucideIcon | typeof HotDog> = {
   coffee: Coffee, bean: Bean, pizza: Pizza, hotdog: HotDog, burger: Hamburger, icecream: IceCreamCone, mojito: CupSoda, beer: Beer,
   shot: GlassWater, cocktail: Martini, sandwich: Sandwich, croissant: Croissant, cake: Cake, utensils: Utensils,
   scissors: Scissors, bag: ShoppingBag, sparkle: Sparkles, heart: Heart, star: Star,
@@ -316,7 +317,7 @@ export function GooglePreview({ design, lang, stamps, target, customerName, bala
   const banner = design.walletHero ?? design.hero;
   const fg = onColor(design.colors.bg);
   return (
-    <div className="wallet google" dir={isRtl(cl) ? "rtl" : "ltr"} lang={cl} style={{ ...cardStyle(design), background: design.colors.bg, color: fg, ["--c-fg" as any]: fg }}>
+    <div className="wallet google" dir={isRtl(cl) ? "rtl" : "ltr"} lang={cl} style={{ ...cardStyle(design), background: design.colors.bg, color: fg, ...({ "--c-fg": fg } as React.CSSProperties) }}>
       <div className="gw-body">
         <div className="gw-h"><Logo design={design} title={text.title} className="card-logo round" /><span>{text.title}</span></div>
         <div className="gw-title">{text.subtitle}</div>

@@ -12,7 +12,17 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Build output and local Cloudflare state.
+    "dist/**",
+    ".wrangler/**",
   ]),
+  {
+    rules: {
+      // vinext app (not Next's router): plain <a> links to app pages are intended,
+      // they do a full load that also refreshes the session and server data.
+      "@next/next/no-html-link-for-pages": "off",
+    },
+  },
   {
     files: ["components/ui/**/*.{ts,tsx}", "hooks/use-mobile.ts"],
     rules: {

@@ -3,7 +3,7 @@ import { formatMoney, pctLabel } from "../lib/cashback.ts";
 import { useMemo, useState, type ReactNode } from "react";
 import { ChevronDown, ImagePlus, Lock, MessageCircle, Shuffle, Trash2, UploadCloud } from "lucide-react";
 import {
-  FONTS, FONT_SCRIPTS, GRADIENTS, GRADIENT_DIRS, ICON_GROUPS, IMAGE_MIN, LIMITS, NOTICE_DEFAULTS, OFFERED_CARD_LANGS, noticeDefault, PALETTES, cardLang, darken, designChecks, is3d, noticeText, stamp3dUrl,
+  FONTS, FONT_SCRIPTS, GRADIENTS, MISS_YOU_DAYS, GRADIENT_DIRS, ICON_GROUPS, IMAGE_MIN, LIMITS, NOTICE_DEFAULTS, OFFERED_CARD_LANGS, noticeDefault, PALETTES, cardLang, darken, designChecks, is3d, noticeText, stamp3dUrl,
   type AssetMeta, type CardLook, type Design, type FontId, type Layout, type LogoFrame, type Size, type StampIcon, type StampNotice, type Texts,
 } from "../lib/design";
 import { CARD_LANGS, isRtl, type Lang } from "../lib/i18n-types";
@@ -18,7 +18,7 @@ import { PizzaProgress } from "./pizza-progress";
 import { StampBannerPreview } from "./stamp-banner-preview";
 
 type Image = AssetMeta & { kind: string };
-type Editor = { draft: Design; publishedVersion: number; publishedAt: string | null; hasUnpublished: boolean; images: Image[] };
+export type Editor = { draft: Design; publishedVersion: number; publishedAt: string | null; hasUnpublished: boolean; images: Image[] };
 type T = (key: string, vars?: Record<string, string | number>) => string;
 
 const MAX_SIDE = { logo: 660, icon: 1024, hero: 1200, wallet: 1125, stamp: 400, stampEmpty: 400, pizza: 700 } as const;
@@ -101,6 +101,9 @@ function PaidTag({ t }: { t: T }) {
   return <span className="paid-tag"><Lock size={11} aria-hidden="true" />{t("paidTag")}</span>;
 }
 
+/** What the picture upload routes answer: the new picture (or pictures), or an error code. */
+type UploadReply = { id?: string; ids?: string[]; width?: number; height?: number; code?: string };
+
 export function CardEditor({ businessId, target, editor, t, lang, notify, reload, paid = true, upgradeHref, setup, specialDays = true, cashback, average = false, currency = "ILS" }: {
   businessId: string; target: number; editor: Editor; t: T; lang: Lang;
   /** The balance card: the preview shows a sample balance instead of stamps. */
@@ -171,7 +174,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
 
   /** One notification text: the business's wording (empty = the default shown greyed out) and how it will read. */
   // Called as a function, not as <NoticeField/>: a component defined here would remount on every keystroke.
-  const noticeField = ({ k, label, notice, placeholder }: { k: "notify" | "notifyReward" | "welcome" | "birthday"; label: string; notice: StampNotice; placeholder: string }) => {
+  const noticeField = ({ k, label, notice, placeholder }: { k: "notify" | "notifyReward" | "welcome" | "birthday" | "missYou"; label: string; notice: StampNotice; placeholder: string }) => {
     const tx = design.texts[textLang];
     const first = design.texts[design.langs[0]];
     const sample = noticeText({ ...tx, title: tx.title || first.title, reward: tx.reward || first.reward }, textLang, notice);
@@ -202,16 +205,17 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
       const r = await fetch(`/api/asset?business=${encodeURIComponent(businessId)}&kind=${kind === "stampEmpty" || kind === "pizza" ? "stamp" : kind}`, {
         method: "POST", headers: { "Content-Type": blob.type }, body: blob, credentials: "same-origin",
       });
-      const data: any = await r.json().catch(() => ({}));
-      if (!r.ok) { notify(errorText(lang, data.code), true); return; }
-      setImages((list) => [{ id: data.id, kind, width: data.width, height: data.height }, ...list]);
-      if (kind === "logo") set({ logo: data.id });
-      if (kind === "icon") set({ notifyIcon: data.id });
-      if (kind === "hero") set({ hero: data.id });
-      if (kind === "wallet") set({ walletHero: data.id });
-      if (kind === "stamp") setDesign((d) => ({ ...d, stamp: { icon: "image", image: data.id }, look: { ...d.look, progress: "stamps" } }));
-      if (kind === "stampEmpty") setDesign((d) => ({ ...d, stamp: { ...d.stamp, emptyImage: data.id } }));
-      if (kind === "pizza") set({ progressImage: data.id });
+      const data = (await r.json().catch(() => ({}))) as UploadReply;
+      if (!r.ok || !data.id) { notify(errorText(lang, data.code), true); return; }
+      const id = data.id;
+      setImages((list) => [{ id, kind, width: data.width ?? 0, height: data.height ?? 0 }, ...list]);
+      if (kind === "logo") set({ logo: id });
+      if (kind === "icon") set({ notifyIcon: id });
+      if (kind === "hero") set({ hero: id });
+      if (kind === "wallet") set({ walletHero: id });
+      if (kind === "stamp") setDesign((d) => ({ ...d, stamp: { icon: "image", image: id }, look: { ...d.look, progress: "stamps" } }));
+      if (kind === "stampEmpty") setDesign((d) => ({ ...d, stamp: { ...d.stamp, emptyImage: id } }));
+      if (kind === "pizza") set({ progressImage: id });
     } catch {
       notify(t("err_network"), true);
     } finally {
@@ -236,7 +240,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
       const form = new FormData();
       blobs.forEach((b, i) => form.append(`s${i}`, b, `s${i}.jpg`));
       const r = await fetch(`/api/asset/banners?business=${encodeURIComponent(businessId)}`, { method: "POST", body: form, credentials: "same-origin" });
-      const data: any = await r.json().catch(() => ({}));
+      const data = (await r.json().catch(() => ({}))) as UploadReply;
       if (!r.ok) { notify(errorText(lang, data.code), true); return null; }
       return { ...d, walletStamps: data.ids as string[] };
     } catch {
@@ -256,7 +260,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
       const form = new FormData();
       blobs.forEach((b, i) => form.append(`s${i}`, b, `s${i}.jpg`));
       const r = await fetch(`/api/asset/banners?set=apple&business=${encodeURIComponent(businessId)}`, { method: "POST", body: form, credentials: "same-origin" });
-      const data: any = await r.json().catch(() => ({}));
+      const data = (await r.json().catch(() => ({}))) as UploadReply;
       return r.ok ? { ...d, appleStamps: data.ids as string[] } : d;
     } catch {
       return d;
@@ -273,7 +277,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
       if (!made) return d;
       const up = async (blob: Blob) => {
         const r = await fetch(`/api/asset?business=${encodeURIComponent(businessId)}&kind=wallet_logo`, { method: "POST", headers: { "Content-Type": "image/png" }, body: blob, credentials: "same-origin" });
-        const data: any = await r.json().catch(() => ({}));
+        const data = (await r.json().catch(() => ({}))) as UploadReply;
         return r.ok ? (data.id as string) : null;
       };
       const [apple, google] = [await up(made.apple), await up(made.google)];
@@ -712,7 +716,18 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
               </div>
             )}
 
-            {(design.walletNotify || design.walletWelcome || design.walletBirthday) && <p className="form-hint">{t("edNotifyVars")}</p>}
+            <h4 className="notify-head">{t("edMsgMissYou")}</h4>
+            <label className="check-row clear-white">
+              <input type="checkbox" checked={design.walletMissYou} onChange={(e) => set({ walletMissYou: e.target.checked })} />
+              <span>{t("edMsgMissYouOn", { days: MISS_YOU_DAYS })}<small className="form-hint">{t("edMsgMissYouHint")}</small></span>
+            </label>
+            {design.walletMissYou && (
+              <div className="stack-form" dir={isRtl(textLang) ? "rtl" : "ltr"}>
+                {noticeField({ k: "missYou", label: t("fMissYou"), notice: { kind: "missyou", name: t("edNotifySampleName") }, placeholder: noticeDefault(textLang, "missyou") })}
+              </div>
+            )}
+
+            {(design.walletNotify || design.walletWelcome || design.walletBirthday || design.walletMissYou) && <p className="form-hint">{t("edNotifyVars")}</p>}
 
             {specialDays && (
               <>

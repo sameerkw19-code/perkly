@@ -32,7 +32,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ op:
   const row = await db
     .prepare(
       `SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays, social, owner_designs,
-         program, cashback_bp, cashback_min, currency, avg_cap, pos_only FROM businesses WHERE id = ? AND archived IS NULL`,
+         program, cashback_bp, cashback_min, currency, avg_cap, pos_only, referral_stamps FROM businesses WHERE id = ? AND archived IS NULL`,
     )
     .bind(key.business)
     .first<Omit<Business, "social"> & { social: string | null }>();
