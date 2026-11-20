@@ -4,7 +4,7 @@ import { withPrices, type Currency } from "../../lib/pricing";
 // - Only claims the product really supports today (see README "מה עובד בגרסה הזו").
 // - One stamp rule everywhere: the business sets how many stamps fill a card; a full card
 //   means the reward is ready; redeeming the reward is not itself counted as a stamp.
-// - Prices: 99 ILS a month, no setup fee, 14-day free trial (TRIAL_DAYS in lib/server/billing.ts). Counter kit: optional, 99 ILS one-time, also without a subscription.
+// - Prices: 99 ILS a month, no setup fee, 14-day free trial (TRIAL_DAYS in lib/server/billing.ts). Counter kit: optional, 299 ILS one-time, also without a subscription.
 // - Yearly plan: not sold at the moment (lib/pricing.ts YEARLY_SOLD). The counter kit is a separate add-on (Israel only).
 // - No testimonials, customer counts or results until real, approved ones exist.
 

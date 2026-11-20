@@ -8,7 +8,7 @@ export type Currency = "ILS" | "USD";
 
 // "was": the price shown struck through next to the monthly price.
 export const PRICES: Record<Currency, { monthly: number; was: number; yearly: number; yearlyMonthly: number; kit: number }> = {
-  ILS: { monthly: 199, was: 300, yearly: 1990, yearlyMonthly: 166, kit: 99 },
+  ILS: { monthly: 199, was: 300, yearly: 1990, yearlyMonthly: 166, kit: 299 },
   USD: { monthly: 59, was: 89, yearly: 590, yearlyMonthly: 49, kit: 29 },
 };
 
