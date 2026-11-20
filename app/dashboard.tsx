@@ -7,7 +7,7 @@ import { israelNow } from "../lib/birthday";
 import {
   Activity, AlertTriangle, Trash2, Cake, Check, Copy, CreditCard, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode,
   ChevronRight, History, Palette, RefreshCw, RotateCcw, ScanLine, Search, Settings, Share2, Store, UserPlus, Users, UserRound, X,
-  Phone, MapPin, Megaphone,
+  Phone, MapPin, Megaphone, BarChart3,
   type LucideIcon,
 } from "lucide-react";
 import type { Design } from "../lib/design";
@@ -28,7 +28,7 @@ import { weekChange } from "../lib/weekly";
 import { Brand } from "../components/brand";
 
 type Role = "owner" | "staff";
-type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social; program?: "stamps" | "cashback" | "average"; cashback_bp?: number; cashback_min?: number; currency?: string; avg_cap?: number; pos_only?: number; near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number; near_evening_from?: number; referral_stamps?: number };
+type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social; program?: "stamps" | "cashback" | "average"; cashback_bp?: number; cashback_min?: number; currency?: string; avg_cap?: number; pos_only?: number; near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number; near_evening_from?: number; referral_stamps?: number; report_email?: number };
 type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; rewards?: number; nextExpiry?: string | null; phone?: string; balance?: number; roundTotal?: number; rewardValue?: number | null };
 type Data = {
   me: { name: string; email: string };
@@ -329,7 +329,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="app" dir={dir}>
+    <div className={"app" + (nav.length < 2 ? " single-view" : "") + (view === "station" ? " on-station" : "")} dir={dir}>
       <a className="skip-link" href="#main">{t("skipToContent")}</a>
       <aside className="sidebar">
         <Brand />
@@ -432,6 +432,7 @@ export default function Dashboard() {
                   <button className="btn soft" onClick={() => setModal({ type: "customer" })}><Plus size={18} />{t("newCustomer")}</button>
                   <button className="btn soft" onClick={() => setModal({ type: "staffLink" })}><UserPlus size={18} />{t("staffLinkButton")}</button>
                   {(isOwner || manage) && <a className="btn soft" href={`/special?b=${encodeURIComponent(b.id)}`}><Megaphone size={18} />{t("spOpen")}</a>}
+                  <a className="btn soft" href={`/report?b=${encodeURIComponent(b.id)}`}><BarChart3 size={18} />{t("rpOpen")}</a>
                 </div>
               </div>
               {data.summary && <Summary summary={data.summary} totals={{ customers: data.stats!.customers, ready: data.stats!.rewards_ready, openBalance: data.stats!.open_balance }} breakdown={data.breakdown} hasBranches={(data.branches?.length ?? 0) > 1} t={t}
@@ -1216,7 +1217,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
   const fixedBranch = myBranch ? branches.find((x) => x.id === myBranch) : null;
 
   const hour = new Date().getHours();
-  const greeting = hour >= 5 && hour < 12 ? t("sxMorning") : hour >= 12 && hour < 17 ? t("sxAfternoon") : t("sxEvening");
+  const greeting = hour >= 5 && hour < 12 ? t("sxMorning") : hour >= 12 && hour < 17 ? t("sxAfternoon") : hour >= 17 && hour < 22 ? t("sxEvening") : t("sxNight");
   const full = !!selected && selected.stamps >= selected.target; // "block" mode: redeem before stamping again
   const maxQty = business.reward_mode === "bank" ? 10 : Math.min(10, remaining);
   const onlyBranch = branches.length === 1 ? branches[0] : null;
@@ -1277,7 +1278,6 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
                 onChange={(e) => setQuery(e.target.value)} />
               {query && <button type="button" className="st-clear" aria-label={t("close")} onClick={() => { setQuery(""); searchRef.current?.focus(); }}><X size={16} /></button>}
             </label>
-            <button type="submit" className="btn soft sx-wide">{t("sxSearch")}<ChevronRight size={16} className="sx-fwd" /></button>
           </form>
           {(shown.length > 0 || query.trim().length >= 2) && (
             <div className="staff-results" role="listbox" aria-label={t("search")}>
@@ -1415,7 +1415,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
           <div className="sx-box">
             <div className="sx-box-head">
               <span className="sx-box-icon" aria-hidden="true"><Gift size={18} /></span>
-              <strong>{selected.rewards ? (selected.rewards === 1 ? t("sxRewardReady1") : t("sxRewardReadyN", { n: selected.rewards })) : full ? t("sxRewardReady1") : t("sxNoRewards")}</strong>
+              <strong>{selected.rewards ? (selected.rewards === 1 ? t("sxRewardReady1") : t("sxRewardReadyN", { n: selected.rewards })) : full ? t("sxRewardReady1") : average ? t("avgMore", { k: remaining }) : t("sxMoreTo", { k: remaining, reward: business.reward })}</strong>
             </div>
             {!!selected.rewards && selected.nextExpiry && <small className="form-hint">{t("expiresOnShort", { d: new Date(selected.nextExpiry).toLocaleDateString(lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB", { timeZone: "Asia/Jerusalem" }) })}</small>}
             {posOnly && <p className="pos-note" role="note">{t("posOnlyNote")}</p>}
@@ -1532,7 +1532,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
             <p className="muted">{selected.name} · {t("cbBalanceNow", { balance: fmt(selected.balance ?? 0) })}</p>
           ) : (
             <>
-              <p className="muted">{selected.name} · <Num>{t("sxOf", { s: selected.stamps, t: selected.target })}</Num></p>
+              <p className="muted">{selected.name} · <bdi>{t("sxOf", { s: selected.stamps, t: selected.target })}</bdi></p>
               <div className="sx-box sx-done-box">
                 <strong>{selected.rewards ? (selected.rewards === 1 ? t("sxRewardReady1") : t("sxRewardReadyN", { n: selected.rewards })) : t("sxToUnlock", { k: remaining })}</strong>
               </div>
@@ -1649,7 +1649,7 @@ function Branches({ branches, t, busy, call, reload }: {
               <input name="name" defaultValue={br.name} required maxLength={60} autoFocus aria-label={t("branchName")} />
               <input name="address" defaultValue={br.address ?? ""} maxLength={160} placeholder={t("branchAddress")} aria-label={t("branchAddress")} />
               <label className="branch-place">{t("branchPlace")}
-                <input name="location" id={`place-${br.id}`} dir="ltr" maxLength={2000} inputMode="url" autoComplete="off" placeholder="https://maps.app.goo.gl/…"
+                <input name="location" id={`place-${br.id}`} dir="ltr" maxLength={2000} inputMode="url" autoComplete="off" placeholder="Google Maps / Waze"
                   defaultValue={br.lat != null && br.lng != null ? `${br.lat}, ${br.lng}` : ""} />
                 <small className="form-hint">{t("branchPlaceHint")}</small>
               </label>

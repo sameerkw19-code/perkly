@@ -137,7 +137,7 @@ export function BuildSteps({ data }: { data: BuildData }) {
 
         <Step n={3} title="סניפים ומיקום במפה" done={data.branches.length > 0 && data.placed > 0}
           status={data.branches.length
-            ? `${data.branches.length === 1 ? "סניף אחד" : `${data.branches.length} סניפים`}: ${data.branches.map((b) => b.name).join(", ")}. ${data.placed ? `📍 ${data.placed === data.branches.length ? "כולם על המפה" : `${data.placed} על המפה`}: הכרטיס קופץ ללקוחות שעוברים ליד. המשפט באייפון: ${data.nearText ? `"${data.nearText}"` : "אוטומטי (כמה חותמות חסרות)"}.` : "עוד אין מיקום במפה: מדביקים קישור מ־Google Maps כדי שהכרטיס יקפוץ ללקוחות שעוברים ליד."}`
+            ? `${data.branches.length === 1 ? "סניף אחד" : `${data.branches.length} סניפים`}: ${data.branches.map((b) => b.name).join(", ")}. ${data.placed ? `📍 ${data.placed === data.branches.length ? "כולם על המפה" : `${data.placed} על המפה`}: הכרטיס קופץ ללקוחות שעוברים ליד. המשפט באייפון: ${data.nearText ? `"${data.nearText}"` : "אוטומטי (כמה חותמות חסרות)"}.` : "עוד אין מיקום במפה: מדביקים קישור מ־Google Maps או מ־Waze, או לוחצים „אני בעסק עכשיו” מהטלפון, כדי שהכרטיס יקפוץ ללקוחות שעוברים ליד."}`
             : "אין סניף."}>
           <a className={"btn " + (data.placed ? "soft" : "primary")} href={dash("#settings")}>{data.placed ? "ניהול סניפים" : "הוספת מיקום במפה"}</a>
         </Step>

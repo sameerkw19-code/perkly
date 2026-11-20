@@ -1016,6 +1016,35 @@ test("near text by time: an evening line with its hours; hours must be in order;
   assert.equal(b.near_text_evening, null);
 });
 
+test("monthly report: the owner sees the month's numbers; strangers can't; the email can be turned off", async () => {
+  const owner = new Client();
+  await signup(owner, "report-owner");
+  const biz = (await owner.post("/api/loyalty", { action: "create_business", name: "Report <b>Cafe</b>", reward: "Free", target: 5, color: "#123456" })).body.id;
+  const c1 = (await owner.act(biz, "register_customer", { name: "Noa", phone: "0531117001" })).body.id;
+  await owner.act(biz, "register_customer", { name: "Ido", phone: "0531117002" });
+  assert.equal((await owner.act(biz, "stamp", { customer: c1, requestId: id() })).status, 200);
+  const month = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit" }).format(new Date()).slice(0, 7);
+  const r = await owner.get(`/api/report?business=${biz}&month=${month}`);
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.report.month, month);
+  assert.equal(r.body.report.customers, 2);
+  assert.equal(r.body.report.now.joined, 2);
+  assert.equal(r.body.report.now.visitors, 1);
+  assert.equal(r.body.report.now.stamps, 1);
+  assert.equal(r.body.report.now.returning, 0, "joined this month, so not a returning customer");
+  assert.equal(r.body.email.on, true);
+  // The default month is last month; a new business has no full month yet.
+  const def = await owner.get(`/api/report?business=${biz}`);
+  assert.equal(def.status, 200);
+  assert.deepEqual(def.body.months, []);
+  assert.equal((await owner.act(biz, "set_report_email", { on: false })).status, 200);
+  assert.equal((await owner.get(`/api/report?business=${biz}&month=${month}`)).body.email.on, false);
+  const stranger = new Client();
+  await signup(stranger, "report-stranger");
+  assert.equal((await stranger.get(`/api/report?business=${biz}`)).status, 403, "never another business's report");
+  assert.equal((await stranger.act(biz, "set_report_email", { on: true })).status >= 400, true);
+});
+
 test("message to customers: the owner sends now or schedules; staff can't; at most 3 a day", async () => {
   const owner = new Client();
   await signup(owner, "msg-owner");

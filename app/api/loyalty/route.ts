@@ -36,7 +36,7 @@ function validTarget(v: unknown, program?: string): v is number {
 
 async function loadBusiness(db: D1Database, id: string) {
   const row = await db
-    .prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays, social, owner_designs, program, cashback_bp, cashback_min, currency, avg_cap, pos_only, near_text, near_text_evening, near_morning_from, near_evening_from, referral_stamps FROM businesses WHERE id = ?")
+    .prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays, social, owner_designs, program, cashback_bp, cashback_min, currency, avg_cap, pos_only, near_text, near_text_evening, near_morning_from, near_evening_from, referral_stamps, report_email FROM businesses WHERE id = ?")
     .bind(id)
     .first<Omit<Business, "social"> & { social: string | null }>();
   return row ? { ...row, social: parseSocial(row.social) } : null;
@@ -694,6 +694,12 @@ export async function POST(request: Request) {
       if (!Number.isInteger(n) || (n as number) < 0 || (n as number) > REFERRAL_MAX_STAMPS) return fail("bad_details", 400, "Invalid bonus");
       if ((n as number) > 0 && business.program !== "stamps") return fail("wrong_program", 409, "Bring a friend is for stamp cards");
       await db.prepare("UPDATE businesses SET referral_stamps = ? WHERE id = ?").bind(n, business.id).run();
+      return json({ ok: true });
+    }
+    case "set_report_email": {
+      // The monthly report by email (on by default).
+      const denied = ownerOnly(); if (denied) return denied;
+      await db.prepare("UPDATE businesses SET report_email = ? WHERE id = ?").bind(p.on ? 1 : 0, business.id).run();
       return json({ ok: true });
     }
     case "set_near_text": {

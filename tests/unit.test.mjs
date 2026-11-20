@@ -198,3 +198,33 @@ test("near text by time: morning line from the morning hour, evening line from t
   assert.equal(nearTemplate({ near_text: null, near_text_evening: "ערב" }, 9), "");
   assert.equal(nearTemplate({}, 20), "");
 });
+
+import { monthStart, prevMonth, nextMonth, lastMonth, validMonth, change, monthName } from "../lib/report-month.ts";
+test("monthly report: months start at midnight in Israel; neighbours, last month, change", () => {
+  assert.equal(monthStart("2026-11"), "2026-10-31T22:00:00.000Z"); // winter, UTC+2
+  assert.equal(monthStart("2026-07"), "2026-06-30T21:00:00.000Z"); // summer, UTC+3
+  assert.equal(prevMonth("2026-01"), "2025-12");
+  assert.equal(nextMonth("2026-12"), "2027-01");
+  assert.equal(lastMonth(new Date("2026-11-20T10:00:00Z")), "2026-10");
+  // 23:30 UTC on Oct 31 is already Nov 1 in Israel.
+  assert.equal(lastMonth(new Date("2026-10-31T23:30:00Z")), "2026-10");
+  assert.ok(validMonth("2026-10"));
+  assert.ok(!validMonth("2026-13") && !validMonth("26-10") && !validMonth(null));
+  assert.equal(change(12, 10), "+20%");
+  assert.equal(change(5, 10), "−50%");
+  assert.equal(change(10, 10), "=");
+  assert.equal(change(3, 0), "");
+  assert.equal(monthName("2026-10", "he"), "אוקטובר 2026");
+});
+
+import { decodeGeohash } from "../lib/geo.ts";
+test("place from Waze links: the app's share link (geohash), ll= and to=ll.", () => {
+  const near = (p, lat, lng, tol) => assert.ok(p && Math.abs(p.lat - lat) < tol && Math.abs(p.lng - lng) < tol, JSON.stringify(p));
+  near(decodeGeohash("sv8wx2zq6t"), 32.0853, 34.7818, 0.0001);
+  near(parsePlace("https://waze.com/ul/hsv8wx2zq6t"), 32.0853, 34.7818, 0.0001);
+  near(parsePlace("Let's meet here: https://waze.com/ul/hsv8wx2zq6t"), 32.0853, 34.7818, 0.0001);
+  near(parsePlace("https://www.waze.com/he/ul/hsv8wx2z"), 32.0853, 34.7818, 0.001);
+  assert.deepEqual(parsePlace("https://www.waze.com/ul?ll=32.08530000%2C34.78180000&navigate=yes&zoom=17"), { lat: 32.0853, lng: 34.7818 });
+  assert.deepEqual(parsePlace("https://www.waze.com/live-map/directions?to=ll.32.0853%2C34.7818"), { lat: 32.0853, lng: 34.7818 });
+  assert.equal(parsePlace("https://waze.com/ul/habc"), null);
+});

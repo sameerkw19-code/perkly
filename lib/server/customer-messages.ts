@@ -10,6 +10,8 @@ import { liveDesign, passLook } from "./designs";
 import { BIRTHDAY_GIFT_DAYS, MISS_YOU_DAYS, noticeOn, type Design, type StampNotice } from "../design";
 import { birthdayKeys, israelNow } from "../birthday";
 import { nearPhase } from "../near-text";
+import { sendMonthlyReports } from "./monthly-report";
+import type { MailEnv } from "./mailer";
 import { pushAppleBusinessNow, pushAppleCustomersNow } from "./apple-push";
 
 type Env = { GOOGLE_WALLET_SA_KEY?: string; GOOGLE_WALLET_ISSUER_ID?: string; GOOGLE_WALLET_CLASS_ID?: string; WALLET_BATCH?: string };
@@ -317,6 +319,7 @@ export async function runScheduled(db: D1Database, env: Env, now = new Date()): 
   }
   await queueSpecialDays(db, nowIso);
   await switchNearTexts(db, today.hour, nowIso);
+  await sendMonthlyReports(db, env as unknown as MailEnv & { REPORT_EMAILS?: string; PUBLIC_ORIGIN?: string }, now).catch((e) => console.error("monthly report failed:", e));
   const config = walletConfig(env);
   if (!config) return;
   const batch = Math.max(1, Math.min(100, Number(env.WALLET_BATCH) || DEFAULT_BATCH));
