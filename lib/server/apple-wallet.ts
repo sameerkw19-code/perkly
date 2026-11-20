@@ -7,7 +7,8 @@ import { appleStampPicture, cardLang, noticeText, textsFor, walletStampPicture, 
 import { buildPkpass, rgb, type Bytes } from "./apple-pass";
 import { PASS_ICONS } from "./apple-pass-icons";
 import { businessPlaces, liveDesign } from "./designs";
-import { fillNearText, stampEmoji } from "../near-text";
+import { fillNearText, nearTemplate, stampEmoji } from "../near-text";
+import { israelNow } from "../birthday";
 import { passToken, type AppleConfig } from "./apple-token";
 
 export { appleConfig, passToken, validToken, type AppleConfig } from "./apple-token";
@@ -34,14 +35,14 @@ const NEAR: Record<Lang, { reward: (b: string, r: string) => string; stamps: (b:
 type CustomerRow = {
   id: string; business: string; name: string; stamps: number; target: number; scan_code: string; created: string;
   business_name: string; reward: string; color: string; rewards: number; balance: number; program: string; currency: string;
-  round_total: number; avg_cap: number; ready_value: number | null; missyou_at?: string | null; last_event?: string | null; near_text?: string | null; news_text?: string | null; news_at?: string | null;
+  round_total: number; avg_cap: number; ready_value: number | null; missyou_at?: string | null; last_event?: string | null; near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number | null; near_evening_from?: number | null; news_text?: string | null; news_at?: string | null;
 };
 
 /** The customer behind a pass serial (the customer id), or null when it was removed. */
 export async function customerForPass(db: D1Database, serial: string): Promise<CustomerRow | null> {
   return db
     .prepare(
-      `SELECT c.id, c.business, c.name, c.stamps, c.target, c.scan_code, c.created, c.balance, c.round_total, c.missyou_at, (SELECT MAX(e.created) FROM events e WHERE e.customer = c.id) AS last_event, b.program, b.currency, b.avg_cap, b.near_text, b.news_text, b.news_at, b.name AS business_name, b.reward, b.color,
+      `SELECT c.id, c.business, c.name, c.stamps, c.target, c.scan_code, c.created, c.balance, c.round_total, c.missyou_at, (SELECT MAX(e.created) FROM events e WHERE e.customer = c.id) AS last_event, b.program, b.currency, b.avg_cap, b.near_text, b.near_text_evening, b.near_morning_from, b.near_evening_from, b.news_text, b.news_at, b.name AS business_name, b.reward, b.color,
          (SELECT value FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2) ORDER BY earned, id LIMIT 1) AS ready_value,
          (SELECT COUNT(*) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2))
            + (CASE WHEN b.reward_mode = 'block' AND c.stamps >= c.target THEN 1 ELSE 0 END) AS rewards
@@ -162,7 +163,9 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
   // Near a branch, the iPhone shows the card on the lock screen with what is waiting for the customer there.
   const N = NEAR[lang] ?? NEAR.en;
   const missing = average ? Math.max(0, c.target - Math.min(c.stamps, c.target)) : balance === undefined ? Math.max(0, c.target - c.stamps) : null;
-  const own = c.near_text?.trim() ? fillNearText(c.near_text, { missing, reward, business: title, balance: balance ?? null }) : "";
+  // The owner's line, or their evening line in the evening (the daily job sends the card again when it switches).
+  const template = nearTemplate(c, israelNow().hour);
+  const own = template ? fillNearText(template, { missing, reward, business: title, balance: balance ?? null }) : "";
   // The automatic line ends with an emoji: 🎁 when a reward is waiting, else the business's stamp (☕, 🍕, ✂️…).
   const emoji = stampEmoji(design.stamp?.icon);
   const nearText = own || (average

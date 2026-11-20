@@ -9,6 +9,7 @@ import { walletConfig, updateLoyaltyObject, type WalletConfig } from "./google-w
 import { liveDesign, passLook } from "./designs";
 import { BIRTHDAY_GIFT_DAYS, MISS_YOU_DAYS, noticeOn, type Design, type StampNotice } from "../design";
 import { birthdayKeys, israelNow } from "../birthday";
+import { nearPhase } from "../near-text";
 import { pushAppleBusinessNow, pushAppleCustomersNow } from "./apple-push";
 
 type Env = { GOOGLE_WALLET_SA_KEY?: string; GOOGLE_WALLET_ISSUER_ID?: string; GOOGLE_WALLET_CLASS_ID?: string; WALLET_BATCH?: string };
@@ -274,6 +275,28 @@ export async function drainOutbox(db: D1Database, config: WalletConfig, nowIso: 
 }
 
 /** One cron run: queue what is due, then send a batch. */
+/**
+ * Businesses with a morning and an evening lock-screen line: when the hour passes the switch,
+ * the iPhones get the card again (silently) with the other line. Each switch happens once.
+ */
+export async function switchNearTexts(db: D1Database, hour: number, nowIso: string): Promise<number> {
+  const { results } = await db
+    .prepare("SELECT id, near_morning_from, near_evening_from, near_phase FROM businesses WHERE near_text_evening IS NOT NULL AND archived IS NULL AND suspended IS NULL")
+    .all<{ id: string; near_morning_from: number; near_evening_from: number; near_phase: string | null }>();
+  let switched = 0;
+  for (const b of results) {
+    const phase = nearPhase(hour, b.near_morning_from, b.near_evening_from);
+    if (phase === b.near_phase) continue;
+    // Marked first (and only if still the old one), so two overlapping runs never both push.
+    const r = await db.prepare("UPDATE businesses SET near_phase = ?, near_updated = ? WHERE id = ? AND near_phase IS ?").bind(phase, nowIso, b.id, b.near_phase).run();
+    if (!r.meta.changes) continue;
+    switched++;
+    await pushAppleBusinessNow(db, b.id).catch((e) => console.error("near switch push failed:", b.id, e));
+  }
+  if (switched) console.log(`near text: ${switched} businesses switched`);
+  return switched;
+}
+
 export async function runScheduled(db: D1Database, env: Env, now = new Date()): Promise<void> {
   const nowIso = now.toISOString();
   const today = israelNow(now);
@@ -293,6 +316,7 @@ export async function runScheduled(db: D1Database, env: Env, now = new Date()): 
     }
   }
   await queueSpecialDays(db, nowIso);
+  await switchNearTexts(db, today.hour, nowIso);
   const config = walletConfig(env);
   if (!config) return;
   const batch = Math.max(1, Math.min(100, Number(env.WALLET_BATCH) || DEFAULT_BATCH));

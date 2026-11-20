@@ -13,7 +13,8 @@ import { START_DAYS, businessAccess, freeLimitReached, hasPaidDesign } from "../
 import { formatBirthday, parseBirthday, upcomingKeys } from "../../../lib/birthday";
 import { pushAppleBusiness } from "../../../lib/server/apple-push";
 import { resolvePlace } from "../../../lib/server/geo";
-import { NEAR_TEXT_MAX } from "../../../lib/near-text";
+import { NEAR_TEXT_MAX, nearPhase } from "../../../lib/near-text";
+import { israelNow } from "../../../lib/birthday";
 import { REFERRAL_MAX_STAMPS } from "../../../lib/server/referral";
 import { ensureBusinessClass, walletConfig } from "../../../lib/server/google-wallet";
 import { getSettings } from "../../../lib/server/settings";
@@ -35,7 +36,7 @@ function validTarget(v: unknown, program?: string): v is number {
 
 async function loadBusiness(db: D1Database, id: string) {
   const row = await db
-    .prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays, social, owner_designs, program, cashback_bp, cashback_min, currency, avg_cap, pos_only, near_text, referral_stamps FROM businesses WHERE id = ?")
+    .prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays, social, owner_designs, program, cashback_bp, cashback_min, currency, avg_cap, pos_only, near_text, near_text_evening, near_morning_from, near_evening_from, referral_stamps FROM businesses WHERE id = ?")
     .bind(id)
     .first<Omit<Business, "social"> & { social: string | null }>();
   return row ? { ...row, social: parseSocial(row.social) } : null;
@@ -697,10 +698,21 @@ export async function POST(request: Request) {
     }
     case "set_near_text": {
       // The business's own lock-screen line near a branch; empty goes back to the automatic one.
+      // Optionally a second line for the evening, and the hours each starts (Israel time).
       const denied = ownerOnly(); if (denied) return denied;
-      const text = typeof p.text === "string" ? [...p.text.replace(/\s+/g, " ").trim()].slice(0, NEAR_TEXT_MAX).join("") : "";
-      if ((business.near_text ?? "") === text) return json({ ok: true });
-      await db.prepare("UPDATE businesses SET near_text = ?, near_updated = ? WHERE id = ?").bind(text || null, now, business.id).run();
+      const clean = (v: unknown) => typeof v === "string" ? [...v.replace(/\s+/g, " ").trim()].slice(0, NEAR_TEXT_MAX).join("") : "";
+      const text = clean(p.text);
+      const evening = p.evening === undefined ? (business.near_text_evening ?? "") : clean(p.evening);
+      const hour = (v: unknown, fb: number) => (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 23 ? (v as number) : fb);
+      const morningFrom = hour(p.morningFrom, business.near_morning_from ?? 6);
+      const eveningFrom = hour(p.eveningFrom, business.near_evening_from ?? 16);
+      if (evening && morningFrom >= eveningFrom) return fail("bad_details", 400, "The evening starts after the morning");
+      if ((business.near_text ?? "") === text && (business.near_text_evening ?? "") === evening
+        && (business.near_morning_from ?? 6) === morningFrom && (business.near_evening_from ?? 16) === eveningFrom) return json({ ok: true });
+      // The phase on the cards from now, so the daily job switches only at the next change of hour.
+      const phase = evening ? nearPhase(israelNow().hour, morningFrom, eveningFrom) : null;
+      await db.prepare("UPDATE businesses SET near_text = ?, near_text_evening = ?, near_morning_from = ?, near_evening_from = ?, near_phase = ?, near_updated = ? WHERE id = ?")
+        .bind(text || null, evening || null, morningFrom, eveningFrom, phase, now, business.id).run();
       pushAppleBusiness(db, business.id);
       return json({ ok: true });
     }

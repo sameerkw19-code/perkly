@@ -181,3 +181,20 @@ test("we miss you: off by default, its own wording or the default with the name"
   assert.match(noticeText(texts, "he", { kind: "missyou", name: "דנה כהן" }), /^התגעגענו אליך דנה! 💜 מחכים לך בתפוח/);
   assert.equal(noticeText({ ...texts, missYou: "חוזרים ל{business}, {name}?" }, "he", { kind: "missyou", name: "דנה" }), "חוזרים לתפוח, דנה?");
 });
+
+import { nearPhase, nearTemplate } from "../lib/near-text.ts";
+test("near text by time: morning line from the morning hour, evening line from the evening hour until the next morning", () => {
+  assert.equal(nearPhase(6, 6, 16), "morning");
+  assert.equal(nearPhase(15, 6, 16), "morning");
+  assert.equal(nearPhase(16, 6, 16), "evening");
+  assert.equal(nearPhase(23, 6, 16), "evening");
+  assert.equal(nearPhase(2, 6, 16), "evening");
+  const b = { near_text: "בוקר טוב ☕", near_text_evening: "ערב טוב 🍰", near_morning_from: 7, near_evening_from: 18 };
+  assert.equal(nearTemplate(b, 9), "בוקר טוב ☕");
+  assert.equal(nearTemplate(b, 18), "ערב טוב 🍰");
+  assert.equal(nearTemplate(b, 3), "ערב טוב 🍰");
+  // No evening line: the one line all day; no lines: automatic (empty).
+  assert.equal(nearTemplate({ near_text: "שלום" }, 20), "שלום");
+  assert.equal(nearTemplate({ near_text: null, near_text_evening: "ערב" }, 9), "");
+  assert.equal(nearTemplate({}, 20), "");
+});

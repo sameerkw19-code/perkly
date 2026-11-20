@@ -38,3 +38,20 @@ export function stampEmoji(icon: string | null | undefined): string {
   const name = (icon ?? "").replace(/^3d-/, "");
   return STAMP_EMOJI[name] ?? "⭐";
 }
+
+export type NearPhase = "morning" | "evening";
+
+/** Morning from `morningFrom` until `eveningFrom`, evening the rest of the day (hours 0–23, Israel time). */
+export function nearPhase(hour: number, morningFrom = 6, eveningFrom = 16): NearPhase {
+  return hour >= morningFrom && hour < eveningFrom ? "morning" : "evening";
+}
+
+/** The owner's line for this hour: the evening line in the evening when there is one, else the main line (empty = automatic). */
+export function nearTemplate(
+  b: { near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number | null; near_evening_from?: number | null },
+  hour: number,
+): string {
+  const evening = b.near_text_evening?.trim();
+  if (evening && nearPhase(hour, b.near_morning_from ?? 6, b.near_evening_from ?? 16) === "evening") return evening;
+  return b.near_text?.trim() ?? "";
+}

@@ -993,6 +993,29 @@ test("near text: the owner sets the lock-screen line; empty goes back to automat
   assert.equal((await admin.get(`/api/loyalty?business=${biz}`)).body.business.near_text, null);
 });
 
+test("near text by time: an evening line with its hours; hours must be in order; clearing removes both", async () => {
+  const built = await admin.post("/api/loyalty", { action: "create_business", forClient: true, kind: "cafe", name: "Times", reward: "Free coffee", target: 8, color: "#123456", setupDays: 30, branchName: "Main" });
+  const biz = built.body.id;
+  const set = await admin.act(biz, "set_near_text", { text: "Good morning ☕", evening: "  Good   evening 🍰 ", morningFrom: 7, eveningFrom: 18 });
+  assert.equal(set.status, 200, JSON.stringify(set.body));
+  let b = (await admin.get(`/api/loyalty?business=${biz}`)).body.business;
+  assert.equal(b.near_text, "Good morning ☕");
+  assert.equal(b.near_text_evening, "Good evening 🍰");
+  assert.equal(b.near_morning_from, 7);
+  assert.equal(b.near_evening_from, 18);
+  const bad = await admin.act(biz, "set_near_text", { text: "x", evening: "y", morningFrom: 18, eveningFrom: 9 });
+  assert.equal(bad.status, 400);
+  // Saving only the main line keeps the evening line.
+  await admin.act(biz, "set_near_text", { text: "Morning!" });
+  b = (await admin.get(`/api/loyalty?business=${biz}`)).body.business;
+  assert.equal(b.near_text, "Morning!");
+  assert.equal(b.near_text_evening, "Good evening 🍰");
+  await admin.act(biz, "set_near_text", { text: "", evening: "" });
+  b = (await admin.get(`/api/loyalty?business=${biz}`)).body.business;
+  assert.equal(b.near_text, null);
+  assert.equal(b.near_text_evening, null);
+});
+
 test("message to customers: the owner sends now or schedules; staff can't; at most 3 a day", async () => {
   const owner = new Client();
   await signup(owner, "msg-owner");

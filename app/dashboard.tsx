@@ -2,7 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SOCIAL_KEYS, SOCIAL_LABEL, normalizeSocial, socialDisplay, type Social } from "../lib/social";
 import { SocialIcon } from "../lib/social-icon";
-import { fillNearText, NEAR_TAG_NAMES, type NearTag } from "../lib/near-text";
+import { fillNearText, NEAR_TAG_NAMES, nearPhase, type NearTag } from "../lib/near-text";
+import { israelNow } from "../lib/birthday";
 import {
   Activity, AlertTriangle, Trash2, Cake, Check, Copy, CreditCard, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode,
   ChevronRight, History, Palette, RefreshCw, RotateCcw, ScanLine, Search, Settings, Share2, Store, UserPlus, Users, UserRound, X,
@@ -27,7 +28,7 @@ import { weekChange } from "../lib/weekly";
 import { Brand } from "../components/brand";
 
 type Role = "owner" | "staff";
-type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social; program?: "stamps" | "cashback" | "average"; cashback_bp?: number; cashback_min?: number; currency?: string; avg_cap?: number; pos_only?: number; near_text?: string | null; referral_stamps?: number };
+type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social; program?: "stamps" | "cashback" | "average"; cashback_bp?: number; cashback_min?: number; currency?: string; avg_cap?: number; pos_only?: number; near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number; near_evening_from?: number; referral_stamps?: number };
 type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; rewards?: number; nextExpiry?: string | null; phone?: string; balance?: number; roundTotal?: number; rewardValue?: number | null };
 type Data = {
   me: { name: string; email: string };
@@ -948,7 +949,7 @@ function BusinessForm({ t, busy, initial, submitLabel, onSubmit, onInvalid }: {
 // ---------- Staff station: scan or search, then confirm. The server is the source of truth. ----------
 
 function Station({ business, branches, myBranch, canFix, owner, t, lang, initial, onDone, notify, onRegister, onStaffLink, myRecent }: {
-  business: Business; design?: Design; branches: { id: string; name: string }[]; myBranch: string | null; canFix: boolean; owner: boolean; t: T; lang: any; initial: CardState | null; onDone: () => void;
+  business: Business; design?: Design; branches: { id: string; name: string }[]; myBranch: string | null; canFix: boolean; owner: boolean; t: T; lang: SiteLang; initial: CardState | null; onDone: () => void;
   notify: (s: string, bad?: boolean) => void; onRegister: () => void; onStaffLink?: () => void; myRecent?: EventRow[];
 }) {
   const [selected, setSelected] = useState<CardState | null>(initial);
@@ -1753,11 +1754,25 @@ function Referral({ business, t, busy, call, reload }: { business: Business; t: 
   );
 }
 
-/** The business's own lock-screen line near a branch (Apple Wallet), with tags for the customer's numbers. */
+/** The hour in Israel now (outside render helpers, so components stay pure). */
+function hourNow(): number {
+  return israelNow().hour;
+}
+
+const HOURS = Array.from({ length: 24 }, (_, h) => h);
+
+/** The business's own lock-screen line near a branch (Apple Wallet), with tags for the customer's numbers; optionally another line for the evening. */
 function NearText({ business, t, lang, busy, call, reload }: { business: Business; t: T; lang: string; busy: boolean; call: Call; reload: () => void }) {
   const [text, setText] = useState(business.near_text ?? "");
+  const [evening, setEvening] = useState(business.near_text_evening ?? "");
+  const [byTime, setByTime] = useState(!!business.near_text_evening);
+  const [morningFrom, setMorningFrom] = useState(business.near_morning_from ?? 6);
+  const [eveningFrom, setEveningFrom] = useState(business.near_evening_from ?? 16);
   const [saved, setSaved] = useState(false);
   const ref = useRef<HTMLInputElement>(null);
+  const eveRef = useRef<HTMLInputElement>(null);
+  // Tags go into the field the owner was last typing in.
+  const [target, setTarget] = useState<"main" | "evening">("main");
   const cash = business.program === "cashback";
   const tags: [NearTag, string][] = cash
     ? [["balance", "nearTagBalance"], ["business", "nearTagBusiness"]]
@@ -1765,32 +1780,67 @@ function NearText({ business, t, lang, busy, call, reload }: { business: Busines
   const li = lang === "he" ? 0 : lang === "ar" ? 1 : 2;
   const add = (key: NearTag) => {
     const tag = NEAR_TAG_NAMES[key][li];
-    const el = ref.current;
-    const at = el?.selectionStart ?? text.length;
-    const next = (text.slice(0, at) + `{${tag}}` + text.slice(at)).slice(0, 120);
-    setText(next); setSaved(false);
+    const eve = byTime && target === "evening";
+    const el = eve ? eveRef.current : ref.current;
+    const cur = eve ? evening : text;
+    const at = el?.selectionStart ?? cur.length;
+    const next = (cur.slice(0, at) + `{${tag}}` + cur.slice(at)).slice(0, 120);
+    if (eve) setEvening(next); else setText(next);
+    setSaved(false);
     requestAnimationFrame(() => { el?.focus(); const pos = Math.min(next.length, at + tag.length + 2); el?.setSelectionRange(pos, pos); });
   };
-  const preview = fillNearText(text, { missing: 3, reward: business.reward, business: business.name, balance: business.currency === "USD" ? "$20" : "₪20" });
-  const save = async (value: string) => {
-    if (await call({ action: "set_near_text", text: value })) { setSaved(true); reload(); }
+  const fill = (v: string) => fillNearText(v, { missing: 3, reward: business.reward, business: business.name, balance: business.currency === "USD" ? "$20" : "₪20" });
+  const eveningOut = byTime ? evening.trim() : "";
+  const hoursBad = byTime && morningFrom >= eveningFrom;
+  const unchanged = text.trim() === (business.near_text ?? "") && eveningOut === (business.near_text_evening ?? "")
+    && morningFrom === (business.near_morning_from ?? 6) && eveningFrom === (business.near_evening_from ?? 16);
+  const save = async (main: string, eve: string) => {
+    if (await call({ action: "set_near_text", text: main, evening: eve, morningFrom, eveningFrom })) { setSaved(true); reload(); }
   };
+  const nowWhich = business.near_text_evening ? t(nearPhase(hourNow(), business.near_morning_from ?? 6, business.near_evening_from ?? 16) === "evening" ? "nearEvening" : "nearMorning") : "";
+  const hourSelect = (id: string, value: number, set: (h: number) => void) => (
+    <select id={id} value={value} onChange={(e) => { set(Number(e.target.value)); setSaved(false); }}>
+      {HOURS.map((h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}
+    </select>
+  );
   return (
     <section className="panel near-text">
       <div className="section-head"><h2><MapPin size={18} /> {t("nearTitle")}</h2></div>
       <p className="form-hint">{t("nearHint")}</p>
-      <form className="near-form" onSubmit={(e) => { e.preventDefault(); save(text); }}>
-        <label className="sr-only" htmlFor="near-text">{t("nearTitle")}</label>
-        <input id="near-text" ref={ref} value={text} maxLength={120} onChange={(e) => { setText(e.target.value); setSaved(false); }} placeholder={t("nearPlaceholder")} />
+      <form className="near-form" onSubmit={(e) => { e.preventDefault(); if (!hoursBad) save(text, eveningOut); }}>
+        {byTime && (
+          <div className="near-time">
+            <label htmlFor="near-text">{t("nearMorning")}</label>
+            <span className="near-from"><label htmlFor="near-morning-from">{t("nearFrom")}</label>{hourSelect("near-morning-from", morningFrom, setMorningFrom)}</span>
+          </div>
+        )}
+        {!byTime && <label className="sr-only" htmlFor="near-text">{t("nearTitle")}</label>}
+        <input id="near-text" ref={ref} value={text} maxLength={120} onFocus={() => setTarget("main")} onChange={(e) => { setText(e.target.value); setSaved(false); }} placeholder={t("nearPlaceholder")} />
+        <p className="near-preview" aria-live="polite">{text.trim() ? <><b>{t("nearPreview")}</b> {fill(text)}</> : byTime ? t("nearEveningEmpty") : t("nearAutoNow")}</p>
+        <label className="check-row">
+          <input type="checkbox" checked={byTime} onChange={(e) => { setByTime(e.target.checked); setSaved(false); if (!e.target.checked) setTarget("main"); }} />
+          <span>{t("nearByTime")}<small className="form-hint">{t("nearByTimeHint")}</small></span>
+        </label>
+        {byTime && (
+          <>
+            <div className="near-time">
+              <label htmlFor="near-evening">{t("nearEvening")}</label>
+              <span className="near-from"><label htmlFor="near-evening-from">{t("nearFrom")}</label>{hourSelect("near-evening-from", eveningFrom, setEveningFrom)}</span>
+            </div>
+            <input id="near-evening" ref={eveRef} value={evening} maxLength={120} onFocus={() => setTarget("evening")} onChange={(e) => { setEvening(e.target.value); setSaved(false); }} placeholder={t("nearEveningPlaceholder")} />
+            {evening.trim() && <p className="near-preview" aria-live="polite"><b>{t("nearPreview")}</b> {fill(evening)}</p>}
+            {hoursBad && <p className="form-hint form-error" role="alert">{t("nearHoursBad")}</p>}
+          </>
+        )}
         <div className="near-tags" role="group" aria-label={t("nearAdd")}>
           <span>{t("nearAdd")}</span>
           {tags.map(([tag, label]) => <button type="button" key={tag} className="chip" onClick={() => add(tag)}>{t(label)}</button>)}
         </div>
-        <p className="near-preview" aria-live="polite">{text.trim() ? <><b>{t("nearPreview")}</b> {preview}</> : t("nearAutoNow")}</p>
         <div className="admin-row">
-          <button className="btn primary small" disabled={busy || text.trim() === (business.near_text ?? "")}>{t("save")}</button>
-          {business.near_text && <button type="button" className="btn soft small" disabled={busy} onClick={() => { setText(""); save(""); }}>{t("nearAuto")}</button>}
+          <button className="btn primary small" disabled={busy || unchanged || hoursBad || (byTime && !evening.trim())}>{t("save")}</button>
+          {(business.near_text || business.near_text_evening) && <button type="button" className="btn soft small" disabled={busy} onClick={() => { setText(""); setEvening(""); setByTime(false); save("", ""); }}>{t("nearAuto")}</button>}
         </div>
+        {nowWhich && <p className="form-hint">{t("nearNowShows", { which: nowWhich })}</p>}
         {saved && <p className="form-hint" role="status">{t("nearSaved")}</p>}
       </form>
     </section>
