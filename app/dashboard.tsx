@@ -92,7 +92,7 @@ type Modal =
   | { type: "customer" }
   | { type: "staffLink" }
   | { type: "business" }
-  | { type: "link"; url: string; title: string; note?: string }
+  | { type: "link"; url: string; title: string; note?: string; book?: CardState }
   | { type: "correct"; customer: CustomerRow | CardState }
   | { type: "remove"; customer: CustomerRow | CardState }
   | { type: "phone"; customer: CustomerRow | CardState };
@@ -199,7 +199,8 @@ export default function Dashboard() {
       setData(next);
       setLoadError("");
       if (next.business && next.business.id !== businessId) setBusinessId(next.business.id);
-      if (next.role === "staff") setView("station");
+      // Staff: the station, or (clinics) the calendar when that's where they are.
+      if (next.role === "staff") setView((v) => (v === "calendar" && next.business?.program === "appointments" ? v : "station"));
     } catch {
       setLoadError(t("err_network"));
     }
@@ -273,7 +274,8 @@ export default function Dashboard() {
   const nav: [LucideIcon, string][] = isOwner
     ? [[LayoutDashboard, "overview"], ...(b?.program === "appointments" ? [[CalendarDays, "calendar"]] as typeof nav : []), [Users, "customers"], [ScanLine, "station"],
        ...(manage ? [[Palette, "design"], [Users, "team"], [Settings, "settings"]] as typeof nav : data?.canDesign ? [[Palette, "design"]] as typeof nav : [])]
-    : [[ScanLine, "station"]];
+    // Staff: the station, and for clinics the calendar (to book; the settings stay with the owner).
+    : [[ScanLine, "station"], ...(b?.program === "appointments" ? [[CalendarDays, "calendar"]] as typeof nav : [])];
 
   // ---------- Loading / empty states ----------
   if (!data) {
@@ -569,7 +571,7 @@ export default function Dashboard() {
           )}
 
           {view === "station" && (
-            <Station key={b.id} business={b} design={data.design!} branches={data.branches ?? []} myBranch={isOwner ? null : data.myBranch ?? null} canFix={isOwner || !!b.staff_adjust} owner={isOwner} t={t} lang={lang} initial={stationPick} onDone={() => load()} notify={notify}
+            <Station key={b.id + ":" + (stationPick?.id ?? "")} business={b} design={data.design!} branches={data.branches ?? []} myBranch={isOwner ? null : data.myBranch ?? null} canFix={isOwner || !!b.staff_adjust} owner={isOwner} t={t} lang={lang} initial={stationPick} onDone={() => load()} notify={notify}
               onRegister={() => setModal({ type: "customer" })} onStaffLink={isOwner ? () => setModal({ type: "staffLink" }) : undefined} myRecent={data.myRecent} />
           )}
 
@@ -583,8 +585,9 @@ export default function Dashboard() {
           )}
 
           {/* The clinic's calendar: owners (and Perkly) only. */}
-          {view === "calendar" && isOwner && b.program === "appointments" && (
-            <ClinicCalendar business={b} customers={customers} t={t} lang={lang} busy={busy} call={call} reload={load} notify={notify} />
+          {view === "calendar" && b.program === "appointments" && (
+            <ClinicCalendar business={b} owner={isOwner} t={t} lang={lang} busy={busy} call={call} reload={load} notify={notify}
+              onNewCard={(url, name, when) => setModal({ type: "link", url, title: name, note: t("calNewBooked", { when }) })} />
           )}
 
           {view === "team" && isOwner && manage && (
@@ -645,7 +648,14 @@ export default function Dashboard() {
                 e.preventDefault();
                 const form = new FormData(e.currentTarget);
                 const r = await call({ action: "register_customer", name: form.get("name"), phone: form.get("phone"), birthday: birthdayFromParts(form.get("bday"), form.get("bmonth")) });
-                if (r) { load(); setModal({ type: "link", url: r.cardUrl, title: String(form.get("name")) }); }
+                if (r) {
+                  load();
+                  // Clinics: straight on to booking the new customer's appointment.
+                  const book = b.program === "appointments"
+                    ? { id: r.id as string, name: String(form.get("name")), stamps: 0, target: b.target, rewards: 0, rewardReady: false, phone: String(form.get("phone")), apptAt: null }
+                    : undefined;
+                  setModal({ type: "link", url: r.cardUrl, title: String(form.get("name")), book });
+                }
               }}>
                 <span className="modal-icon"><Plus /></span>
                 <h2>{t("newCustomer")}</h2>
@@ -693,6 +703,11 @@ export default function Dashboard() {
                 <p>{modal.note ?? (modal.url.includes("/invite/") ? t("inviteCreated") : t("customerCreated"))}</p>
                 <LinkBox url={modal.url} t={t} notify={notify} />
                 {!modal.url.includes("/invite/") && <p className="form-hint">{t("cardLinkHint")}</p>}
+                {modal.book && (
+                  <button type="button" className="btn primary sx-wide" onClick={() => { setStationPick(modal.book!); setModal(null); setView("station"); }}>
+                    <CalendarDays size={18} />{t("calBookNow")}
+                  </button>
+                )}
               </div>
             )}
 

@@ -4,7 +4,7 @@
 // A free slot books an appointment for a customer (the same reminders as from the station).
 // Also here: the working hours and slot length, and what the appointments card adds (the owner's choice).
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock, Gift, Search, X } from "lucide-react";
 import { addDays, endOf, freeStarts, monthGrid, parseHours, parseServices, slotsOf, SLOT_CHOICES, toMin, weekStart, type Service, type WorkHours } from "../lib/calendar";
 import { formatTime } from "../lib/appointment";
@@ -38,10 +38,23 @@ function israelNowParts(): { date: string; min: number } {
   return { date: p.date, min: toMin(p.hm) };
 }
 
-export function ClinicCalendar({ business, customers, t, lang, busy, call, reload, notify }: {
-  business: CalendarBusiness; customers: CalendarCustomer[]; t: T; lang: string; busy: boolean; call: Call; reload: () => void;
+export function ClinicCalendar({ business, owner, t, lang, busy, call, reload, notify, onNewCard }: {
+  business: CalendarBusiness; owner: boolean; t: T; lang: string; busy: boolean; call: Call; reload: () => void;
   notify: (s: string, bad?: boolean) => void;
+  /** A customer registered while booking: their card link, to send them (the reminders reach the card). */
+  onNewCard: (url: string, name: string, when: string) => void;
 }) {
+  // The appointments come from their own query (owners and staff; staff see a masked phone).
+  const [customers, setCustomers] = useState<CalendarCustomer[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  async function refresh() {
+    const r = await call({ action: "appt_list" });
+    if (r) setCustomers(r.appts as CalendarCustomer[]);
+    setLoaded(true);
+  }
+  // Once, when the calendar opens (the dashboard's `call` is a new function on every render).
+  // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps -- load once on open
+  useEffect(() => { refresh(); }, []);
   const hours = parseHours(business.work_hours);
   const slot = business.appt_slot ?? 30;
   const services = parseServices(business.services);
@@ -104,7 +117,8 @@ export function ClinicCalendar({ business, customers, t, lang, busy, call, reloa
           </div>
         </div>
 
-        {mode === "day" && (() => {
+        {!loaded && <p className="form-hint" role="status">{t("loading")}</p>}
+        {loaded && mode === "day" && (() => {
           const { rows, outside, total, busy: taken } = dayRows(anchor);
           if (!total && !outside.length) return <p className="cal-closed">{t("calClosed")}</p>;
           return (
@@ -142,7 +156,7 @@ export function ClinicCalendar({ business, customers, t, lang, busy, call, reloa
           );
         })()}
 
-        {mode === "week" && (() => {
+        {loaded && mode === "week" && (() => {
           const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart(anchor), i));
           const open = hours.filter((h): h is [string, string] => !!h);
           if (!open.length) return <p className="cal-closed">{t("calClosed")}</p>;
@@ -186,7 +200,7 @@ export function ClinicCalendar({ business, customers, t, lang, busy, call, reloa
           );
         })()}
 
-        {mode === "month" && (
+        {loaded && mode === "month" && (
           <div className="cal-month">
             {Array.from({ length: 7 }, (_, i) => <span key={i} className="cal-wd" aria-hidden="true">{dayLabel(addDays("2026-11-22", i), { weekday: "short" })}</span>)}
             {monthGrid(anchor.slice(0, 7)).flat().map((d) => {
@@ -208,11 +222,22 @@ export function ClinicCalendar({ business, customers, t, lang, busy, call, reloa
       </section>
 
       {booking && <BookSlot slot={booking} services={services} fits={(min) => freeStarts(hours, booking.date, 5, min, booking.busy).includes(booking.hm)} defaultMin={slot} t={t} call={call} busy={busy} dayLabel={dayLabel}
-        onClose={() => setBooking(null)} onDone={(name) => { setBooking(null); notify(t("calBooked", { name, when: `${dayLabel(booking.date, { weekday: "short", day: "numeric", month: "numeric" })} ${booking.hm}` })); reload(); }} />}
+        onClose={() => setBooking(null)} onDone={(name, cardUrl) => {
+          // "יום א׳, 22.11 בשעה 11:00": the word between keeps the date and the time in order in Hebrew and Arabic.
+          const when = t("calWhen", { day: dayLabel(booking.date, { weekday: "short", day: "numeric", month: "numeric" }), time: booking.hm });
+          setBooking(null);
+          if (cardUrl) onNewCard(cardUrl, name, when); else notify(t("calBooked", { name, when }));
+          refresh();
+        }} />}
 
-      <ServicesEditor services={services} t={t} busy={busy} call={call} reload={reload} notify={notify} />
-      <HoursEditor hours={hours} slot={slot} t={t} busy={busy} call={call} reload={reload} notify={notify} />
-      <ExtraEditor business={business} t={t} busy={busy} call={call} reload={reload} notify={notify} />
+      {/* The settings: the owner (and Perkly) only. */}
+      {owner && (
+        <>
+          <ServicesEditor services={services} t={t} busy={busy} call={call} reload={reload} notify={notify} />
+          <HoursEditor hours={hours} slot={slot} t={t} busy={busy} call={call} reload={reload} notify={notify} />
+          <ExtraEditor business={business} t={t} busy={busy} call={call} reload={reload} notify={notify} />
+        </>
+      )}
     </div>
   );
 }
@@ -228,8 +253,12 @@ function shiftMonth(date: string, n: number): string {
 function BookSlot({ slot, services, fits, defaultMin, t, call, busy, dayLabel, onClose, onDone }: {
   slot: { date: string; hm: string }; services: Service[]; fits: (min: number) => boolean; defaultMin: number;
   t: T; call: Call; busy: boolean; dayLabel: (d: string, o: Intl.DateTimeFormatOptions) => string;
-  onClose: () => void; onDone: (name: string) => void;
+  onClose: () => void; onDone: (name: string, cardUrl?: string) => void;
 }) {
+  // A new customer: name and phone, registered and booked in one go.
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newPhone, setNewPhone] = useState("");
   const [svc, setSvc] = useState<Service | null>(services.find((s) => fits(s.min)) ?? null);
   const [q, setQ] = useState("");
   const [found, setFound] = useState<Found[] | null>(null);
@@ -238,9 +267,13 @@ function BookSlot({ slot, services, fits, defaultMin, t, call, busy, dayLabel, o
     const r = await call({ action: "lookup", query: q.trim() });
     setFound(r ? (r.results as Found[]) : []);
   };
-  const book = async (c: Found) => {
+  const book = async (c: Found, cardUrl?: string) => {
     const r = await call({ action: "appt_set", customer: c.id, requestId: crypto.randomUUID(), date: slot.date, time: slot.hm, ...(svc ? { service: svc.id } : { minutes: defaultMin }) });
-    if (r) onDone(c.name);
+    if (r) onDone(c.name, cardUrl);
+  };
+  const registerAndBook = async () => {
+    const r = await call({ action: "register_customer", name: newName.trim(), phone: newPhone.trim() });
+    if (r?.id) await book({ id: r.id, name: newName.trim() }, r.cardUrl);
   };
   return (
     <div className="modal-overlay" role="presentation" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -261,6 +294,17 @@ function BookSlot({ slot, services, fits, defaultMin, t, call, busy, dayLabel, o
             })}
           </div>
         )}
+        {adding ? (
+          <form className="cal-new" onSubmit={(e) => { e.preventDefault(); registerAndBook(); }}>
+            <label>{t("name")}<input value={newName} required maxLength={80} autoFocus autoComplete="off" onChange={(e) => setNewName(e.target.value)} /></label>
+            <label>{t("phone")}<input value={newPhone} type="tel" required maxLength={20} dir="ltr" placeholder={t("phoneHint")} autoComplete="off" onChange={(e) => setNewPhone(e.target.value)} /></label>
+            <p className="form-hint">{t("privacy")}</p>
+            <div className="form-actions">
+              <button className="btn primary" disabled={busy || !newName.trim() || newPhone.trim().length < 9}>{t("calNewAndBook")}</button>
+              <button type="button" className="btn soft" onClick={() => setAdding(false)}>{t("calExisting")}</button>
+            </div>
+          </form>
+        ) : (<>
         <form className="cal-book-search" role="search" onSubmit={(e) => { e.preventDefault(); search(); }}>
           <label className="search"><Search size={17} />
             <input autoFocus value={q} placeholder={t("sxSearchPh")} aria-label={t("sxSearchPh")} enterKeyHint="search" onChange={(e) => { setQ(e.target.value); setFound(null); }} />
@@ -279,7 +323,9 @@ function BookSlot({ slot, services, fits, defaultMin, t, call, busy, dayLabel, o
             </div>
           ) : <p className="form-hint">{t("noCustomer")}</p>
         )}
+        <button type="button" className="btn soft cal-new-btn" onClick={() => { setAdding(true); if (q.trim() && !/\d{3}/.test(q)) setNewName(q.trim()); else if (/\d{3}/.test(q)) setNewPhone(q.trim()); }}>+ {t("newCustomer")}</button>
         <p className="form-hint">{t("calBookHint")}</p>
+        </>)}
       </section>
     </div>
   );

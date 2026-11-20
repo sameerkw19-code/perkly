@@ -1002,3 +1002,7 @@ html,body{overflow-x:clip}
 .modal .cal-book-search label.search { display: flex; margin: 0; align-items: center; }
 .modal .cal-book-search label.search input { display: block; margin: 0; }
 .cal-book-search .btn { min-height: 44px; }
+.cal-new { display: grid; gap: 10px; }
+.cal-new label { display: grid; gap: 6px; font-weight: 600; }
+.cal-new input { min-height: 48px; font-size: 16px; }
+.cal-new-btn { margin-top: 10px; width: 100%; min-height: 44px; }
