@@ -512,3 +512,30 @@ export function PolarSync({ business }: { business: string }) {
     </span>
   );
 }
+
+/** The one-time setup fee: mark it paid by hand, waive it, or owe it (again). Inline confirmation. */
+export function SetupFeeActions({ business, state }: { business: string; state: "due" | "paid" | "none" }) {
+  const [busy, setBusy] = useState(false);
+  const [ask, setAsk] = useState<"paid" | "waive" | "due" | null>(null);
+  const [error, setError] = useState("");
+  const labels = { paid: "סימון כשולם", waive: "ביטול דמי ההקמה", due: "חיוב בדמי הקמה" } as const;
+  const run = async (op: "paid" | "waive" | "due") => {
+    setBusy(true); setError("");
+    const r = await post("/api/admin", { action: "setup_fee", business, op });
+    setBusy(false);
+    if (r.ok) window.location.reload(); else { setError("הפעולה נכשלה. נסה שוב."); setAsk(null); }
+  };
+  const ops: ("paid" | "waive" | "due")[] = state === "due" ? ["paid", "waive"] : state === "none" ? ["due"] : [];
+  return (
+    <span className="row-actions" style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
+      {ask ? (
+        <>
+          <span>{labels[ask]}?</span>
+          <button className="btn primary small" disabled={busy} onClick={() => run(ask)}>כן</button>
+          <button className="btn soft small" disabled={busy} onClick={() => setAsk(null)}>לא</button>
+        </>
+      ) : ops.map((op) => <button key={op} className="btn soft small" disabled={busy} onClick={() => setAsk(op)}>{labels[op]}</button>)}
+      {error && <span role="alert" className="form-error">{error}</span>}
+    </span>
+  );
+}

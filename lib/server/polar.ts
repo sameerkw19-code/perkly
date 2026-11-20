@@ -14,6 +14,8 @@ export type PolarEnv = {
   /** Dollar products for businesses abroad. Without them, those businesses get the shekel products. */
   POLAR_PRODUCT_ID_USD?: string;
   POLAR_PRODUCT_ID_YEARLY_USD?: string;
+  /** Optional: the one-time setup fee (300 ILS), for businesses Perkly sets up and designs. Without it the fee is paid by hand. */
+  POLAR_PRODUCT_ID_SETUP?: string;
   POLAR_WEBHOOK_SECRET?: string;
   POLAR_SANDBOX?: string;
 };
@@ -74,6 +76,37 @@ export async function createCheckoutUrl(env: PolarEnv, businessId: string, origi
   const data = (await response.json().catch(() => null)) as { url?: string } | null;
   if (!response.ok || !data?.url) throw new Error(`polar_checkout_failed:${response.status}`);
   return data.url;
+}
+
+/** Whether the setup fee can be paid online: billing works and a setup product is set (shekel businesses). */
+export function setupCheckoutConfigured(env: PolarEnv, currency: Currency): boolean {
+  return polarConfigured(env) && !!env.POLAR_PRODUCT_ID_SETUP && currency === "ILS";
+}
+
+/** A hosted Polar checkout for the one-time setup fee of one business. The order's metadata names the business. */
+export async function createSetupCheckoutUrl(env: PolarEnv, businessId: string, origin: string, customerEmail: string): Promise<string> {
+  const response = await fetch(`${apiBase(env)}/checkouts/`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${env.POLAR_ACCESS_TOKEN}`, "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({
+      products: [env.POLAR_PRODUCT_ID_SETUP],
+      success_url: `${origin}/billing?setup=1`,
+      return_url: `${origin}/billing`,
+      customer_email: customerEmail,
+      metadata: { business: businessId, kind: "setup" },
+    }),
+  });
+  const data = (await response.json().catch(() => null)) as { url?: string } | null;
+  if (!response.ok || !data?.url) throw new Error(`polar_checkout_failed:${response.status}`);
+  return data.url;
+}
+
+/** A paid setup-fee order from a webhook: the business and the order id, or null for anything else. */
+export function setupOrder(event: { type: string; data: Record<string, unknown> }): { business: string; order: string } | null {
+  if (event.type !== "order.paid") return null;
+  const meta = (event.data.metadata ?? {}) as Record<string, unknown>;
+  if (meta.kind !== "setup" || typeof meta.business !== "string" || typeof event.data.id !== "string") return null;
+  return { business: meta.business, order: event.data.id };
 }
 
 function base64ToBytes(value: string): Uint8Array<ArrayBuffer> {

@@ -291,3 +291,13 @@ test("clinic services and the free times that fit them", () => {
   assert.deepEqual(freeStarts(hours, "2026-11-22", 30, 30, [], 650), ["11:00", "11:30"]);
   assert.deepEqual(freeStarts(hours, "2026-11-23", 30, 30, []), [], "closed on Monday");
 });
+
+import { setupOrder } from "../lib/server/polar.ts";
+import { fillPrices as fillP } from "../lib/pricing.ts";
+test("setup fee: the price placeholder, and a paid setup order from a webhook", () => {
+  assert.equal(fillP("דמי הקמה {$s} חד־פעמי", "ILS", "he"), "דמי הקמה 300 ₪ חד־פעמי");
+  assert.equal(fillP("setup {$s}", "ILS", "en"), "setup ₪300");
+  assert.deepEqual(setupOrder({ type: "order.paid", data: { id: "ord_1", metadata: { business: "b1", kind: "setup" } } }), { business: "b1", order: "ord_1" });
+  assert.equal(setupOrder({ type: "order.paid", data: { id: "ord_2", metadata: { business: "b1" } } }), null, "a subscription order");
+  assert.equal(setupOrder({ type: "order.created", data: { id: "ord_3", metadata: { business: "b1", kind: "setup" } } }), null, "not paid yet");
+});

@@ -15,6 +15,7 @@ import { pushAppleBusiness } from "../../../lib/server/apple-push";
 import { resolvePlace } from "../../../lib/server/geo";
 import { NEAR_TEXT_MAX, nearPhase } from "../../../lib/near-text";
 import { israelNow } from "../../../lib/birthday";
+import { PRICES } from "../../../lib/pricing";
 import { formatTime, israelTime } from "../../../lib/appointment";
 import { freeStarts, parseHours, SERVICE_MAX, toMin, weekdayOf } from "../../../lib/calendar";
 
@@ -43,7 +44,7 @@ function validTarget(v: unknown, program?: string): v is number {
 
 async function loadBusiness(db: D1Database, id: string) {
   const row = await db
-    .prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays, social, owner_designs, program, cashback_bp, cashback_min, currency, avg_cap, pos_only, near_text, near_text_evening, near_morning_from, near_evening_from, referral_stamps, report_email, appt_extra, appt_points, work_hours, appt_slot, services FROM businesses WHERE id = ?")
+    .prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays, social, owner_designs, program, cashback_bp, cashback_min, currency, avg_cap, pos_only, near_text, near_text_evening, near_morning_from, near_evening_from, referral_stamps, report_email, appt_extra, appt_points, work_hours, appt_slot, services, setup_fee, setup_paid FROM businesses WHERE id = ?")
     .bind(id)
     .first<Omit<Business, "social"> & { social: string | null }>();
   return row ? { ...row, social: parseSocial(row.social) } : null;
@@ -380,6 +381,8 @@ export async function POST(request: Request) {
         .bind(id, user.id, name, reward, p.target, p.color, now, randomCode(10), program === "average" || program === "appointments" ? "bank" : mode, currency, program, bp, minUse, avgCap),
       // The starting card: the example look for the business type, in the sign-up language (English abroad).
       // After this the owner (and Perkly) edit it in the design screen.
+      // Set up and designed by Perkly: the one-time setup fee is owed (self sign-up has none).
+      db.prepare("UPDATE businesses SET setup_fee = ? WHERE id = ?").bind(forClient ? PRICES[currency].setup * 100 : null, id),
       db.prepare("INSERT INTO card_designs(id, business, version, data, published, published_by) VALUES(?, ?, 1, ?, ?, ?)")
         .bind(crypto.randomUUID(), id, JSON.stringify(isKind(p.kind) ? startDesign(p.kind, name, reward, cardLang) : defaultDesign({ name, reward, color: p.color }, cardLang)), now, user.id),
       db.prepare("INSERT INTO memberships(id, business, user, role, created) VALUES(?, ?, ?, 'owner', ?)")
