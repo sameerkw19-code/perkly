@@ -1159,6 +1159,32 @@ test("clinic services: a service sets the length; free times skip what's taken",
   assert.equal(row.appt_min, 60);
 });
 
+test("clinic calendar for staff: they see appointments (masked phones) and book; settings stay with the owner", async () => {
+  const built = await admin.post("/api/loyalty", { action: "create_business", forClient: true, kind: "studio", name: "Clinic4", reward: "Reminders", target: 10, color: "#2a6f97", setupDays: 30, branchName: "Main", program: "appointments" });
+  const biz = built.body.id;
+  const inv = await admin.act(biz, "invite_staff", { label: "Desk", email: `desk-${run}@test.perkly` });
+  const token = new URL(inv.body.inviteUrl).pathname.split("/").pop();
+  const desk = new Client();
+  assert.equal((await desk.post("/api/auth", { action: "accept_invite", token, name: "Desk", email: `desk-${run}@test.perkly`, password: "desk pass 12" })).status, 200);
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(Date.now() + 4 * 86_400_000));
+  // The seller registers a new customer and books them.
+  const reg = await desk.act(biz, "register_customer", { name: "Gili", phone: "0531119301" });
+  assert.equal(reg.status, 200, JSON.stringify(reg.body));
+  assert.equal((await desk.act(biz, "appt_set", { customer: reg.body.id, requestId: id(), date: day, time: "11:00" })).status, 200);
+  const list = await desk.act(biz, "appt_list", {});
+  assert.equal(list.status, 200, JSON.stringify(list.body));
+  const gili = list.body.appts.find((a) => a.name === "Gili");
+  assert.ok(gili && gili.appt_at);
+  assert.ok(!gili.phone.includes("119301"), "staff see a masked phone");
+  assert.ok((await admin.act(biz, "appt_list", {})).body.appts.find((a) => a.name === "Gili").phone.replace(/\D/g, "").includes("1119301"), "owners see it");
+  // The settings are the owner's.
+  assert.equal((await desk.act(biz, "set_services", { services: [{ name: "X", min: 30 }] })).status, 403);
+  assert.equal((await desk.act(biz, "set_work_hours", { hours: [null, null, null, null, null, null, null], slot: 30 })).status, 403);
+  assert.equal((await desk.act(biz, "set_appt_extra", { extra: "none" })).status, 403);
+  // Not for stamp cards.
+  assert.equal((await ownerA.act(bizA, "appt_list", {})).status, 409);
+});
+
 test("message to customers: the owner sends now or schedules; staff can't; at most 3 a day", async () => {
   const owner = new Client();
   await signup(owner, "msg-owner");

@@ -537,6 +537,15 @@ export async function POST(request: Request) {
       });
     }
 
+    case "appt_list": {
+      // The calendar: every customer's next appointment (owners and staff). Staff see a masked phone.
+      if (business.program !== "appointments") return fail("wrong_program", 409, "Only for the appointments card");
+      const rows = await db
+        .prepare("SELECT id, name, phone, appt_at, appt_service, appt_min FROM customers WHERE business = ? AND archived IS NULL AND appt_at IS NOT NULL AND appt_at > ? ORDER BY appt_at LIMIT 3000")
+        .bind(business.id, new Date(Date.now() - 62 * 86_400_000).toISOString())
+        .all<{ id: string; name: string; phone: string; appt_at: string; appt_service: string | null; appt_min: number | null }>();
+      return json({ appts: rows.results.map((c) => ({ ...c, phone: role === "owner" ? formatPhone(c.phone) : maskPhone(c.phone) })) });
+    }
     case "appt_free": {
       // The appointments card: start times on a day when an appointment of `minutes` fits (working hours, other appointments).
       if (business.program !== "appointments") return fail("wrong_program", 409, "Only for the appointments card");
