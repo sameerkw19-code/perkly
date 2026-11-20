@@ -15,6 +15,13 @@ import { pushAppleBusiness } from "../../../lib/server/apple-push";
 import { resolvePlace } from "../../../lib/server/geo";
 import { NEAR_TEXT_MAX, nearPhase } from "../../../lib/near-text";
 import { israelNow } from "../../../lib/birthday";
+import { formatTime, israelTime } from "../../../lib/appointment";
+import { freeStarts, parseHours, SERVICE_MAX, toMin, weekdayOf } from "../../../lib/calendar";
+
+/** The Israel date ("2026-11-25") of a moment. */
+function israelDateOf(iso: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
+}
 import { REFERRAL_MAX_STAMPS } from "../../../lib/server/referral";
 import { ensureBusinessClass, walletConfig } from "../../../lib/server/google-wallet";
 import { getSettings } from "../../../lib/server/settings";
@@ -36,7 +43,7 @@ function validTarget(v: unknown, program?: string): v is number {
 
 async function loadBusiness(db: D1Database, id: string) {
   const row = await db
-    .prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays, social, owner_designs, program, cashback_bp, cashback_min, currency, avg_cap, pos_only, near_text, near_text_evening, near_morning_from, near_evening_from, referral_stamps, report_email FROM businesses WHERE id = ?")
+    .prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays, social, owner_designs, program, cashback_bp, cashback_min, currency, avg_cap, pos_only, near_text, near_text_evening, near_morning_from, near_evening_from, referral_stamps, report_email, appt_extra, appt_points, work_hours, appt_slot, services FROM businesses WHERE id = ?")
     .bind(id)
     .first<Omit<Business, "social"> & { social: string | null }>();
   return row ? { ...row, social: parseSocial(row.social) } : null;
@@ -196,7 +203,7 @@ export async function GET(request: Request) {
          COALESCE(SUM(CASE WHEN e.kind = 'spend' AND e.created >= ?2 THEN e.amount ELSE 0 END), 0) AS used_now,
          COALESCE(SUM(CASE WHEN e.kind = 'spend' AND e.created < ?2 THEN e.amount ELSE 0 END), 0) AS used_prev
        FROM events e JOIN customers c ON c.id = e.customer
-       WHERE e.business = ?1 AND e.created >= ?3 AND e.kind IN ('stamp', 'redeem', 'earn', 'spend')`,
+       WHERE e.business = ?1 AND e.created >= ?3 AND e.kind IN ('stamp', 'redeem', 'earn', 'spend', 'visit')`,
     ).bind(business!.id, mid, start);
   };
   // Stamps and rewards per staff member and per branch, for the last day, week and month (the reports).
@@ -217,17 +224,17 @@ export async function GET(request: Request) {
          COALESCE(SUM(e.kind = 'earn'), 0) AS purchases_month,
          COALESCE(SUM(CASE WHEN e.kind = 'earn' THEN e.amount ELSE 0 END), 0) AS sales_month
        FROM events e ${by === "actor" ? "LEFT JOIN users u ON u.id = e.actor LEFT JOIN pos_keys pk ON 'pos:' || pk.id = e.actor" : "LEFT JOIN branches br ON br.id = e.branch"}
-       WHERE e.business = ?1 AND e.created >= ?4 AND e.kind IN ('stamp', 'redeem', 'earn', 'spend')
+       WHERE e.business = ?1 AND e.created >= ?4 AND e.kind IN ('stamp', 'redeem', 'earn', 'spend', 'visit')
        GROUP BY e.${by} ORDER BY stamps_month DESC, purchases_month DESC LIMIT 50`,
     ).bind(business!.id, ago(1), ago(7), ago(30));
   const [customers, events, stats, team, invites, busyCustomers, busyStaff, perBranch, staffFixes, sumDay, sumWeek, sumMonth, byStaff, byBranch] = await db.batch([
     db.prepare(
-      `SELECT c.id, c.name, c.phone, c.stamps, c.target, c.balance, c.created, c.source, c.consent_marketing, c.birthday, c.card_hash IS NOT NULL AS has_link,
+      `SELECT c.id, c.name, c.phone, c.stamps, c.target, c.balance, c.appt_at, c.appt_service, c.appt_min, c.created, c.source, c.consent_marketing, c.birthday, c.card_hash IS NOT NULL AS has_link,
          (SELECT COUNT(*) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2))
            + (CASE WHEN ?3 = 'block' AND c.stamps >= c.target THEN 1 ELSE 0 END) AS rewards,
          -- Last visit: the latest stamp or reward use, read per customer through events(customer, created).
          -- (Three times faster than grouping all of a big business's events.)
-         (SELECT MAX(e.created) FROM events e WHERE e.customer = c.id AND e.kind IN ('stamp', 'redeem', 'earn', 'spend')) AS last_visit
+         (SELECT MAX(e.created) FROM events e WHERE e.customer = c.id AND e.kind IN ('stamp', 'redeem', 'earn', 'spend', 'visit')) AS last_visit
        FROM customers c
        WHERE c.business = ?1 AND c.archived IS NULL ORDER BY c.created DESC LIMIT 5000`,
     ).bind(business!.id, new Date().toISOString(), business!.reward_mode),
@@ -362,7 +369,7 @@ export async function POST(request: Request) {
     const currency = forClient ? (p.market === "intl" ? "USD" : "ILS") : region.currency;
     const cardLang = forClient || region.israel ? (p.lang === "en" ? "en" : "he") : "en";
     // The kind of card: stamps (default) or a balance card with a percentage back (Perkly picks it for a client).
-    const program: Program = forClient && (p.program === "cashback" || p.program === "average") ? p.program : "stamps";
+    const program: Program = forClient && (p.program === "cashback" || p.program === "average" || p.program === "appointments") ? p.program : "stamps";
     const avgCap = program === "average" && Number.isInteger(p.avgCap) && (p.avgCap as number) >= 0 && (p.avgCap as number) <= AMOUNT_MAX ? (p.avgCap as number) : 0;
     const bp = program === "cashback" && Number.isInteger(p.cashbackBp) && (p.cashbackBp as number) >= BP_MIN && (p.cashbackBp as number) <= BP_MAX ? (p.cashbackBp as number) : 200;
     const minUse = program === "cashback" && Number.isInteger(p.cashbackMin) && (p.cashbackMin as number) >= 0 && (p.cashbackMin as number) <= AMOUNT_MAX ? (p.cashbackMin as number) : 0;
@@ -370,7 +377,7 @@ export async function POST(request: Request) {
       // The currency follows where the owner signs up: shekels in Israel, dollars abroad.
       // Owners design their own card (owner_designs = 1); Perkly can switch that off per business.
       db.prepare("INSERT INTO businesses(id, owner, name, reward, target, color, created, join_code, reward_mode, currency, program, cashback_bp, cashback_min, avg_cap, owner_designs) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)")
-        .bind(id, user.id, name, reward, p.target, p.color, now, randomCode(10), program === "average" ? "bank" : mode, currency, program, bp, minUse, avgCap),
+        .bind(id, user.id, name, reward, p.target, p.color, now, randomCode(10), program === "average" || program === "appointments" ? "bank" : mode, currency, program, bp, minUse, avgCap),
       // The starting card: the example look for the business type, in the sign-up language (English abroad).
       // After this the owner (and Perkly) edit it in the design screen.
       db.prepare("INSERT INTO card_designs(id, business, version, data, published, published_by) VALUES(?, ?, 1, ?, ?, ?)")
@@ -439,7 +446,7 @@ export async function POST(request: Request) {
       const denied = adminOnly(); if (denied) return denied;
       const name = str(p.name, 80);
       const reward = str(p.reward, 160);
-      const nextProgram = p.program === "cashback" || p.program === "stamps" || p.program === "average" ? p.program : business.program;
+      const nextProgram = p.program === "cashback" || p.program === "stamps" || p.program === "average" || p.program === "appointments" ? p.program : business.program;
       if (!name || !reward || !validTarget(p.target, nextProgram) || typeof p.color !== "string" || !COLOR.test(p.color)) {
         return fail("bad_details", 400, "Invalid business details");
       }
@@ -458,7 +465,7 @@ export async function POST(request: Request) {
       }
       const socialJson = Object.keys(social).length ? JSON.stringify(social) : null;
       // The kind of card, the percentage back and the minimum balance to use it (the balance card).
-      const program: Program = p.program === "cashback" || p.program === "stamps" || p.program === "average" ? p.program : business.program;
+      const program: Program = p.program === "cashback" || p.program === "stamps" || p.program === "average" || p.program === "appointments" ? p.program : business.program;
       const avgCap = p.avgCap === undefined ? business.avg_cap : p.avgCap;
       if (!Number.isInteger(avgCap) || (avgCap as number) < 0 || (avgCap as number) > AMOUNT_MAX) return fail("bad_details", 400, "Invalid cap");
       const bp = p.cashbackBp === undefined ? business.cashback_bp : p.cashbackBp;
@@ -467,7 +474,7 @@ export async function POST(request: Request) {
       if (!Number.isInteger(minUse) || (minUse as number) < 0 || (minUse as number) > AMOUNT_MAX) return fail("bad_details", 400, "Invalid minimum");
       const statements = [
         db.prepare("UPDATE businesses SET name = ?, reward = ?, target = ?, color = ?, staff_adjust = ?, reward_mode = ?, reward_expiry_days = ?, birthdays = ?, social = ?, program = ?, cashback_bp = ?, cashback_min = ?, avg_cap = ? WHERE id = ?")
-          .bind(name, reward, p.target, p.color, staffAdjust, program === "average" ? "bank" : mode, expiry, birthdaysOn, socialJson, program, bp, minUse, avgCap, business.id),
+          .bind(name, reward, p.target, p.color, staffAdjust, program === "average" || program === "appointments" ? "bank" : mode, expiry, birthdaysOn, socialJson, program, bp, minUse, avgCap, business.id),
       ];
       if (business.reward_mode === "block" && mode === "bank") {
         // Switching to collect mode: cards that are full now become a saved reward and start a new round.
@@ -530,12 +537,37 @@ export async function POST(request: Request) {
       });
     }
 
+    case "appt_free": {
+      // The appointments card: start times on a day when an appointment of `minutes` fits (working hours, other appointments).
+      if (business.program !== "appointments") return fail("wrong_program", 409, "Only for the appointments card");
+      if (!(await allow(db, `free:${user.id}`, 120, 60))) return fail("rate_limited", 429);
+      const date = typeof p.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(p.date) ? p.date : null;
+      const dayStart = date ? israelTime(date, "00:00") : null;
+      if (!date || !dayStart) return fail("bad_details", 400, "Invalid date");
+      const slot = business.appt_slot ?? 30;
+      const minutes = Number.isInteger(p.minutes) && (p.minutes as number) >= 5 && (p.minutes as number) <= 480 ? (p.minutes as number) : slot;
+      const rows = await db
+        .prepare("SELECT appt_at, appt_min FROM customers WHERE business = ? AND archived IS NULL AND appt_at >= ? AND appt_at < ? AND id != ?")
+        .bind(business.id, dayStart.toISOString(), new Date(dayStart.getTime() + 25 * 3_600_000).toISOString(), typeof p.except === "string" ? p.except : "")
+        .all<{ appt_at: string; appt_min: number | null }>();
+      const busy = rows.results
+        .filter((r) => israelDateOf(r.appt_at) === date)
+        .map((r) => { const s = toMin(formatTime(r.appt_at)); return [s, s + (r.appt_min ?? slot)] as [number, number]; });
+      const today = israelDateOf(new Date().toISOString());
+      const notBefore = date === today ? toMin(formatTime(new Date().toISOString())) + 5 : date < today ? 24 * 60 : -1;
+      const hours = parseHours(business.work_hours);
+      return json({ times: freeStarts(hours, date, slot, minutes, busy, notBefore), closed: !hours[weekdayOf(date)], busy: busy.length });
+    }
+
     case "stamp":
     case "redeem":
     case "adjust":
     case "purchase":
     case "spend":
     case "adjust_balance":
+    case "appt_set":
+    case "appt_clear":
+    case "visit":
       return cardAction({ db, p, business, actorId: user.id, role, memberBranch: membership.branch, now, origin });
 
     case "new_card_link": {
@@ -695,6 +727,61 @@ export async function POST(request: Request) {
       if ((n as number) > 0 && business.program !== "stamps") return fail("wrong_program", 409, "Bring a friend is for stamp cards");
       await db.prepare("UPDATE businesses SET referral_stamps = ? WHERE id = ?").bind(n, business.id).run();
       return json({ ok: true });
+    }
+    case "set_appt_extra": {
+      // The appointments card: what it adds besides the next appointment (the owner's choice).
+      const denied = ownerOnly(); if (denied) return denied;
+      if (business.program !== "appointments") return fail("wrong_program", 409, "Only for the appointments card");
+      const kind = p.extra;
+      if (kind !== "none" && kind !== "stamps" && kind !== "points" && kind !== "cashback") return fail("bad_details", 400, "Unknown option");
+      const reward = kind === "stamps" || kind === "points" ? str(p.reward, 160) : business.reward;
+      if (!reward) return fail("bad_details", 400, "The reward is required");
+      const goal = kind === "stamps" ? p.target : kind === "points" ? p.target : business.target;
+      if (kind === "stamps" && !(Number.isInteger(goal) && (goal as number) >= 2 && (goal as number) <= 30)) return fail("bad_details", 400, "Visits for a gift: 2-30");
+      if (kind === "points" && !(Number.isInteger(goal) && (goal as number) >= 2 && (goal as number) <= 100_000)) return fail("bad_details", 400, "Points for a reward: 2-100,000");
+      const perVisit = kind === "points" ? p.points : business.appt_points ?? 10;
+      if (kind === "points" && !(Number.isInteger(perVisit) && (perVisit as number) >= 1 && (perVisit as number) <= 1000 && (perVisit as number) < (goal as number))) return fail("bad_details", 400, "Points per visit: 1-1,000");
+      const bp = kind === "cashback" ? p.cashbackBp : business.cashback_bp;
+      if (kind === "cashback" && !(Number.isInteger(bp) && (bp as number) >= BP_MIN && (bp as number) <= BP_MAX)) return fail("bad_details", 400, "Invalid percentage");
+      const minUse = kind === "cashback" ? (p.cashbackMin ?? 0) : business.cashback_min;
+      if (!Number.isInteger(minUse) || (minUse as number) < 0 || (minUse as number) > AMOUNT_MAX) return fail("bad_details", 400, "Invalid minimum");
+      await db.batch([
+        db.prepare("UPDATE businesses SET appt_extra = ?, reward = ?, target = ?, appt_points = ?, cashback_bp = ?, cashback_min = ?, reward_mode = 'bank' WHERE id = ?")
+          .bind(kind, reward, goal, perVisit, bp, minUse, business.id),
+        // Customers who haven't reached the new goal follow it now; fuller cards keep theirs until the next round.
+        db.prepare("UPDATE customers SET target = ? WHERE business = ? AND stamps < ?").bind(goal, business.id, goal),
+      ]);
+      await refreshPasses(db, business.id, new URL(request.url).origin, now);
+      return json({ ok: true });
+    }
+    case "set_work_hours": {
+      // The clinic's calendar: working hours per weekday (Sunday first; null = closed) and the slot length.
+      const denied = ownerOnly(); if (denied) return denied;
+      const HM = /^([01]\d|2[0-3]):[0-5]\d$/;
+      const days = Array.isArray(p.hours) && p.hours.length === 7 ? p.hours : null;
+      if (!days || !days.every((d) => d === null || (Array.isArray(d) && d.length === 2 && HM.test(String(d[0])) && HM.test(String(d[1])) && String(d[0]) < String(d[1])))) {
+        return fail("bad_details", 400, "Invalid working hours");
+      }
+      const slot = p.slot;
+      if (![10, 15, 20, 30, 45, 60, 90].includes(slot as number)) return fail("bad_details", 400, "Invalid slot length");
+      await db.prepare("UPDATE businesses SET work_hours = ?, appt_slot = ? WHERE id = ?").bind(JSON.stringify(days), slot, business.id).run();
+      return json({ ok: true });
+    }
+    case "set_services": {
+      // The clinic's services: a name and how long it takes (5 minutes to 8 hours, in steps of 5).
+      const denied = ownerOnly(); if (denied) return denied;
+      const list = Array.isArray(p.services) ? p.services : null;
+      if (!list || list.length > SERVICE_MAX) return fail("bad_details", 400, "Invalid services");
+      const clean: { id: string; name: string; min: number }[] = [];
+      for (const item of list as Record<string, unknown>[]) {
+        const name = str(item?.name, 60);
+        const min = item?.min;
+        if (!name || !Number.isInteger(min) || (min as number) < 5 || (min as number) > 480 || (min as number) % 5) return fail("bad_details", 400, "Each service needs a name and a length");
+        const sid = typeof item.id === "string" && /^[a-z0-9]{6,16}$/.test(item.id) ? item.id : randomCode(8);
+        clean.push({ id: sid, name, min: min as number });
+      }
+      await db.prepare("UPDATE businesses SET services = ? WHERE id = ?").bind(clean.length ? JSON.stringify(clean) : null, business.id).run();
+      return json({ ok: true, services: clean });
     }
     case "set_report_email": {
       // The monthly report by email (on by default).

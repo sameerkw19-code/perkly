@@ -68,7 +68,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
          (SELECT COUNT(*) FROM customers WHERE business = ?1 AND archived IS NULL) AS customers,
          (SELECT COUNT(*) FROM customers WHERE business = ?1 AND created >= ?2) AS customers30,
          (SELECT COUNT(*) FROM customers WHERE business = ?1 AND source = 'self' AND archived IS NULL) AS selfJoined,
-         (SELECT COUNT(*) FROM events WHERE business = ?1 AND kind IN ('stamp', 'earn') AND created >= ?2) AS stamps30,
+         (SELECT COUNT(*) FROM events WHERE business = ?1 AND kind IN ('stamp', 'earn', 'visit') AND created >= ?2) AS stamps30,
          (SELECT COUNT(*) FROM events WHERE business = ?1 AND kind = 'redeem' AND created >= ?2) AS redeems30,
          (SELECT MAX(version) FROM card_designs WHERE business = ?1) AS published`,
     ).bind(id, since30).first<{ customers: number; customers30: number; selfJoined: number; stamps30: number; redeems30: number; published: number | null }>(),
@@ -105,7 +105,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
   const ownerInvite = [...invites.results].reverse().find((i) => i.role === "owner") ?? null;
   const build = {
     id: b.id, name: b.name,
-    details: `${b.reward} · ${b.target} ${b.program === "average" ? "קניות בסבב" : b.program === "cashback" ? "(כרטיס יתרה)" : "חותמות להטבה"}`,
+    details: `${b.reward} · ${b.target} ${b.program === "appointments" ? "(כרטיס תורים)" : b.program === "average" ? "קניות בסבב" : b.program === "cashback" ? "(כרטיס יתרה)" : "חותמות להטבה"}`,
     designVersion: c.published,
     // A logo, or any design published after the starting one.
     designDone: !!design.logo || (c.published ?? 0) >= 2,
@@ -132,7 +132,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
             <h1>{b.name} <span className={"admin-chip st-" + (b.archived ? "none" : st)}>{b.archived ? "סגור" : STATUS_LABEL[st]}</span></h1>
             <p className="muted">
               <span dir="ltr">{b.owner_email ?? "—"}</span>{b.owner_phone && !withPerkly ? <> · <bdi dir="ltr">{formatPhone(b.owner_phone)}</bdi></> : null}
-              {" · "}נוצר {shortDate(b.created)} · {b.target} {b.program === "average" ? "קניות בסבב" : "חותמות להטבה"} · {b.reward}
+              {" · "}נוצר {shortDate(b.created)} · {b.program === "appointments" ? "כרטיס תורים" : `${b.target} ${b.program === "average" ? "קניות בסבב" : "חותמות להטבה"}`} · {b.reward}
             </p>
           </div>
           {!b.archived && (

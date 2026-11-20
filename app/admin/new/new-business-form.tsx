@@ -30,7 +30,7 @@ export default function NewBusinessForm() {
   const [market, setMarket] = useState<"il" | "intl">("il");
   const [cardLang, setCardLang] = useState<"he" | "en">("he");
   // The kind of card: stamps, or a balance card with a percentage of each purchase back.
-  const [program, setProgram] = useState<"stamps" | "cashback" | "average">("stamps");
+  const [program, setProgram] = useState<"stamps" | "cashback" | "average" | "appointments">("stamps");
   const [pct, setPct] = useState(2);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -73,7 +73,12 @@ export default function NewBusinessForm() {
             onClick={() => { setProgram("cashback"); if (!reward.trim()) setReward(`${pct}% מכל קנייה חוזרים אליכם ליתרה`); }}>כרטיס יתרה (אחוז מכל קנייה)</button>
           <button type="button" className={"btn small " + (program === "average" ? "primary" : "soft")} aria-pressed={program === "average"}
             onClick={() => { setProgram("average"); setTarget(4); if (!reward.trim()) setReward("קונים 4, החמישית עלינו לפי ממוצע הקניות"); }}>קנה X, הבאה חינם לפי ממוצע</button>
+          <button type="button" className={"btn small " + (program === "appointments" ? "primary" : "soft")} aria-pressed={program === "appointments"}
+            onClick={() => { setProgram("appointments"); setTarget(10); setReward("תזכורת לפני כל תור"); }}>כרטיס תורים (קליניקות)</button>
         </fieldset>
+        {program === "appointments" && (
+          <p className="form-hint">בלי חותמות והנחות: בכרטיס של הלקוח מופיע התור הבא שלו, והוא מקבל תזכורת יום לפני, בבוקר של אותו יום ושעה לפני. את התור קובעים בעמדת העובד.</p>
+        )}
         {program === "cashback" && (
           <div className="admin-new-row">
             <label>אחוז חזרה (%)<input type="number" inputMode="decimal" min={0.1} max={50} step={0.1} required dir="ltr" value={pct} onChange={(e) => setPct(Number(e.target.value))} /></label>
@@ -81,8 +86,8 @@ export default function NewBusinessForm() {
           </div>
         )}
         <label>שם העסק<input required maxLength={80} value={name} onChange={(e) => setName(e.target.value)} /></label>
-        <label>{program === "cashback" ? "תיאור ההטבה בכרטיס" : "ההטבה"}<input required maxLength={160} value={reward} onChange={(e) => setReward(e.target.value)} placeholder="למשל: קפה חינם" /></label>
-        {program !== "cashback" && <label>{program === "average" ? "כמה קניות בסבב (למשל 4 = הקנייה החמישית חינם)" : "חותמות להטבה"}<input type="number" required min={2} max={program === "average" ? 50 : 30} value={target} onChange={(e) => setTarget(Number(e.target.value))} /></label>}
+        <label>{program === "cashback" ? "תיאור ההטבה בכרטיס" : program === "appointments" ? "שורה קצרה בכרטיס" : "ההטבה"}<input required maxLength={160} value={reward} onChange={(e) => setReward(e.target.value)} placeholder="למשל: קפה חינם" /></label>
+        {program !== "cashback" && program !== "appointments" && <label>{program === "average" ? "כמה קניות בסבב (למשל 4 = הקנייה החמישית חינם)" : "חותמות להטבה"}<input type="number" required min={2} max={program === "average" ? 50 : 30} value={target} onChange={(e) => setTarget(Number(e.target.value))} /></label>}
         {program === "average" && <label>תקרה להטבה (0 = בלי תקרה)<input name="avgCap" type="number" inputMode="decimal" min={0} step={0.01} dir="ltr" defaultValue={0} /></label>}
         <label>שם הסניף<input name="branchName" maxLength={60} placeholder="ריק = שם העסק" /></label>
         <label>כתובת הסניף<input name="branchAddress" maxLength={160} placeholder="רחוב, מספר ועיר" /></label>

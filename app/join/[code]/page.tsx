@@ -22,5 +22,6 @@ export default async function JoinPage({ params, searchParams }: { params: Promi
   const design = business ? await liveDesign(db, business) : null;
   return <JoinForm code={code} invite={invited ? { ref: ref!, stamps: invited } : null} business={business && design ? { name: business.name, target: business.target, design, birthdays: !!business.birthdays,
     average: business.program === "average",
+    appointments: business.program === "appointments",
     cashback: business.program === "cashback" ? { bp: business.cashback_bp, min: business.cashback_min, currency: business.currency === "USD" ? "USD" : "ILS" } : null } : null} />;
 }
