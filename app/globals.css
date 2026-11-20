@@ -847,3 +847,18 @@ html,body{overflow-x:clip}
 .invite-actions .btn { min-height: 44px; flex: 1 1 auto; justify-content: center; }
 .join-invited { margin: 0; padding: 10px 12px; border-radius: 10px; background: #fff3d6; color: #5a4300; font-weight: 600; line-height: 1.5; }
 .sp-result { display: block; margin-top: 4px; font-weight: 600; color: #2f6b2a; }
+
+/* The monthly report page. */
+.report-pick { display: flex; flex-wrap: wrap; gap: 10px 20px; }
+.report-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+.report-table th, .report-table td { padding: 10px 6px; border-top: 1px solid var(--line); text-align: start; font-weight: 500; }
+.report-table tr:first-child th, .report-table tr:first-child td { border-top: 0; }
+.report-num { font-size: 20px; font-weight: 800 !important; text-align: end !important; white-space: nowrap; }
+.report-change { width: 64px; text-align: end !important; font-size: 13px; color: var(--muted); white-space: nowrap; }
+.report-change.up { color: #1a7f4b; }
+.report-change.down { color: #b4413a; }
+.report-notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; line-height: 1.6; }
+.report-check { display: flex; align-items: flex-start; gap: 10px; font-weight: 600; }
+.report-check input { width: 20px; height: 20px; margin-top: 2px; flex: none; accent-color: var(--purple); }
+.report-check small { display: block; font-weight: 400; margin-top: 2px; }
+.special-main .report-check + .btn { justify-self: start; }

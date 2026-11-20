@@ -66,7 +66,9 @@
         "APPLE_PASS_TYPE_ID": "pass.shop.perkly.loyalty",
         "APPLE_TEAM_ID": "MR969J2QHG",
         // Sender for emails sent through Resend (domain verified at resend.com).
-        "MAIL_FROM": "Perkly <no-reply@mail.perkly.shop>"
+        "MAIL_FROM": "Perkly <no-reply@mail.perkly.shop>",
+        // The monthly report email to business owners (staging keeps it off, so owners never get two).
+        "REPORT_EMAILS": "on"
       },
       // Your own domain. Works once perkly.shop is active in the same Cloudflare account.
       "routes": [

@@ -7,7 +7,7 @@ import { israelNow } from "../lib/birthday";
 import {
   Activity, AlertTriangle, Trash2, Cake, Check, Copy, CreditCard, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode,
   ChevronRight, History, Palette, RefreshCw, RotateCcw, ScanLine, Search, Settings, Share2, Store, UserPlus, Users, UserRound, X,
-  Phone, MapPin, Megaphone,
+  Phone, MapPin, Megaphone, BarChart3,
   type LucideIcon,
 } from "lucide-react";
 import type { Design } from "../lib/design";
@@ -28,7 +28,7 @@ import { weekChange } from "../lib/weekly";
 import { Brand } from "../components/brand";
 
 type Role = "owner" | "staff";
-type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social; program?: "stamps" | "cashback" | "average"; cashback_bp?: number; cashback_min?: number; currency?: string; avg_cap?: number; pos_only?: number; near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number; near_evening_from?: number; referral_stamps?: number };
+type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social; program?: "stamps" | "cashback" | "average"; cashback_bp?: number; cashback_min?: number; currency?: string; avg_cap?: number; pos_only?: number; near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number; near_evening_from?: number; referral_stamps?: number; report_email?: number };
 type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; rewards?: number; nextExpiry?: string | null; phone?: string; balance?: number; roundTotal?: number; rewardValue?: number | null };
 type Data = {
   me: { name: string; email: string };
@@ -432,6 +432,7 @@ export default function Dashboard() {
                   <button className="btn soft" onClick={() => setModal({ type: "customer" })}><Plus size={18} />{t("newCustomer")}</button>
                   <button className="btn soft" onClick={() => setModal({ type: "staffLink" })}><UserPlus size={18} />{t("staffLinkButton")}</button>
                   {(isOwner || manage) && <a className="btn soft" href={`/special?b=${encodeURIComponent(b.id)}`}><Megaphone size={18} />{t("spOpen")}</a>}
+                  <a className="btn soft" href={`/report?b=${encodeURIComponent(b.id)}`}><BarChart3 size={18} />{t("rpOpen")}</a>
                 </div>
               </div>
               {data.summary && <Summary summary={data.summary} totals={{ customers: data.stats!.customers, ready: data.stats!.rewards_ready, openBalance: data.stats!.open_balance }} breakdown={data.breakdown} hasBranches={(data.branches?.length ?? 0) > 1} t={t}
