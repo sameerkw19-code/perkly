@@ -851,7 +851,7 @@ html,body{overflow-x:clip}
 /* The monthly report page. */
 .report-pick { display: flex; flex-wrap: wrap; gap: 10px 20px; }
 .report-table { width: 100%; border-collapse: collapse; font-size: 15px; }
-.report-table th, .report-table td { padding: 10px 6px; border-top: 1px solid var(--line); text-align: start; font-weight: 500; }
+.report-table th, .report-table td { padding: 10px 6px; border-top: 1px solid var(--line); text-align: start; font-weight: 500; background: none; border-radius: 0; }
 .report-table tr:first-child th, .report-table tr:first-child td { border-top: 0; }
 .report-num { font-size: 20px; font-weight: 800 !important; text-align: end !important; white-space: nowrap; }
 .report-change { width: 64px; text-align: end !important; font-size: 13px; color: var(--muted); white-space: nowrap; }

@@ -216,3 +216,15 @@ test("monthly report: months start at midnight in Israel; neighbours, last month
   assert.equal(change(3, 0), "");
   assert.equal(monthName("2026-10", "he"), "אוקטובר 2026");
 });
+
+import { decodeGeohash } from "../lib/geo.ts";
+test("place from Waze links: the app's share link (geohash), ll= and to=ll.", () => {
+  const near = (p, lat, lng, tol) => assert.ok(p && Math.abs(p.lat - lat) < tol && Math.abs(p.lng - lng) < tol, JSON.stringify(p));
+  near(decodeGeohash("sv8wx2zq6t"), 32.0853, 34.7818, 0.0001);
+  near(parsePlace("https://waze.com/ul/hsv8wx2zq6t"), 32.0853, 34.7818, 0.0001);
+  near(parsePlace("Let's meet here: https://waze.com/ul/hsv8wx2zq6t"), 32.0853, 34.7818, 0.0001);
+  near(parsePlace("https://www.waze.com/he/ul/hsv8wx2z"), 32.0853, 34.7818, 0.001);
+  assert.deepEqual(parsePlace("https://www.waze.com/ul?ll=32.08530000%2C34.78180000&navigate=yes&zoom=17"), { lat: 32.0853, lng: 34.7818 });
+  assert.deepEqual(parsePlace("https://www.waze.com/live-map/directions?to=ll.32.0853%2C34.7818"), { lat: 32.0853, lng: 34.7818 });
+  assert.equal(parsePlace("https://waze.com/ul/habc"), null);
+});

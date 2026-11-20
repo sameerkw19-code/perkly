@@ -425,7 +425,7 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
         )}
 
         {step === "done" && business && (
-          <section className="su-card st-done" aria-labelledby="st-done">
+          <section className="su-card st-finish" aria-labelledby="st-done">
             <span className="su-done-icon st-noprint" aria-hidden="true"><Icon name="check" size={40} stroke={2.8} /></span>
             <h1 id="st-done" ref={headingRef} tabIndex={-1} className="lp-h2 st-noprint">{t.doneTitle}</h1>
             <p className="lp-lead st-noprint">{t.doneIntro}</p>

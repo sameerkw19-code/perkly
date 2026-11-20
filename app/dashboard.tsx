@@ -1217,7 +1217,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
   const fixedBranch = myBranch ? branches.find((x) => x.id === myBranch) : null;
 
   const hour = new Date().getHours();
-  const greeting = hour >= 5 && hour < 12 ? t("sxMorning") : hour >= 12 && hour < 17 ? t("sxAfternoon") : t("sxEvening");
+  const greeting = hour >= 5 && hour < 12 ? t("sxMorning") : hour >= 12 && hour < 17 ? t("sxAfternoon") : hour >= 17 && hour < 22 ? t("sxEvening") : t("sxNight");
   const full = !!selected && selected.stamps >= selected.target; // "block" mode: redeem before stamping again
   const maxQty = business.reward_mode === "bank" ? 10 : Math.min(10, remaining);
   const onlyBranch = branches.length === 1 ? branches[0] : null;
@@ -1533,7 +1533,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
             <p className="muted">{selected.name} · {t("cbBalanceNow", { balance: fmt(selected.balance ?? 0) })}</p>
           ) : (
             <>
-              <p className="muted">{selected.name} · <Num>{t("sxOf", { s: selected.stamps, t: selected.target })}</Num></p>
+              <p className="muted">{selected.name} · <bdi>{t("sxOf", { s: selected.stamps, t: selected.target })}</bdi></p>
               <div className="sx-box sx-done-box">
                 <strong>{selected.rewards ? (selected.rewards === 1 ? t("sxRewardReady1") : t("sxRewardReadyN", { n: selected.rewards })) : t("sxToUnlock", { k: remaining })}</strong>
               </div>
@@ -1650,7 +1650,7 @@ function Branches({ branches, t, busy, call, reload }: {
               <input name="name" defaultValue={br.name} required maxLength={60} autoFocus aria-label={t("branchName")} />
               <input name="address" defaultValue={br.address ?? ""} maxLength={160} placeholder={t("branchAddress")} aria-label={t("branchAddress")} />
               <label className="branch-place">{t("branchPlace")}
-                <input name="location" id={`place-${br.id}`} dir="ltr" maxLength={2000} inputMode="url" autoComplete="off" placeholder="https://maps.app.goo.gl/…"
+                <input name="location" id={`place-${br.id}`} dir="ltr" maxLength={2000} inputMode="url" autoComplete="off" placeholder="Google Maps / Waze"
                   defaultValue={br.lat != null && br.lng != null ? `${br.lat}, ${br.lng}` : ""} />
                 <small className="form-hint">{t("branchPlaceHint")}</small>
               </label>
