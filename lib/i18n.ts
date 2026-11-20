@@ -532,7 +532,7 @@ Object.assign(words, {
   fReward: ["תיאור ההטבה", "وصف المكافأة", "Reward description"],
   fGift: ["תווית המתנה", "ملصق الهدية", "Gift label"],
   fPromo: ["הודעה ללקוחות (רשות)", "رسالة للعملاء (اختياري)", "Customer message (optional)"],
-  edNotify: ["הודעות ללקוחות (Google Wallet)", "رسائل للزبائن (Google Wallet)", "Messages to customers (Google Wallet)"],
+  edNotify: ["הודעות ללקוחות בארנק (Apple ו־Google)", "رسائل للزبائن في المحفظة (Apple وGoogle)", "Messages to customers in the wallet (Apple and Google)"],
   edMsgStamp: ["אחרי קנייה", "بعد الشراء", "After a purchase"],
   edNotifyOn: ["לשלוח ללקוח התראה כשנוספת חותמת", "إرسال إشعار للزبون عند إضافة ختم", "Notify the customer when a stamp is added"],
   edNotifyOnHint: ["ללקוחות ששמרו את הכרטיס ב-Google Wallet. Google מגביל ל-3 התראות ביום לכל לקוח; מעבר לזה ההודעה נשמרת בכרטיס בלי צלצול.", "للزبائن الذين حفظوا البطاقة في Google Wallet. تسمح Google بثلاثة إشعارات يومياً لكل زبون؛ بعدها تُحفظ الرسالة في البطاقة بدون تنبيه.", "For customers who saved the card to Google Wallet. Google allows 3 notifications a day per customer; after that the message stays on the card without an alert."],
