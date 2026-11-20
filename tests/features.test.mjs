@@ -311,6 +311,7 @@ test("monthly only: 199 ₪ (was 300 ₪), no yearly plan anywhere it is sold", 
   assert.equal(PRICES.ILS.monthly, MONTHLY_PRICE_ILS);
   assert.equal(PRICES.ILS.monthly, 199);
   assert.equal(PRICES.ILS.was, 300);
+  assert.equal(PRICES.ILS.kit, 299, "the counter kit");
   assert.match(read("app/terms/page.tsx"), /מנוי: 199 ₪ לחודש/);
   assert.doesNotMatch(read("app/terms/page.tsx"), /מנוי שנתי/);
   assert.match(read("lib/server/polar.ts"), /return YEARLY_SOLD && polarConfigured/);
@@ -319,7 +320,7 @@ test("monthly only: 199 ₪ (was 300 ₪), no yearly plan anywhere it is sold", 
 });
 
 test("prices: shekels in Israel, dollars abroad, written the way each language reads", () => {
-  assert.equal(fillPrices("{$m} / {$was} / {$k}", "ILS", "he"), "199 ₪ / 300 ₪ / 99 ₪");
+  assert.equal(fillPrices("{$m} / {$was} / {$k}", "ILS", "he"), "199 ₪ / 300 ₪ / 299 ₪");
   assert.equal(fillPrices("{$m}", "ILS", "en"), "₪199");
   assert.equal(fillPrices("{$m} / {$was} / {$0}", "USD", "he"), "$59 / $89 / $0");
   assert.deepEqual(withPrices({ a: ["{$m}"], b: { c: "{$was}" }, n: 3 }, "USD", "en"), { a: ["$59"], b: { c: "$89" }, n: 3 });
