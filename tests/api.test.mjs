@@ -1030,6 +1030,16 @@ test("billing portal: owners only; without Polar or a subscription it says so", 
   assert.equal(page.status, 200);
 });
 
+test("refresh all cards: admin only, counts what it refreshed", async () => {
+  const r = await admin.post("/api/admin/wallet", { action: "refresh_all" });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(typeof r.body.businesses, "number");
+  assert.ok(r.body.businesses > 0);
+  const stranger = new Client();
+  await signup(stranger, "refresh-stranger");
+  assert.equal((await stranger.post("/api/admin/wallet", { action: "refresh_all" })).status, 404);
+});
+
 test("change the sign-in email: needs the current password, refuses a taken or same address", async () => {
   const a = new Client();
   await signup(a, "mover");
