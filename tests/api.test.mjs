@@ -1185,28 +1185,6 @@ test("clinic calendar for staff: they see appointments (masked phones) and book;
   assert.equal((await ownerA.act(bizA, "appt_list", {})).status, 409);
 });
 
-test("setup fee: owed only when Perkly builds the business; marked paid or waived by the admin", async () => {
-  const built = await admin.post("/api/loyalty", { action: "create_business", forClient: true, kind: "cafe", name: "Built", reward: "Free", target: 8, color: "#123456", setupDays: 30, branchName: "Main" });
-  const fee = async (b) => (await admin.get(`/api/loyalty?business=${b}`)).body.business;
-  // Self sign-up: no fee (ownerA's business).
-  const self = await ownerA.get(`/api/loyalty?business=${bizA}`);
-  assert.ok(!self.body.business.setup_fee, "self sign-up has no setup fee");
-  assert.equal((await fee(built.body.id)).setup_fee, 30000, "300 shekels");
-  // Online payment isn't set up locally: the owner gets a clear refusal (or no fee).
-  assert.equal((await ownerA.post("/api/billing/setup", { business: bizA })).status, 400, "nothing owed");
-  // The admin marks it paid by hand, and it can't be paid twice.
-  assert.equal((await admin.post("/api/admin", { action: "setup_fee", business: built.body.id, op: "paid" })).status, 200);
-  assert.ok((await fee(built.body.id)).setup_paid);
-  assert.equal((await admin.post("/api/admin", { action: "setup_fee", business: built.body.id, op: "paid" })).status, 400);
-  // Owed again, then waived.
-  assert.equal((await admin.post("/api/admin", { action: "setup_fee", business: built.body.id, op: "due" })).status, 200);
-  assert.equal((await fee(built.body.id)).setup_paid, null);
-  assert.equal((await admin.post("/api/admin", { action: "setup_fee", business: built.body.id, op: "waive" })).status, 200);
-  assert.equal((await fee(built.body.id)).setup_fee, null);
-  // Only the admin.
-  assert.equal((await ownerA.post("/api/admin", { action: "setup_fee", business: bizA, op: "due" })).status, 404, "the admin API is hidden from others");
-});
-
 test("message to customers: the owner sends now or schedules; staff can't; at most 3 a day", async () => {
   const owner = new Client();
   await signup(owner, "msg-owner");

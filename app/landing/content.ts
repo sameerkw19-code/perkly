@@ -4,7 +4,7 @@ import { withPrices, type Currency } from "../../lib/pricing";
 // - Only claims the product really supports today (see README "מה עובד בגרסה הזו").
 // - One stamp rule everywhere: the business sets how many stamps fill a card; a full card
 //   means the reward is ready; redeeming the reward is not itself counted as a stamp.
-// - Prices: see lib/pricing.ts. Setup fee ({$s}) only when Perkly sets up and designs the card; self sign-up has none. 14-day free trial (TRIAL_DAYS in lib/server/billing.ts). Counter kit: optional, 99 ILS one-time, also without a subscription.
+// - Prices: 99 ILS a month, no setup fee, 14-day free trial (TRIAL_DAYS in lib/server/billing.ts). Counter kit: optional, 99 ILS one-time, also without a subscription.
 // - Yearly plan: not sold at the moment (lib/pricing.ts YEARLY_SOLD). The counter kit is a separate add-on (Israel only).
 // - No testimonials, customer counts or results until real, approved ones exist.
 
@@ -31,7 +31,7 @@ const he = {
     cta: "התחילו עכשיו",
     demo: "נסו הדגמה",
     price: "{$m} לחודש",
-    priceNote: "14 ימי ניסיון חינם · נרשמים לבד: בלי דמי הקמה · הקמה ועיצוב על ידינו: {$s} חד־פעמי",
+    priceNote: "14 ימי ניסיון חינם · בלי דמי הקמה",
     points: ["הלקוח לא מוריד אפליקציה", "מספיק טלפון או טאבלט בקופה", "עברית, ערבית ואנגלית"],
     sceneLabel: "המחשה: כרטיס נאמנות של בית קפה בטלפון, ומאחוריו כרטיסים של מספרה ושל גלידרייה",
     myCard: "הכרטיס שלי",
@@ -158,7 +158,7 @@ const he = {
       was: "{$was}",
       wasLabel: "במקום",
       per: "לחודש",
-      note: "14 ימי ניסיון חינם · נרשמים לבד: בלי דמי הקמה · הקמה ועיצוב על ידינו: {$s} חד־פעמי",
+      note: "14 ימי ניסיון חינם · בלי דמי הקמה",
       desc: "לעסק שרוצה שהלקוחות יחזרו",
       monthlySub: "בלי התחייבות, מבטלים מתי שרוצים",
       features: ["לקוחות ללא הגבלה", "עיצוב מלא: לוגו, תמונת רקע וחותמת משלכם", "באנר בעיצוב שלכם ב־Google Wallet", "עמדת עובד והזמנת עובדים", "לוח בקרה, היסטוריה והתראות", "עברית ואנגלית"],
@@ -193,7 +193,7 @@ const he = {
       { q: "צריך לקנות ציוד?", a: "לא. עמדת העובד עובדת בדפדפן של טלפון או טאבלט עם מצלמה. את ה־QR אפשר להדפיס בעצמכם או להזמין ערכת קופה." },
       { q: "איך מונעים חותמות לא מוצדקות?", a: "לכל עובד כניסה אישית, וכל פעולה נרשמת עם שמו. המערכת מתריעה על פעילות חריגה, ואפשר לבטל גישה של עובד מיד." },
       { q: "מה קורה כשהכרטיס מתמלא?", a: "ההטבה מוכנה. אתם בוחרים אם לממש אותה מיד, או לשמור אותה ולתת ללקוח להמשיך לצבור בכרטיס חדש. אפשר גם לקבוע תוקף להטבה." },
-      { q: "כמה זה עולה?", a: "{$m} לחודש, עם 14 ימי ניסיון חינם. נרשמים ומעצבים לבד? בלי דמי הקמה. רוצים שנקים ונעצב לכם את הכרטיס? דמי הקמה {$s} חד־פעמי. אפשר גם להתחיל בלי מנוי: עד 10 לקוחות, עם העיצובים, הצבעים והאייקונים המוכנים. לוגו, תמונת רקע וחותמת מתמונה משלכם נפתחים במנוי. ערכת קופה היא תוספת לבחירה ב־{$k} חד־פעמי." },
+      { q: "כמה זה עולה?", a: "{$m} לחודש, בלי דמי הקמה, עם 14 ימי ניסיון חינם. אפשר גם להתחיל בלי מנוי: עד 10 לקוחות, עם העיצובים, הצבעים והאייקונים המוכנים. לוגו, תמונת רקע וחותמת מתמונה משלכם נפתחים במנוי. ערכת קופה היא תוספת לבחירה ב־{$k} חד־פעמי." },
       { q: "יש חיבור ל־Apple Wallet ול־Google Wallet?", a: "Google Wallet כן: לקוחות עם אנדרואיד מוסיפים את הכרטיס לארנק, והוא מתעדכן לבד בכל חותמת. Apple Wallet בפיתוח. באייפון הכרטיס נפתח מהקישור האישי או מקיצור במסך הבית." },
       { q: "איך מתחילים?", a: "פותחים חשבון וממלאים את פרטי העסק וההטבה. מקבלים QR להדפסה ואפשר להתחיל בחינם, עד 10 לקוחות, בלי כרטיס אשראי. מנוי כולל 14 ימי ניסיון חינם, ואז {$m} לחודש. אפשר לבטל בכל עת." },
     ],
@@ -235,7 +235,7 @@ const ar: Copy = {
     cta: "ابدأوا الآن",
     demo: "جرّبوا العرض",
     price: "{$m} شهرياً",
-    priceNote: "تجربة مجانية لمدة 14 يوماً · التسجيل الذاتي: بدون رسوم تأسيس · التأسيس والتصميم من قبلنا: {$s} لمرة واحدة",
+    priceNote: "تجربة مجانية لمدة 14 يوماً · بدون رسوم تأسيس",
     points: ["الزبون لا يحتاج إلى تطبيق", "يكفي هاتف أو جهاز لوحي عند الصندوق", "العبرية والعربية والإنجليزية"],
     sceneLabel: "توضيح: بطاقة ولاء لمقهى في الهاتف، وخلفها بطاقتان لصالون حلاقة ولمحل بوظة",
     myCard: "بطاقتي",
@@ -362,7 +362,7 @@ const ar: Copy = {
       was: "{$was}",
       wasLabel: "بدلاً من",
       per: "شهرياً",
-      note: "تجربة مجانية لمدة 14 يوماً · التسجيل الذاتي: بدون رسوم تأسيس · التأسيس والتصميم من قبلنا: {$s} لمرة واحدة",
+      note: "تجربة مجانية لمدة 14 يوماً · بدون رسوم تأسيس",
       desc: "لمحل يريد أن يعود زبائنه",
       monthlySub: "بدون التزام، الإلغاء في أي وقت",
       features: ["زبائن بلا حدود", "تصميم كامل: الشعار وصورة خلفية وختم خاص بكم", "بانر بتصميمكم في Google Wallet", "واجهة موظف ودعوة موظفين", "لوحة تحكم، سجل وتنبيهات", "العبرية والعربية والإنجليزية"],
@@ -397,7 +397,7 @@ const ar: Copy = {
       { q: "هل يجب شراء معدات؟", a: "لا. واجهة الموظف تعمل في متصفح هاتف أو جهاز لوحي فيه كاميرا. يمكن طباعة رمز QR بأنفسكم أو طلب طقم الصندوق." },
       { q: "كيف نمنع أختاماً غير مبررة؟", a: "لكل موظف دخول شخصي، وكل عملية تُسجّل باسمه. النظام ينبّه عند نشاط غير اعتيادي، وصاحب المشروع يستطيع إلغاء صلاحية موظف فوراً." },
       { q: "ماذا يحدث عندما تمتلئ البطاقة؟", a: "تكون المكافأة جاهزة. تختارون استبدالها فوراً، أو حفظها والسماح للزبون بالاستمرار في الجمع على بطاقة جديدة. يمكن أيضاً تحديد صلاحية للمكافأة." },
-      { q: "كم يكلّف؟", a: "{$m} شهرياً، مع تجربة مجانية لمدة 14 يوماً. تسجّلون وتصمّمون بأنفسكم؟ بدون رسوم تأسيس. تريدون أن نؤسس ونصمم البطاقة لكم؟ رسوم تأسيس {$s} لمرة واحدة. يمكن أيضاً البدء بدون اشتراك: حتى 10 زبائن، مع التصاميم والألوان والأيقونات الجاهزة. الشعار وصورة الخلفية والختم من صورتكم تُفتح بالاشتراك. طقم الصندوق إضافة اختيارية بسعر {$k} لمرة واحدة." },
+      { q: "كم يكلّف؟", a: "{$m} شهرياً، بدون رسوم تأسيس، مع تجربة مجانية لمدة 14 يوماً. يمكن أيضاً البدء بدون اشتراك: حتى 10 زبائن، مع التصاميم والألوان والأيقونات الجاهزة. الشعار وصورة الخلفية والختم من صورتكم تُفتح بالاشتراك. طقم الصندوق إضافة اختيارية بسعر {$k} لمرة واحدة." },
       { q: "هل يوجد ربط مع Apple Wallet وGoogle Wallet؟", a: "Google Wallet نعم: زبائن أندرويد يضيفون البطاقة إلى المحفظة وتتحدث تلقائياً مع كل ختم. Apple Wallet قيد التطوير، وفي الآيفون تُفتح البطاقة من الرابط الشخصي أو من اختصار في الشاشة الرئيسية." },
       { q: "كيف نبدأ؟", a: "تفتحون حساباً وتدخلون تفاصيل المشروع والمكافأة. تحصلون على رمز QR للطباعة ويمكن البدء مجاناً، حتى 10 زبائن، بدون بطاقة ائتمان. الاشتراك يشمل تجربة مجانية 14 يوماً، ثم {$m} شهرياً. يمكن الإلغاء في أي وقت." },
     ],
@@ -437,7 +437,7 @@ const en: Copy = {
     cta: "Get started",
     demo: "Try the demo",
     price: "{$m} a month",
-    priceNote: "14-day free trial · sign up yourself: no setup fee · set up and designed by us: {$s} one-time",
+    priceNote: "14-day free trial · no setup fee",
     points: ["No app for customers to download", "Any phone or tablet at the counter", "Hebrew, Arabic and English"],
     sceneLabel: "Illustration: a café loyalty card on a phone, with a barbershop card and an ice cream shop card behind it",
     myCard: "My card",
@@ -564,7 +564,7 @@ const en: Copy = {
       was: "{$was}",
       wasLabel: "instead of",
       per: "a month",
-      note: "14-day free trial · sign up yourself: no setup fee · set up and designed by us: {$s} one-time",
+      note: "14-day free trial · no setup fee",
       desc: "For a business that wants customers back",
       monthlySub: "No commitment, cancel any time",
       features: ["Unlimited customers", "Full design: your logo, background image and stamp", "Your own banner in Google Wallet", "Staff station and staff invites", "Dashboard, history and alerts", "Hebrew and English"],
@@ -599,7 +599,7 @@ const en: Copy = {
       { q: "Do I need to buy equipment?", a: "No. The staff station runs in the browser of any phone or tablet with a camera. You can print the QR code yourself or order a counter kit." },
       { q: "How do you prevent unearned stamps?", a: "Each staff member has a personal login, and every action is logged with their name. The system flags unusual activity, and a staff member's access can be removed immediately." },
       { q: "What happens when the card is full?", a: "The reward is ready. You choose whether it's redeemed right away, or saved while the customer keeps collecting on a new card. You can also set an expiry for rewards." },
-      { q: "How much does it cost?", a: "{$m} a month, with a 14-day free trial. Sign up and design it yourself: no setup fee. Want us to set up and design your card? A one-time setup fee of {$s}. You can also start without a subscription: up to 10 customers, with the ready designs, colors and icons. Your logo, a background image and a stamp from your own image come with a subscription. The counter kit is an optional one-time add-on for {$k}." },
+      { q: "How much does it cost?", a: "{$m} a month, no setup fee, with a 14-day free trial. You can also start without a subscription: up to 10 customers, with the ready designs, colors and icons. Your logo, a background image and a stamp from your own image come with a subscription. The counter kit is an optional one-time add-on for {$k}." },
       { q: "Does it work with Apple Wallet and Google Wallet?", a: "Google Wallet, yes: Android customers add the card to their wallet and it updates by itself with every stamp. Apple Wallet is in development; on iPhone the card opens from its personal link or a home screen shortcut." },
       { q: "How do I get started?", a: "Open an account and enter your business and reward details. You get a QR code to print and can start free, up to 10 customers, with no payment card. A subscription starts with a 14-day free trial, then {$m} a month. Cancel anytime." },
     ],
@@ -634,7 +634,7 @@ const filled = new Map<string, Copy>();
 const ABROAD_FAQ: Partial<Record<Lang, Record<string, string>>> = {
   en: {
     "Do I need to buy equipment?": "No. The staff station runs in the browser of any phone or tablet with a camera. You print the QR code sign yourself, straight from the dashboard.",
-    "How much does it cost?": "{$m} a month, with a 14-day free trial. Sign up and design it yourself: no setup fee. Want us to set up and design your card? A one-time setup fee of {$s}. You can also start without a subscription: up to 10 customers, with the ready designs, colors and icons. Your logo, a background image and a stamp from your own image come with a subscription.",
+    "How much does it cost?": "{$m} a month, no setup fee, with a 14-day free trial. You can also start without a subscription: up to 10 customers, with the ready designs, colors and icons. Your logo, a background image and a stamp from your own image come with a subscription.",
   },
 };
 function abroad(c: Copy, lang: Lang): Copy {

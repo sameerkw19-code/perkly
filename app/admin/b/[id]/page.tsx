@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getD1 } from "../../../../db";
 import { liveDesign } from "../../../../lib/server/designs";
 import { STATUS_LABEL, adminStatus, requireAdminPage, shortDate, shortDateTime } from "../../../../lib/server/admin";
-import { AdminActions, ExportBusiness, PolarSync, PaymentLink, PosKeys, AdminCardPreview, ApplePushTest, GoogleSyncTest, KitSentButton, SetupFeeActions, OwnerDesignSwitch } from "./admin-actions";
+import { AdminActions, ExportBusiness, PolarSync, PaymentLink, PosKeys, AdminCardPreview, ApplePushTest, GoogleSyncTest, KitSentButton, OwnerDesignSwitch } from "./admin-actions";
 import { env } from "cloudflare:workers";
 import { planOf } from "../../../../lib/server/billing";
 import { isPlatformAdmin } from "../../../../lib/server/auth";
@@ -44,7 +44,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
 
   const b = await db
     .prepare(
-      `SELECT b.id, b.owner, b.name, b.reward, b.target, b.color, b.created, b.reward_mode, b.suspended, b.suspend_reason, b.comp_until, b.archived, b.kit_due, b.kit_sent, b.setup_fee, b.setup_paid, b.setup_order, b.owner_designs, b.currency, b.pos_only, b.program, b.near_text,
+      `SELECT b.id, b.owner, b.name, b.reward, b.target, b.color, b.created, b.reward_mode, b.suspended, b.suspend_reason, b.comp_until, b.archived, b.kit_due, b.kit_sent, b.owner_designs, b.currency, b.pos_only, b.program, b.near_text,
          s.status, s.plan, s.current_period_end, s.external_subscription, s.updated AS sub_updated, u.email AS owner_email, u.phone AS owner_phone
        FROM businesses b LEFT JOIN subscriptions s ON s.business = b.id LEFT JOIN users u ON u.id = b.owner WHERE b.id = ?`,
     )
@@ -53,7 +53,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
       id: string; name: string; reward: string; target: number; color: string; created: string; reward_mode: string;
       owner: string; suspended: string | null; suspend_reason: string | null; comp_until: string | null; archived: string | null; owner_email: string | null; owner_phone: string | null;
       status: string | null; current_period_end: string | null; external_subscription: string | null; sub_updated: string | null;
-      plan: string | null; kit_due: string | null; kit_sent: string | null; setup_fee: number | null; setup_paid: string | null; setup_order: string | null; owner_designs: number; currency: string; pos_only: number; program: string; near_text: string | null;
+      plan: string | null; kit_due: string | null; kit_sent: string | null; owner_designs: number; currency: string; pos_only: number; program: string; near_text: string | null;
     }>();
   if (!b) notFound();
 
@@ -163,12 +163,6 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
                 <dt>מסלול</dt><dd>{b.status ? (planOf(b.plan, env) === "yearly" ? "שנתי (ערכת קופה כלולה)" : "חודשי") : "—"}</dd>
                 <dt>סוף תקופה</dt><dd>{shortDate(b.current_period_end)}</dd>
                 <dt>גישה חינם</dt><dd>{compActive ? (compForever ? "ללא הגבלת זמן" : `עד ${shortDate(b.comp_until)}`) : "לא"}</dd>
-                <dt>דמי הקמה</dt>
-                <dd>
-                  {b.setup_paid ? `שולמו ${shortDate(b.setup_paid)}${b.setup_order === "manual" ? " (סומן ידנית)" : " (Polar)"}`
-                    : b.setup_fee ? <>{b.setup_fee / 100} {b.currency === "USD" ? "$" : "₪"} · ממתין לתשלום <SetupFeeActions business={b.id} state="due" /></>
-                    : <>אין <SetupFeeActions business={b.id} state="none" /></>}
-                </dd>
                 {(b.kit_due || b.kit_sent) && <><dt>ערכת קופה</dt><dd>{b.kit_sent ? `נשלחה ${shortDate(b.kit_sent)}` : <>מגיעה מאז {shortDate(b.kit_due)} <KitSentButton business={b.id} /></>}</dd></>}
               </dl>
               {!b.archived && (withPerkly
