@@ -41,6 +41,8 @@ export type LoyaltyCard = {
   balance?: string;
   /** The average card: what the free purchase is worth now. Replaces the rewards count. */
   average?: PassAverage;
+  /** The appointments card: the next appointment as shown. Replaces the stamps. */
+  appointment?: string;
   /** The business's own look on the pass (see passLook). */
   look?: PassLook;
 };
@@ -75,6 +77,15 @@ function label(en: string, he: string, ar: string, others: [ru: string, de: stri
 
 /** The fields that change with every stamp. Used both when saving and when updating a pass. */
 function liveFields(card: LoyaltyCard) {
+  if (card.appointment !== undefined) {
+    return {
+      loyaltyPoints: {
+        label: "Next appointment",
+        localizedLabel: label("Next appointment", "התור הבא", "الموعد القادم", ["Следующий визит", "Nächster Termin", "Prochain rendez-vous"]),
+        balance: { string: card.appointment },
+      },
+    };
+  }
   if (card.balance !== undefined) {
     return {
       loyaltyPoints: {

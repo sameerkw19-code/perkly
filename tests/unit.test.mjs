@@ -228,3 +228,31 @@ test("place from Waze links: the app's share link (geohash), ll= and to=ll.", ()
   assert.deepEqual(parsePlace("https://www.waze.com/live-map/directions?to=ll.32.0853%2C34.7818"), { lat: 32.0853, lng: 34.7818 });
   assert.equal(parsePlace("https://waze.com/ul/habc"), null);
 });
+
+import { israelTime, stageTimes, passedStages, dueStage, parseSent, formatAppt, reminderText } from "../lib/appointment.ts";
+test("appointments: Israel time, reminder times, the one to send now", () => {
+  const appt = israelTime("2026-11-25", "10:30");
+  assert.equal(appt.toISOString(), "2026-11-25T08:30:00.000Z"); // winter: UTC+2
+  assert.equal(israelTime("2026-07-01", "09:00").toISOString(), "2026-07-01T06:00:00.000Z"); // summer: UTC+3
+  assert.equal(israelTime("2026-02-30", "10:00"), null);
+  assert.equal(israelTime("2026-11-25", "25:00"), null);
+  const t = stageTimes(appt);
+  assert.equal(new Date(t.d1).toISOString(), "2026-11-24T08:30:00.000Z");
+  assert.equal(new Date(t.am).toISOString(), "2026-11-25T06:00:00.000Z"); // 8:00 in Israel
+  assert.equal(new Date(t.h1).toISOString(), "2026-11-25T07:30:00.000Z");
+  // An early appointment has no morning reminder.
+  assert.equal(stageTimes(israelTime("2026-11-25", "09:00")).am, undefined);
+  // Set two days ahead: nothing has passed yet.
+  assert.deepEqual(passedStages(appt, new Date("2026-11-23T10:00:00Z")), []);
+  // The day before, after 10:30: the day-before reminder.
+  assert.deepEqual(dueStage(appt, [], new Date("2026-11-24T09:00:00Z")), { stage: "d1", skip: [] });
+  assert.equal(dueStage(appt, ["d1"], new Date("2026-11-24T20:00:00Z")), null);
+  // The job was down overnight: only the morning one goes out, the missed one is marked.
+  assert.deepEqual(dueStage(appt, [], new Date("2026-11-25T06:30:00Z")), { stage: "am", skip: ["d1"] });
+  assert.deepEqual(dueStage(appt, ["d1", "am"], new Date("2026-11-25T07:35:00Z")), { stage: "h1", skip: [] });
+  // After the appointment: nothing.
+  assert.equal(dueStage(appt, [], new Date("2026-11-25T09:00:00Z")), null);
+  assert.deepEqual(parseSent("d1,xx,h1"), ["d1", "h1"]);
+  assert.equal(formatAppt(appt.toISOString(), "en", false), "25.11 · 10:30");
+  assert.equal(reminderText("h1", "he", "קליניקה", appt.toISOString()), "⏰ בעוד שעה התור שלך בקליניקה (10:30). נתראה!");
+});

@@ -196,7 +196,7 @@ export async function GET(request: Request) {
          COALESCE(SUM(CASE WHEN e.kind = 'spend' AND e.created >= ?2 THEN e.amount ELSE 0 END), 0) AS used_now,
          COALESCE(SUM(CASE WHEN e.kind = 'spend' AND e.created < ?2 THEN e.amount ELSE 0 END), 0) AS used_prev
        FROM events e JOIN customers c ON c.id = e.customer
-       WHERE e.business = ?1 AND e.created >= ?3 AND e.kind IN ('stamp', 'redeem', 'earn', 'spend')`,
+       WHERE e.business = ?1 AND e.created >= ?3 AND e.kind IN ('stamp', 'redeem', 'earn', 'spend', 'visit')`,
     ).bind(business!.id, mid, start);
   };
   // Stamps and rewards per staff member and per branch, for the last day, week and month (the reports).
@@ -217,17 +217,17 @@ export async function GET(request: Request) {
          COALESCE(SUM(e.kind = 'earn'), 0) AS purchases_month,
          COALESCE(SUM(CASE WHEN e.kind = 'earn' THEN e.amount ELSE 0 END), 0) AS sales_month
        FROM events e ${by === "actor" ? "LEFT JOIN users u ON u.id = e.actor LEFT JOIN pos_keys pk ON 'pos:' || pk.id = e.actor" : "LEFT JOIN branches br ON br.id = e.branch"}
-       WHERE e.business = ?1 AND e.created >= ?4 AND e.kind IN ('stamp', 'redeem', 'earn', 'spend')
+       WHERE e.business = ?1 AND e.created >= ?4 AND e.kind IN ('stamp', 'redeem', 'earn', 'spend', 'visit')
        GROUP BY e.${by} ORDER BY stamps_month DESC, purchases_month DESC LIMIT 50`,
     ).bind(business!.id, ago(1), ago(7), ago(30));
   const [customers, events, stats, team, invites, busyCustomers, busyStaff, perBranch, staffFixes, sumDay, sumWeek, sumMonth, byStaff, byBranch] = await db.batch([
     db.prepare(
-      `SELECT c.id, c.name, c.phone, c.stamps, c.target, c.balance, c.created, c.source, c.consent_marketing, c.birthday, c.card_hash IS NOT NULL AS has_link,
+      `SELECT c.id, c.name, c.phone, c.stamps, c.target, c.balance, c.appt_at, c.created, c.source, c.consent_marketing, c.birthday, c.card_hash IS NOT NULL AS has_link,
          (SELECT COUNT(*) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2))
            + (CASE WHEN ?3 = 'block' AND c.stamps >= c.target THEN 1 ELSE 0 END) AS rewards,
          -- Last visit: the latest stamp or reward use, read per customer through events(customer, created).
          -- (Three times faster than grouping all of a big business's events.)
-         (SELECT MAX(e.created) FROM events e WHERE e.customer = c.id AND e.kind IN ('stamp', 'redeem', 'earn', 'spend')) AS last_visit
+         (SELECT MAX(e.created) FROM events e WHERE e.customer = c.id AND e.kind IN ('stamp', 'redeem', 'earn', 'spend', 'visit')) AS last_visit
        FROM customers c
        WHERE c.business = ?1 AND c.archived IS NULL ORDER BY c.created DESC LIMIT 5000`,
     ).bind(business!.id, new Date().toISOString(), business!.reward_mode),
@@ -362,7 +362,7 @@ export async function POST(request: Request) {
     const currency = forClient ? (p.market === "intl" ? "USD" : "ILS") : region.currency;
     const cardLang = forClient || region.israel ? (p.lang === "en" ? "en" : "he") : "en";
     // The kind of card: stamps (default) or a balance card with a percentage back (Perkly picks it for a client).
-    const program: Program = forClient && (p.program === "cashback" || p.program === "average") ? p.program : "stamps";
+    const program: Program = forClient && (p.program === "cashback" || p.program === "average" || p.program === "appointments") ? p.program : "stamps";
     const avgCap = program === "average" && Number.isInteger(p.avgCap) && (p.avgCap as number) >= 0 && (p.avgCap as number) <= AMOUNT_MAX ? (p.avgCap as number) : 0;
     const bp = program === "cashback" && Number.isInteger(p.cashbackBp) && (p.cashbackBp as number) >= BP_MIN && (p.cashbackBp as number) <= BP_MAX ? (p.cashbackBp as number) : 200;
     const minUse = program === "cashback" && Number.isInteger(p.cashbackMin) && (p.cashbackMin as number) >= 0 && (p.cashbackMin as number) <= AMOUNT_MAX ? (p.cashbackMin as number) : 0;
@@ -439,7 +439,7 @@ export async function POST(request: Request) {
       const denied = adminOnly(); if (denied) return denied;
       const name = str(p.name, 80);
       const reward = str(p.reward, 160);
-      const nextProgram = p.program === "cashback" || p.program === "stamps" || p.program === "average" ? p.program : business.program;
+      const nextProgram = p.program === "cashback" || p.program === "stamps" || p.program === "average" || p.program === "appointments" ? p.program : business.program;
       if (!name || !reward || !validTarget(p.target, nextProgram) || typeof p.color !== "string" || !COLOR.test(p.color)) {
         return fail("bad_details", 400, "Invalid business details");
       }
@@ -458,7 +458,7 @@ export async function POST(request: Request) {
       }
       const socialJson = Object.keys(social).length ? JSON.stringify(social) : null;
       // The kind of card, the percentage back and the minimum balance to use it (the balance card).
-      const program: Program = p.program === "cashback" || p.program === "stamps" || p.program === "average" ? p.program : business.program;
+      const program: Program = p.program === "cashback" || p.program === "stamps" || p.program === "average" || p.program === "appointments" ? p.program : business.program;
       const avgCap = p.avgCap === undefined ? business.avg_cap : p.avgCap;
       if (!Number.isInteger(avgCap) || (avgCap as number) < 0 || (avgCap as number) > AMOUNT_MAX) return fail("bad_details", 400, "Invalid cap");
       const bp = p.cashbackBp === undefined ? business.cashback_bp : p.cashbackBp;
@@ -536,6 +536,9 @@ export async function POST(request: Request) {
     case "purchase":
     case "spend":
     case "adjust_balance":
+    case "appt_set":
+    case "appt_clear":
+    case "visit":
       return cardAction({ db, p, business, actorId: user.id, role, memberBranch: membership.branch, now, origin });
 
     case "new_card_link": {

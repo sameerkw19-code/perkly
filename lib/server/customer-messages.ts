@@ -11,6 +11,7 @@ import { BIRTHDAY_GIFT_DAYS, MISS_YOU_DAYS, noticeOn, type Design, type StampNot
 import { birthdayKeys, israelNow } from "../birthday";
 import { nearPhase } from "../near-text";
 import { sendMonthlyReports } from "./monthly-report";
+import { sendApptReminders } from "./appointment-reminders";
 import type { MailEnv } from "./mailer";
 import { pushAppleBusinessNow, pushAppleCustomersNow } from "./apple-push";
 
@@ -191,10 +192,10 @@ export async function queueBirthdays(db: D1Database, today: { md: string; year: 
 }
 
 type OutboxRow = {
-  id: string; business: string; customer: string; kind: "welcome" | "birthday" | "special" | "sync" | "missyou"; campaign: string | null; attempts: number; origin: string | null;
+  id: string; business: string; customer: string; kind: "welcome" | "birthday" | "special" | "sync" | "missyou" | "appt"; campaign: string | null; attempts: number; origin: string | null;
   name: string; stamps: number; target: number; scan_code: string; google_wallet: string | null; archived: string | null;
   b_name: string; b_reward: string; b_color: string; reward_mode: string; b_archived: string | null; suspended: string | null;
-  special_text: string | null; special_canceled: string | null;
+  special_text: string | null; special_canceled: string | null; appt_msg: string | null;
 };
 
 /** Sends due outbox messages, oldest first. Returns how many were handled. */
@@ -202,7 +203,7 @@ export async function drainOutbox(db: D1Database, config: WalletConfig, nowIso: 
   const due = await db
     .prepare(
       `SELECT o.id, o.business, o.customer, o.kind, o.campaign, o.attempts, o.origin,
-         c.name, c.stamps, c.target, c.scan_code, c.google_wallet, c.archived,
+         c.name, c.stamps, c.target, c.scan_code, c.google_wallet, c.archived, c.appt_msg,
          b.name AS b_name, b.reward AS b_reward, b.color AS b_color, b.reward_mode, b.archived AS b_archived, b.suspended,
          s.text AS special_text, s.canceled AS special_canceled
        FROM wallet_outbox o JOIN customers c ON c.id = o.customer JOIN businesses b ON b.id = o.business
@@ -229,11 +230,14 @@ export async function drainOutbox(db: D1Database, config: WalletConfig, nowIso: 
     };
     // A refresh: the current stamps, rewards and look, without a message (a retry, or a new design).
     if (o.kind === "sync") {
-      const full = o.origin ? await passLook(db, business, o.origin, { stamps: o.stamps, target: o.target }).catch(() => null) : null;
+      const program = await passProgram(db, o.customer);
+      // Balance and appointment cards have no stamp banner.
+      const stampsLook = program.balance === undefined && program.appointment === undefined ? { stamps: o.stamps, target: o.target } : undefined;
+      const full = o.origin ? await passLook(db, business, o.origin, stampsLook).catch(() => null) : null;
       const { notice: _none, ...look } = full ?? { notice: null };
       const result = await updateLoyaltyObject(
         config,
-        { customerId: o.customer, businessId: o.business, stamps: o.stamps, target: o.target, scanCode: o.scan_code, rewards: await rewardsNow(), ...(await passProgram(db, o.customer)), look: full ? (look as typeof full) : undefined },
+        { customerId: o.customer, businessId: o.business, stamps: o.stamps, target: o.target, scanCode: o.scan_code, rewards: await rewardsNow(), ...program, look: full ? (look as typeof full) : undefined },
         null,
       );
       if (result === "updated") await finish(o.id, "sent");
@@ -250,7 +254,9 @@ export async function drainOutbox(db: D1Database, config: WalletConfig, nowIso: 
       continue;
     }
     const notice: StampNotice =
-      o.kind === "special" ? { kind: "special", name: o.name, text: o.special_text ?? "" }
+      // An appointment reminder: its text was written when it was due (the business, the day and the time).
+      o.kind === "appt" ? { kind: "special", name: o.name, text: o.appt_msg ?? "" }
+      : o.kind === "special" ? { kind: "special", name: o.name, text: o.special_text ?? "" }
       : o.kind === "birthday" ? { kind: "birthday", name: o.name, gift: design.birthdayGift }
       : o.kind === "missyou" ? { kind: "missyou", name: o.name }
       : { kind: "welcome", name: o.name };
@@ -319,6 +325,7 @@ export async function runScheduled(db: D1Database, env: Env, now = new Date()): 
   }
   await queueSpecialDays(db, nowIso);
   await switchNearTexts(db, today.hour, nowIso);
+  await sendApptReminders(db, nowIso).catch((e) => console.error("appointment reminders failed:", e));
   await sendMonthlyReports(db, env as unknown as MailEnv & { REPORT_EMAILS?: string; PUBLIC_ORIGIN?: string }, now).catch((e) => console.error("monthly report failed:", e));
   const config = walletConfig(env);
   if (!config) return;

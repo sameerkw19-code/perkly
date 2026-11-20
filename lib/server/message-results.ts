@@ -18,7 +18,7 @@ export async function visitedAfter(db: D1Database, business: string, s: { id: st
          AND (EXISTS (SELECT 1 FROM wallet_outbox o WHERE o.campaign = ?2 AND o.customer = c.id)
               OR EXISTS (SELECT 1 FROM apple_registrations r WHERE r.serial = c.id))
          AND EXISTS (SELECT 1 FROM events e WHERE e.customer = c.id AND e.created > ?3 AND e.created <= ?4
-                     AND e.kind IN ('stamp', 'redeem', 'earn', 'spend'))`,
+                     AND e.kind IN ('stamp', 'redeem', 'earn', 'spend', 'visit'))`,
     )
     .bind(business, s.id, s.queued, until)
     .first<{ n: number }>();

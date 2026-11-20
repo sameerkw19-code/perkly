@@ -4,10 +4,11 @@ import { SOCIAL_KEYS, SOCIAL_LABEL, normalizeSocial, socialDisplay, type Social 
 import { SocialIcon } from "../lib/social-icon";
 import { fillNearText, NEAR_TAG_NAMES, nearPhase, type NearTag } from "../lib/near-text";
 import { israelNow } from "../lib/birthday";
+import { formatAppt, formatTime, israelTime } from "../lib/appointment";
 import {
   Activity, AlertTriangle, Trash2, Cake, Check, Copy, CreditCard, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode,
   ChevronRight, History, Palette, RefreshCw, RotateCcw, ScanLine, Search, Settings, Share2, Store, UserPlus, Users, UserRound, X,
-  Phone, MapPin, Megaphone, BarChart3,
+  Phone, MapPin, Megaphone, BarChart3, CalendarDays,
   type LucideIcon,
 } from "lucide-react";
 import type { Design } from "../lib/design";
@@ -28,8 +29,8 @@ import { weekChange } from "../lib/weekly";
 import { Brand } from "../components/brand";
 
 type Role = "owner" | "staff";
-type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social; program?: "stamps" | "cashback" | "average"; cashback_bp?: number; cashback_min?: number; currency?: string; avg_cap?: number; pos_only?: number; near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number; near_evening_from?: number; referral_stamps?: number; report_email?: number };
-type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; rewards?: number; nextExpiry?: string | null; phone?: string; balance?: number; roundTotal?: number; rewardValue?: number | null };
+type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social; program?: "stamps" | "cashback" | "average" | "appointments"; cashback_bp?: number; cashback_min?: number; currency?: string; avg_cap?: number; pos_only?: number; near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number; near_evening_from?: number; referral_stamps?: number; report_email?: number };
+type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; rewards?: number; nextExpiry?: string | null; phone?: string; balance?: number; roundTotal?: number; rewardValue?: number | null; apptAt?: string | null };
 type Data = {
   me: { name: string; email: string };
   /** Perkly (a platform admin): manages the card, settings and team of any business. */
@@ -66,7 +67,7 @@ type Data = {
 };
 /** One customer in the list (see GET /api/loyalty). */
 type CustomerRow = {
-  id: string; name: string; phone: string; stamps: number; target: number; balance: number; created: string; source: string;
+  id: string; name: string; phone: string; stamps: number; target: number; balance: number; appt_at?: string | null; created: string; source: string;
   consent_marketing: number; birthday: string | null; has_link: boolean; rewards: number; last_visit: string | null;
 };
 /** One entry of the activity history (several entries can be grouped into one). */
@@ -420,7 +421,7 @@ export default function Dashboard() {
           {view === "overview" && isOwner && (
             <>
               <div className="page-head">
-                <div><h1>{t("repTitle")}</h1><p className="muted">{t(b.program === "cashback" ? "repSubtitleCb" : "repSubtitle")}</p></div>
+                <div><h1>{t("repTitle")}</h1><p className="muted">{t(b.program === "cashback" ? "repSubtitleCb" : b.program === "appointments" ? "repSubtitleAppt" : "repSubtitle")}</p></div>
                 <div className="head-actions">
                   {(data.branches?.length ?? 0) > 1 && (
                     <select aria-label={t("branch")} value={branchView} onChange={(e) => setBranchView(e.target.value)}>
@@ -435,8 +436,9 @@ export default function Dashboard() {
                   <a className="btn soft" href={`/report?b=${encodeURIComponent(b.id)}`}><BarChart3 size={18} />{t("rpOpen")}</a>
                 </div>
               </div>
+              {b.program === "appointments" && <TodayAppts customers={customers} t={t} />}
               {data.summary && <Summary summary={data.summary} totals={{ customers: data.stats!.customers, ready: data.stats!.rewards_ready, openBalance: data.stats!.open_balance }} breakdown={data.breakdown} hasBranches={(data.branches?.length ?? 0) > 1} t={t}
-                money={b.program === "cashback" || b.program === "average" ? (n) => formatMoney(n, b.currency === "USD" ? "USD" : "ILS", lang) : undefined} average={b.program === "average"} />}
+                money={b.program === "cashback" || b.program === "average" ? (n) => formatMoney(n, b.currency === "USD" ? "USD" : "ILS", lang) : undefined} average={b.program === "average"} appts={b.program === "appointments"} />}
               {!!data.alerts?.length && <Alerts alerts={data.alerts} t={t} />}
               <section className="overview-grid">
                 <div className="panel card-panel join-panel">
@@ -484,14 +486,15 @@ export default function Dashboard() {
               ) : (
                 <div className="table-wrap">
                   <table>
-                    <thead><tr><th>{t("name")}</th><th>{t("phone")}</th><th>{t("balance")}</th><th>{t("lastVisitCol")}</th>{b.birthdays !== 0 && <th>{t("birthdayCol")}</th>}<th>{t("marketingCol")}</th><th>{t("actions")}</th></tr></thead>
+                    <thead><tr><th>{t("name")}</th><th>{t("phone")}</th><th>{b.program === "appointments" ? t("apptWord") : t("balance")}</th><th>{t("lastVisitCol")}</th>{b.birthdays !== 0 && <th>{t("birthdayCol")}</th>}<th>{t("marketingCol")}</th><th>{t("actions")}</th></tr></thead>
                     <tbody>
                       {filtered.map((c) => (
                         <tr key={c.id}>
                           <td><span className="customer-avatar">{c.name.charAt(0)}</span><strong>{c.name}</strong></td>
                           <td dir="ltr" className="start">{c.phone}</td>
                           <td>
-                            {b.program === "cashback" ? <Num>{formatMoney(c.balance ?? 0, b.currency === "USD" ? "USD" : "ILS", lang)}</Num> : (
+                            {b.program === "appointments" ? <bdi>{c.appt_at ? formatAppt(c.appt_at, lang) : "—"}</bdi>
+                            : b.program === "cashback" ? <Num>{formatMoney(c.balance ?? 0, b.currency === "USD" ? "USD" : "ILS", lang)}</Num> : (
                             <div className="progress-cell">
                               <span className="progress-track"><i style={{ width: Math.min(100, (c.stamps / c.target) * 100) + "%" }} /></span>
                               <Num>{c.stamps}/{c.target}</Num>
@@ -504,7 +507,7 @@ export default function Dashboard() {
                           <td>{c.consent_marketing ? t("yes") : t("no")}</td>
                           <td>
                             <div className="row-actions">
-                              <button className="btn soft small" onClick={() => { setStationPick({ id: c.id, name: c.name, stamps: c.stamps, target: c.target, rewards: c.rewards, rewardReady: c.rewards > 0, phone: c.phone }); setView("station"); }}>
+                              <button className="btn soft small" onClick={() => { setStationPick({ id: c.id, name: c.name, stamps: c.stamps, target: c.target, rewards: c.rewards, rewardReady: c.rewards > 0, phone: c.phone, apptAt: c.appt_at ?? null }); setView("station"); }}>
                                 <ScanLine size={14} />{t("station")}
                               </button>
                               <button className="icon-btn" title={t("newLink")} aria-label={t("newLink")} disabled={busy} onClick={async () => {
@@ -573,7 +576,7 @@ export default function Dashboard() {
               <div className="page-head"><div><h1>{t("design")}</h1><p className="muted">{t("designNoBalance")}</p></div></div>
               <CardEditor key={b.id + ":" + data.editor.publishedVersion} businessId={b.id} target={b.target} editor={data.editor} t={t} lang={lang} notify={notify} reload={load}
                 paid={!!data.access?.ok && !data.access.free} upgradeHref={`/start?b=${encodeURIComponent(b.id)}`} specialDays={isOwner || manage}
-                cashback={b.program === "cashback" ? { bp: b.cashback_bp ?? 200, currency: b.currency === "USD" ? "USD" : "ILS" } : null} average={b.program === "average"} currency={b.currency === "USD" ? "USD" : "ILS"} />
+                cashback={b.program === "cashback" ? { bp: b.cashback_bp ?? 200, currency: b.currency === "USD" ? "USD" : "ILS" } : null} average={b.program === "average"} appointments={b.program === "appointments"} currency={b.currency === "USD" ? "USD" : "ILS"} />
             </>
           )}
 
@@ -820,15 +823,18 @@ function EventList({ events, t, lang, currency = "ILS" }: { events: EventRow[]; 
     <div>
       {groupEvents(events).slice(0, 8).map((e, i) => (
         <div className="activity-row" key={e.id ?? i}>
-          <span className={"activity-icon" + (e.kind === "redeem" || e.kind === "spend" ? " reward-icon" : "")}>{e.kind === "redeem" || e.kind === "spend" ? <Gift size={16} /> : e.kind === "adjust" || e.kind === "balance_adjust" ? <Activity size={16} /> : <Plus size={16} />}</span>
+          <span className={"activity-icon" + (e.kind === "redeem" || e.kind === "spend" ? " reward-icon" : "")}>{e.kind === "redeem" || e.kind === "spend" ? <Gift size={16} /> : e.kind === "adjust" || e.kind === "balance_adjust" ? <Activity size={16} /> : e.kind === "appt" || e.kind === "appt_cancel" ? <CalendarDays size={16} /> : e.kind === "visit" ? <Check size={16} /> : <Plus size={16} />}</span>
           <div>
             <strong>{e.customer}</strong>
             <small>
-              {e.kind === "earn" || e.kind === "spend" || e.kind === "balance_adjust" ? <Num>{money(e)}</Num> : <>{t("ev_" + e.kind)} <Num>{e.delta > 0 ? "+" + e.delta : e.delta}</Num></>}
+              {e.kind === "earn" || e.kind === "spend" || e.kind === "balance_adjust" ? <Num>{money(e)}</Num>
+                // The appointments card: what happened, and for a new appointment its day and time.
+                : e.kind === "appt" || e.kind === "appt_cancel" || e.kind === "visit" ? <>{t("ev_" + e.kind)}{e.kind === "appt" && e.note ? <> · <bdi>{formatAppt(e.note, lang)}</bdi></> : null}</>
+                : <>{t("ev_" + e.kind)} <Num>{e.delta > 0 ? "+" + e.delta : e.delta}</Num></>}
               {e.actor_name ? " · " + t("by", { name: e.actor_name }) : ""}
               {e.branch_name ? " · " + e.branch_name : ""}
               {e.rewards_earned ? " · 🎁 " + t("rewardEarnedEv") + (e.rewards_earned > 1 ? " ×" + e.rewards_earned : "") : ""}
-              {e.note ? " · " + e.note : ""}
+              {e.note && e.kind !== "appt" ? " · " + e.note : ""}
             </small>
           </div>
           <time dateTime={e.created}>{new Date(e.created).toLocaleString(locale, { dateStyle: "short", timeStyle: "short" })}</time>
@@ -997,6 +1003,11 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
   const [balanceFix, setBalanceFix] = useState<{ value: string; note: string } | null>(null);
   // The "average" card: buy N, the next one free at the average of those purchases.
   const average = business.program === "average";
+  // The appointments card (clinics): the next appointment instead of stamps, and the customer's arrival.
+  const appts = business.program === "appointments";
+  const [apptDate, setApptDate] = useState("");
+  const [apptTime, setApptTime] = useState("");
+  const [apptCancelAsk, setApptCancelAsk] = useState(false);
   // Connected to the cashier: cards change only through the cashier; here staff see the card (owners can still correct).
   const posOnly = !!business.pos_only;
   const mayFix = canFix && (!posOnly || owner);
@@ -1017,6 +1028,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
   /** Ready for the next customer: back to the start, the search box focused. */
   function next() {
     setSelected(null); setPending(null); setFixing(null); setResult(null); setStep("customer"); setQty(1);
+    setApptDate(""); setApptTime(""); setApptCancelAsk(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
     setTimeout(() => searchRef.current?.focus(), 50);
   }
@@ -1104,6 +1116,39 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
       next();
       onDone();
     } else {
+      notify(errorText(lang, r.code), true);
+    }
+  }
+
+  /** The appointments card: set or cancel the next appointment, or record that the customer came in. Same safe retry as stamps. */
+  async function actAppt(kind: "appt_set" | "appt_clear" | "visit") {
+    if (!selected || busy) return;
+    if (branches.length > 1 && !myBranch && !branch) { notify(t("err_branch_required"), true); return; }
+    if (kind === "appt_clear" && !apptCancelAsk) { setApptCancelAsk(true); return; }
+    setApptCancelAsk(false);
+    if (kind === "appt_set" && (!apptDate || !apptTime)) { notify(t("apptPick"), true); return; }
+    const key = kind + ":" + apptDate + ":" + apptTime;
+    const requestId = pending && pending.kind === key && pending.customer === selected.id ? pending.requestId : crypto.randomUUID();
+    setPending({ kind: key, customer: selected.id, requestId });
+    setBusy(true);
+    const r = await post("/api/loyalty", { action: kind, business: business.id, customer: selected.id, requestId, date: apptDate, time: apptTime, branch: myBranch ? undefined : branch || undefined });
+    setBusy(false);
+    if (r.ok) {
+      setPending(null);
+      const card = r.data.card as CardState;
+      setSelected({ ...selected, ...card });
+      const text = r.data.replayed ? t("replayed")
+        : kind === "appt_set" ? t("apptSetDone", { when: formatAppt(card.apptAt!, lang) })
+        : kind === "appt_clear" ? t("apptClearDone")
+        : t("apptVisitDone");
+      setResult({ text, reward: false });
+      setCountdown(DONE_SECONDS);
+      setStep("done");
+      onDone();
+    } else if (r.network) {
+      notify(t("err_network"), true);
+    } else {
+      setPending(null);
       notify(errorText(lang, r.code), true);
     }
   }
@@ -1287,7 +1332,9 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
                   <button key={c.id} role="option" aria-selected={false} className="customer-result" onClick={() => choose(c)}>
                     <span className="st-avatar" aria-hidden="true">{c.name.charAt(0)}</span>
                     <span className="st-result-who"><strong>{c.name}</strong><small dir="ltr">{c.phone}</small></span>
-                    {cashback ? (
+                    {appts ? (
+                      <span className="st-result-count"><CalendarDays size={14} /><bdi>{c.apptAt ? formatAppt(c.apptAt, lang, false) : "—"}</bdi></span>
+                    ) : cashback ? (
                       <span className="st-result-count"><Num>{fmt(c.balance ?? 0)}</Num></span>
                     ) : (
                     <span className="st-result-count">
@@ -1404,7 +1451,62 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
         );
       })()}
 
-      {selected && !cashback && step === "customer" && (
+      {/* 2c. The appointments card: the next appointment, the arrival, and setting the next one */}
+      {selected && appts && step === "customer" && (() => {
+        // The appointment they came for: one within the next 12 hours (or just past).
+        const arriving = !!selected.apptAt && msUntil(selected.apptAt) < 12 * 3_600_000;
+        return (
+          <section className="sx-screen" aria-label={selected.name}>
+            {who}
+            {branchControl && <div className="sx-chips">{branchControl}</div>}
+            <div className="sx-box">
+              <div className="sx-box-head">
+                <span className="sx-box-icon appt" aria-hidden="true"><CalendarDays size={18} /></span>
+                <strong>{selected.apptAt ? <>{t("apptNextShort")} <bdi>{formatAppt(selected.apptAt, lang)}</bdi></> : t("apptNone")}</strong>
+              </div>
+              <button className={"btn big sx-wide " + (arriving ? "primary" : "soft")} disabled={busy} onClick={() => actAppt("visit")}>
+                <Check size={18} />{busy && pending?.kind.startsWith("visit") ? t("sending") : arriving ? t("apptArrived") : t("apptVisitNoAppt")}
+              </button>
+            </div>
+            <h2 className="sx-label">{selected.apptAt ? t("apptChange") : t("apptSetNext")}</h2>
+            <form className="appt-form" onSubmit={(e) => { e.preventDefault(); actAppt("appt_set"); }}>
+              <div className="appt-quick" role="group" aria-label={t("apptQuick")}>
+                {[7, 14, 28].map((d) => (
+                  <button key={d} type="button" className="chip" onClick={() => { setApptDate(dayPlus(d)); if (!apptTime) setApptTime(selected.apptAt ? formatTime(selected.apptAt) : "10:00"); }}>
+                    {t(d === 7 ? "apptIn1w" : d === 14 ? "apptIn2w" : "apptIn4w")}
+                  </button>
+                ))}
+              </div>
+              <div className="appt-fields">
+                <label>{t("apptDate")}<input type="date" required value={apptDate} min={dayPlus(0)} onChange={(e) => setApptDate(e.target.value)} /></label>
+                <label>{t("apptTime")}<input type="time" required step={300} value={apptTime} onChange={(e) => setApptTime(e.target.value)} /></label>
+              </div>
+              {apptDate && apptTime && <p className="form-hint" aria-live="polite">{t("apptRemindersFor", { when: apptPreview(apptDate, apptTime, lang) })}</p>}
+              <button className="btn primary big sx-wide" disabled={busy || !apptDate || !apptTime}>
+                <CalendarDays size={18} />{busy && pending?.kind.startsWith("appt_set") ? t("sending") : selected.apptAt ? t("apptSaveChange") : t("apptSave")}
+              </button>
+            </form>
+            {selected.apptAt && (
+              apptCancelAsk ? (
+                <div className="sp-confirm" role="group" aria-label={t("apptCancel")}>
+                  <p>{t("apptCancelAsk")}</p>
+                  <div className="form-actions">
+                    <button type="button" className="btn primary small" disabled={busy} onClick={() => actAppt("appt_clear")}>{t("apptCancelYes")}</button>
+                    <button type="button" className="btn soft small" onClick={() => setApptCancelAsk(false)}>{t("cancel")}</button>
+                  </div>
+                </div>
+              ) : (
+                <button type="button" className="text-btn appt-cancel" onClick={() => actAppt("appt_clear")}>{t("apptCancel")}</button>
+              )
+            )}
+            <div className="sx-bar">
+              <button className="btn soft" onClick={next}><ChevronRight size={16} className="sx-back" />{t("sxBack")}</button>
+            </div>
+          </section>
+        );
+      })()}
+
+      {selected && !cashback && !appts && step === "customer" && (
         <section className="sx-screen" aria-label={selected.name}>
           {who}
           <div className="sx-chips">
@@ -1497,7 +1599,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
       )}
 
       {/* 3. Add stamps */}
-      {selected && !cashback && step === "stamp" && (
+      {selected && !cashback && !appts && step === "stamp" && (
         <section className="sx-screen" aria-label={t("sxAddStamps")}>
           {who}
           <h2 className="sx-label">{t("sxPunchCards")}</h2>
@@ -1528,7 +1630,9 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
         <section className="sx-screen sx-done" role="status" aria-live="polite">
           <span className={"sx-done-icon" + (result.reward ? " reward" : "")}>{result.reward ? <Gift size={34} /> : <Check size={34} />}</span>
           <h2>{result.text}</h2>
-          {cashback ? (
+          {appts ? (
+            <p className="muted">{selected.name}{selected.apptAt && !result.text.includes(formatAppt(selected.apptAt, lang)) ? <> · {t("apptNextShort")} <bdi>{formatAppt(selected.apptAt, lang)}</bdi></> : null}</p>
+          ) : cashback ? (
             <p className="muted">{selected.name} · {t("cbBalanceNow", { balance: fmt(selected.balance ?? 0) })}</p>
           ) : (
             <>
@@ -1754,6 +1858,47 @@ function Referral({ business, t, busy, call, reload }: { business: Business; t: 
   );
 }
 
+/** The appointments card: today's appointments by time, so the clinic sees the day at a glance. */
+function TodayAppts({ customers, t }: { customers: CustomerRow[]; t: T }) {
+  const today = dayPlus(0);
+  const list = customers
+    .filter((c) => c.appt_at && israelDate(c.appt_at) === today)
+    .sort((a, b) => a.appt_at!.localeCompare(b.appt_at!));
+  return (
+    <section className="panel today-appts">
+      <div className="section-head"><h2><CalendarDays size={18} /> {t("apptToday")}</h2></div>
+      {!list.length ? <p className="form-hint">{t("apptTodayNone")}</p> : (
+        <ul>
+          {list.map((c) => (
+            <li key={c.id}><b><bdi>{formatTime(c.appt_at!)}</bdi></b><span>{c.name}</span><small dir="ltr">{c.phone}</small></li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/** The Israel date ("2026-11-25") of a moment. */
+function israelDate(iso: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
+}
+
+/** The appointments card: today plus `days`, as an Israel date for <input type="date">. */
+function dayPlus(days: number): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(Date.now() + days * 86_400_000));
+}
+
+/** Milliseconds from now until `iso` (negative when past). */
+function msUntil(iso: string): number {
+  return Date.parse(iso) - Date.now();
+}
+
+/** "יום ג׳, 25.11 · 10:30" for the date and time being picked, or the raw values when they don't make a time. */
+function apptPreview(date: string, time: string, lang: string): string {
+  const at = israelTime(date, time);
+  return at ? formatAppt(at.toISOString(), lang) : `${date} ${time}`;
+}
+
 /** The hour in Israel now (outside render helpers, so components stay pure). */
 function hourNow(): number {
   return israelNow().hour;
@@ -1887,6 +2032,13 @@ const CASHBACK_ROWS: readonly (readonly [string, string, boolean])[] = [
   ["joined", "sumJoined", false],
 ];
 /** The "average" card's summary: purchases (stamps) and their total, free purchases and what they were worth. */
+/** The appointments card: visits, returning and new customers (no stamps or rewards). */
+const APPT_ROWS: readonly (readonly [string, string, boolean])[] = [
+  ["visitors", "sumVisitors", false],
+  ["returning", "sumReturning", false],
+  ["joined", "sumJoined", false],
+];
+
 const AVERAGE_ROWS: readonly (readonly [string, string, boolean])[] = [
   ["stamps", "sumPurchases", false],
   ["sales", "sumSales", true],
@@ -1914,7 +2066,7 @@ function Alerts({ alerts, t }: { alerts: { type: "customer" | "staff" | "staffFi
 
 /** Summary for the owner: this day, week or month against the one before. */
 type BreakdownRow = { id: string | null; name: string | null } & Record<string, number | string | null>;
-function Summary({ summary, totals, breakdown, hasBranches, t, money, average = false }: {
+function Summary({ summary, totals, breakdown, hasBranches, t, money, average = false, appts = false }: {
   summary: Record<Period, Record<string, number>>; totals: { customers: number; ready: number; openBalance?: number };
   breakdown?: { staff: BreakdownRow[]; branches: BreakdownRow[] }; hasBranches?: boolean;
   t: (k: string, v?: Record<string, string | number>) => string;
@@ -1922,6 +2074,8 @@ function Summary({ summary, totals, breakdown, hasBranches, t, money, average = 
   money?: (minor: number) => string;
   /** The "average" card: stamp counts plus purchase totals and the value of free purchases. */
   average?: boolean;
+  /** The appointments card: visits and customers only. */
+  appts?: boolean;
 }) {
   const [period, setPeriod] = useState<Period>("week");
   const cash = !!money && !average;
@@ -1960,13 +2114,13 @@ function Summary({ summary, totals, breakdown, hasBranches, t, money, average = 
       </div>
       <p className="summary-totals">
         <span><Users size={15} /><Num>{totals.customers}</Num> {t("statCustomers")}</span>
-        {cash
+        {appts ? null : cash
           ? <span><Gift size={15} /><Num>{money!(totals.openBalance ?? 0)}</Num> {t("statOpenBalance")}</span>
           : <span><Gift size={15} /><Num>{totals.ready}</Num> {t("statReady")}</span>}
       </p>
       <p className="form-hint">{t("sumNote_" + period)}</p>
       <div className="summary-grid">
-        {(cash ? CASHBACK_ROWS : average ? AVERAGE_ROWS : SUMMARY_ROWS.map(([k, l]) => [k, l, false] as const)).map(([key, label, isMoney]) => {
+        {(appts ? APPT_ROWS : cash ? CASHBACK_ROWS : average ? AVERAGE_ROWS : SUMMARY_ROWS.map(([k, l]) => [k, l, false] as const)).map(([key, label, isMoney]) => {
           const now = Number(s?.[key + "_now"] ?? 0), prev = Number(s?.[key + "_prev"] ?? 0);
           const show = (n: number) => (isMoney ? money!(n) : n);
           const c = weekChange(now, prev);
@@ -1985,7 +2139,7 @@ function Summary({ summary, totals, breakdown, hasBranches, t, money, average = 
           );
         })}
       </div>
-      {breakdown && (
+      {breakdown && !appts && (
         <div className="report-tables">
           {table(t("repByStaff"), t("repStaffCol"), rows(breakdown.staff), t("repUnknown"))}
           {hasBranches && table(t("repByBranch"), t("branch"), rows(breakdown.branches), t("noBranch"))}

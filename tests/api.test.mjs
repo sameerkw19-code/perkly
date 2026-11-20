@@ -1045,6 +1045,52 @@ test("monthly report: the owner sees the month's numbers; strangers can't; the e
   assert.equal((await stranger.act(biz, "set_report_email", { on: true })).status >= 400, true);
 });
 
+test("appointments card: set, change and cancel the next appointment; arrival is a visit; stamps are refused", async () => {
+  const built = await admin.post("/api/loyalty", { action: "create_business", forClient: true, kind: "studio", name: "Clinic", reward: "Reminder before every appointment", target: 10, color: "#2a6f97", setupDays: 30, branchName: "Main", program: "appointments" });
+  assert.equal(built.status, 200, JSON.stringify(built.body));
+  const biz = built.body.id;
+  const c = (await admin.act(biz, "register_customer", { name: "Maya", phone: "0531118001" })).body.id;
+  const day = (n) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(Date.now() + n * 86_400_000));
+  const set = await admin.act(biz, "appt_set", { customer: c, requestId: id(), date: day(3), time: "10:30" });
+  assert.equal(set.status, 200, JSON.stringify(set.body));
+  assert.ok(set.body.card.apptAt, "the card carries the appointment");
+  // 10:30 in Israel is 08:30 or 07:30 UTC.
+  assert.match(set.body.card.apptAt, new RegExp(`^${day(3)}T0[78]:30:00`));
+  // A retry with the same request id changes nothing.
+  const rid = id();
+  await admin.act(biz, "appt_set", { customer: c, requestId: rid, date: day(5), time: "09:00" });
+  const again = await admin.act(biz, "appt_set", { customer: c, requestId: rid, date: day(6), time: "09:00" });
+  assert.equal(again.body.replayed, true);
+  assert.match(again.body.card.apptAt, new RegExp(`^${day(5)}`));
+  // In the past or invalid: refused.
+  assert.equal((await admin.act(biz, "appt_set", { customer: c, requestId: id(), date: day(-1), time: "10:00" })).status, 400);
+  assert.equal((await admin.act(biz, "appt_set", { customer: c, requestId: id(), date: day(2), time: "26:00" })).status, 400);
+  // Stamps don't belong to this card; appointments don't belong to stamp cards.
+  assert.equal((await admin.act(biz, "stamp", { customer: c, requestId: id() })).status, 409);
+  assert.equal((await ownerA.act(bizA, "appt_set", { customer: dana, requestId: id(), date: day(2), time: "10:00" })).status, 409);
+  // The customer list and the activity show it.
+  const view = (await admin.get(`/api/loyalty?business=${biz}`)).body;
+  assert.ok(view.customers.find((x) => x.id === c).appt_at);
+  assert.ok(view.events.some((e) => e.kind === "appt"));
+  // Cancel, then an appointment in an hour, then the arrival clears it and counts as a visit.
+  assert.equal((await admin.act(biz, "appt_clear", { customer: c, requestId: id() })).body.card.apptAt, null);
+  const soon = new Date(Date.now() + 2 * 3_600_000);
+  const hm = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Jerusalem", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(soon);
+  const dsoon = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit", day: "2-digit" }).format(soon);
+  assert.equal((await admin.act(biz, "appt_set", { customer: c, requestId: id(), date: dsoon, time: hm })).status, 200);
+  const visit = await admin.act(biz, "visit", { customer: c, requestId: id() });
+  assert.equal(visit.status, 200, JSON.stringify(visit.body));
+  assert.equal(visit.body.card.apptAt, null, "the appointment they came for is done");
+  const after = (await admin.get(`/api/loyalty?business=${biz}`)).body;
+  assert.equal(after.summary.day.visitors_now, 1, "an arrival is a visit");
+  // The customer's own card page shows the card (no stamps).
+  const link = await admin.act(biz, "new_card_link", { customer: c });
+  if (link.status === 200 && link.body.cardUrl) {
+    const html = await (await fetch(link.body.cardUrl.replace(/^https?:\/\/[^/]+/, BASE))).text();
+    assert.match(html, /התור הבא שלך|Your next appointment/);
+  }
+});
+
 test("message to customers: the owner sends now or schedules; staff can't; at most 3 a day", async () => {
   const owner = new Client();
   await signup(owner, "msg-owner");

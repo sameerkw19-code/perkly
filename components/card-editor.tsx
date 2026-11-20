@@ -1,5 +1,9 @@
 "use client";
 import { formatMoney, pctLabel } from "../lib/cashback.ts";
+import { formatAppt } from "../lib/appointment";
+
+/** The editor's sample appointment (a fixed date, so the preview is the same on the server and in the browser). */
+const SAMPLE_APPT = "2026-11-24T08:30:00.000Z";
 import { useMemo, useState, type ReactNode } from "react";
 import { ChevronDown, ImagePlus, Lock, MessageCircle, Shuffle, Trash2, UploadCloud } from "lucide-react";
 import {
@@ -104,12 +108,14 @@ function PaidTag({ t }: { t: T }) {
 /** What the picture upload routes answer: the new picture (or pictures), or an error code. */
 type UploadReply = { id?: string; ids?: string[]; width?: number; height?: number; code?: string };
 
-export function CardEditor({ businessId, target, editor, t, lang, notify, reload, paid = true, upgradeHref, setup, specialDays = true, cashback, average = false, currency = "ILS" }: {
+export function CardEditor({ businessId, target, editor, t, lang, notify, reload, paid = true, upgradeHref, setup, specialDays = true, cashback, average = false, appointments = false, currency = "ILS" }: {
   businessId: string; target: number; editor: Editor; t: T; lang: Lang;
   /** The balance card: the preview shows a sample balance instead of stamps. */
   cashback?: { bp: number; currency: "ILS" | "USD" } | null;
   /** The "average" card: the preview explains the free purchase's value. */
   average?: boolean;
+  /** The appointments card: the preview shows a sample next appointment instead of stamps. */
+  appointments?: boolean;
   /** The business's currency (the average card's sample worth). */
   currency?: "ILS" | "USD";
   /** Special-day messages are sent by Perkly: hidden for an owner who edits the design. */
@@ -253,7 +259,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
 
   /** Apple Wallet stamp grid: one picture per stamp count, every plan. On failure the pass keeps its banner image. */
   async function withAppleStrips(d: Design): Promise<Design> {
-    if (usesPizza(d, target) || average) return { ...d, appleStamps: [] };
+    if (usesPizza(d, target) || average || appointments) return { ...d, appleStamps: [] };
     setBusy("banners");
     try {
       const blobs = await makeAppleStrips(d, target);
@@ -291,7 +297,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
     if (!setup && !confirm(t("publishConfirm"))) return;
     let next = design;
     // The average card draws its progress bar on the pass itself: no stamp pictures.
-    if (design.walletBanner === "stamps" && !average) {
+    if (design.walletBanner === "stamps" && !average && !appointments) {
       const made = await withStampBanners(design);
       if (!made) return;
       next = made;
@@ -317,6 +323,8 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
     balance: cashback ? { text: formatMoney(demo * 490, cashback.currency, textLang), pct: pctLabel(cashback.bp) } : undefined,
     // A sample worth for the average card: an average basket of 303.09.
     average: average ? { soFar: demo > 0 ? formatMoney(30309, currency, textLang) : undefined } : undefined,
+    // A sample appointment: next week, 10:30.
+    appointment: appointments ? { text: formatAppt(SAMPLE_APPT, textLang) } : undefined,
   };
   const previewDir = isRtl(textLang) ? "rtl" : "ltr";
   const locale = lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB";

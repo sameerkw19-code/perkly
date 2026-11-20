@@ -23,6 +23,11 @@ export async function generateMetadata({ params }: { params: Promise<{ secret: s
 
 // Public customer card. The secret in the link opens this view only:
 // it cannot add stamps, and the phone number is never shown.
+/** The appointments card: the next appointment, until an hour after its time. */
+function upcoming(iso: string | null): string | null {
+  return iso && Date.parse(iso) > Date.now() - 3_600_000 ? iso : null;
+}
+
 export default async function CardPage({ params }: { params: Promise<{ secret: string }> }) {
   const { secret } = await params;
   const db = getD1();
@@ -30,14 +35,14 @@ export default async function CardPage({ params }: { params: Promise<{ secret: s
     secret.length <= 100
       ? await db
           .prepare(
-            `SELECT c.id, c.name, c.stamps, c.target, c.scan_code, c.balance, c.round_total, b.program, b.avg_cap, b.cashback_bp, b.cashback_min, b.currency, b.id AS business_id, b.name AS business, b.reward, b.color, b.reward_mode, b.social, b.referral_stamps, b.join_code,
+            `SELECT c.id, c.name, c.stamps, c.target, c.scan_code, c.balance, c.round_total, c.appt_at, b.program, b.avg_cap, b.cashback_bp, b.cashback_min, b.currency, b.id AS business_id, b.name AS business, b.reward, b.color, b.reward_mode, b.social, b.referral_stamps, b.join_code,
                (SELECT COUNT(*) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2)) AS saved,
                (SELECT MIN(expires) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2)) AS next_expiry,
                (SELECT value FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2) ORDER BY earned, id LIMIT 1) AS next_value
              FROM customers c JOIN businesses b ON b.id = c.business WHERE c.card_hash = ?1 AND c.archived IS NULL AND b.archived IS NULL`,
           )
           .bind(await sha256(secret), new Date().toISOString())
-          .first<{ id: string; referral_stamps: number; join_code: string | null; name: string; stamps: number; target: number; scan_code: string; balance: number; round_total: number; avg_cap: number; next_value: number | null; program: string; cashback_bp: number; cashback_min: number; currency: string; business_id: string; business: string; reward: string; color: string; reward_mode: string; social: string | null; saved: number; next_expiry: string | null }>()
+          .first<{ id: string; appt_at: string | null; referral_stamps: number; join_code: string | null; name: string; stamps: number; target: number; scan_code: string; balance: number; round_total: number; avg_cap: number; next_value: number | null; program: string; cashback_bp: number; cashback_min: number; currency: string; business_id: string; business: string; reward: string; color: string; reward_mode: string; social: string | null; saved: number; next_expiry: string | null }>()
       : null;
   if (!row) return <CardView card={null} secret={secret} googleWallet={false} appleWallet={false} isIOS={false} />;
   const design = await liveDesign(db, { id: row.business_id, name: row.business, reward: row.reward, color: row.color });
@@ -61,6 +66,7 @@ export default async function CardPage({ params }: { params: Promise<{ secret: s
     <CardView
       card={{ name: row.name, stamps: row.stamps, target: row.target, scan_code: row.scan_code, design, rewards, nextExpiry: row.next_expiry, business: row.business, links: socialLinks(parseSocial(row.social)),
         cashback: row.program === "cashback" ? { balance: row.balance, bp: row.cashback_bp, min: row.cashback_min, currency: row.currency === "USD" ? "USD" : "ILS" } : null,
+        appointment: row.program === "appointments" ? { at: upcoming(row.appt_at) } : null,
         average: row.program === "average" ? { roundTotal: row.round_total, cap: row.avg_cap ?? 0, ready: row.next_value, currency: row.currency === "USD" ? "USD" : "ILS" } : null }}
       secret={secret}
       googleWallet={googleWallet}

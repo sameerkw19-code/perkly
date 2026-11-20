@@ -9,6 +9,7 @@ import { PASS_ICONS } from "./apple-pass-icons";
 import { businessPlaces, liveDesign } from "./designs";
 import { fillNearText, nearTemplate, stampEmoji } from "../near-text";
 import { israelNow } from "../birthday";
+import { apptLabel, formatAppt, noApptText } from "../appointment";
 import { passToken, type AppleConfig } from "./apple-token";
 
 export { appleConfig, passToken, validToken, type AppleConfig } from "./apple-token";
@@ -36,13 +37,14 @@ type CustomerRow = {
   id: string; business: string; name: string; stamps: number; target: number; scan_code: string; created: string;
   business_name: string; reward: string; color: string; rewards: number; balance: number; program: string; currency: string;
   round_total: number; avg_cap: number; ready_value: number | null; missyou_at?: string | null; last_event?: string | null; near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number | null; near_evening_from?: number | null; news_text?: string | null; news_at?: string | null;
+  appt_at?: string | null; appt_msg?: string | null;
 };
 
 /** The customer behind a pass serial (the customer id), or null when it was removed. */
 export async function customerForPass(db: D1Database, serial: string): Promise<CustomerRow | null> {
   return db
     .prepare(
-      `SELECT c.id, c.business, c.name, c.stamps, c.target, c.scan_code, c.created, c.balance, c.round_total, c.missyou_at, (SELECT MAX(e.created) FROM events e WHERE e.customer = c.id) AS last_event, b.program, b.currency, b.avg_cap, b.near_text, b.near_text_evening, b.near_morning_from, b.near_evening_from, b.news_text, b.news_at, b.name AS business_name, b.reward, b.color,
+      `SELECT c.id, c.business, c.name, c.stamps, c.target, c.scan_code, c.created, c.balance, c.round_total, c.missyou_at, c.appt_at, c.appt_msg, (SELECT MAX(e.created) FROM events e WHERE e.customer = c.id) AS last_event, b.program, b.currency, b.avg_cap, b.near_text, b.near_text_evening, b.near_morning_from, b.near_evening_from, b.news_text, b.news_at, b.name AS business_name, b.reward, b.color,
          (SELECT value FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2) ORDER BY earned, id LIMIT 1) AS ready_value,
          (SELECT COUNT(*) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2))
            + (CASE WHEN b.reward_mode = 'block' AND c.stamps >= c.target THEN 1 ELSE 0 END) AS rewards
@@ -62,6 +64,7 @@ export async function passUpdated(db: D1Database, customer: { id: string; busine
          UNION ALL SELECT MAX(located) FROM branches WHERE business = ?2
          UNION ALL SELECT near_updated FROM businesses WHERE id = ?2
          UNION ALL SELECT missyou_at FROM customers WHERE id = ?1
+         UNION ALL SELECT appt_updated FROM customers WHERE id = ?1
          UNION ALL SELECT news_at FROM businesses WHERE id = ?2
          UNION ALL SELECT ?3 UNION ALL SELECT ?4)`,
     )
@@ -148,7 +151,10 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
   const balance = passBalance(c, c.balance);
   // The average card: the purchases this round over a progress bar, and what the free purchase is worth.
   const average = passAverage(c, c, c.ready_value);
-  const stampCard = balance === undefined && average === undefined;
+  // The appointments card: the next appointment instead of stamps; reminders come as notifications.
+  const appointments = c.program === "appointments";
+  const apptNext = appointments && c.appt_at && Date.parse(c.appt_at) > Date.now() - 3_600_000 ? c.appt_at : null;
+  const stampCard = balance === undefined && average === undefined && !appointments;
   const grid = stampCard ? appleStampPicture(design, c.stamps, c.target) : null;
   const strip = average
     ? await progressStrip({ bg: design.colors.bg, bg2: design.look.bg2, fg: design.colors.fg, fill: design.colors.stamp, done: Math.min(c.stamps, c.target), target: c.target, rtl: lang === "he" || lang === "ar" })
@@ -168,7 +174,9 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
   const own = template ? fillNearText(template, { missing, reward, business: title, balance: balance ?? null }) : "";
   // The automatic line ends with an emoji: 🎁 when a reward is waiting, else the business's stamp (☕, 🍕, ✂️…).
   const emoji = stampEmoji(design.stamp?.icon);
-  const nearText = own || (average
+  const nearText = own || (appointments
+    ? apptNext ? `${title} · ${apptLabel(lang)}: ${formatAppt(apptNext, lang)} 🗓️` : title
+    : average
     ? average.ready ? `${N.reward(title, reward)} 🎁` : `${N.round(title, Math.min(c.stamps, c.target), c.target)} ${emoji}`
     : balance !== undefined ? `${N.balance(title, balance)} 💰`
     : c.rewards > 0 ? `${N.reward(title, reward)} 🎁`
@@ -185,8 +193,19 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
   const missYou = c.missyou_at && Date.now() - Date.parse(c.missyou_at) < 7 * 86_400_000 && design.walletMissYou && !(c.last_event && c.last_event > c.missyou_at)
     ? noticeText({ ...text, title, reward } as Texts, lang, { kind: "missyou", name: c.name })
     : "";
+  // The appointments card: near the time, the iPhone puts the pass on the lock screen by itself.
+  const apptField = { key: "appt", label: apptLabel(lang), value: apptNext ? formatAppt(apptNext, lang) : noApptText(lang), changeMessage: `${apptLabel(lang)}: %@` };
+  // W3C dates without milliseconds ("2026-11-25T08:30:00Z"), the form Apple's examples use.
+  const w3c = (ms: number) => new Date(ms).toISOString().slice(0, 19) + "Z";
+  const relevance = apptNext
+    ? {
+        relevantDate: w3c(Date.parse(apptNext)),
+        relevantDates: [{ startDate: w3c(Date.parse(apptNext) - 2 * 3_600_000), endDate: w3c(Date.parse(apptNext) + 3_600_000) }],
+      }
+    : {};
   const pass = {
     ...(locations.length ? { locations } : {}),
+    ...relevance,
     formatVersion: 1,
     passTypeIdentifier: config.passTypeId,
     teamIdentifier: config.teamId,
@@ -203,16 +222,22 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
     barcodes: [{ format: "PKBarcodeFormatQR", message: "perkly:" + c.scan_code, messageEncoding: "iso-8859-1", altText: "Powered by Perkly" }],
     storeCard: {
       // Logo and the customer's name on top, the stamps as a picture, then the stamp count and the rewards ready.
-      headerFields: average
+      headerFields: appointments
+        ? []
+        : average
         ? [{ key: "worth", label: average.ready ? L.worthReady : L.worth, value: average.worth ?? "—", textAlignment: "PKTextAlignmentRight" }]
         : design.showCustomerName ? [name] : [],
-      primaryFields: average ? [{ key: "round", label: L.round, value: `${Math.min(c.stamps, c.target)} / ${c.target}`, changeMessage: L.roundChanged }] : [],
-      secondaryFields: average
+      primaryFields: appointments ? [apptField] : average ? [{ key: "round", label: L.round, value: `${Math.min(c.stamps, c.target)} / ${c.target}`, changeMessage: L.roundChanged }] : [],
+      secondaryFields: appointments
+        ? (design.showCustomerName ? [{ ...name, textAlignment: "PKTextAlignmentNatural" }] : [])
+        : average
         ? [...(design.showCustomerName ? [{ ...name, textAlignment: "PKTextAlignmentNatural" }] : []), { key: "rewardFront", label: L.reward, value: reward, textAlignment: "PKTextAlignmentRight" }]
         : balance === undefined ? [stamps, ready] : [{ key: "balance", label: L.balance, value: balance, changeMessage: L.balanceChanged }],
-      ...(strip ? {} : { auxiliaryFields: [{ key: "reward", label: L.reward, value: reward }] }),
+      ...(strip || appointments ? {} : { auxiliaryFields: [{ key: "reward", label: L.reward, value: reward }] }),
       backFields: [
-        { key: "rewardBack", label: L.reward, value: reward },
+        ...(appointments ? [] : [{ key: "rewardBack", label: L.reward, value: reward }]),
+        // The appointments card: the latest reminder (the day before, that morning, an hour before) shows as a notification.
+        ...(apptNext && c.appt_msg ? [{ key: "reminder", label: apptLabel(lang), value: c.appt_msg, changeMessage: "%@" }] : []),
         // The latest message to customers: when it changes, the iPhone shows it as a notification (changeMessage).
         ...(news ? [{ key: "news", label: L.news, value: news, changeMessage: "%@" }] : []),
         ...(missYou ? [{ key: "missyou", label: L.news, value: missYou, changeMessage: "%@" }] : []),

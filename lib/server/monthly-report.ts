@@ -12,7 +12,7 @@ import { visitedAfter, RESULT_DAYS } from "./message-results";
 import { mailReady, sendMail, type Mail, type MailEnv } from "./mailer";
 
 /** Visits: a stamp, a reward, a purchase or use of balance. */
-const VISIT = "('stamp', 'redeem', 'earn', 'spend')";
+const VISIT = "('stamp', 'redeem', 'earn', 'spend', 'visit')";
 /** Customers who came in the last 3 months but not in the last AWAY_DAYS days: worth a word from the owner. */
 const LOST_DAYS = 90;
 /** The email goes out in the first days of the month, from this hour (Israel time). */

@@ -103,7 +103,7 @@ export default function ReportView() {
                 <h2>{r.business.name} · {monthLabel(r.month)}</h2>
                 <p className="muted">{t("rpCustomers", { n: r.customers })}</p>
               </div>
-              <table className="report-table">
+              <table className="mreport-table">
                 <tbody>
                   {rows.map(([label, a, b, fmt]) => {
                     const c = change(a, b);

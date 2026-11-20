@@ -851,9 +851,9 @@ html,body{overflow-x:clip}
 
 /* The monthly report page. */
 .report-pick { display: flex; flex-wrap: wrap; gap: 10px 20px; }
-.report-table { width: 100%; border-collapse: collapse; font-size: 15px; }
-.report-table th, .report-table td { padding: 10px 6px; border-top: 1px solid var(--line); text-align: start; font-weight: 500; background: none; border-radius: 0; }
-.report-table tr:first-child th, .report-table tr:first-child td { border-top: 0; }
+.mreport-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+.mreport-table th, .mreport-table td { padding: 10px 6px; border-top: 1px solid var(--line); text-align: start; font-weight: 500; background: none; border-radius: 0; }
+.mreport-table tr:first-child th, .mreport-table tr:first-child td { border-top: 0; }
 .report-num { font-size: 20px; font-weight: 800 !important; text-align: end !important; white-space: nowrap; }
 .report-change { width: 64px; text-align: end !important; font-size: 13px; color: var(--muted); white-space: nowrap; }
 .report-change.up { color: #1a7f4b; }
@@ -873,3 +873,20 @@ html,body{overflow-x:clip}
 /* New stamps: the dots shrink to stay on one line (up to about 20). */
 .sx-dots { gap: 6px; }
 .sx-dots i { flex: 1 1 0; max-width: 22px; min-width: 10px; width: auto; height: auto; aspect-ratio: 1; }
+
+/* The appointments card (clinics). */
+.sx-box-icon.appt { background: #eaf0ff; color: #4a64b8; }
+.appt-form { display: grid; gap: 12px; }
+.appt-quick { display: flex; flex-wrap: wrap; gap: 8px; }
+.appt-quick .chip { min-height: 40px; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+.appt-quick .chip:hover, .appt-quick .chip:focus-visible { border-color: var(--purple); }
+.appt-fields { display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px; }
+.appt-fields label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; }
+.appt-fields input { min-height: 48px; font-size: 16px; width: 100%; min-width: 0; }
+.appt-cancel { color: #b4413a; justify-self: center; min-height: 44px; }
+.today-appts ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.today-appts li { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 10px; padding: 10px 4px; border-top: 1px solid var(--line); }
+.today-appts li:first-child { border-top: 0; }
+.today-appts li b { font-size: 16px; }
+.today-appts li small { color: var(--muted); }
+.pcard-appt b { font-size: 24px; }
