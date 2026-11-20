@@ -560,6 +560,8 @@ Object.assign(words, {
   edMsgSpecialLink: ["לכתיבת הודעה", "كتابة رسالة", "Write a message"],
   spTitle: ["הודעה ללקוחות", "رسالة للزبائن", "Message to customers"],
   spIntro: ["מבצע, אירוע, שעות פתיחה מיוחדות או כל עדכון: ההודעה מגיעה כהתראה ללקוחות ששמרו את הכרטיס ב־Apple Wallet או ב־Google Wallet. שולחים עכשיו או מתזמנים.", "عرض، فعالية، ساعات عمل خاصة أو أي تحديث: تصل الرسالة كإشعار للزبائن الذين حفظوا البطاقة في Apple Wallet أو Google Wallet. أرسلوا الآن أو جدولوا.", "An offer, an event, special opening hours or any update: it arrives as a notification for customers who saved the card to Apple Wallet or Google Wallet. Send now or schedule."],
+  spResult: ["תוצאה: {n} מתוך {total} הגיעו לעסק תוך 7 ימים ({pct}%)", "النتيجة: {n} من {total} زاروا المحل خلال 7 أيام ({pct}%)", "Result: {n} of {total} visited within 7 days ({pct}%)"],
+  spResultSoFar: ["עד עכשיו: {n} מתוך {total} הגיעו לעסק ({pct}%). התוצאה הסופית אחרי 7 ימים", "حتى الآن: {n} من {total} زاروا المحل ({pct}%). النتيجة النهائية بعد 7 أيام", "So far: {n} of {total} visited ({pct}%). Final after 7 days"],
   spNow: ["לשלוח עכשיו", "إرسال الآن", "Send now"],
   spLater: ["לתזמן לתאריך ושעה", "جدولة لموعد", "Schedule for later"],
   spSendNow: ["שליחה עכשיו", "إرسال الآن", "Send now"],

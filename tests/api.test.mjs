@@ -1006,6 +1006,8 @@ test("message to customers: the owner sends now or schedules; staff can't; at mo
   const after = (await owner.get(`/api/special?business=${biz}`)).body.items;
   assert.equal(after.length, 1);
   assert.ok(after[0].queued, "sent at once");
+  assert.equal(typeof after[0].visited, "number", "the result is counted");
+  assert.equal(after[0].windowDone, false);
   const later = await owner.post("/api/special", { action: "create", business: biz, text: "Tomorrow", sendAt: new Date(Date.now() + 86_400_000).toISOString() });
   assert.equal(later.status, 200);
   assert.equal((await owner.post("/api/special", { action: "create", business: biz, text: "Third", now: true })).status, 200);

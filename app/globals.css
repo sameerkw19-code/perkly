@@ -839,3 +839,4 @@ html,body{overflow-x:clip}
 .invite-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .invite-actions .btn { min-height: 44px; flex: 1 1 auto; justify-content: center; }
 .join-invited { margin: 0; padding: 10px 12px; border-radius: 10px; background: #fff3d6; color: #5a4300; font-weight: 600; line-height: 1.5; }
+.sp-result { display: block; margin-top: 4px; font-weight: 600; color: #2f6b2a; }

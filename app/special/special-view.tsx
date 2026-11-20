@@ -6,7 +6,7 @@ import { Brand } from "../../components/brand";
 import { errorText, useLang } from "../../lib/i18n";
 import { SPECIAL_MAX_TEXT, noticeText, type Texts } from "../../lib/design";
 
-type Item = { id: string; send_at: string; text: string; queued: string | null; recipients: number | null; canceled: string | null; sent: number };
+type Item = { id: string; send_at: string; text: string; queued: string | null; recipients: number | null; canceled: string | null; sent: number; visited?: number; windowDone?: boolean };
 type Data = {
   business: { id: string; name: string }; businesses: { id: string; name: string }[]; items: Item[];
   walletCustomers: number; reach?: { google: number; apple: number; total: number }; walletReady: boolean;
@@ -163,6 +163,11 @@ export default function SpecialView() {
                         <strong>{fmt(i.send_at)}</strong>
                         <p>{i.text}</p>
                         <small className="form-hint">{state(i)}</small>
+                        {i.queued && !i.canceled && (i.recipients ?? 0) > 0 && (
+                          <small className="sp-result">
+                            📈 {t(i.windowDone ? "spResult" : "spResultSoFar", { n: i.visited ?? 0, total: i.recipients ?? 0, pct: Math.round(((i.visited ?? 0) / (i.recipients || 1)) * 100) })}
+                          </small>
+                        )}
                       </div>
                       {!i.queued && !i.canceled && (
                         <button type="button" className="btn soft small" disabled={busy} onClick={() => { if (window.confirm(t("spCancelConfirm"))) post({ action: "cancel", id: i.id }); }}>
