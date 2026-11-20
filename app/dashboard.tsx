@@ -1,10 +1,12 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { SOCIAL_KEYS, SOCIAL_LABEL, normalizeSocial, socialDisplay, type Social } from "../lib/social";
 import { SocialIcon } from "../lib/social-icon";
 import { fillNearText, NEAR_TAG_NAMES, nearPhase, type NearTag } from "../lib/near-text";
 import { israelNow } from "../lib/birthday";
 import { formatAppt, formatTime, israelTime } from "../lib/appointment";
+import { ClinicCalendar, minutesLabel } from "../components/clinic-calendar";
+import { parseServices } from "../lib/calendar";
 import {
   Activity, AlertTriangle, Trash2, Cake, Check, Copy, CreditCard, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode,
   ChevronRight, History, Palette, RefreshCw, RotateCcw, ScanLine, Search, Settings, Share2, Store, UserPlus, Users, UserRound, X,
@@ -29,7 +31,7 @@ import { weekChange } from "../lib/weekly";
 import { Brand } from "../components/brand";
 
 type Role = "owner" | "staff";
-type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social; program?: "stamps" | "cashback" | "average" | "appointments"; cashback_bp?: number; cashback_min?: number; currency?: string; avg_cap?: number; pos_only?: number; near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number; near_evening_from?: number; referral_stamps?: number; report_email?: number };
+type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social; program?: "stamps" | "cashback" | "average" | "appointments"; cashback_bp?: number; cashback_min?: number; currency?: string; avg_cap?: number; pos_only?: number; near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number; near_evening_from?: number; referral_stamps?: number; report_email?: number; appt_extra?: "none" | "stamps" | "points" | "cashback"; appt_points?: number; work_hours?: string | null; appt_slot?: number; services?: string | null };
 type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; rewards?: number; nextExpiry?: string | null; phone?: string; balance?: number; roundTotal?: number; rewardValue?: number | null; apptAt?: string | null };
 type Data = {
   me: { name: string; email: string };
@@ -110,7 +112,7 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- read once from the browser after hydration (the server can't see it)
     if (new URLSearchParams(window.location.search).get("from") === "admin") setFromAdmin(true);
     const h = window.location.hash.slice(1);
-    if (h === "design" || h === "settings" || h === "team" || h === "customers" || h === "station") setView(h);
+    if (h === "design" || h === "settings" || h === "team" || h === "customers" || h === "station" || h === "calendar") setView(h);
   }, []);
   const [modal, setModal] = useState<Modal | null>(null);
   const [toast, setToast] = useState<{ text: string; bad?: boolean } | null>(null);
@@ -269,7 +271,7 @@ export default function Dashboard() {
   // Perkly (a platform admin), who sees those screens too.
   const manage = !!data?.manage;
   const nav: [LucideIcon, string][] = isOwner
-    ? [[LayoutDashboard, "overview"], [Users, "customers"], [ScanLine, "station"],
+    ? [[LayoutDashboard, "overview"], ...(b?.program === "appointments" ? [[CalendarDays, "calendar"]] as typeof nav : []), [Users, "customers"], [ScanLine, "station"],
        ...(manage ? [[Palette, "design"], [Users, "team"], [Settings, "settings"]] as typeof nav : data?.canDesign ? [[Palette, "design"]] as typeof nav : [])]
     : [[ScanLine, "station"]];
 
@@ -578,6 +580,11 @@ export default function Dashboard() {
                 paid={!!data.access?.ok && !data.access.free} upgradeHref={`/start?b=${encodeURIComponent(b.id)}`} specialDays={isOwner || manage}
                 cashback={b.program === "cashback" ? { bp: b.cashback_bp ?? 200, currency: b.currency === "USD" ? "USD" : "ILS" } : null} average={b.program === "average"} appointments={b.program === "appointments"} currency={b.currency === "USD" ? "USD" : "ILS"} />
             </>
+          )}
+
+          {/* The clinic's calendar: owners (and Perkly) only. */}
+          {view === "calendar" && isOwner && b.program === "appointments" && (
+            <ClinicCalendar business={b} customers={customers} t={t} lang={lang} busy={busy} call={call} reload={load} notify={notify} />
           )}
 
           {view === "team" && isOwner && manage && (
@@ -1005,9 +1012,29 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
   const average = business.program === "average";
   // The appointments card (clinics): the next appointment instead of stamps, and the customer's arrival.
   const appts = business.program === "appointments";
+  // What the appointments card adds (the owner's choice): a gift punch card, points per visit, or a balance.
+  const apptExtra = appts ? (business.appt_extra ?? "none") : "none";
   const [apptDate, setApptDate] = useState("");
   const [apptTime, setApptTime] = useState("");
   const [apptCancelAsk, setApptCancelAsk] = useState(false);
+  // The clinic's services, the one picked, and the free times on the picked day for its length.
+  const services = useMemo(() => parseServices(business.services), [business.services]);
+  const [apptSvc, setApptSvc] = useState<string | null>(null);
+  const apptSvcObj = services.find((sv) => sv.id === apptSvc) ?? null;
+  const apptMin = apptSvcObj?.min ?? business.appt_slot ?? 30;
+  const [freeTimes, setFreeTimes] = useState<string[] | null>(null);
+  const [freeClosed, setFreeClosed] = useState(false);
+  async function loadFree(date: string, minutes: number) {
+    setFreeTimes(null);
+    const r = await post("/api/loyalty", { action: "appt_free", business: business.id, date, minutes, except: selected?.id });
+    setFreeClosed(r.ok ? !!r.data.closed : false);
+    setFreeTimes(r.ok ? (r.data.times as string[]) : []);
+  }
+  function pickApptDate(date: string) {
+    setApptDate(date);
+    setApptTime("");
+    loadFree(date, apptMin);
+  }
   // Connected to the cashier: cards change only through the cashier; here staff see the card (owners can still correct).
   const posOnly = !!business.pos_only;
   const mayFix = canFix && (!posOnly || owner);
@@ -1028,7 +1055,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
   /** Ready for the next customer: back to the start, the search box focused. */
   function next() {
     setSelected(null); setPending(null); setFixing(null); setResult(null); setStep("customer"); setQty(1);
-    setApptDate(""); setApptTime(""); setApptCancelAsk(false);
+    setApptDate(""); setApptTime(""); setApptCancelAsk(false); setApptSvc(null); setFreeTimes(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
     setTimeout(() => searchRef.current?.focus(), 50);
   }
@@ -1131,7 +1158,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
     const requestId = pending && pending.kind === key && pending.customer === selected.id ? pending.requestId : crypto.randomUUID();
     setPending({ kind: key, customer: selected.id, requestId });
     setBusy(true);
-    const r = await post("/api/loyalty", { action: kind, business: business.id, customer: selected.id, requestId, date: apptDate, time: apptTime, branch: myBranch ? undefined : branch || undefined });
+    const r = await post("/api/loyalty", { action: kind, business: business.id, customer: selected.id, requestId, date: apptDate, time: apptTime, ...(apptSvc ? { service: apptSvc } : { minutes: apptMin }), branch: myBranch ? undefined : branch || undefined });
     setBusy(false);
     if (r.ok) {
       setPending(null);
@@ -1141,7 +1168,9 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
         : kind === "appt_set" ? t("apptSetDone", { when: formatAppt(card.apptAt!, lang) })
         : kind === "appt_clear" ? t("apptClearDone")
         : t("apptVisitDone");
-      setResult({ text, reward: false });
+      // A punch card or points that just reached the reward.
+      const earned = (r.data.earned as number | undefined) ?? 0;
+      setResult({ text: earned ? `${text} · 🎁 ${t("rewardEarnedEv")}` : text, reward: earned > 0 });
       setCountdown(DONE_SECONDS);
       setStep("done");
       onDone();
@@ -1466,22 +1495,100 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
               </div>
               <button className={"btn big sx-wide " + (arriving ? "primary" : "soft")} disabled={busy} onClick={() => actAppt("visit")}>
                 <Check size={18} />{busy && pending?.kind.startsWith("visit") ? t("sending") : arriving ? t("apptArrived") : t("apptVisitNoAppt")}
+                {apptExtra === "stamps" ? <small className="sx-plus">{t("apptPlusStamp")}</small> : apptExtra === "points" ? <small className="sx-plus">{t("apptPlusPoints", { n: business.appt_points ?? 10 })}</small> : null}
               </button>
             </div>
+            {/* The add-on: progress and a reward to use, or the balance (a payment adds to it, a use takes from it). */}
+            {(apptExtra === "stamps" || apptExtra === "points") && (
+              <div className="sx-box appt-extra">
+                <div className="sx-box-head">
+                  <span className="sx-box-icon" aria-hidden="true"><Gift size={18} /></span>
+                  <strong>
+                    {apptExtra === "points" ? t("apptPointsOf", { s: selected.stamps, t: selected.target }) : t("apptVisitsOf", { s: selected.stamps, t: selected.target })}
+                    {" · "}{business.reward}
+                  </strong>
+                </div>
+                <div className="sx-avgbar" aria-hidden="true"><i style={{ width: `${Math.min(100, (selected.stamps / selected.target) * 100)}%` }} /></div>
+                {!!selected.rewards && redeemButton}
+              </div>
+            )}
+            {apptExtra === "cashback" && (() => {
+              const pay = parseAmount(buyText);
+              const use = parseAmount(useText);
+              const balanceNow = selected.balance ?? 0;
+              return (
+                <div className="sx-box appt-extra">
+                  <div className="sx-box-head">
+                    <span className="sx-box-icon" aria-hidden="true"><Gift size={18} /></span>
+                    <strong>{t("cbBalanceNow", { balance: fmt(balanceNow) })}</strong>
+                  </div>
+                  <form className="appt-pay" onSubmit={(e) => { e.preventDefault(); if (pay) actBalance("purchase", pay).then(() => setBuyText("")); }}>
+                    <label className="cb-amount">
+                      <span className="sr-only">{t("apptPayAmount")}</span>
+                      <input inputMode="decimal" autoComplete="off" dir="ltr" placeholder={t("apptPayAmount")} value={buyText} onChange={(e) => { setBuyText(e.target.value); setPending(null); }} />
+                      <span aria-hidden="true">{currency === "USD" ? "$" : "₪"}</span>
+                    </label>
+                    <button className="btn soft" disabled={busy || !pay}>{t("apptPayRecord")}{pay ? <small className="sx-plus">+{fmt(Math.round((pay * bp) / 10_000))}</small> : null}</button>
+                  </form>
+                  {balanceNow > 0 && balanceNow >= minUse && (
+                    <form className="appt-pay" onSubmit={(e) => { e.preventDefault(); if (use) actBalance("spend", use).then(() => setUseText("")); }}>
+                      <label className="cb-amount">
+                        <span className="sr-only">{t("cbUseAmount")}</span>
+                        <input inputMode="decimal" autoComplete="off" dir="ltr" placeholder={t("cbUseAmount")} value={useText} onChange={(e) => { setUseText(e.target.value); setUseAsk(false); setPending(null); }} />
+                        <span aria-hidden="true">{currency === "USD" ? "$" : "₪"}</span>
+                      </label>
+                      <button className="btn lime" disabled={busy || !use || use > balanceNow}>{useAsk ? t("cbUseAgain", { amount: fmt(use ?? 0) }) : t("cbUse")}</button>
+                    </form>
+                  )}
+                </div>
+              );
+            })()}
             <h2 className="sx-label">{selected.apptAt ? t("apptChange") : t("apptSetNext")}</h2>
             <form className="appt-form" onSubmit={(e) => { e.preventDefault(); actAppt("appt_set"); }}>
-              <div className="appt-quick" role="group" aria-label={t("apptQuick")}>
-                {[7, 14, 28].map((d) => (
-                  <button key={d} type="button" className="chip" onClick={() => { setApptDate(dayPlus(d)); if (!apptTime) setApptTime(selected.apptAt ? formatTime(selected.apptAt) : "10:00"); }}>
-                    {t(d === 7 ? "apptIn1w" : d === 14 ? "apptIn2w" : "apptIn4w")}
-                  </button>
-                ))}
+              {/* 1. The service (sets the length), 2. the day, 3. a free time that fits. */}
+              {services.length > 0 && (
+                <div className="appt-step">
+                  <span className="appt-step-label">{t("svcPick")}</span>
+                  <div className="svc-chips" role="group" aria-label={t("svcPick")}>
+                    {services.map((sv) => (
+                      <button key={sv.id} type="button" className="svc-chip" aria-pressed={apptSvc === sv.id} onClick={() => { setApptSvc(sv.id); if (apptDate) loadFree(apptDate, sv.min); }}>
+                        {sv.name}<small>{minutesLabel(sv.min, t)}</small>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="appt-step">
+                <span className="appt-step-label">{t("apptDate")}</span>
+                <div className="appt-quick" role="group" aria-label={t("apptQuick")}>
+                  {[0, 1, 7, 14, 28].map((d) => (
+                    <button key={d} type="button" className="chip" aria-pressed={apptDate === dayPlus(d)} onClick={() => pickApptDate(dayPlus(d))}>
+                      {t(d === 0 ? "calToday" : d === 1 ? "apptTomorrow" : d === 7 ? "apptIn1w" : d === 14 ? "apptIn2w" : "apptIn4w")}
+                    </button>
+                  ))}
+                  <label className="chip appt-other-date">
+                    <span>{apptDate && ![0, 1, 7, 14, 28].some((d) => dayPlus(d) === apptDate) ? apptPreviewDate(apptDate, lang) : t("apptOtherDate")}</span>
+                    <input type="date" value={apptDate} min={dayPlus(0)} aria-label={t("apptOtherDate")} onChange={(e) => e.target.value && pickApptDate(e.target.value)} />
+                  </label>
+                </div>
               </div>
-              <div className="appt-fields">
-                <label>{t("apptDate")}<input type="date" required value={apptDate} min={dayPlus(0)} onChange={(e) => setApptDate(e.target.value)} /></label>
-                <label>{t("apptTime")}<input type="time" required step={300} value={apptTime} onChange={(e) => setApptTime(e.target.value)} /></label>
-              </div>
-              {apptDate && apptTime && <p className="form-hint" aria-live="polite">{t("apptRemindersFor", { when: apptPreview(apptDate, apptTime, lang) })}</p>}
+              {apptDate && (
+                <div className="appt-step">
+                  <span className="appt-step-label">{t("apptTime")}{apptMin ? <small> · {minutesLabel(apptMin, t)}</small> : null}</span>
+                  {freeTimes === null ? <p className="form-hint">{t("sending")}</p>
+                    : freeClosed ? <p className="form-hint">{t("calClosed")}</p>
+                    : freeTimes.length === 0 ? <p className="form-hint">{t("apptNoFree")}</p>
+                    : (
+                      <div className="time-chips" role="group" aria-label={t("apptTime")}>
+                        {freeTimes.map((hm) => (
+                          <button key={hm} type="button" className="time-chip" aria-pressed={apptTime === hm} onClick={() => setApptTime(hm)}><bdi>{hm}</bdi></button>
+                        ))}
+                      </div>
+                    )}
+                  <label className="appt-other-time">{t("apptOtherTime")}<input type="time" step={300} value={apptTime} onChange={(e) => setApptTime(e.target.value)} /></label>
+                </div>
+              )}
+              {apptDate && apptTime && <p className="appt-summary" aria-live="polite">{apptSvcObj ? <b>{apptSvcObj.name} · </b> : null}{t("apptRemindersFor", { when: apptPreview(apptDate, apptTime, lang) })}</p>}
               <button className="btn primary big sx-wide" disabled={busy || !apptDate || !apptTime}>
                 <CalendarDays size={18} />{busy && pending?.kind.startsWith("appt_set") ? t("sending") : selected.apptAt ? t("apptSaveChange") : t("apptSave")}
               </button>
@@ -1891,6 +1998,11 @@ function dayPlus(days: number): string {
 /** Milliseconds from now until `iso` (negative when past). */
 function msUntil(iso: string): number {
   return Date.parse(iso) - Date.now();
+}
+
+/** "יום ג׳, 25.11" for a picked date. */
+function apptPreviewDate(date: string, lang: string): string {
+  return new Intl.DateTimeFormat(lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB", { timeZone: "UTC", weekday: "short", day: "numeric", month: "numeric" }).format(new Date(`${date}T12:00:00Z`));
 }
 
 /** "יום ג׳, 25.11 · 10:30" for the date and time being picked, or the raw values when they don't make a time. */

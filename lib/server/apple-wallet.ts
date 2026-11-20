@@ -37,14 +37,14 @@ type CustomerRow = {
   id: string; business: string; name: string; stamps: number; target: number; scan_code: string; created: string;
   business_name: string; reward: string; color: string; rewards: number; balance: number; program: string; currency: string;
   round_total: number; avg_cap: number; ready_value: number | null; missyou_at?: string | null; last_event?: string | null; near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number | null; near_evening_from?: number | null; news_text?: string | null; news_at?: string | null;
-  appt_at?: string | null; appt_msg?: string | null;
+  appt_at?: string | null; appt_msg?: string | null; appt_extra?: string | null;
 };
 
 /** The customer behind a pass serial (the customer id), or null when it was removed. */
 export async function customerForPass(db: D1Database, serial: string): Promise<CustomerRow | null> {
   return db
     .prepare(
-      `SELECT c.id, c.business, c.name, c.stamps, c.target, c.scan_code, c.created, c.balance, c.round_total, c.missyou_at, c.appt_at, c.appt_msg, (SELECT MAX(e.created) FROM events e WHERE e.customer = c.id) AS last_event, b.program, b.currency, b.avg_cap, b.near_text, b.near_text_evening, b.near_morning_from, b.near_evening_from, b.news_text, b.news_at, b.name AS business_name, b.reward, b.color,
+      `SELECT c.id, c.business, c.name, c.stamps, c.target, c.scan_code, c.created, c.balance, c.round_total, c.missyou_at, c.appt_at, c.appt_msg, (SELECT MAX(e.created) FROM events e WHERE e.customer = c.id) AS last_event, b.program, b.appt_extra, b.currency, b.avg_cap, b.near_text, b.near_text_evening, b.near_morning_from, b.near_evening_from, b.news_text, b.news_at, b.name AS business_name, b.reward, b.color,
          (SELECT value FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2) ORDER BY earned, id LIMIT 1) AS ready_value,
          (SELECT COUNT(*) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2))
            + (CASE WHEN b.reward_mode = 'block' AND c.stamps >= c.target THEN 1 ELSE 0 END) AS rewards
@@ -154,7 +154,9 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
   // The appointments card: the next appointment instead of stamps; reminders come as notifications.
   const appointments = c.program === "appointments";
   const apptNext = appointments && c.appt_at && Date.parse(c.appt_at) > Date.now() - 3_600_000 ? c.appt_at : null;
-  const stampCard = balance === undefined && average === undefined && !appointments;
+  // The appointments card's add-on (the owner's choice): a gift punch card shows the stamp picture like a stamp card.
+  const apptExtra = appointments ? c.appt_extra ?? "none" : null;
+  const stampCard = balance === undefined && average === undefined && (!appointments || apptExtra === "stamps");
   const grid = stampCard ? appleStampPicture(design, c.stamps, c.target) : null;
   const strip = average
     ? await progressStrip({ bg: design.colors.bg, bg2: design.look.bg2, fg: design.colors.fg, fill: design.colors.stamp, done: Math.min(c.stamps, c.target), target: c.target, rtl: lang === "he" || lang === "ar" })
@@ -229,13 +231,20 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
         : design.showCustomerName ? [name] : [],
       primaryFields: appointments ? [apptField] : average ? [{ key: "round", label: L.round, value: `${Math.min(c.stamps, c.target)} / ${c.target}`, changeMessage: L.roundChanged }] : [],
       secondaryFields: appointments
-        ? (design.showCustomerName ? [{ ...name, textAlignment: "PKTextAlignmentNatural" }] : [])
+        ? [
+            ...(design.showCustomerName ? [{ ...name, textAlignment: "PKTextAlignmentNatural" }] : []),
+            ...(apptExtra === "stamps" ? [{ key: "stamps", label: L.stamps, value: `${Math.min(c.stamps, c.target)}/${c.target}`, changeMessage: L.changed, textAlignment: "PKTextAlignmentRight" }]
+              : apptExtra === "points" ? [{ key: "points", label: lang === "he" ? "נקודות" : lang === "ar" ? "نقاط" : "Points", value: `${Math.min(c.stamps, c.target)}/${c.target}`, changeMessage: "%@", textAlignment: "PKTextAlignmentRight" }]
+              : apptExtra === "cashback" ? [{ key: "balance", label: L.balance, value: passBalance({ program: "cashback", currency: c.currency }, c.balance)!, changeMessage: L.balanceChanged, textAlignment: "PKTextAlignmentRight" }]
+              : []),
+            ...(apptExtra === "stamps" || apptExtra === "points" ? [{ ...ready, textAlignment: "PKTextAlignmentRight" }] : []),
+          ]
         : average
         ? [...(design.showCustomerName ? [{ ...name, textAlignment: "PKTextAlignmentNatural" }] : []), { key: "rewardFront", label: L.reward, value: reward, textAlignment: "PKTextAlignmentRight" }]
         : balance === undefined ? [stamps, ready] : [{ key: "balance", label: L.balance, value: balance, changeMessage: L.balanceChanged }],
       ...(strip || appointments ? {} : { auxiliaryFields: [{ key: "reward", label: L.reward, value: reward }] }),
       backFields: [
-        ...(appointments ? [] : [{ key: "rewardBack", label: L.reward, value: reward }]),
+        ...(appointments && apptExtra !== "stamps" && apptExtra !== "points" ? [] : [{ key: "rewardBack", label: L.reward, value: reward }]),
         // The appointments card: the latest reminder (the day before, that morning, an hour before) shows as a notification.
         ...(apptNext && c.appt_msg ? [{ key: "reminder", label: apptLabel(lang), value: c.appt_msg, changeMessage: "%@" }] : []),
         // The latest message to customers: when it changes, the iPhone shows it as a notification (changeMessage).

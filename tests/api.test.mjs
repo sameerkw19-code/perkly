@@ -1091,6 +1091,74 @@ test("appointments card: set, change and cancel the next appointment; arrival is
   }
 });
 
+test("appointments card add-ons: punch card, points per visit, balance; working hours are owner-only", async () => {
+  const built = await admin.post("/api/loyalty", { action: "create_business", forClient: true, kind: "studio", name: "Clinic2", reward: "Reminders", target: 10, color: "#2a6f97", setupDays: 30, branchName: "Main", program: "appointments" });
+  const biz = built.body.id;
+  const c = (await admin.act(biz, "register_customer", { name: "Lea", phone: "0531119101" })).body.id;
+  // Only the next appointment: arrivals are visits, redeem is refused.
+  assert.equal((await admin.act(biz, "redeem", { customer: c, requestId: id() })).status, 409);
+  // A gift punch card: 3 visits for a free treatment.
+  assert.equal((await admin.act(biz, "set_appt_extra", { extra: "stamps", reward: "Free treatment", target: 3 })).status, 200);
+  for (let i = 0; i < 3; i++) assert.equal((await admin.act(biz, "visit", { customer: c, requestId: id() })).status, 200);
+  let card = (await admin.act(biz, "lookup", { query: "Lea" })).body.results[0];
+  assert.equal(card.rewards, 1, "the third visit earned the gift");
+  assert.equal((await admin.act(biz, "redeem", { customer: c, requestId: id() })).status, 200);
+  // Points: 10 per visit, 30 for the reward.
+  assert.equal((await admin.act(biz, "set_appt_extra", { extra: "points", reward: "Free treatment", target: 30, points: 10 })).status, 200);
+  const v = await admin.act(biz, "visit", { customer: c, requestId: id() });
+  assert.equal(v.status, 200, JSON.stringify(v.body));
+  assert.equal(v.body.card.stamps, 10);
+  assert.equal(v.body.card.target, 30);
+  assert.equal((await admin.act(biz, "set_appt_extra", { extra: "points", reward: "x", target: 30, points: 40 })).status, 400, "points per visit below the goal");
+  // Balance: 5% of a payment of 200.00 adds 10.00.
+  assert.equal((await admin.act(biz, "set_appt_extra", { extra: "cashback", cashbackBp: 500, cashbackMin: 0 })).status, 200);
+  const pay = await admin.act(biz, "purchase", { customer: c, requestId: id(), amount: 20000 });
+  assert.equal(pay.status, 200, JSON.stringify(pay.body));
+  assert.equal(pay.body.card.balance, 1000);
+  // Stamps are now refused (the card adds a balance).
+  assert.equal((await admin.act(biz, "stamp", { customer: c, requestId: id() })).status, 409);
+  // Working hours: valid ones are saved; a closing before opening is refused; staff can't.
+  const hours = [["09:00", "17:00"], ["09:00", "17:00"], null, ["10:00", "19:00"], ["09:00", "17:00"], ["08:00", "12:00"], null];
+  assert.equal((await admin.act(biz, "set_work_hours", { hours, slot: 45 })).status, 200);
+  const b = (await admin.get(`/api/loyalty?business=${biz}`)).body.business;
+  assert.deepEqual(JSON.parse(b.work_hours), hours);
+  assert.equal(b.appt_slot, 45);
+  assert.equal((await admin.act(biz, "set_work_hours", { hours: [["17:00", "09:00"], null, null, null, null, null, null], slot: 30 })).status, 400);
+  assert.equal((await admin.act(biz, "set_work_hours", { hours, slot: 7 })).status, 400);
+  assert.equal((await ownerA.act(bizA, "set_appt_extra", { extra: "none" })).status, 409, "only for the appointments card");
+});
+
+test("clinic services: a service sets the length; free times skip what's taken", async () => {
+  const built = await admin.post("/api/loyalty", { action: "create_business", forClient: true, kind: "studio", name: "Clinic3", reward: "Reminders", target: 10, color: "#2a6f97", setupDays: 30, branchName: "Main", program: "appointments" });
+  const biz = built.body.id;
+  const saved = await admin.act(biz, "set_services", { services: [{ name: "Facial", min: 60 }, { name: "Brows", min: 20 }] });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  const [facial] = saved.body.services;
+  assert.equal((await admin.act(biz, "set_services", { services: [{ name: "Bad", min: 7 }] })).status, 400);
+  // Open every day 09:00-13:00, 30-minute slots.
+  const open = ["09:00", "13:00"];
+  await admin.act(biz, "set_work_hours", { hours: [open, open, open, open, open, open, open], slot: 30 });
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(Date.now() + 3 * 86_400_000));
+  const a = (await admin.act(biz, "register_customer", { name: "Ella", phone: "0531119201" })).body.id;
+  const b = (await admin.act(biz, "register_customer", { name: "Omer", phone: "0531119202" })).body.id;
+  const set = await admin.act(biz, "appt_set", { customer: a, requestId: id(), date: day, time: "10:00", service: facial.id });
+  assert.equal(set.status, 200, JSON.stringify(set.body));
+  assert.equal(set.body.card.apptService, "Facial");
+  assert.equal(set.body.card.apptMin, 60);
+  // A 60-minute service: 10:00-11:00 is taken, so 09:30 and 10:30 don't fit.
+  const free = await admin.act(biz, "appt_free", { date: day, minutes: 60 });
+  assert.equal(free.status, 200, JSON.stringify(free.body));
+  assert.deepEqual(free.body.times, ["09:00", "11:00", "11:30", "12:00"]);
+  // Rescheduling Ella herself: her own appointment doesn't block.
+  assert.ok((await admin.act(biz, "appt_free", { date: day, minutes: 60, except: a })).body.times.includes("10:00"));
+  // A service id that isn't the clinic's is refused.
+  assert.equal((await admin.act(biz, "appt_set", { customer: b, requestId: id(), date: day, time: "11:00", service: "zzzzzzzz" })).status, 400);
+  // The customer list carries the service and length (the calendar shows them).
+  const row = (await admin.get(`/api/loyalty?business=${biz}`)).body.customers.find((x) => x.id === a);
+  assert.equal(row.appt_service, "Facial");
+  assert.equal(row.appt_min, 60);
+});
+
 test("message to customers: the owner sends now or schedules; staff can't; at most 3 a day", async () => {
   const owner = new Client();
   await signup(owner, "msg-owner");

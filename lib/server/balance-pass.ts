@@ -36,15 +36,28 @@ export function passAppointment(b: { program?: string | null; currency?: string 
   return apptAt && Date.parse(apptAt) > Date.now() - 3_600_000 ? formatAppt(apptAt, lang) : noApptText(lang);
 }
 
-export async function passProgram(db: D1Database, customerId: string): Promise<{ balance?: string; average?: PassAverage; appointment?: string }> {
+/** What the appointments card adds (the owner's choice): the visits on a gift punch card, points, or the balance. */
+export type PassApptExtra = { kind: "stamps" | "points" | "cashback"; value: string };
+
+export function passApptExtra(
+  b: { program?: string | null; appt_extra?: string | null; currency?: string | null },
+  c: { stamps: number; target: number; balance?: number | null },
+): PassApptExtra | undefined {
+  if (b.program !== "appointments") return undefined;
+  if (b.appt_extra === "stamps" || b.appt_extra === "points") return { kind: b.appt_extra, value: `${Math.min(c.stamps, c.target)}/${c.target}` };
+  if (b.appt_extra === "cashback") return { kind: "cashback", value: passBalance({ program: "cashback", currency: b.currency }, c.balance)! };
+  return undefined;
+}
+
+export async function passProgram(db: D1Database, customerId: string): Promise<{ balance?: string; average?: PassAverage; appointment?: string; apptExtra?: PassApptExtra }> {
   const row = await db
     .prepare(
-      `SELECT c.stamps, c.balance, c.round_total, c.appt_at, b.program, b.currency, b.avg_cap,
+      `SELECT c.stamps, c.target, c.balance, c.round_total, c.appt_at, b.program, b.appt_extra, b.currency, b.avg_cap,
          (SELECT value FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2) ORDER BY earned, id LIMIT 1) AS ready_value
        FROM customers c JOIN businesses b ON b.id = c.business WHERE c.id = ?1`,
     )
     .bind(customerId, new Date().toISOString())
-    .first<{ stamps: number; balance: number; round_total: number; appt_at: string | null; program: string; currency: string; avg_cap: number; ready_value: number | null }>();
+    .first<{ stamps: number; target: number; balance: number; round_total: number; appt_at: string | null; program: string; appt_extra: string | null; currency: string; avg_cap: number; ready_value: number | null }>();
   if (!row) return {};
-  return { balance: passBalance(row, row.balance), average: passAverage(row, row, row.ready_value), appointment: passAppointment(row, row.appt_at) };
+  return { balance: passBalance(row, row.balance), average: passAverage(row, row, row.ready_value), appointment: passAppointment(row, row.appt_at), apptExtra: passApptExtra(row, row) };
 }

@@ -6,11 +6,12 @@ import { allow } from "./rate-limit";
 import { AMOUNT_MAX, averageReward, earnFor, parseAmount, type Program } from "../cashback.ts";
 import { syncGoogleWallet } from "./wallet-sync";
 import { APPT_MAX_DAYS, israelTime, passedStages } from "../appointment.ts";
+import { parseServices } from "../calendar.ts";
 import { pushAppleCustomer } from "./apple-push";
 import type { Social } from "../social";
 
-export type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust: number; reward_mode: "bank" | "block"; reward_expiry_days: number; birthdays: number; social: Social; owner_designs: number; program: Program; cashback_bp: number; cashback_min: number; currency: string; avg_cap: number; pos_only?: number; near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number; near_evening_from?: number; referral_stamps?: number; report_email?: number };
-export type Customer = { id: string; business: string; name: string; phone: string; stamps: number; target: number; scan_code: string; google_wallet?: string | null; balance: number; round_total: number; appt_at?: string | null };
+export type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust: number; reward_mode: "bank" | "block"; reward_expiry_days: number; birthdays: number; social: Social; owner_designs: number; program: Program; cashback_bp: number; cashback_min: number; currency: string; avg_cap: number; pos_only?: number; near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number; near_evening_from?: number; referral_stamps?: number; report_email?: number; appt_extra?: string; appt_points?: number; work_hours?: string | null; appt_slot?: number; services?: string | null };
+export type Customer = { id: string; business: string; name: string; phone: string; stamps: number; target: number; scan_code: string; google_wallet?: string | null; balance: number; round_total: number; appt_at?: string | null; appt_service?: string | null; appt_min?: number | null };
 
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -40,7 +41,7 @@ export async function cardState(db: D1Database, c: Customer, mode: Business["rew
     // The "average" card: what this round's purchases add up to, and the value of the next reward to use.
     roundTotal: c.round_total ?? 0, rewardValue: saved.nextValue,
     // The appointments card: the next appointment (ISO), or null.
-    apptAt: c.appt_at ?? null,
+    apptAt: c.appt_at ?? null, apptService: c.appt_service ?? null, apptMin: c.appt_min ?? null,
   };
 }
 
@@ -79,9 +80,12 @@ export async function cardAction(x: CardActionInput): Promise<Response> {
   // Each kind of card has its own actions.
   const balanceAction = p.action === "purchase" || p.action === "spend" || p.action === "adjust_balance";
   const apptAction = p.action === "appt_set" || p.action === "appt_clear" || p.action === "visit";
-  if (balanceAction !== (business.program === "cashback") || apptAction !== (business.program === "appointments")) {
-    return fail("wrong_program", 409, "This action is for the other kind of card");
-  }
+  // The appointments card can add a gift punch card, points per visit, or a balance (the owner's choice).
+  const addOn = business.program === "appointments" ? (business.appt_extra ?? "none") : null;
+  const stampsCard = business.program === "stamps" || business.program === "average" || addOn === "stamps" || addOn === "points";
+  const balanceCard = business.program === "cashback" || addOn === "cashback";
+  const allowed = apptAction ? business.program === "appointments" : balanceAction ? balanceCard : stampsCard;
+  if (!allowed) return fail("wrong_program", 409, "This action is for the other kind of card");
   if (p.action === "adjust_balance" && role === "staff" && !business.staff_adjust) return fail("forbidden", 403, "Corrections are owner-only in this business");
   if (p.action === "adjust" && role === "staff" && !business.staff_adjust) return fail("forbidden", 403, "Corrections are owner-only in this business");
   if (typeof p.requestId !== "string" || !UUID.test(p.requestId)) return fail("bad_request", 400, "Invalid request id");
@@ -119,7 +123,7 @@ export async function cardAction(x: CardActionInput): Promise<Response> {
     const fresh = (await db.prepare("SELECT * FROM customers WHERE id = ?").bind(c!.id).first<Customer>())!;
     const card = await cardState(db, fresh, business.reward_mode);
     const reached = business.reward_mode === "block" ? fresh.stamps >= fresh.target : earned > 0;
-    const notice = added
+    const notice = added && !(addOn === "points" && !reached)
       ? reached
         ? ({ kind: "reward", name: fresh.name } as const)
         : ({ kind: "stamp", added, left: Math.max(0, fresh.target - fresh.stamps), name: fresh.name } as const)
@@ -142,11 +146,15 @@ export async function cardAction(x: CardActionInput): Promise<Response> {
       if (!at) return fail("appt_invalid", 400, "Invalid date or time");
       const t = at.getTime();
       if (t < Date.parse(now) - 5 * 60_000 || t > Date.parse(now) + APPT_MAX_DAYS * 86_400_000) return fail("appt_invalid", 400, "The appointment must be in the future");
+      // The service and its length (the clinic's list), or a length given, or one slot.
+      const service = typeof p.service === "string" ? parseServices(business.services).find((s) => s.id === p.service) : undefined;
+      if (typeof p.service === "string" && p.service && !service) return fail("bad_details", 400, "Unknown service");
+      const minutes = service?.min ?? (Number.isInteger(p.minutes) && (p.minutes as number) >= 5 && (p.minutes as number) <= 480 ? (p.minutes as number) : business.appt_slot ?? 30);
       // Reminders whose time already passed are never sent late.
       const sent = passedStages(at, new Date(now)).join(",") || null;
       const r = await db.batch([
-        db.prepare(`UPDATE customers SET appt_at = ?, appt_sent = ?, appt_msg = NULL, appt_updated = ? WHERE id = ? AND business = ? ${unapplied}`)
-          .bind(at.toISOString(), sent, now, c.id, business.id, requestId),
+        db.prepare(`UPDATE customers SET appt_at = ?, appt_service = ?, appt_min = ?, appt_sent = ?, appt_msg = NULL, appt_updated = ? WHERE id = ? AND business = ? ${unapplied}`)
+          .bind(at.toISOString(), service?.name ?? null, minutes, sent, now, c.id, business.id, requestId),
         event("appt", 0, at.toISOString()),
       ]);
       if (r[0].meta.changes) return done({ apptAt: at.toISOString() });
@@ -155,7 +163,7 @@ export async function cardAction(x: CardActionInput): Promise<Response> {
     }
     if (p.action === "appt_clear") {
       const r = await db.batch([
-        db.prepare(`UPDATE customers SET appt_at = NULL, appt_sent = NULL, appt_msg = NULL, appt_updated = ? WHERE id = ? AND business = ? ${unapplied}`)
+        db.prepare(`UPDATE customers SET appt_at = NULL, appt_service = NULL, appt_min = NULL, appt_sent = NULL, appt_msg = NULL, appt_updated = ? WHERE id = ? AND business = ? ${unapplied}`)
           .bind(now, c.id, business.id, requestId),
         event("appt_cancel", 0, null),
       ]);
@@ -164,10 +172,22 @@ export async function cardAction(x: CardActionInput): Promise<Response> {
       return refuse("busy_retry");
     }
     // The customer came in: a visit. An appointment within the next 12 hours (or past) is the one they came for, so it is cleared.
+    const clearAppt = db.prepare(
+      `UPDATE customers SET appt_at = CASE WHEN appt_at IS NOT NULL AND appt_at < ? THEN NULL ELSE appt_at END,
+         appt_updated = ? WHERE id = ? AND business = ? ${unapplied}`,
+    ).bind(new Date(Date.parse(now) + 12 * 3_600_000).toISOString(), now, c.id, business.id, requestId);
+    if (addOn === "stamps" || addOn === "points") {
+      // The arrival is recorded as stamps (a stamp, or the visit's points), below; the appointment is cleared first.
+      await clearAppt.run();
+      p.action = "stamp";
+      p.count = addOn === "points" ? Math.max(1, business.appt_points ?? 10) : 1;
+    }
+  }
+  if (apptAction && p.action === "visit") {
     const r = await db.batch([
       db.prepare(
         `UPDATE customers SET appt_at = CASE WHEN appt_at IS NOT NULL AND appt_at < ? THEN NULL ELSE appt_at END,
-           appt_updated = ? WHERE id = ? AND business = ? ${unapplied}`,
+           appt_updated = ? WHERE id = ? AND business = ? AND NOT EXISTS(SELECT 1 FROM events WHERE id = ?)`,
       ).bind(new Date(Date.parse(now) + 12 * 3_600_000).toISOString(), now, c.id, business.id, requestId),
       event("visit", 1, null),
     ]);
@@ -280,7 +300,9 @@ export async function cardAction(x: CardActionInput): Promise<Response> {
   if (p.action === "stamp") {
     // Several purchases at once (e.g. 3 coffees) are one action and one history entry.
     const count = p.count === undefined ? 1 : p.count;
-    if (!Number.isInteger(count) || (count as number) < 1 || (count as number) > 10) return fail("bad_request", 400, "Count must be 1-10");
+    // Points on the appointments card: up to 1,000 per visit (set by the owner); stamps: 1-10.
+    const maxCount = addOn === "points" ? 1000 : 10;
+    if (!Number.isInteger(count) || (count as number) < 1 || (count as number) > maxCount) return fail("bad_request", 400, `Count must be 1-${maxCount}`);
     const n = count as number;
 
     if (business.reward_mode === "block") {

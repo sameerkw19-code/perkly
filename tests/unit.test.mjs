@@ -256,3 +256,38 @@ test("appointments: Israel time, reminder times, the one to send now", () => {
   assert.equal(formatAppt(appt.toISOString(), "en", false), "25.11 · 10:30");
   assert.equal(reminderText("h1", "he", "קליניקה", appt.toISOString()), "⏰ בעוד שעה התור שלך בקליניקה (10:30). נתראה!");
 });
+
+import { parseHours, DEFAULT_HOURS, slotsOf, slotOf, weekStart, weekdayOf, addDays, monthGrid } from "../lib/calendar.ts";
+test("clinic calendar: hours, slots, weeks and months", () => {
+  assert.deepEqual(parseHours(null), DEFAULT_HOURS);
+  assert.deepEqual(parseHours('[["08:00","12:00"],null,null,null,null,null,null]')[0], ["08:00", "12:00"]);
+  assert.deepEqual(parseHours('[["12:00","08:00"],null,null,null,null,null,null]'), DEFAULT_HOURS, "closing before opening is ignored");
+  assert.equal(weekdayOf("2026-11-22"), 0); // a Sunday
+  assert.equal(weekStart("2026-11-26"), "2026-11-22");
+  assert.equal(addDays("2026-12-31", 1), "2027-01-01");
+  const fri = slotsOf(DEFAULT_HOURS, "2026-11-27", 30);
+  assert.deepEqual(fri, ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30"]);
+  assert.deepEqual(slotsOf(DEFAULT_HOURS, "2026-11-28", 30), [], "Saturday is closed");
+  assert.equal(slotsOf(DEFAULT_HOURS, "2026-11-22", 45).at(-1), "17:15", "the last slot ends by closing");
+  assert.equal(slotOf(fri, "10:40", 30), "10:30");
+  assert.equal(slotOf(fri, "13:00", 30), null);
+  const nov = monthGrid("2026-11");
+  assert.equal(nov[0][0], "2026-11-01"); // Nov 1, 2026 is a Sunday
+  assert.equal(nov.length, 5);
+  assert.equal(monthGrid("2026-12")[0][0], "2026-11-29");
+});
+
+import { parseServices, freeStarts, endOf } from "../lib/calendar.ts";
+test("clinic services and the free times that fit them", () => {
+  assert.deepEqual(parseServices('[{"id":"a","name":"Facial","min":45},{"id":"b","name":"","min":30},{"id":"c","name":"X","min":3}]'), [{ id: "a", name: "Facial", min: 45 }]);
+  assert.deepEqual(parseServices("nope"), []);
+  assert.equal(endOf("10:30", 45), "11:15");
+  const hours = [["09:00", "12:00"], null, null, null, null, null, null];
+  // Sunday 2026-11-22, 30-minute steps, a 60-minute service, busy 10:00-10:45.
+  assert.deepEqual(freeStarts(hours, "2026-11-22", 30, 60, [[600, 645]]), ["09:00", "11:00"]);
+  // 30 minutes: 10:45 isn't a step; 09:00, 09:30, 11:00, 11:30.
+  assert.deepEqual(freeStarts(hours, "2026-11-22", 30, 30, [[600, 645]]), ["09:00", "09:30", "11:00", "11:30"]);
+  // Today from 10:50 on.
+  assert.deepEqual(freeStarts(hours, "2026-11-22", 30, 30, [], 650), ["11:00", "11:30"]);
+  assert.deepEqual(freeStarts(hours, "2026-11-23", 30, 30, []), [], "closed on Monday");
+});

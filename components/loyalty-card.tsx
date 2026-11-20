@@ -77,7 +77,7 @@ type Props = {
   /** The "average" card: the average so far this round, and the value of a reward ready to use. */
   average?: { soFar?: string; ready?: string };
   /** The appointments card: the next appointment as shown ("יום ג׳, 25.11 · 10:30"), or null when there is none. */
-  appointment?: { text: string | null };
+  appointment?: { text: string | null; extra?: "none" | "stamps" | "points" | "cashback" };
 };
 
 /**
@@ -210,11 +210,21 @@ export function LoyaltyCard({ design, lang, stamps, target, customerName, reward
 
       <div className="pcard-reward">{text.reward}</div>
 
-      {appointment ? (
+      {appointment && (
         <div className="pcard-balance pcard-appt">
           <small>{t("apptWord")}</small>
           <b><Num>{appointment.text ?? t("apptNone")}</Num></b>
           <p className="pcard-hint">{t(appointment.text ? "apptCardHint" : "apptCardNoneHint")}</p>
+        </div>
+      )}
+      {/* The appointments card shows its add-on (if any) below the appointment: points, a punch card or the balance. */}
+      {appointment && (!appointment.extra || appointment.extra === "none") ? null : appointment?.extra === "points" ? (
+        <div className="pcard-points">
+          <div className="pcard-fields">
+            <div className="pcard-field"><small>{t("pointsWord")}</small><b><Num>{Math.min(stamps, target)}/{target}</Num></b></div>
+            {!!rewards && <div className="pcard-field pcard-end"><small>{t("rewardsWord")}</small><b><Num>{rewards}</Num></b></div>}
+          </div>
+          <div className="pcard-pointsbar" aria-hidden="true"><i style={{ width: `${Math.min(100, (stamps / target) * 100)}%` }} /></div>
         </div>
       ) : balance ? (
         <div className="pcard-balance">

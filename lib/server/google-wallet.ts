@@ -3,7 +3,7 @@
 // so deploying this code before Google approves the account changes nothing for customers.
 
 import { base64url } from "./crypto";
-import type { PassAverage } from "./balance-pass";
+import type { PassApptExtra, PassAverage } from "./balance-pass";
 import { classBody, lookFields, type ClassLook, type PassLook } from "../wallet-look";
 
 export type WalletConfig = { issuerId: string; serviceEmail: string; privateKeyPem: string; classId: string };
@@ -43,6 +43,8 @@ export type LoyaltyCard = {
   average?: PassAverage;
   /** The appointments card: the next appointment as shown. Replaces the stamps. */
   appointment?: string;
+  /** The appointments card's add-on: visits on a gift punch card, points, or the balance. */
+  apptExtra?: PassApptExtra;
   /** The business's own look on the pass (see passLook). */
   look?: PassLook;
 };
@@ -84,6 +86,15 @@ function liveFields(card: LoyaltyCard) {
         localizedLabel: label("Next appointment", "התור הבא", "الموعد القادم", ["Следующий визит", "Nächster Termin", "Prochain rendez-vous"]),
         balance: { string: card.appointment },
       },
+      ...(card.apptExtra
+        ? {
+            secondaryLoyaltyPoints: card.apptExtra.kind === "cashback"
+              ? { label: "Balance", localizedLabel: label("Balance", "יתרה", "الرصيد", ["Баланс", "Guthaben", "Solde"]), balance: { string: card.apptExtra.value } }
+              : card.apptExtra.kind === "points"
+                ? { label: "Points", localizedLabel: label("Points", "נקודות", "نقاط", ["Баллы", "Punkte", "Points"]), balance: { string: card.apptExtra.value } }
+                : { label: "Visits", localizedLabel: label("Visits", "ביקורים", "زيارات", ["Визиты", "Besuche", "Visites"]), balance: { string: card.apptExtra.value } },
+          }
+        : {}),
     };
   }
   if (card.balance !== undefined) {

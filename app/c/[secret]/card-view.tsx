@@ -17,7 +17,7 @@ type Card = { name: string; stamps: number; target: number; scan_code: string; d
   /** The balance card: balance and minimum in minor units, basis points back. */
   cashback?: { balance: number; bp: number; min: number; currency: "ILS" | "USD" } | null;
   /** The appointments card: the next appointment (ISO), or null. */
-  appointment?: { at: string | null } | null;
+  appointment?: { at: string | null; extra?: "none" | "stamps" | "points" | "cashback" } | null;
   /** The "average" card: this round's total and the value of the next reward (minor units). */
   average?: { roundTotal: number; cap?: number; ready: number | null; currency: "ILS" | "USD" } | null };
 
@@ -86,7 +86,7 @@ export default function CardView({ card, secret, googleWallet, appleWallet = fal
               text: formatMoney(card.cashback.balance, card.cashback.currency, lang), pct: pctLabel(card.cashback.bp),
               min: card.cashback.min > 0 ? formatMoney(card.cashback.min, card.cashback.currency, lang) : undefined,
             } : undefined}
-            appointment={card.appointment ? { text: card.appointment.at ? formatAppt(card.appointment.at, lang) : null } : undefined}
+            appointment={card.appointment ? { text: card.appointment.at ? formatAppt(card.appointment.at, lang) : null, extra: card.appointment.extra } : undefined}
             average={card.average ? {
               soFar: card.stamps > 0 ? formatMoney(averageReward(card.average.roundTotal, card.stamps, card.average.cap ?? 0), card.average.currency, lang) : undefined,
               ready: card.average.ready != null ? formatMoney(card.average.ready, card.average.currency, lang) : undefined,
@@ -94,7 +94,7 @@ export default function CardView({ card, secret, googleWallet, appleWallet = fal
             t={t}
             qr={<QrImage text={"perkly:" + card.scan_code} size={336} label={t("showQr")} />}
           />
-          {!card.cashback && !card.appointment && card.rewards > 0 && (
+          {!card.cashback && (!card.appointment || card.appointment.extra === "stamps" || card.appointment.extra === "points") && card.rewards > 0 && (
             <div className="ready-banner" role="status">
               {t("earned")}
               {card.rewards > 1 && <> · {t("rewardsAvail", { n: card.rewards })}</>}
