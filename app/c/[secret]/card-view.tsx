@@ -18,7 +18,7 @@ type Card = { name: string; stamps: number; target: number; scan_code: string; d
   /** The "average" card: this round's total and the value of the next reward (minor units). */
   average?: { roundTotal: number; cap?: number; ready: number | null; currency: "ILS" | "USD" } | null };
 
-export default function CardView({ card, secret, googleWallet, appleWallet = false, isIOS }: { card: Card | null; secret: string; googleWallet: boolean; appleWallet?: boolean; isIOS: boolean }) {
+export default function CardView({ card, secret, googleWallet, appleWallet = false, isIOS, invite = null }: { card: Card | null; secret: string; googleWallet: boolean; appleWallet?: boolean; isIOS: boolean; invite?: { stamps: number; link: string } | null }) {
   // The page's own chrome follows the visitor's site language; the card follows its business's languages.
   const { lang: siteLang, dir: siteDir } = useLang();
   const [picked, setPicked] = useState<Lang | null>(null);
@@ -100,6 +100,7 @@ export default function CardView({ card, secret, googleWallet, appleWallet = fal
             <p>{t("showQr")}</p>
             <small className="form-hint">{t("qrNote")}</small>
           </div>
+          {invite && <InviteFriend invite={invite} business={card.business} t={t} />}
           {card.links.length > 0 && (
             <section className="panel social-panel" aria-label={t("socialFollow")}>
               <p><strong>{t("socialFollow")}</strong> · {card.business}</p>
@@ -130,5 +131,30 @@ export default function CardView({ card, secret, googleWallet, appleWallet = fal
       )}
       </main>
     </div>
+  );
+}
+
+/** "Bring a friend": the customer's invite link, to share, send on WhatsApp or copy. */
+function InviteFriend({ invite, business, t }: { invite: { stamps: number; link: string }; business: string; t: (k: string, v?: Record<string, string | number>) => string }) {
+  const [copied, setCopied] = useState(false);
+  const message = t("friendMessage", { b: business, n: invite.stamps, link: invite.link });
+  const share = async () => {
+    try {
+      if (navigator.share) { await navigator.share({ text: message }); return; }
+    } catch { return; }
+    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank", "noopener");
+  };
+  return (
+    <section className="panel invite-panel" aria-labelledby="invite-title">
+      <h2 id="invite-title">🎁 {t("friendTitle")}</h2>
+      <p>{t("friendText", { n: invite.stamps })}</p>
+      <div className="invite-actions">
+        <button type="button" className="btn primary" onClick={share}>{t("friendShare")}</button>
+        <a className="btn soft" href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>
+        <button type="button" className="btn soft" onClick={async () => {
+          try { await navigator.clipboard.writeText(invite.link); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {}
+        }}>{copied ? t("friendCopied") : t("friendCopy")}</button>
+      </div>
+    </section>
   );
 }

@@ -1,13 +1,14 @@
 // The actions on a customer's card (stamps, rewards, purchases, balance), shared by the staff station and the cashier API.
 // Every action is idempotent by request id: a retry after a network error never counts twice.
 import { fail, json, str } from "./http";
+import { payReferral } from "./referral";
 import { allow } from "./rate-limit";
 import { AMOUNT_MAX, averageReward, earnFor, parseAmount, type Program } from "../cashback.ts";
 import { syncGoogleWallet } from "./wallet-sync";
 import { pushAppleCustomer } from "./apple-push";
 import type { Social } from "../social";
 
-export type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust: number; reward_mode: "bank" | "block"; reward_expiry_days: number; birthdays: number; social: Social; owner_designs: number; program: Program; cashback_bp: number; cashback_min: number; currency: string; avg_cap: number; pos_only?: number; near_text?: string | null };
+export type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust: number; reward_mode: "bank" | "block"; reward_expiry_days: number; birthdays: number; social: Social; owner_designs: number; program: Program; cashback_bp: number; cashback_min: number; currency: string; avg_cap: number; pos_only?: number; near_text?: string | null; referral_stamps?: number };
 export type Customer = { id: string; business: string; name: string; phone: string; stamps: number; target: number; scan_code: string; google_wallet?: string | null; balance: number; round_total: number };
 
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -106,6 +107,9 @@ export async function cardAction(x: CardActionInput): Promise<Response> {
   const replayed = async () => !!(await db.prepare("SELECT id FROM events WHERE id = ? AND customer = ?").bind(requestId, c!.id).first());
   /** `added`: stamps just given (not a replay), for the customer's phone notification. */
   const done = async (extra: Record<string, unknown> = {}, added = 0, earned = 0) => {
+    // An invited friend's first visit: both get the "bring a friend" bonus (before the card is read back).
+    const bonus = added && p.action === "stamp" ? await payReferral(db, business, c!.id, now) : 0;
+    if (bonus) extra = { ...extra, referralBonus: bonus };
     const fresh = (await db.prepare("SELECT * FROM customers WHERE id = ?").bind(c!.id).first<Customer>())!;
     const card = await cardState(db, fresh, business.reward_mode);
     const reached = business.reward_mode === "block" ? fresh.stamps >= fresh.target : earned > 0;

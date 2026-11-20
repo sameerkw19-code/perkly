@@ -25,7 +25,7 @@ import { weekChange } from "../lib/weekly";
 import { Brand } from "../components/brand";
 
 type Role = "owner" | "staff";
-type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social; program?: "stamps" | "cashback" | "average"; cashback_bp?: number; cashback_min?: number; currency?: string; avg_cap?: number; pos_only?: number; near_text?: string | null };
+type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social; program?: "stamps" | "cashback" | "average"; cashback_bp?: number; cashback_min?: number; currency?: string; avg_cap?: number; pos_only?: number; near_text?: string | null; referral_stamps?: number };
 type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; rewards?: number; nextExpiry?: string | null; phone?: string; balance?: number; roundTotal?: number; rewardValue?: number | null };
 type Data = {
   me: { name: string; email: string };
@@ -586,6 +586,7 @@ export default function Dashboard() {
               </section>
               <Branches branches={data.branches ?? []} t={t} busy={busy} call={call} reload={load} />
               <NearText business={b} t={t} lang={lang} busy={busy} call={call} reload={load} />
+              <Referral business={b} t={t} busy={busy} call={call} reload={load} />
               <section className="panel">
                 <button className="btn soft" onClick={() => setModal({ type: "business" })}><Store size={16} />{t("newBusiness")}</button>
               </section>
@@ -1102,7 +1103,9 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
         : average && kind === "stamp" ? t("avgRecorded", { amount: fmt(purchase ?? 0) })
         : earned ? (earned === 1 ? t("earnedSaved") : t("earnedSavedN", { n: earned }))
         : kind === "stamp" ? (count === 1 ? t("stampOk") : t("stampsOk", { n: count! })) : t("redeemOk");
-      setResult({ text: message, reward: !!earned || kind === "redeem" });
+      // An invited friend's first visit: the "bring a friend" bonus was added too.
+      const bonus = r.data.referralBonus as number | undefined;
+      setResult({ text: bonus ? `${message} · 🎁 ${t("referralBonusDone", { n: bonus })}` : message, reward: !!earned || kind === "redeem" || !!bonus });
       setCountdown(DONE_SECONDS);
       setStep("done");
       onDone();
@@ -1688,6 +1691,34 @@ function HereButton({ input, t }: { input: string; t: any }) {
         </small>
       )}
     </div>
+  );
+}
+
+/** "Bring a friend": how many stamps each side gets on the invited friend's first visit (0 = off). */
+function Referral({ business, t, busy, call, reload }: { business: Business; t: any; busy: boolean; call: (b: Record<string, unknown>) => Promise<any>; reload: () => void }) {
+  const [saved, setSaved] = useState(false);
+  const stamps = business.program === "stamps" || !business.program;
+  const value = business.referral_stamps ?? 0;
+  return (
+    <section className="panel">
+      <div className="section-head"><h2><Gift size={18} /> {t("referralTitle")}</h2></div>
+      <p className="form-hint">{t("referralHint")}</p>
+      {!stamps ? <p className="muted">{t("referralStampsOnly")}</p> : (
+        <label className="sr-only" htmlFor="referral-stamps">{t("referralTitle")}</label>
+      )}
+      {stamps && (
+        <select id="referral-stamps" value={value} disabled={busy} onChange={async (e) => {
+          setSaved(false);
+          if (await call({ action: "set_referral", stamps: Number(e.target.value) })) { setSaved(true); reload(); }
+        }}>
+          <option value={0}>{t("referralOff")}</option>
+          <option value={1}>{t("referralOne")}</option>
+          <option value={2}>{t("referralStamps", { n: 2 })}</option>
+          <option value={3}>{t("referralStamps", { n: 3 })}</option>
+        </select>
+      )}
+      {saved && <p className="form-hint" role="status">{t("referralSaved")}</p>}
+    </section>
   );
 }
 

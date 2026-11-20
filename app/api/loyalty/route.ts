@@ -14,6 +14,7 @@ import { formatBirthday, parseBirthday, upcomingKeys } from "../../../lib/birthd
 import { pushAppleBusiness } from "../../../lib/server/apple-push";
 import { resolvePlace } from "../../../lib/server/geo";
 import { NEAR_TEXT_MAX } from "../../../lib/near-text";
+import { REFERRAL_MAX_STAMPS } from "../../../lib/server/referral";
 import { ensureBusinessClass, walletConfig } from "../../../lib/server/google-wallet";
 import { getSettings } from "../../../lib/server/settings";
 import { normalizeSocial, parseSocial } from "../../../lib/social";
@@ -34,7 +35,7 @@ function validTarget(v: unknown, program?: string): v is number {
 
 async function loadBusiness(db: D1Database, id: string) {
   const row = await db
-    .prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays, social, owner_designs, program, cashback_bp, cashback_min, currency, avg_cap, pos_only, near_text FROM businesses WHERE id = ?")
+    .prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays, social, owner_designs, program, cashback_bp, cashback_min, currency, avg_cap, pos_only, near_text, referral_stamps FROM businesses WHERE id = ?")
     .bind(id)
     .first<Omit<Business, "social"> & { social: string | null }>();
   return row ? { ...row, social: parseSocial(row.social) } : null;
@@ -685,6 +686,15 @@ export async function POST(request: Request) {
       return json({ ok: true });
     }
 
+    case "set_referral": {
+      // "Bring a friend": 0 (off) to REFERRAL_MAX_STAMPS stamps for each side, on the friend's first visit.
+      const denied = ownerOnly(); if (denied) return denied;
+      const n = p.stamps;
+      if (!Number.isInteger(n) || (n as number) < 0 || (n as number) > REFERRAL_MAX_STAMPS) return fail("bad_details", 400, "Invalid bonus");
+      if ((n as number) > 0 && business.program !== "stamps") return fail("wrong_program", 409, "Bring a friend is for stamp cards");
+      await db.prepare("UPDATE businesses SET referral_stamps = ? WHERE id = ?").bind(n, business.id).run();
+      return json({ ok: true });
+    }
     case "set_near_text": {
       // The business's own lock-screen line near a branch; empty goes back to the automatic one.
       const denied = ownerOnly(); if (denied) return denied;

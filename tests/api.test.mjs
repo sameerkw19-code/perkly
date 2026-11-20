@@ -1040,6 +1040,33 @@ test("refresh all cards: admin only, counts what it refreshed", async () => {
   assert.equal((await stranger.post("/api/admin/wallet", { action: "refresh_all" })).status, 404);
 });
 
+test("bring a friend: both get the bonus on the friend's first visit, once", async () => {
+  const owner = new Client();
+  await signup(owner, "ref-owner");
+  const biz = (await owner.post("/api/loyalty", { action: "create_business", name: "Refer", reward: "Free", target: 10, color: "#123456" })).body.id;
+  assert.equal((await owner.act(biz, "set_referral", { stamps: 9 })).status, 400);
+  assert.equal((await owner.act(biz, "set_referral", { stamps: 2 })).status, 200);
+  const joinCode = (await owner.get(`/api/loyalty?business=${biz}`)).body.business.join_code;
+  const a = (await owner.act(biz, "register_customer", { name: "Dana", phone: "0531110001" })).body;
+  const page = await fetch(a.cardUrl.replace(/^https?:\/\/[^/]+/, BASE)).then((r) => r.text());
+  const ref = page.match(/join\/[a-z0-9]+\?ref=([A-Za-z0-9_-]+)/)?.[1];
+  assert.ok(ref, "the card shows an invite link");
+  const joined = await new Client().post("/api/join", { code: joinCode, name: "Lior", phone: "0531110002", terms: true, ref });
+  assert.equal(joined.status, 200, JSON.stringify(joined.body));
+  const friend = (await owner.get(`/api/loyalty?business=${biz}&q=Lior`)).body.customers?.find((c) => c.name === "Lior")
+    ?? (await owner.act(biz, "find_customer", { q: "0531110002" })).body?.customer;
+  assert.ok(friend?.id, "friend found");
+  const first = await owner.act(biz, "stamp", { customer: friend.id, requestId: id() });
+  assert.equal(first.status, 200, JSON.stringify(first.body));
+  assert.equal(first.body.referralBonus, 2);
+  assert.equal(first.body.card.stamps, 3);
+  const second = await owner.act(biz, "stamp", { customer: friend.id, requestId: id() });
+  assert.equal(second.body.referralBonus, undefined);
+  const list = (await owner.get(`/api/loyalty?business=${biz}`)).body.customers ?? [];
+  const inviter = list.find((c) => c.id === a.id);
+  if (inviter) assert.equal(inviter.stamps, 2);
+});
+
 test("change the sign-in email: needs the current password, refuses a taken or same address", async () => {
   const a = new Client();
   await signup(a, "mover");
