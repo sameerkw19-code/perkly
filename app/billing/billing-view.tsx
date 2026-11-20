@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useLang } from "../../lib/i18n";
-import { withPrices, type Currency } from "../../lib/pricing";
+import { money, withPrices, type Currency } from "../../lib/pricing";
 
 export type BillingBusiness = {
   id: string; name: string; status: string; periodEnd: string | null; compUntil?: string | null;
@@ -14,6 +14,8 @@ export type BillingBusiness = {
   manage?: boolean;
   /** When a subscription started now would first charge (after the trial or the free access). */
   firstCharge?: string | null;
+  /** Set up and designed by Perkly: the one-time setup fee (whole shekels/dollars), when it was paid, and whether it can be paid online. */
+  setup?: { amount: number; paid: string | null; online: boolean } | null;
 };
 
 const FOREVER_YEAR = "9999";
@@ -24,7 +26,7 @@ const T = {
   he: {
     status: { none: "לא הופעל", trialing: "תקופת ניסיון", active: "פעיל", past_due: "תשלום נכשל", unpaid: "לא שולם", canceled: "בוטל", incomplete: "לא הושלם" } as Record<string, string>,
     back: "← חזרה ללוח הבקרה", title: "מנוי ותשלום",
-    intro: "בלי דמי הקמה. למנוי חדש 14 ימי ניסיון חינם, והחיוב הראשון רק אחרי 14 ימים.",
+    intro: "למנוי חדש 14 ימי ניסיון חינם, והחיוב הראשון רק אחרי 14 ימים.",
     pick: "בחירת מסלול",
     plans: {
       monthly: { name: "חודשי", price: "{$m} לחודש", note: "מבטלים מתי שרוצים" },
@@ -36,6 +38,8 @@ const T = {
     statusLabel: "סטטוס", planLabel: "מסלול",
     kitAfter: "ערכת הקופה תישלח אחרי החיוב הראשון.", kitIncluded: "ערכת הקופה כלולה במנוי.", kitAddress: "שלחו לנו כתובת למשלוח בוואטסאפ",
     kitText: (name: string) => `היי, זו כתובת המשלוח לערכת הקופה של ${name}:`, kitSent: "ערכת הקופה נשלחה.",
+    setupDue: (amount: string) => `דמי הקמה ועיצוב: ${amount} חד־פעמי.`, setupPay: "תשלום דמי ההקמה", setupPaid: (d: string) => `דמי ההקמה שולמו (${d}). תודה!`,
+    setupByHand: "נשלח אליכם פרטי תשלום, או כתבו לנו בוואטסאפ.", setupText: (name: string) => `היי, אני רוצה לשלם את דמי ההקמה של ${name}`, setupReturned: "תודה! התשלום על דמי ההקמה התקבל ומתעדכן.",
     next: "החיוב הבא", comp: "גישה ללא מנוי", forever: "ללא הגבלת זמן", until: "עד",
     opening: "פותח דף תשלום...", start: (plan: string) => `הפעלת מנוי ${plan}`, failed: "לא הצלחנו לפתוח את דף התשלום. נסה שוב.", testSite: "זה אתר הבדיקה. תשלום אמיתי עושים רק ב־perkly.shop.",
     manage: "ניהול המנוי: כרטיס אשראי, חשבוניות וביטול", managing: "פותח את דף המנוי...", manageFailed: "לא הצלחנו לפתוח את דף המנוי. נסה שוב, או כתוב לנו ב־support@perkly.shop.",
@@ -48,7 +52,7 @@ const T = {
   en: {
     status: { none: "Not started", trialing: "Free trial", active: "Active", past_due: "Payment failed", unpaid: "Unpaid", canceled: "Canceled", incomplete: "Incomplete" } as Record<string, string>,
     back: "← Back to dashboard", title: "Subscription and billing",
-    intro: "No setup fee. A new subscription starts with a 14-day free trial; the first charge is after 14 days.",
+    intro: "A new subscription starts with a 14-day free trial; the first charge is after 14 days.",
     pick: "Choose a plan",
     plans: {
       monthly: { name: "Monthly", price: "{$m} a month", note: "Cancel anytime" },
@@ -60,6 +64,8 @@ const T = {
     statusLabel: "Status", planLabel: "plan",
     kitAfter: "The counter kit ships after the first charge.", kitIncluded: "The counter kit is included.", kitAddress: "Send us a shipping address on WhatsApp",
     kitText: (name: string) => `Hi, here is the shipping address for the ${name} counter kit:`, kitSent: "The counter kit has shipped.",
+    setupDue: (amount: string) => `Setup and design: ${amount} one-time.`, setupPay: "Pay the setup fee", setupPaid: (d: string) => `The setup fee is paid (${d}). Thank you!`,
+    setupByHand: "We'll send you payment details, or message us on WhatsApp.", setupText: (name: string) => `Hi, I'd like to pay the setup fee for ${name}`, setupReturned: "Thank you! The setup fee payment was received and is being updated.",
     next: "Next charge", comp: "Access without a subscription", forever: "no end date", until: "until",
     opening: "Opening the payment page...", start: (plan: string) => `Start the ${plan.toLowerCase()} plan`, failed: "We couldn't open the payment page. Please try again.", testSite: "This is the test site. Real payments are taken only on perkly.shop.",
     manage: "Manage subscription: card, invoices and cancel", managing: "Opening your subscription page...", manageFailed: "We couldn't open your subscription page. Try again, or write to support@perkly.shop.",
@@ -81,6 +87,13 @@ export default function BillingView({ businesses, configured, yearly = false, cu
   const [error, setError] = useState("");
   const [returned, setReturned] = useState(false);
   const [waiting, setWaiting] = useState(false);
+
+  // Returning from paying the setup fee (?setup=1): thanks, until the webhook marks it paid.
+  const [setupReturned, setSetupReturned] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read once from the browser after hydration
+    if (new URLSearchParams(window.location.search).get("setup") === "1") setSetupReturned(true);
+  }, []);
 
   // Returning from Polar with ?ok=1: the webhook may land a few seconds later, so retry the page a few times.
   useEffect(() => {
@@ -121,6 +134,20 @@ export default function BillingView({ businesses, configured, yearly = false, cu
   const anyToStart = configured && businesses.some((b) => !["active", "trialing"].includes(b.status) && !b.compUntil?.startsWith(FOREVER_YEAR));
   const allLive = businesses.length > 0 && businesses.every((b) => ["active", "trialing"].includes(b.status) || !!b.compUntil?.startsWith(FOREVER_YEAR));
   const day = (iso: string) => new Date(iso).toLocaleDateString(t.locale);
+
+  async function paySetup(businessId: string) {
+    setError("");
+    setBusy("s" + businessId);
+    try {
+      const response = await fetch("/api/billing/setup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ business: businessId }) });
+      const data = (await response.json().catch(() => null)) as { url?: string; code?: string } | null;
+      if (response.ok && data?.url) { window.location.assign(data.url); return; }
+      setError(data?.code === "billing_test_site" ? t.testSite : t.failed);
+    } catch {
+      setError(t.failed);
+    }
+    setBusy(null);
+  }
 
   async function subscribe(businessId: string) {
     const chosen = yearly ? plan : "monthly";
@@ -179,6 +206,19 @@ export default function BillingView({ businesses, configured, yearly = false, cu
               </div>
             )}
             {b.kit === "sent" && <div style={{ fontSize: 14, marginBottom: 6 }}>{t.kitSent}</div>}
+            {/* Set up and designed by Perkly: the one-time setup fee. */}
+            {b.setup && (b.setup.paid ? (
+              <div style={{ fontSize: 14, marginBottom: 6 }}>{t.setupPaid(day(b.setup.paid))}</div>
+            ) : (
+              <div className="setup-fee">
+                <div style={{ fontSize: 14, marginBottom: 6, fontWeight: 600 }}>{t.setupDue(money(b.setup.amount, currency, L))}</div>
+                {setupReturned ? <p role="status" style={{ fontSize: 14 }}>{t.setupReturned}</p> : b.setup.online ? (
+                  <button className="btn soft" disabled={busy === "s" + b.id} onClick={() => paySetup(b.id)}>{busy === "s" + b.id ? t.opening : t.setupPay}</button>
+                ) : (
+                  <p style={{ fontSize: 14 }}>{t.setupByHand} <a href={`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(t.setupText(b.name))}`} target="_blank" rel="noreferrer">WhatsApp</a></p>
+                )}
+              </div>
+            ))}
             {b.periodEnd && <div style={{ fontSize: 14, marginBottom: 6 }}>{t.next}: {new Date(b.periodEnd).toLocaleDateString(t.locale)}</div>}
             {b.compUntil && (
               <div style={{ fontSize: 14, marginBottom: 6 }}>

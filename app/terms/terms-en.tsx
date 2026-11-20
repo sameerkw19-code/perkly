@@ -41,7 +41,8 @@ export default function TermsEn() {
 
       <h2>5. Price and payment</h2>
       <ul>
-        <li>Subscription: {m(p.monthly)} a month, no setup fee.</li>
+        <li>Subscription: {m(p.monthly)} a month.</li>
+        <li>Setup fee: {m(p.setup)} one-time, only when Perkly sets up and designs the card for the business. A business that signs up and designs its card itself on the site pays no setup fee.</li>
         <li>Without a subscription the service can be used for up to 10 customers, with the ready-made designs, colors and icons. Adding more customers, or uploading a logo, background image or stamp from an image, needs a subscription.</li>
         <li>A new subscription comes with a 14-day free trial. Card details are given at the start of the trial, and the first charge is made when the 14 days end. Cancelling before the trial ends costs nothing.</li>
         <li>Subscription payments are handled by Polar, the official seller (Merchant of Record), and renew every month until cancelled.</li>
