@@ -793,6 +793,7 @@ Object.assign(words, {
   sxStampsLabel: ["חותמות", "أختام", "stamps"],
   sxRewardsChip: ["{n} הטבות", "{n} مكافآت", "{n} rewards"],
   sxRewardsChip1: ["הטבה אחת", "مكافأة واحدة", "1 reward"],
+  sxMoreTo: ["עוד {k} עד {reward}", "باقي {k} حتى {reward}", "{k} more to {reward}"],
   sxNoRewards: ["אין עדיין הטבות זמינות", "لا توجد مكافآت متاحة بعد", "No rewards available yet"],
   sxRewardReady1: ["הטבה אחת מוכנה למימוש", "مكافأة واحدة جاهزة", "1 reward ready"],
   sxRewardReadyN: ["{n} הטבות מוכנות למימוש", "{n} مكافآت جاهزة", "{n} rewards ready"],

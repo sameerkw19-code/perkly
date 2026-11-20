@@ -329,7 +329,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="app" dir={dir}>
+    <div className={"app" + (nav.length < 2 ? " single-view" : "") + (view === "station" ? " on-station" : "")} dir={dir}>
       <a className="skip-link" href="#main">{t("skipToContent")}</a>
       <aside className="sidebar">
         <Brand />
@@ -1278,7 +1278,6 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
                 onChange={(e) => setQuery(e.target.value)} />
               {query && <button type="button" className="st-clear" aria-label={t("close")} onClick={() => { setQuery(""); searchRef.current?.focus(); }}><X size={16} /></button>}
             </label>
-            <button type="submit" className="btn soft sx-wide">{t("sxSearch")}<ChevronRight size={16} className="sx-fwd" /></button>
           </form>
           {(shown.length > 0 || query.trim().length >= 2) && (
             <div className="staff-results" role="listbox" aria-label={t("search")}>
@@ -1416,7 +1415,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
           <div className="sx-box">
             <div className="sx-box-head">
               <span className="sx-box-icon" aria-hidden="true"><Gift size={18} /></span>
-              <strong>{selected.rewards ? (selected.rewards === 1 ? t("sxRewardReady1") : t("sxRewardReadyN", { n: selected.rewards })) : full ? t("sxRewardReady1") : t("sxNoRewards")}</strong>
+              <strong>{selected.rewards ? (selected.rewards === 1 ? t("sxRewardReady1") : t("sxRewardReadyN", { n: selected.rewards })) : full ? t("sxRewardReady1") : average ? t("avgMore", { k: remaining }) : t("sxMoreTo", { k: remaining, reward: business.reward })}</strong>
             </div>
             {!!selected.rewards && selected.nextExpiry && <small className="form-hint">{t("expiresOnShort", { d: new Date(selected.nextExpiry).toLocaleDateString(lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB", { timeZone: "Asia/Jerusalem" }) })}</small>}
             {posOnly && <p className="pos-note" role="note">{t("posOnlyNote")}</p>}

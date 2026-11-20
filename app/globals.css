@@ -636,6 +636,7 @@ html,body{overflow-x:clip}
 .sx-who-text{flex:1;min-width:0}
 .sx-who-text strong{display:block;font-size:17px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sx-who-text small{display:block;color:var(--muted);font-size:13px;margin-top:3px;text-align:start}
+.sx-who .icon-btn{width:44px;height:44px;border-radius:12px}
 .sx-chips{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .sx-chips select{font-size:12px;padding:6px 8px;max-width:160px}
 .sx-chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;border-radius:999px;padding:5px 11px;background:#f0ecfc;color:#6b4bd8}
@@ -654,7 +655,7 @@ html,body{overflow-x:clip}
 .sx-segments i.on{background:#4caf50}
 .sx-item-row{display:flex;align-items:center;gap:10px}
 .sx-item-row strong{flex:1;font-size:15px;min-width:0}
-.sx-item .stepper button:first-child{background:#e5484d;color:#fff;border-color:#e5484d}
+.sx-item .stepper button:first-child{background:#f0ecfc;color:#5b3fc4;border-color:#f0ecfc}
 .sx-item .stepper button:last-child{background:var(--purple);color:#fff;border-color:var(--purple)}
 .sx-item .stepper button:disabled{opacity:.35}
 .sx-dots{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
@@ -684,7 +685,7 @@ html,body{overflow-x:clip}
   .sx-title{font-size:24px}
 }
 .sx-item .stepper{flex-shrink:0;border:0;gap:8px;overflow:visible;background:none}
-.sx-item .stepper button{width:40px;height:40px;border-radius:10px}
+.sx-item .stepper button{width:44px;height:44px;border-radius:10px}
 .sx-item .stepper output{min-width:36px;font-size:18px}
 
 /* Reports: per staff member / per branch for the chosen period */
@@ -862,3 +863,13 @@ html,body{overflow-x:clip}
 .report-check input { width: 20px; height: 20px; margin-top: 2px; flex: none; accent-color: var(--purple); }
 .report-check small { display: block; font-weight: 400; margin-top: 2px; }
 .special-main .report-check + .btn { justify-self: start; }
+
+/* The staff station on a phone: no one-tab bar and no footer, so the screen is the work. */
+@media (max-width: 760px) {
+  .app.single-view .sidebar { display: none; }
+  .app.single-view .shell { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .app.on-station main > footer { display: none; }
+}
+/* New stamps: the dots shrink to stay on one line (up to about 20). */
+.sx-dots { gap: 6px; }
+.sx-dots i { flex: 1 1 0; max-width: 22px; min-width: 10px; width: auto; height: auto; aspect-ratio: 1; }
