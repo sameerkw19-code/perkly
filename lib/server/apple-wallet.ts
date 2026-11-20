@@ -56,21 +56,20 @@ export async function customerForPass(db: D1Database, serial: string): Promise<C
 
 /** When the pass last changed: the customer's latest stamp or redemption, or the business's latest card design. */
 export async function passUpdated(db: D1Database, customer: { id: string; business: string; created: string }): Promise<string> {
+  // Few parts on purpose: D1 refuses a compound SELECT with more than 8 terms ("too many terms"), and then
+  // every iPhone's update request failed. New timestamps go into the businesses or customers row, not a new UNION.
   const row = await db
     .prepare(
       `SELECT MAX(t) AS t FROM (
          SELECT MAX(created) AS t FROM events WHERE customer = ?1
          UNION ALL SELECT MAX(published) FROM card_designs WHERE business = ?2
          UNION ALL SELECT MAX(located) FROM branches WHERE business = ?2
-         UNION ALL SELECT near_updated FROM businesses WHERE id = ?2
-         UNION ALL SELECT missyou_at FROM customers WHERE id = ?1
-         UNION ALL SELECT appt_updated FROM customers WHERE id = ?1
-         UNION ALL SELECT news_at FROM businesses WHERE id = ?2
-         UNION ALL SELECT ?3 UNION ALL SELECT ?4)`,
+         UNION ALL SELECT MAX(COALESCE(near_updated, ''), COALESCE(news_at, '')) FROM businesses WHERE id = ?2
+         UNION ALL SELECT MAX(COALESCE(missyou_at, ''), COALESCE(appt_updated, ''), ?3, ?4) FROM customers WHERE id = ?1)`,
     )
     .bind(customer.id, customer.business, customer.created, PASS_FORMAT)
     .first<{ t: string | null }>();
-  return row?.t ?? customer.created;
+  return row?.t || customer.created;
 }
 
 /** When the pass itself last changed shape (say, the business's logo as the icon): iPhones fetch it again after a push. */

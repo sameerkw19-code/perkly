@@ -707,3 +707,13 @@ test("a Polar subscription linked by an admin keeps following its business in la
   const admin = readFileSync(new URL("../app/api/admin/route.ts", import.meta.url), "utf8");
   assert.match(admin, /case "polar_link":/);
 });
+
+// ---- Apple Wallet updates ----
+
+test("apple wallet: the 'pass changed' query stays within D1's 8-term compound SELECT limit", () => {
+  // Past bug: a 9th UNION made D1 refuse the query, and every iPhone's update request failed with 500.
+  const src = readFileSync(new URL("../lib/server/apple-wallet.ts", import.meta.url), "utf8");
+  const body = src.slice(src.indexOf("export async function passUpdated"), src.indexOf("const PASS_FORMAT"));
+  const terms = (body.match(/UNION ALL/g) ?? []).length + 1;
+  assert.ok(terms <= 8, `${terms} terms`);
+});
