@@ -34,14 +34,14 @@ const NEAR: Record<Lang, { reward: (b: string, r: string) => string; stamps: (b:
 type CustomerRow = {
   id: string; business: string; name: string; stamps: number; target: number; scan_code: string; created: string;
   business_name: string; reward: string; color: string; rewards: number; balance: number; program: string; currency: string;
-  round_total: number; avg_cap: number; ready_value: number | null; near_text?: string | null; news_text?: string | null; news_at?: string | null;
+  round_total: number; avg_cap: number; ready_value: number | null; missyou_at?: string | null; last_event?: string | null; near_text?: string | null; news_text?: string | null; news_at?: string | null;
 };
 
 /** The customer behind a pass serial (the customer id), or null when it was removed. */
 export async function customerForPass(db: D1Database, serial: string): Promise<CustomerRow | null> {
   return db
     .prepare(
-      `SELECT c.id, c.business, c.name, c.stamps, c.target, c.scan_code, c.created, c.balance, c.round_total, b.program, b.currency, b.avg_cap, b.near_text, b.news_text, b.news_at, b.name AS business_name, b.reward, b.color,
+      `SELECT c.id, c.business, c.name, c.stamps, c.target, c.scan_code, c.created, c.balance, c.round_total, c.missyou_at, (SELECT MAX(e.created) FROM events e WHERE e.customer = c.id) AS last_event, b.program, b.currency, b.avg_cap, b.near_text, b.news_text, b.news_at, b.name AS business_name, b.reward, b.color,
          (SELECT value FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2) ORDER BY earned, id LIMIT 1) AS ready_value,
          (SELECT COUNT(*) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2))
            + (CASE WHEN b.reward_mode = 'block' AND c.stamps >= c.target THEN 1 ELSE 0 END) AS rewards
@@ -60,6 +60,7 @@ export async function passUpdated(db: D1Database, customer: { id: string; busine
          UNION ALL SELECT MAX(published) FROM card_designs WHERE business = ?2
          UNION ALL SELECT MAX(located) FROM branches WHERE business = ?2
          UNION ALL SELECT near_updated FROM businesses WHERE id = ?2
+         UNION ALL SELECT missyou_at FROM customers WHERE id = ?1
          UNION ALL SELECT news_at FROM businesses WHERE id = ?2
          UNION ALL SELECT ?3 UNION ALL SELECT ?4)`,
     )
@@ -176,6 +177,11 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
   const news = c.news_text && c.news_at && Date.now() - Date.parse(c.news_at) < 30 * 86_400_000
     ? noticeText({ ...text, title, reward } as Texts, lang, { kind: "special", name: c.name, text: c.news_text })
     : "";
+  // "We miss you": sent by the daily job to a customer who hasn't visited for a while; shown for a week, and the
+  // iPhone notifies when it appears. A visit after it (an event newer than missyou_at) makes it go away.
+  const missYou = c.missyou_at && Date.now() - Date.parse(c.missyou_at) < 7 * 86_400_000 && design.walletMissYou && !(c.last_event && c.last_event > c.missyou_at)
+    ? noticeText({ ...text, title, reward } as Texts, lang, { kind: "missyou", name: c.name })
+    : "";
   const pass = {
     ...(locations.length ? { locations } : {}),
     formatVersion: 1,
@@ -206,6 +212,7 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
         { key: "rewardBack", label: L.reward, value: reward },
         // The latest message to customers: when it changes, the iPhone shows it as a notification (changeMessage).
         ...(news ? [{ key: "news", label: L.news, value: news, changeMessage: "%@" }] : []),
+        ...(missYou ? [{ key: "missyou", label: L.news, value: missYou, changeMessage: "%@" }] : []),
         ...(text.promo ? [{ key: "offer", label: L.offer, value: text.promo.slice(0, 200) }] : []),
         { key: "about", label: "Perkly", value: L.about },
       ],

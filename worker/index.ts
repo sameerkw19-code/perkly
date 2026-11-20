@@ -70,10 +70,11 @@ export default {
   },
 
   // Cron (see "triggers" in wrangler.jsonc): welcome, birthday and special-day messages.
-  async scheduled(_controller: ScheduledController, env: Cloudflare.Env, ctx: ExecutionContext) {
+  async scheduled(controller: ScheduledController, env: Cloudflare.Env, ctx: ExecutionContext) {
     // Imported here: the app's modules are set up lazily, and a cron run has no request to do it first.
+    // The run's own time (the same as now in production; settable when testing a run locally).
     const run = import("../lib/server/customer-messages").then(({ runScheduled }) =>
-      runScheduled(env.DB, env as unknown as Record<string, string | undefined>),
+      runScheduled(env.DB, env as unknown as Record<string, string | undefined>, new Date(controller.scheduledTime || Date.now())),
     );
     ctx.waitUntil(run.catch((e) => console.error("scheduled run failed:", e)));
   },

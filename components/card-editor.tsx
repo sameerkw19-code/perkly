@@ -3,7 +3,7 @@ import { formatMoney, pctLabel } from "../lib/cashback.ts";
 import { useMemo, useState, type ReactNode } from "react";
 import { ChevronDown, ImagePlus, Lock, MessageCircle, Shuffle, Trash2, UploadCloud } from "lucide-react";
 import {
-  FONTS, FONT_SCRIPTS, GRADIENTS, GRADIENT_DIRS, ICON_GROUPS, IMAGE_MIN, LIMITS, NOTICE_DEFAULTS, OFFERED_CARD_LANGS, noticeDefault, PALETTES, cardLang, darken, designChecks, is3d, noticeText, stamp3dUrl,
+  FONTS, FONT_SCRIPTS, GRADIENTS, MISS_YOU_DAYS, GRADIENT_DIRS, ICON_GROUPS, IMAGE_MIN, LIMITS, NOTICE_DEFAULTS, OFFERED_CARD_LANGS, noticeDefault, PALETTES, cardLang, darken, designChecks, is3d, noticeText, stamp3dUrl,
   type AssetMeta, type CardLook, type Design, type FontId, type Layout, type LogoFrame, type Size, type StampIcon, type StampNotice, type Texts,
 } from "../lib/design";
 import { CARD_LANGS, isRtl, type Lang } from "../lib/i18n-types";
@@ -171,7 +171,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
 
   /** One notification text: the business's wording (empty = the default shown greyed out) and how it will read. */
   // Called as a function, not as <NoticeField/>: a component defined here would remount on every keystroke.
-  const noticeField = ({ k, label, notice, placeholder }: { k: "notify" | "notifyReward" | "welcome" | "birthday"; label: string; notice: StampNotice; placeholder: string }) => {
+  const noticeField = ({ k, label, notice, placeholder }: { k: "notify" | "notifyReward" | "welcome" | "birthday" | "missYou"; label: string; notice: StampNotice; placeholder: string }) => {
     const tx = design.texts[textLang];
     const first = design.texts[design.langs[0]];
     const sample = noticeText({ ...tx, title: tx.title || first.title, reward: tx.reward || first.reward }, textLang, notice);
@@ -712,7 +712,18 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
               </div>
             )}
 
-            {(design.walletNotify || design.walletWelcome || design.walletBirthday) && <p className="form-hint">{t("edNotifyVars")}</p>}
+            <h4 className="notify-head">{t("edMsgMissYou")}</h4>
+            <label className="check-row clear-white">
+              <input type="checkbox" checked={design.walletMissYou} onChange={(e) => set({ walletMissYou: e.target.checked })} />
+              <span>{t("edMsgMissYouOn", { days: MISS_YOU_DAYS })}<small className="form-hint">{t("edMsgMissYouHint")}</small></span>
+            </label>
+            {design.walletMissYou && (
+              <div className="stack-form" dir={isRtl(textLang) ? "rtl" : "ltr"}>
+                {noticeField({ k: "missYou", label: t("fMissYou"), notice: { kind: "missyou", name: t("edNotifySampleName") }, placeholder: noticeDefault(textLang, "missyou") })}
+              </div>
+            )}
+
+            {(design.walletNotify || design.walletWelcome || design.walletBirthday || design.walletMissYou) && <p className="form-hint">{t("edNotifyVars")}</p>}
 
             {specialDays && (
               <>

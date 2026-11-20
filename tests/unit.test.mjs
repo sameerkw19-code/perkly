@@ -169,3 +169,15 @@ test("trial: the standard trial for a first subscription, and never a charge whi
   assert.equal(trialDaysFor(true, "9999-12-31T00:00:00Z", 14, now), 14);
   assert.equal(trialDaysFor(true, "2026-11-01T00:00:00Z", 14, now), 14);
 });
+
+import { noticeText, noticeOn } from "../lib/design.ts";
+test("we miss you: off by default, its own wording or the default with the name", () => {
+  const base = defaultDesign({ name: "תפוח", reward: "קפה חינם", color: "#123456" });
+  assert.equal(base.walletMissYou, false);
+  assert.equal(noticeOn(base, "missyou"), false);
+  const on = sanitizeDesign({ ...base, walletMissYou: true });
+  assert.equal(noticeOn(on, "missyou"), true);
+  const texts = { ...on.texts.he, title: "תפוח", reward: "קפה חינם" };
+  assert.match(noticeText(texts, "he", { kind: "missyou", name: "דנה כהן" }), /^התגעגענו אליך דנה! 💜 מחכים לך בתפוח/);
+  assert.equal(noticeText({ ...texts, missYou: "חוזרים ל{business}, {name}?" }, "he", { kind: "missyou", name: "דנה" }), "חוזרים לתפוח, דנה?");
+});

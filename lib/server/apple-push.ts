@@ -62,6 +62,25 @@ export function pushAppleCustomer(db: D1Database, customer: string): void {
   waitUntil(customerTokens(db, customer).then((t) => pushTokens(db, t)).catch((e) => console.log("apple wallet push error", String(e))));
 }
 
+/** These customers' Apple Wallet passes fetch themselves again; awaitable (the cron job waits for it). */
+export async function pushAppleCustomersNow(db: D1Database, customers: string[]): Promise<void> {
+  if (!applePushReady() || !customers.length) return;
+  try {
+    const tokens: string[] = [];
+    for (let i = 0; i < customers.length; i += 50) {
+      const part = customers.slice(i, i + 50);
+      const rows = await db
+        .prepare(`SELECT push_token FROM apple_registrations WHERE serial IN (${part.map(() => "?").join(",")})`)
+        .bind(...part)
+        .all<{ push_token: string }>();
+      tokens.push(...rows.results.map((r) => r.push_token));
+    }
+    await pushTokens(db, tokens);
+  } catch (e) {
+    console.log("apple wallet push error", String(e));
+  }
+}
+
 /** Every Apple Wallet pass of the business fetches itself again; awaitable (the cron job waits for it). */
 export async function pushAppleBusinessNow(db: D1Database, business: string): Promise<void> {
   if (!applePushReady()) return;
