@@ -1,5 +1,6 @@
 import { passProgram } from "../../../lib/server/balance-pass";
 import { env } from "cloudflare:workers";
+import { PRICES, asCurrency } from "../../../lib/pricing";
 import { getD1 } from "../../../db";
 import { getUser, isPlatformAdmin } from "../../../lib/server/auth";
 import { fail, json, readJson, sameOrigin, str } from "../../../lib/server/http";
@@ -253,6 +254,22 @@ export async function POST(request: Request) {
         log("owner_designs", on ? "on" : "off"),
       ]);
       return json({ ok: true, on: !!on });
+    }
+    case "setup_fee": {
+      // The one-time setup fee: mark it paid by hand (bank transfer, cash), waive it, or owe it again.
+      const op = body.op;
+      if (op === "paid") {
+        const r = await db.prepare("UPDATE businesses SET setup_paid = ?, setup_order = 'manual' WHERE id = ? AND setup_fee IS NOT NULL AND setup_paid IS NULL").bind(nowIso, businessId).run();
+        if (r.meta.changes !== 1) return fail("no_setup_fee", 400, "No setup fee is owed");
+      } else if (op === "waive") {
+        await db.prepare("UPDATE businesses SET setup_fee = NULL WHERE id = ? AND setup_paid IS NULL").bind(businessId).run();
+      } else if (op === "due") {
+        const cur = await db.prepare("SELECT currency FROM businesses WHERE id = ?").bind(businessId).first<{ currency: string }>();
+        const amount = Number.isInteger(body.amount) && (body.amount as number) > 0 && (body.amount as number) <= 1_000_000 ? (body.amount as number) : PRICES[asCurrency(cur?.currency)].setup * 100;
+        await db.prepare("UPDATE businesses SET setup_fee = ?, setup_paid = NULL, setup_order = NULL WHERE id = ?").bind(amount, businessId).run();
+      } else return fail("bad_request", 400);
+      await db.batch([log("setup_fee", String(op))]);
+      return json({ ok: true });
     }
     case "kit_sent": {
       // Yearly plan: marks the included counter kit as shipped. Only for a business that is owed one.

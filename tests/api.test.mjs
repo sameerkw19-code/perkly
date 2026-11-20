@@ -964,6 +964,325 @@ test("after handing a business to an account, the admin still has every owner sc
   assert.equal(ownerView.role, "owner");
 });
 
+test("branch place on the map: a Google Maps link or coordinates; a bad one is refused; empty clears it", async () => {
+  const built = await admin.post("/api/loyalty", { action: "create_business", forClient: true, kind: "cafe", name: "Nearby", reward: "Free coffee", target: 8, color: "#123456", setupDays: 30, branchName: "Main" });
+  const biz = built.body.id;
+  const branch = (await admin.get(`/api/loyalty?business=${biz}`)).body.branches[0];
+  const bad = await admin.act(biz, "rename_branch", { branch: branch.id, name: "Main", location: "somewhere nice" });
+  assert.equal(bad.status, 400);
+  assert.equal(bad.body.code, "location_invalid");
+  const ok = await admin.act(biz, "rename_branch", { branch: branch.id, name: "Main", location: "https://www.google.com/maps/place/X/@32.07,34.77,17z/data=!3d32.0779!4d34.7745" });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  let b = (await admin.get(`/api/loyalty?business=${biz}`)).body.branches[0];
+  assert.equal(b.lat, 32.0779);
+  assert.equal(b.lng, 34.7745);
+  const second = await admin.act(biz, "create_branch", { name: "North", address: "x", location: "32.1, 34.8" });
+  assert.equal(second.status, 200);
+  await admin.act(biz, "rename_branch", { branch: branch.id, name: "Main", location: "" });
+  b = (await admin.get(`/api/loyalty?business=${biz}`)).body.branches.find((x) => x.id === branch.id);
+  assert.equal(b.lat, null);
+});
+
+test("near text: the owner sets the lock-screen line; empty goes back to automatic; staff can't", async () => {
+  const built = await admin.post("/api/loyalty", { action: "create_business", forClient: true, kind: "cafe", name: "Line", reward: "Free coffee", target: 8, color: "#123456", setupDays: 30, branchName: "Main" });
+  const biz = built.body.id;
+  const set = await admin.act(biz, "set_near_text", { text: "  Passing by?   {missing} to go  " });
+  assert.equal(set.status, 200);
+  assert.equal((await admin.get(`/api/loyalty?business=${biz}`)).body.business.near_text, "Passing by? {missing} to go");
+  await admin.act(biz, "set_near_text", { text: "" });
+  assert.equal((await admin.get(`/api/loyalty?business=${biz}`)).body.business.near_text, null);
+});
+
+test("near text by time: an evening line with its hours; hours must be in order; clearing removes both", async () => {
+  const built = await admin.post("/api/loyalty", { action: "create_business", forClient: true, kind: "cafe", name: "Times", reward: "Free coffee", target: 8, color: "#123456", setupDays: 30, branchName: "Main" });
+  const biz = built.body.id;
+  const set = await admin.act(biz, "set_near_text", { text: "Good morning ☕", evening: "  Good   evening 🍰 ", morningFrom: 7, eveningFrom: 18 });
+  assert.equal(set.status, 200, JSON.stringify(set.body));
+  let b = (await admin.get(`/api/loyalty?business=${biz}`)).body.business;
+  assert.equal(b.near_text, "Good morning ☕");
+  assert.equal(b.near_text_evening, "Good evening 🍰");
+  assert.equal(b.near_morning_from, 7);
+  assert.equal(b.near_evening_from, 18);
+  const bad = await admin.act(biz, "set_near_text", { text: "x", evening: "y", morningFrom: 18, eveningFrom: 9 });
+  assert.equal(bad.status, 400);
+  // Saving only the main line keeps the evening line.
+  await admin.act(biz, "set_near_text", { text: "Morning!" });
+  b = (await admin.get(`/api/loyalty?business=${biz}`)).body.business;
+  assert.equal(b.near_text, "Morning!");
+  assert.equal(b.near_text_evening, "Good evening 🍰");
+  await admin.act(biz, "set_near_text", { text: "", evening: "" });
+  b = (await admin.get(`/api/loyalty?business=${biz}`)).body.business;
+  assert.equal(b.near_text, null);
+  assert.equal(b.near_text_evening, null);
+});
+
+test("monthly report: the owner sees the month's numbers; strangers can't; the email can be turned off", async () => {
+  const owner = new Client();
+  await signup(owner, "report-owner");
+  const biz = (await owner.post("/api/loyalty", { action: "create_business", name: "Report <b>Cafe</b>", reward: "Free", target: 5, color: "#123456" })).body.id;
+  const c1 = (await owner.act(biz, "register_customer", { name: "Noa", phone: "0531117001" })).body.id;
+  await owner.act(biz, "register_customer", { name: "Ido", phone: "0531117002" });
+  assert.equal((await owner.act(biz, "stamp", { customer: c1, requestId: id() })).status, 200);
+  const month = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit" }).format(new Date()).slice(0, 7);
+  const r = await owner.get(`/api/report?business=${biz}&month=${month}`);
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.report.month, month);
+  assert.equal(r.body.report.customers, 2);
+  assert.equal(r.body.report.now.joined, 2);
+  assert.equal(r.body.report.now.visitors, 1);
+  assert.equal(r.body.report.now.stamps, 1);
+  assert.equal(r.body.report.now.returning, 0, "joined this month, so not a returning customer");
+  assert.equal(r.body.email.on, true);
+  // The default month is last month; a new business has no full month yet.
+  const def = await owner.get(`/api/report?business=${biz}`);
+  assert.equal(def.status, 200);
+  assert.deepEqual(def.body.months, []);
+  assert.equal((await owner.act(biz, "set_report_email", { on: false })).status, 200);
+  assert.equal((await owner.get(`/api/report?business=${biz}&month=${month}`)).body.email.on, false);
+  const stranger = new Client();
+  await signup(stranger, "report-stranger");
+  assert.equal((await stranger.get(`/api/report?business=${biz}`)).status, 403, "never another business's report");
+  assert.equal((await stranger.act(biz, "set_report_email", { on: true })).status >= 400, true);
+});
+
+test("appointments card: set, change and cancel the next appointment; arrival is a visit; stamps are refused", async () => {
+  const built = await admin.post("/api/loyalty", { action: "create_business", forClient: true, kind: "studio", name: "Clinic", reward: "Reminder before every appointment", target: 10, color: "#2a6f97", setupDays: 30, branchName: "Main", program: "appointments" });
+  assert.equal(built.status, 200, JSON.stringify(built.body));
+  const biz = built.body.id;
+  const c = (await admin.act(biz, "register_customer", { name: "Maya", phone: "0531118001" })).body.id;
+  const day = (n) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(Date.now() + n * 86_400_000));
+  const set = await admin.act(biz, "appt_set", { customer: c, requestId: id(), date: day(3), time: "10:30" });
+  assert.equal(set.status, 200, JSON.stringify(set.body));
+  assert.ok(set.body.card.apptAt, "the card carries the appointment");
+  // 10:30 in Israel is 08:30 or 07:30 UTC.
+  assert.match(set.body.card.apptAt, new RegExp(`^${day(3)}T0[78]:30:00`));
+  // A retry with the same request id changes nothing.
+  const rid = id();
+  await admin.act(biz, "appt_set", { customer: c, requestId: rid, date: day(5), time: "09:00" });
+  const again = await admin.act(biz, "appt_set", { customer: c, requestId: rid, date: day(6), time: "09:00" });
+  assert.equal(again.body.replayed, true);
+  assert.match(again.body.card.apptAt, new RegExp(`^${day(5)}`));
+  // In the past or invalid: refused.
+  assert.equal((await admin.act(biz, "appt_set", { customer: c, requestId: id(), date: day(-1), time: "10:00" })).status, 400);
+  assert.equal((await admin.act(biz, "appt_set", { customer: c, requestId: id(), date: day(2), time: "26:00" })).status, 400);
+  // Stamps don't belong to this card; appointments don't belong to stamp cards.
+  assert.equal((await admin.act(biz, "stamp", { customer: c, requestId: id() })).status, 409);
+  assert.equal((await ownerA.act(bizA, "appt_set", { customer: dana, requestId: id(), date: day(2), time: "10:00" })).status, 409);
+  // The customer list and the activity show it.
+  const view = (await admin.get(`/api/loyalty?business=${biz}`)).body;
+  assert.ok(view.customers.find((x) => x.id === c).appt_at);
+  assert.ok(view.events.some((e) => e.kind === "appt"));
+  // Cancel, then an appointment in an hour, then the arrival clears it and counts as a visit.
+  assert.equal((await admin.act(biz, "appt_clear", { customer: c, requestId: id() })).body.card.apptAt, null);
+  const soon = new Date(Date.now() + 2 * 3_600_000);
+  const hm = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Jerusalem", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(soon);
+  const dsoon = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit", day: "2-digit" }).format(soon);
+  assert.equal((await admin.act(biz, "appt_set", { customer: c, requestId: id(), date: dsoon, time: hm })).status, 200);
+  const visit = await admin.act(biz, "visit", { customer: c, requestId: id() });
+  assert.equal(visit.status, 200, JSON.stringify(visit.body));
+  assert.equal(visit.body.card.apptAt, null, "the appointment they came for is done");
+  const after = (await admin.get(`/api/loyalty?business=${biz}`)).body;
+  assert.equal(after.summary.day.visitors_now, 1, "an arrival is a visit");
+  // The customer's own card page shows the card (no stamps).
+  const link = await admin.act(biz, "new_card_link", { customer: c });
+  if (link.status === 200 && link.body.cardUrl) {
+    const html = await (await fetch(link.body.cardUrl.replace(/^https?:\/\/[^/]+/, BASE))).text();
+    assert.match(html, /התור הבא שלך|Your next appointment/);
+  }
+});
+
+test("appointments card add-ons: punch card, points per visit, balance; working hours are owner-only", async () => {
+  const built = await admin.post("/api/loyalty", { action: "create_business", forClient: true, kind: "studio", name: "Clinic2", reward: "Reminders", target: 10, color: "#2a6f97", setupDays: 30, branchName: "Main", program: "appointments" });
+  const biz = built.body.id;
+  const c = (await admin.act(biz, "register_customer", { name: "Lea", phone: "0531119101" })).body.id;
+  // Only the next appointment: arrivals are visits, redeem is refused.
+  assert.equal((await admin.act(biz, "redeem", { customer: c, requestId: id() })).status, 409);
+  // A gift punch card: 3 visits for a free treatment.
+  assert.equal((await admin.act(biz, "set_appt_extra", { extra: "stamps", reward: "Free treatment", target: 3 })).status, 200);
+  for (let i = 0; i < 3; i++) assert.equal((await admin.act(biz, "visit", { customer: c, requestId: id() })).status, 200);
+  let card = (await admin.act(biz, "lookup", { query: "Lea" })).body.results[0];
+  assert.equal(card.rewards, 1, "the third visit earned the gift");
+  assert.equal((await admin.act(biz, "redeem", { customer: c, requestId: id() })).status, 200);
+  // Points: 10 per visit, 30 for the reward.
+  assert.equal((await admin.act(biz, "set_appt_extra", { extra: "points", reward: "Free treatment", target: 30, points: 10 })).status, 200);
+  const v = await admin.act(biz, "visit", { customer: c, requestId: id() });
+  assert.equal(v.status, 200, JSON.stringify(v.body));
+  assert.equal(v.body.card.stamps, 10);
+  assert.equal(v.body.card.target, 30);
+  assert.equal((await admin.act(biz, "set_appt_extra", { extra: "points", reward: "x", target: 30, points: 40 })).status, 400, "points per visit below the goal");
+  // Balance: 5% of a payment of 200.00 adds 10.00.
+  assert.equal((await admin.act(biz, "set_appt_extra", { extra: "cashback", cashbackBp: 500, cashbackMin: 0 })).status, 200);
+  const pay = await admin.act(biz, "purchase", { customer: c, requestId: id(), amount: 20000 });
+  assert.equal(pay.status, 200, JSON.stringify(pay.body));
+  assert.equal(pay.body.card.balance, 1000);
+  // Stamps are now refused (the card adds a balance).
+  assert.equal((await admin.act(biz, "stamp", { customer: c, requestId: id() })).status, 409);
+  // Working hours: valid ones are saved; a closing before opening is refused; staff can't.
+  const hours = [["09:00", "17:00"], ["09:00", "17:00"], null, ["10:00", "19:00"], ["09:00", "17:00"], ["08:00", "12:00"], null];
+  assert.equal((await admin.act(biz, "set_work_hours", { hours, slot: 45 })).status, 200);
+  const b = (await admin.get(`/api/loyalty?business=${biz}`)).body.business;
+  assert.deepEqual(JSON.parse(b.work_hours), hours);
+  assert.equal(b.appt_slot, 45);
+  assert.equal((await admin.act(biz, "set_work_hours", { hours: [["17:00", "09:00"], null, null, null, null, null, null], slot: 30 })).status, 400);
+  assert.equal((await admin.act(biz, "set_work_hours", { hours, slot: 7 })).status, 400);
+  assert.equal((await ownerA.act(bizA, "set_appt_extra", { extra: "none" })).status, 409, "only for the appointments card");
+});
+
+test("clinic services: a service sets the length; free times skip what's taken", async () => {
+  const built = await admin.post("/api/loyalty", { action: "create_business", forClient: true, kind: "studio", name: "Clinic3", reward: "Reminders", target: 10, color: "#2a6f97", setupDays: 30, branchName: "Main", program: "appointments" });
+  const biz = built.body.id;
+  const saved = await admin.act(biz, "set_services", { services: [{ name: "Facial", min: 60 }, { name: "Brows", min: 20 }] });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  const [facial] = saved.body.services;
+  assert.equal((await admin.act(biz, "set_services", { services: [{ name: "Bad", min: 7 }] })).status, 400);
+  // Open every day 09:00-13:00, 30-minute slots.
+  const open = ["09:00", "13:00"];
+  await admin.act(biz, "set_work_hours", { hours: [open, open, open, open, open, open, open], slot: 30 });
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(Date.now() + 3 * 86_400_000));
+  const a = (await admin.act(biz, "register_customer", { name: "Ella", phone: "0531119201" })).body.id;
+  const b = (await admin.act(biz, "register_customer", { name: "Omer", phone: "0531119202" })).body.id;
+  const set = await admin.act(biz, "appt_set", { customer: a, requestId: id(), date: day, time: "10:00", service: facial.id });
+  assert.equal(set.status, 200, JSON.stringify(set.body));
+  assert.equal(set.body.card.apptService, "Facial");
+  assert.equal(set.body.card.apptMin, 60);
+  // A 60-minute service: 10:00-11:00 is taken, so 09:30 and 10:30 don't fit.
+  const free = await admin.act(biz, "appt_free", { date: day, minutes: 60 });
+  assert.equal(free.status, 200, JSON.stringify(free.body));
+  assert.deepEqual(free.body.times, ["09:00", "11:00", "11:30", "12:00"]);
+  // Rescheduling Ella herself: her own appointment doesn't block.
+  assert.ok((await admin.act(biz, "appt_free", { date: day, minutes: 60, except: a })).body.times.includes("10:00"));
+  // A service id that isn't the clinic's is refused.
+  assert.equal((await admin.act(biz, "appt_set", { customer: b, requestId: id(), date: day, time: "11:00", service: "zzzzzzzz" })).status, 400);
+  // The customer list carries the service and length (the calendar shows them).
+  const row = (await admin.get(`/api/loyalty?business=${biz}`)).body.customers.find((x) => x.id === a);
+  assert.equal(row.appt_service, "Facial");
+  assert.equal(row.appt_min, 60);
+});
+
+test("clinic calendar for staff: they see appointments (masked phones) and book; settings stay with the owner", async () => {
+  const built = await admin.post("/api/loyalty", { action: "create_business", forClient: true, kind: "studio", name: "Clinic4", reward: "Reminders", target: 10, color: "#2a6f97", setupDays: 30, branchName: "Main", program: "appointments" });
+  const biz = built.body.id;
+  const inv = await admin.act(biz, "invite_staff", { label: "Desk", email: `desk-${run}@test.perkly` });
+  const token = new URL(inv.body.inviteUrl).pathname.split("/").pop();
+  const desk = new Client();
+  assert.equal((await desk.post("/api/auth", { action: "accept_invite", token, name: "Desk", email: `desk-${run}@test.perkly`, password: "desk pass 12" })).status, 200);
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(Date.now() + 4 * 86_400_000));
+  // The seller registers a new customer and books them.
+  const reg = await desk.act(biz, "register_customer", { name: "Gili", phone: "0531119301" });
+  assert.equal(reg.status, 200, JSON.stringify(reg.body));
+  assert.equal((await desk.act(biz, "appt_set", { customer: reg.body.id, requestId: id(), date: day, time: "11:00" })).status, 200);
+  const list = await desk.act(biz, "appt_list", {});
+  assert.equal(list.status, 200, JSON.stringify(list.body));
+  const gili = list.body.appts.find((a) => a.name === "Gili");
+  assert.ok(gili && gili.appt_at);
+  assert.ok(!gili.phone.includes("119301"), "staff see a masked phone");
+  assert.ok((await admin.act(biz, "appt_list", {})).body.appts.find((a) => a.name === "Gili").phone.replace(/\D/g, "").includes("1119301"), "owners see it");
+  // The settings are the owner's.
+  assert.equal((await desk.act(biz, "set_services", { services: [{ name: "X", min: 30 }] })).status, 403);
+  assert.equal((await desk.act(biz, "set_work_hours", { hours: [null, null, null, null, null, null, null], slot: 30 })).status, 403);
+  assert.equal((await desk.act(biz, "set_appt_extra", { extra: "none" })).status, 403);
+  // Not for stamp cards.
+  assert.equal((await ownerA.act(bizA, "appt_list", {})).status, 409);
+});
+
+test("setup fee: owed only when Perkly builds the business; marked paid or waived by the admin", async () => {
+  const built = await admin.post("/api/loyalty", { action: "create_business", forClient: true, kind: "cafe", name: "Built", reward: "Free", target: 8, color: "#123456", setupDays: 30, branchName: "Main" });
+  const fee = async (b) => (await admin.get(`/api/loyalty?business=${b}`)).body.business;
+  // Self sign-up: no fee (ownerA's business).
+  const self = await ownerA.get(`/api/loyalty?business=${bizA}`);
+  assert.ok(!self.body.business.setup_fee, "self sign-up has no setup fee");
+  assert.equal((await fee(built.body.id)).setup_fee, 30000, "300 shekels");
+  // Online payment isn't set up locally: the owner gets a clear refusal (or no fee).
+  assert.equal((await ownerA.post("/api/billing/setup", { business: bizA })).status, 400, "nothing owed");
+  // The admin marks it paid by hand, and it can't be paid twice.
+  assert.equal((await admin.post("/api/admin", { action: "setup_fee", business: built.body.id, op: "paid" })).status, 200);
+  assert.ok((await fee(built.body.id)).setup_paid);
+  assert.equal((await admin.post("/api/admin", { action: "setup_fee", business: built.body.id, op: "paid" })).status, 400);
+  // Owed again, then waived.
+  assert.equal((await admin.post("/api/admin", { action: "setup_fee", business: built.body.id, op: "due" })).status, 200);
+  assert.equal((await fee(built.body.id)).setup_paid, null);
+  assert.equal((await admin.post("/api/admin", { action: "setup_fee", business: built.body.id, op: "waive" })).status, 200);
+  assert.equal((await fee(built.body.id)).setup_fee, null);
+  // Only the admin.
+  assert.equal((await ownerA.post("/api/admin", { action: "setup_fee", business: bizA, op: "due" })).status, 404, "the admin API is hidden from others");
+});
+
+test("message to customers: the owner sends now or schedules; staff can't; at most 3 a day", async () => {
+  const owner = new Client();
+  await signup(owner, "msg-owner");
+  const biz = (await owner.post("/api/loyalty", { action: "create_business", name: "Msg", reward: "Free", target: 5, color: "#123456" })).body.id;
+  const list = await owner.get(`/api/special?business=${biz}`);
+  assert.equal(list.status, 200, JSON.stringify(list.body));
+  assert.equal(typeof list.body.reach.total, "number");
+  const now = await owner.post("/api/special", { action: "create", business: biz, text: "Double stamps today, {name}!", now: true });
+  assert.equal(now.status, 200, JSON.stringify(now.body));
+  assert.equal(typeof now.body.recipients, "number");
+  const after = (await owner.get(`/api/special?business=${biz}`)).body.items;
+  assert.equal(after.length, 1);
+  assert.ok(after[0].queued, "sent at once");
+  assert.equal(typeof after[0].visited, "number", "the result is counted");
+  assert.equal(after[0].windowDone, false);
+  const later = await owner.post("/api/special", { action: "create", business: biz, text: "Tomorrow", sendAt: new Date(Date.now() + 86_400_000).toISOString() });
+  assert.equal(later.status, 200);
+  assert.equal((await owner.post("/api/special", { action: "create", business: biz, text: "Third", now: true })).status, 200);
+  const fourth = await owner.post("/api/special", { action: "create", business: biz, text: "Fourth", now: true });
+  assert.equal(fourth.status, 429);
+  assert.equal(fourth.body.code, "special_daily");
+  const stranger = new Client();
+  await signup(stranger, "msg-stranger");
+  assert.equal((await stranger.post("/api/special", { action: "create", business: biz, text: "Hi", now: true })).status, 403);
+});
+
+test("billing portal: owners only; without Polar or a subscription it says so", async () => {
+  const owner = new Client();
+  await signup(owner, "portal-owner");
+  const biz = (await owner.post("/api/loyalty", { action: "create_business", name: "Portal", reward: "Free", target: 5, color: "#123456" })).body.id;
+  const r = await owner.post("/api/billing/portal", { business: biz });
+  assert.ok([503, 404].includes(r.status), `${r.status} ${JSON.stringify(r.body)}`);
+  const stranger = new Client();
+  await signup(stranger, "portal-stranger");
+  assert.equal((await stranger.post("/api/billing/portal", { business: biz })).status, 403);
+  const page = await owner.get("/billing");
+  assert.equal(page.status, 200);
+});
+
+test("refresh all cards: admin only, counts what it refreshed", async () => {
+  const r = await admin.post("/api/admin/wallet", { action: "refresh_all" });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(typeof r.body.businesses, "number");
+  assert.ok(r.body.businesses > 0);
+  const stranger = new Client();
+  await signup(stranger, "refresh-stranger");
+  assert.equal((await stranger.post("/api/admin/wallet", { action: "refresh_all" })).status, 404);
+});
+
+test("bring a friend: both get the bonus on the friend's first visit, once", async () => {
+  const owner = new Client();
+  await signup(owner, "ref-owner");
+  const biz = (await owner.post("/api/loyalty", { action: "create_business", name: "Refer", reward: "Free", target: 10, color: "#123456" })).body.id;
+  assert.equal((await owner.act(biz, "set_referral", { stamps: 9 })).status, 400);
+  assert.equal((await owner.act(biz, "set_referral", { stamps: 2 })).status, 200);
+  const joinCode = (await owner.get(`/api/loyalty?business=${biz}`)).body.business.join_code;
+  const a = (await owner.act(biz, "register_customer", { name: "Dana", phone: "0531110001" })).body;
+  const page = await fetch(a.cardUrl.replace(/^https?:\/\/[^/]+/, BASE)).then((r) => r.text());
+  const ref = page.match(/join\/[a-z0-9]+\?ref=([A-Za-z0-9_-]+)/)?.[1];
+  assert.ok(ref, "the card shows an invite link");
+  const joined = await new Client().post("/api/join", { code: joinCode, name: "Lior", phone: "0531110002", terms: true, ref });
+  assert.equal(joined.status, 200, JSON.stringify(joined.body));
+  const friend = (await owner.get(`/api/loyalty?business=${biz}&q=Lior`)).body.customers?.find((c) => c.name === "Lior")
+    ?? (await owner.act(biz, "find_customer", { q: "0531110002" })).body?.customer;
+  assert.ok(friend?.id, "friend found");
+  const first = await owner.act(biz, "stamp", { customer: friend.id, requestId: id() });
+  assert.equal(first.status, 200, JSON.stringify(first.body));
+  assert.equal(first.body.referralBonus, 2);
+  assert.equal(first.body.card.stamps, 3);
+  const second = await owner.act(biz, "stamp", { customer: friend.id, requestId: id() });
+  assert.equal(second.body.referralBonus, undefined);
+  const list = (await owner.get(`/api/loyalty?business=${biz}`)).body.customers ?? [];
+  const inviter = list.find((c) => c.id === a.id);
+  if (inviter) assert.equal(inviter.stamps, 2);
+});
+
 test("change the sign-in email: needs the current password, refuses a taken or same address", async () => {
   const a = new Client();
   await signup(a, "mover");

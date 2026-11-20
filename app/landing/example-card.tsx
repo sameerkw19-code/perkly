@@ -31,7 +31,7 @@ export function exampleDesign(k: ExampleKey, lang: Lang, name: string, rewardLin
     walletNotify: false,
     walletWelcome: false,
     walletBirthday: false,
-    birthdayGift: false,
+    birthdayGift: false, walletMissYou: false,
     progressImage: null,
     langs: [lang],
     texts: Object.fromEntries((["he", "ar", "en", "ru", "de", "fr"] as const).map((l) => [l, { ...texts, notify: "", notifyReward: "", welcome: "", birthday: "" }])) as Design["texts"],

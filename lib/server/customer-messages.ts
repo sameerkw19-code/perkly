@@ -7,8 +7,13 @@
 import { passProgram } from "./balance-pass";
 import { walletConfig, updateLoyaltyObject, type WalletConfig } from "./google-wallet";
 import { liveDesign, passLook } from "./designs";
-import { BIRTHDAY_GIFT_DAYS, noticeOn, type Design, type StampNotice } from "../design";
+import { BIRTHDAY_GIFT_DAYS, MISS_YOU_DAYS, noticeOn, type Design, type StampNotice } from "../design";
 import { birthdayKeys, israelNow } from "../birthday";
+import { nearPhase } from "../near-text";
+import { sendMonthlyReports } from "./monthly-report";
+import { sendApptReminders } from "./appointment-reminders";
+import type { MailEnv } from "./mailer";
+import { pushAppleBusinessNow, pushAppleCustomersNow } from "./apple-push";
 
 type Env = { GOOGLE_WALLET_SA_KEY?: string; GOOGLE_WALLET_ISSUER_ID?: string; GOOGLE_WALLET_CLASS_ID?: string; WALLET_BATCH?: string };
 
@@ -47,27 +52,95 @@ export async function queueWelcome(db: D1Database, customer: { id: string; busin
 }
 
 /** Special days whose time came: one outbox row per customer with the card in Google Wallet. */
+/**
+ * Sends one message to the business's customers: Google Wallet passes through the outbox (a batch per run),
+ * Apple Wallet passes by setting the business's latest message and pushing every iPhone, which fetches the
+ * pass again and shows the message as a notification. Marked queued first, so it never goes out twice.
+ */
+/** How many customers have the card in Google Wallet, in Apple Wallet, and in at least one of them. */
+export async function walletReach(db: D1Database, business: string): Promise<{ google: number; apple: number; total: number }> {
+  const r = await db
+    .prepare(
+      `SELECT SUM(g) AS google, SUM(a) AS apple, SUM(CASE WHEN g + a > 0 THEN 1 ELSE 0 END) AS total FROM (
+         SELECT (c.google_wallet IS NOT NULL) AS g, EXISTS(SELECT 1 FROM apple_registrations r WHERE r.serial = c.id) AS a
+         FROM customers c WHERE c.business = ? AND c.archived IS NULL)`,
+    )
+    .bind(business)
+    .first<{ google: number | null; apple: number | null; total: number | null }>();
+  return { google: r?.google ?? 0, apple: r?.apple ?? 0, total: r?.total ?? 0 };
+}
+
+export async function sendSpecial(db: D1Database, s: { id: string; business: string; text: string }, nowIso: string): Promise<void> {
+  const claimed = await db.prepare("UPDATE special_days SET queued = ? WHERE id = ? AND queued IS NULL AND canceled IS NULL").bind(nowIso, s.id).run();
+  if (!claimed.meta.changes) return;
+  await db.batch([
+    db
+      .prepare(
+        `INSERT OR IGNORE INTO wallet_outbox(id, business, customer, kind, campaign, not_before, created)
+         SELECT 'sp:' || ? || ':' || id, business, id, 'special', ?, ?, ? FROM customers
+         WHERE business = ? AND archived IS NULL AND google_wallet IS NOT NULL`,
+      )
+      .bind(s.id, s.id, nowIso, nowIso, s.business),
+    db.prepare("UPDATE businesses SET news_text = ?, news_at = ? WHERE id = ?").bind(s.text, nowIso, s.business),
+  ]);
+  // Customers with the card in a wallet (Google, Apple or both), counted once.
+  const reach = await walletReach(db, s.business);
+  await db.prepare("UPDATE special_days SET recipients = ? WHERE id = ?").bind(reach.total, s.id).run();
+  await pushAppleBusinessNow(db, s.business);
+}
+
 async function queueSpecialDays(db: D1Database, nowIso: string): Promise<void> {
   const due = await db
     .prepare(
-      `SELECT s.id, s.business FROM special_days s JOIN businesses b ON b.id = s.business
+      `SELECT s.id, s.business, s.text FROM special_days s JOIN businesses b ON b.id = s.business
        WHERE s.queued IS NULL AND s.canceled IS NULL AND s.send_at <= ? AND b.archived IS NULL AND b.suspended IS NULL LIMIT 20`,
     )
     .bind(nowIso)
-    .all<{ id: string; business: string }>();
-  for (const s of due.results ?? []) {
-    const [insert] = await db.batch([
-      db
-        .prepare(
-          `INSERT OR IGNORE INTO wallet_outbox(id, business, customer, kind, campaign, not_before, created)
-           SELECT 'sp:' || ? || ':' || id, business, id, 'special', ?, ?, ? FROM customers
-           WHERE business = ? AND archived IS NULL AND google_wallet IS NOT NULL`,
-        )
-        .bind(s.id, s.id, nowIso, nowIso, s.business),
-      db.prepare("UPDATE special_days SET queued = ? WHERE id = ?").bind(nowIso, s.id),
-    ]);
-    await db.prepare("UPDATE special_days SET recipients = ? WHERE id = ?").bind(insert.meta.changes ?? 0, s.id).run();
+    .all<{ id: string; business: string; text: string }>();
+  for (const s of due.results ?? []) await sendSpecial(db, s, nowIso);
+}
+
+/**
+ * Once a day (from BIRTHDAY_HOUR), in businesses that turned it on: "we miss you" to customers whose last visit
+ * (or joining) was MISS_YOU_DAYS to 60 days ago, once per quiet spell (not again until they visit and go quiet
+ * again). Google Wallet passes through the outbox; Apple Wallet passes show it as a message on the pass, and
+ * the iPhones are pushed now. Returns how many customers it reached.
+ */
+export async function queueMissYou(db: D1Database, nowIso: string): Promise<number> {
+  const now = Date.parse(nowIso);
+  const from = new Date(now - 60 * 86_400_000).toISOString();
+  const to = new Date(now - MISS_YOU_DAYS * 86_400_000).toISOString();
+  const businesses = (await db
+    .prepare("SELECT id, name, reward, color FROM businesses WHERE archived IS NULL AND suspended IS NULL")
+    .all<{ id: string; name: string; reward: string; color: string }>()).results;
+  let reached = 0;
+  for (const b of businesses) {
+    const design = await liveDesign(db, b);
+    if (!design.walletMissYou) continue;
+    const quiet = (await db
+      .prepare(
+        `SELECT id, google_wallet FROM (
+           SELECT c.id, c.google_wallet, c.missyou_at, COALESCE((SELECT MAX(e.created) FROM events e WHERE e.customer = c.id), c.created) AS last
+           FROM customers c WHERE c.business = ? AND c.archived IS NULL
+         ) WHERE last > ? AND last <= ? AND (missyou_at IS NULL OR missyou_at < last) LIMIT 500`,
+      )
+      .bind(b.id, from, to)
+      .all<{ id: string; google_wallet: string | null }>()).results;
+    if (!quiet.length) continue;
+    for (let i = 0; i < quiet.length; i += 50) {
+      const part = quiet.slice(i, i + 50);
+      await db.batch([
+        db.prepare(`UPDATE customers SET missyou_at = ? WHERE id IN (${part.map(() => "?").join(",")})`).bind(nowIso, ...part.map((c) => c.id)),
+        ...part.filter((c) => c.google_wallet).map((c) =>
+          db.prepare("INSERT OR IGNORE INTO wallet_outbox(id, business, customer, kind, not_before, created) VALUES(?, ?, ?, 'missyou', ?, ?)")
+            .bind(`miss:${c.id}:${nowIso.slice(0, 10)}`, b.id, c.id, nowIso, nowIso),
+        ),
+      ]);
+    }
+    await pushAppleCustomersNow(db, quiet.map((c) => c.id));
+    reached += quiet.length;
   }
+  return reached;
 }
 
 /**
@@ -119,10 +192,10 @@ export async function queueBirthdays(db: D1Database, today: { md: string; year: 
 }
 
 type OutboxRow = {
-  id: string; business: string; customer: string; kind: "welcome" | "birthday" | "special" | "sync"; campaign: string | null; attempts: number; origin: string | null;
+  id: string; business: string; customer: string; kind: "welcome" | "birthday" | "special" | "sync" | "missyou" | "appt"; campaign: string | null; attempts: number; origin: string | null;
   name: string; stamps: number; target: number; scan_code: string; google_wallet: string | null; archived: string | null;
   b_name: string; b_reward: string; b_color: string; reward_mode: string; b_archived: string | null; suspended: string | null;
-  special_text: string | null; special_canceled: string | null;
+  special_text: string | null; special_canceled: string | null; appt_msg: string | null;
 };
 
 /** Sends due outbox messages, oldest first. Returns how many were handled. */
@@ -130,7 +203,7 @@ export async function drainOutbox(db: D1Database, config: WalletConfig, nowIso: 
   const due = await db
     .prepare(
       `SELECT o.id, o.business, o.customer, o.kind, o.campaign, o.attempts, o.origin,
-         c.name, c.stamps, c.target, c.scan_code, c.google_wallet, c.archived,
+         c.name, c.stamps, c.target, c.scan_code, c.google_wallet, c.archived, c.appt_msg,
          b.name AS b_name, b.reward AS b_reward, b.color AS b_color, b.reward_mode, b.archived AS b_archived, b.suspended,
          s.text AS special_text, s.canceled AS special_canceled
        FROM wallet_outbox o JOIN customers c ON c.id = o.customer JOIN businesses b ON b.id = o.business
@@ -157,11 +230,14 @@ export async function drainOutbox(db: D1Database, config: WalletConfig, nowIso: 
     };
     // A refresh: the current stamps, rewards and look, without a message (a retry, or a new design).
     if (o.kind === "sync") {
-      const full = o.origin ? await passLook(db, business, o.origin, { stamps: o.stamps, target: o.target }).catch(() => null) : null;
+      const program = await passProgram(db, o.customer);
+      // Balance and appointment cards have no stamp banner.
+      const stampsLook = program.balance === undefined && program.appointment === undefined ? { stamps: o.stamps, target: o.target } : undefined;
+      const full = o.origin ? await passLook(db, business, o.origin, stampsLook).catch(() => null) : null;
       const { notice: _none, ...look } = full ?? { notice: null };
       const result = await updateLoyaltyObject(
         config,
-        { customerId: o.customer, businessId: o.business, stamps: o.stamps, target: o.target, scanCode: o.scan_code, rewards: await rewardsNow(), ...(await passProgram(db, o.customer)), look: full ? (look as typeof full) : undefined },
+        { customerId: o.customer, businessId: o.business, stamps: o.stamps, target: o.target, scanCode: o.scan_code, rewards: await rewardsNow(), ...program, look: full ? (look as typeof full) : undefined },
         null,
       );
       if (result === "updated") await finish(o.id, "sent");
@@ -178,8 +254,11 @@ export async function drainOutbox(db: D1Database, config: WalletConfig, nowIso: 
       continue;
     }
     const notice: StampNotice =
-      o.kind === "special" ? { kind: "special", name: o.name, text: o.special_text ?? "" }
+      // An appointment reminder: its text was written when it was due (the business, the day and the time).
+      o.kind === "appt" ? { kind: "special", name: o.name, text: o.appt_msg ?? "" }
+      : o.kind === "special" ? { kind: "special", name: o.name, text: o.special_text ?? "" }
       : o.kind === "birthday" ? { kind: "birthday", name: o.name, gift: design.birthdayGift }
+      : o.kind === "missyou" ? { kind: "missyou", name: o.name }
       : { kind: "welcome", name: o.name };
     // Turned off after it was queued (or a special day with no text): nothing to send.
     if (!noticeOn(design, notice.kind) || (notice.kind === "special" && !notice.text.trim())) { await finish(o.id, "off"); continue; }
@@ -204,6 +283,28 @@ export async function drainOutbox(db: D1Database, config: WalletConfig, nowIso: 
 }
 
 /** One cron run: queue what is due, then send a batch. */
+/**
+ * Businesses with a morning and an evening lock-screen line: when the hour passes the switch,
+ * the iPhones get the card again (silently) with the other line. Each switch happens once.
+ */
+export async function switchNearTexts(db: D1Database, hour: number, nowIso: string): Promise<number> {
+  const { results } = await db
+    .prepare("SELECT id, near_morning_from, near_evening_from, near_phase FROM businesses WHERE near_text_evening IS NOT NULL AND archived IS NULL AND suspended IS NULL")
+    .all<{ id: string; near_morning_from: number; near_evening_from: number; near_phase: string | null }>();
+  let switched = 0;
+  for (const b of results) {
+    const phase = nearPhase(hour, b.near_morning_from, b.near_evening_from);
+    if (phase === b.near_phase) continue;
+    // Marked first (and only if still the old one), so two overlapping runs never both push.
+    const r = await db.prepare("UPDATE businesses SET near_phase = ?, near_updated = ? WHERE id = ? AND near_phase IS ?").bind(phase, nowIso, b.id, b.near_phase).run();
+    if (!r.meta.changes) continue;
+    switched++;
+    await pushAppleBusinessNow(db, b.id).catch((e) => console.error("near switch push failed:", b.id, e));
+  }
+  if (switched) console.log(`near text: ${switched} businesses switched`);
+  return switched;
+}
+
 export async function runScheduled(db: D1Database, env: Env, now = new Date()): Promise<void> {
   const nowIso = now.toISOString();
   const today = israelNow(now);
@@ -215,8 +316,17 @@ export async function runScheduled(db: D1Database, env: Env, now = new Date()): 
       const r = await queueBirthdays(db, today, nowIso);
       console.log(`birthdays ${today.date}: ${r.gifts} gifts, ${r.greetings} greetings queued`);
     }
+    const missed = await db.prepare("SELECT last FROM job_runs WHERE name = 'missyou'").first<{ last: string }>();
+    if (missed?.last !== today.date) {
+      await db.prepare("INSERT INTO job_runs(name, last) VALUES('missyou', ?) ON CONFLICT(name) DO UPDATE SET last = excluded.last").bind(today.date).run();
+      const n = await queueMissYou(db, nowIso);
+      console.log(`missyou ${today.date}: ${n} customers`);
+    }
   }
   await queueSpecialDays(db, nowIso);
+  await switchNearTexts(db, today.hour, nowIso);
+  await sendApptReminders(db, nowIso).catch((e) => console.error("appointment reminders failed:", e));
+  await sendMonthlyReports(db, env as unknown as MailEnv & { REPORT_EMAILS?: string; PUBLIC_ORIGIN?: string }, now).catch((e) => console.error("monthly report failed:", e));
   const config = walletConfig(env);
   if (!config) return;
   const batch = Math.max(1, Math.min(100, Number(env.WALLET_BATCH) || DEFAULT_BATCH));

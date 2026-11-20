@@ -49,6 +49,15 @@ export type PassNotice = { header: string; body: string; language: string; trans
  * `card`: the customer's stamps and target, for the stamp banner (one picture per stamp count).
  * `card.notice`: what just happened, when the business turned on wallet notifications.
  */
+/** Where the business's open branches are on the map (Apple and Google Wallet take 10 at most). */
+export async function businessPlaces(db: D1Database, businessId: string): Promise<{ lat: number; lng: number; name: string }[]> {
+  const rows = await db
+    .prepare("SELECT lat, lng, name FROM branches WHERE business = ? AND archived IS NULL AND lat IS NOT NULL AND lng IS NOT NULL ORDER BY created LIMIT 10")
+    .bind(businessId)
+    .all<{ lat: number; lng: number; name: string }>();
+  return rows.results;
+}
+
 export async function passLook(db: D1Database, business: BusinessLike, origin: string, card?: { stamps: number; target: number; notice?: StampNotice }) {
   const design = await liveDesign(db, business);
   const first = cardLang(design);
@@ -71,7 +80,8 @@ export async function passLook(db: D1Database, business: BusinessLike, origin: s
   // The business's own Wallet class needs its logo as PNG or JPEG (not WebP).
   let classLook: { name: string; color: string; logoUrl: string } | null = null;
   // The wallet version of the logo (white background removed, centred in a square) when the editor made one.
-  const logoId = design.googleLogo ?? design.logo;
+  // The notification icon, when the business uploaded one, is made for exactly this round spot.
+  const logoId = design.notifyIcon ?? design.googleLogo ?? design.logo;
   if (logoId) {
     const logo = await db.prepare("SELECT mime FROM assets WHERE id = ? AND business = ?").bind(logoId, business.id).first<{ mime: string }>();
     if (logo && (logo.mime === "image/png" || logo.mime === "image/jpeg")) {
@@ -101,5 +111,7 @@ export async function passLook(db: D1Database, business: BusinessLike, origin: s
     language: GOOGLE_TAG[first],
     translations,
     classLook,
+    // Google shows the pass on the phone near these places.
+    places: (await businessPlaces(db, business.id)).map(({ lat, lng }) => ({ lat, lng })),
   };
 }

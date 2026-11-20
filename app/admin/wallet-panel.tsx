@@ -62,6 +62,7 @@ export function WalletPanel() {
     const r = await fetch("/api/admin/wallet", { credentials: "same-origin" });
     setState((await r.json().catch(() => ({ status: "error" }))) as State);
   }
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loading the status once when the panel opens
   useEffect(() => { load(); }, []);
 
   async function submit() {
@@ -73,6 +74,19 @@ export function WalletPanel() {
     if (!r.ok) { setMsg("השליחה נכשלה. נסה שוב או בדוק בקונסולה של Google Pay."); return; }
     setMsg("נשלח לבדיקה.");
     load();
+  }
+
+  // Every business's cards get the current name, logo, icon and design.
+  const [refreshing, setRefreshing] = useState<"idle" | "ask" | "busy">("idle");
+  const [refreshMsg, setRefreshMsg] = useState("");
+  async function refreshAll() {
+    setRefreshing("busy");
+    setRefreshMsg("");
+    const r = await post<{ businesses: number; classes: number; google: number; apple: number }>("/api/admin/wallet", { action: "refresh_all" });
+    setRefreshing("idle");
+    if (!r.ok || !r.data) { setRefreshMsg("הריענון נכשל. נסה שוב."); return; }
+    const d = r.data;
+    setRefreshMsg(`רוענן: ${d.businesses} עסקים. Google: ${d.classes} עיצובי עסק ו־${d.google} כרטיסים (יתעדכנו תוך כמה דקות). אייפון: ${d.apple} מכשירים.`);
   }
 
   const status = state?.status;
@@ -94,6 +108,18 @@ export function WalletPanel() {
       {state?.classes && <p className="form-hint" dir="ltr">Classes at Google: {state.classes.length ? state.classes.join(", ") : "none"}</p>}
       {msg && <p className="form-hint">{msg}</p>}
       {state && <AppleStatus apple={state.apple} />}
+      <h2 style={{ marginTop: 20 }}>ריענון כל הכרטיסים</h2>
+      <p className="form-hint">מעדכן בכל העסקים הפתוחים את השם, הלוגו, סמל ההתראות והעיצוב בכרטיסים שכבר אצל לקוחות, ב־Google וב־Apple. אין צורך לפרסם כל עסק מחדש.</p>
+      {refreshing === "ask" ? (
+        <div className="admin-row" role="group" aria-label="אישור ריענון">
+          <span>לרענן עכשיו את כל הכרטיסים של כל העסקים?</span>
+          <button className="btn primary small" onClick={refreshAll}>כן, לרענן</button>
+          <button className="btn soft small" onClick={() => setRefreshing("idle")}>ביטול</button>
+        </div>
+      ) : (
+        <button className="btn soft small" disabled={refreshing === "busy"} onClick={() => setRefreshing("ask")}>{refreshing === "busy" ? "מרענן…" : "ריענון כל הכרטיסים"}</button>
+      )}
+      {refreshMsg && <p className="form-hint" role="status">{refreshMsg}</p>}
     </section>
   );
 }

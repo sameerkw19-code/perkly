@@ -7,6 +7,7 @@ import { releaseArchivedPhone } from "../../../lib/server/customers";
 import { businessAccess, freeLimitReached } from "../../../lib/server/billing";
 import { parseBirthday } from "../../../lib/birthday";
 import { getSettings } from "../../../lib/server/settings";
+import { referrerFor } from "../../../lib/server/referral";
 
 export const dynamic = "force-dynamic";
 
@@ -40,14 +41,17 @@ export async function POST(request: Request) {
   if (birthday === "invalid") return fail("bad_details", 400, "Invalid birthday");
 
   const now = new Date().toISOString();
+  // Joined through a friend's invite link: remembered, and rewarded on the first visit (see lib/server/referral.ts).
+  const invitedBy = await referrerFor(db, business.id, body.ref);
+  const newId = crypto.randomUUID();
   const secret = randomToken(24);
   const scan = randomToken(16);
   const insert = db
     .prepare(
-      `INSERT OR IGNORE INTO customers(id, business, name, phone, token, stamps, target, created, card_hash, scan_code, consent_terms, consent_marketing, source, birthday)
-       VALUES(?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, 'self', ?)`,
+      `INSERT OR IGNORE INTO customers(id, business, name, phone, token, stamps, target, created, card_hash, scan_code, consent_terms, consent_marketing, source, birthday, invited_by)
+       VALUES(?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(crypto.randomUUID(), business.id, name, phone, scan, business.target, now, await sha256(secret), scan, now, marketing, birthday);
+    .bind(newId, business.id, name, phone, scan, business.target, now, await sha256(secret), scan, now, marketing, "self", birthday, invitedBy);
   // A removed customer's phone may join again: free it first, in the same batch as the insert.
   const [, r] = await db.batch([releaseArchivedPhone(db, business.id, phone), insert]);
   if (r.meta.changes) return json({ cardPath: `/c/${secret}?welcome=1` });

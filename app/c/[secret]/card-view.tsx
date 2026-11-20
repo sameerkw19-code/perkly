@@ -4,6 +4,7 @@ import { RefreshCw, Wallet } from "lucide-react";
 import { useLang, translate } from "../../../lib/i18n";
 import { LoyaltyCard } from "../../../components/loyalty-card";
 import { averageReward, formatMoney, pctLabel } from "../../../lib/cashback.ts";
+import { formatAppt } from "../../../lib/appointment";
 import { QrImage } from "../../../components/qr";
 
 import { cardLang, noticeText, textsFor, type Design } from "../../../lib/design";
@@ -15,10 +16,12 @@ import { Brand } from "../../../components/brand";
 type Card = { name: string; stamps: number; target: number; scan_code: string; design: Design; rewards: number; nextExpiry: string | null; business: string; links: { key: SocialKey; label: string; url: string }[];
   /** The balance card: balance and minimum in minor units, basis points back. */
   cashback?: { balance: number; bp: number; min: number; currency: "ILS" | "USD" } | null;
+  /** The appointments card: the next appointment (ISO), or null. */
+  appointment?: { at: string | null; extra?: "none" | "stamps" | "points" | "cashback" } | null;
   /** The "average" card: this round's total and the value of the next reward (minor units). */
   average?: { roundTotal: number; cap?: number; ready: number | null; currency: "ILS" | "USD" } | null };
 
-export default function CardView({ card, secret, googleWallet, appleWallet = false, isIOS }: { card: Card | null; secret: string; googleWallet: boolean; appleWallet?: boolean; isIOS: boolean }) {
+export default function CardView({ card, secret, googleWallet, appleWallet = false, isIOS, invite = null }: { card: Card | null; secret: string; googleWallet: boolean; appleWallet?: boolean; isIOS: boolean; invite?: { stamps: number; link: string } | null }) {
   // The page's own chrome follows the visitor's site language; the card follows its business's languages.
   const { lang: siteLang, dir: siteDir } = useLang();
   const [picked, setPicked] = useState<Lang | null>(null);
@@ -41,6 +44,7 @@ export default function CardView({ card, secret, googleWallet, appleWallet = fal
   useEffect(() => {
     const url = new URL(window.location.href);
     if (url.searchParams.get("welcome") !== "1") return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read once from the browser after hydration (the server can't see it)
     setWelcome(true);
     url.searchParams.delete("welcome");
     window.history.replaceState(null, "", url.pathname + url.search);
@@ -82,6 +86,7 @@ export default function CardView({ card, secret, googleWallet, appleWallet = fal
               text: formatMoney(card.cashback.balance, card.cashback.currency, lang), pct: pctLabel(card.cashback.bp),
               min: card.cashback.min > 0 ? formatMoney(card.cashback.min, card.cashback.currency, lang) : undefined,
             } : undefined}
+            appointment={card.appointment ? { text: card.appointment.at ? formatAppt(card.appointment.at, lang) : null, extra: card.appointment.extra } : undefined}
             average={card.average ? {
               soFar: card.stamps > 0 ? formatMoney(averageReward(card.average.roundTotal, card.stamps, card.average.cap ?? 0), card.average.currency, lang) : undefined,
               ready: card.average.ready != null ? formatMoney(card.average.ready, card.average.currency, lang) : undefined,
@@ -89,7 +94,7 @@ export default function CardView({ card, secret, googleWallet, appleWallet = fal
             t={t}
             qr={<QrImage text={"perkly:" + card.scan_code} size={336} label={t("showQr")} />}
           />
-          {!card.cashback && card.rewards > 0 && (
+          {!card.cashback && (!card.appointment || card.appointment.extra === "stamps" || card.appointment.extra === "points") && card.rewards > 0 && (
             <div className="ready-banner" role="status">
               {t("earned")}
               {card.rewards > 1 && <> · {t("rewardsAvail", { n: card.rewards })}</>}
@@ -98,8 +103,9 @@ export default function CardView({ card, secret, googleWallet, appleWallet = fal
           )}
           <div className="qr-note">
             <p>{t("showQr")}</p>
-            <small className="form-hint">{t("qrNote")}</small>
+            {!card.appointment && <small className="form-hint">{t("qrNote")}</small>}
           </div>
+          {invite && <InviteFriend invite={invite} business={card.business} t={t} />}
           {card.links.length > 0 && (
             <section className="panel social-panel" aria-label={t("socialFollow")}>
               <p><strong>{t("socialFollow")}</strong> · {card.business}</p>
@@ -130,5 +136,30 @@ export default function CardView({ card, secret, googleWallet, appleWallet = fal
       )}
       </main>
     </div>
+  );
+}
+
+/** "Bring a friend": the customer's invite link, to share, send on WhatsApp or copy. */
+function InviteFriend({ invite, business, t }: { invite: { stamps: number; link: string }; business: string; t: (k: string, v?: Record<string, string | number>) => string }) {
+  const [copied, setCopied] = useState(false);
+  const message = t("friendMessage", { b: business, n: invite.stamps, link: invite.link });
+  const share = async () => {
+    try {
+      if (navigator.share) { await navigator.share({ text: message }); return; }
+    } catch { return; }
+    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank", "noopener");
+  };
+  return (
+    <section className="panel invite-panel" aria-labelledby="invite-title">
+      <h2 id="invite-title">🎁 {t("friendTitle")}</h2>
+      <p>{t("friendText", { n: invite.stamps })}</p>
+      <div className="invite-actions">
+        <button type="button" className="btn primary" onClick={share}>{t("friendShare")}</button>
+        <a className="btn soft" href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>
+        <button type="button" className="btn soft" onClick={async () => {
+          try { await navigator.clipboard.writeText(invite.link); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {}
+        }}>{copied ? t("friendCopied") : t("friendCopy")}</button>
+      </div>
+    </section>
   );
 }

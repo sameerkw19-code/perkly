@@ -14,6 +14,8 @@ export type PolarEnv = {
   /** Dollar products for businesses abroad. Without them, those businesses get the shekel products. */
   POLAR_PRODUCT_ID_USD?: string;
   POLAR_PRODUCT_ID_YEARLY_USD?: string;
+  /** Optional: the one-time setup fee (300 ILS), for businesses Perkly sets up and designs. Without it the fee is paid by hand. */
+  POLAR_PRODUCT_ID_SETUP?: string;
   POLAR_WEBHOOK_SECRET?: string;
   POLAR_SANDBOX?: string;
 };
@@ -74,6 +76,37 @@ export async function createCheckoutUrl(env: PolarEnv, businessId: string, origi
   const data = (await response.json().catch(() => null)) as { url?: string } | null;
   if (!response.ok || !data?.url) throw new Error(`polar_checkout_failed:${response.status}`);
   return data.url;
+}
+
+/** Whether the setup fee can be paid online: billing works and a setup product is set (shekel businesses). */
+export function setupCheckoutConfigured(env: PolarEnv, currency: Currency): boolean {
+  return polarConfigured(env) && !!env.POLAR_PRODUCT_ID_SETUP && currency === "ILS";
+}
+
+/** A hosted Polar checkout for the one-time setup fee of one business. The order's metadata names the business. */
+export async function createSetupCheckoutUrl(env: PolarEnv, businessId: string, origin: string, customerEmail: string): Promise<string> {
+  const response = await fetch(`${apiBase(env)}/checkouts/`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${env.POLAR_ACCESS_TOKEN}`, "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({
+      products: [env.POLAR_PRODUCT_ID_SETUP],
+      success_url: `${origin}/billing?setup=1`,
+      return_url: `${origin}/billing`,
+      customer_email: customerEmail,
+      metadata: { business: businessId, kind: "setup" },
+    }),
+  });
+  const data = (await response.json().catch(() => null)) as { url?: string } | null;
+  if (!response.ok || !data?.url) throw new Error(`polar_checkout_failed:${response.status}`);
+  return data.url;
+}
+
+/** A paid setup-fee order from a webhook: the business and the order id, or null for anything else. */
+export function setupOrder(event: { type: string; data: Record<string, unknown> }): { business: string; order: string } | null {
+  if (event.type !== "order.paid") return null;
+  const meta = (event.data.metadata ?? {}) as Record<string, unknown>;
+  if (meta.kind !== "setup" || typeof meta.business !== "string" || typeof event.data.id !== "string") return null;
+  return { business: meta.business, order: event.data.id };
 }
 
 function base64ToBytes(value: string): Uint8Array<ArrayBuffer> {
@@ -177,6 +210,13 @@ export type PolarOrder = {
  * Reads up to `pages` pages of 100. Field names are read defensively, since the API evolves.
  * Throws "polar_orders_<status>" on an API error (e.g. 401/403 when the token lacks orders:read).
  */
+/** The fields of a Polar order this site reads. */
+type PolarOrderItem = {
+  id?: string; created_at?: string; total_amount?: number; amount?: number; net_amount?: number; currency?: string; status?: string;
+  paid?: boolean; billing_reason?: string; customer?: { email?: unknown }; metadata?: { business?: unknown };
+  subscription?: { metadata?: { business?: unknown } };
+};
+
 export async function listOrders(env: PolarEnv, pages = 3): Promise<PolarOrder[]> {
   if (!env.POLAR_ACCESS_TOKEN) throw new Error("polar_not_configured");
   const out: PolarOrder[] = [];
@@ -185,7 +225,7 @@ export async function listOrders(env: PolarEnv, pages = 3): Promise<PolarOrder[]
       headers: { Authorization: `Bearer ${env.POLAR_ACCESS_TOKEN}`, Accept: "application/json" },
     });
     if (!r.ok) throw new Error(`polar_orders_${r.status}`);
-    const data = (await r.json()) as { items?: Record<string, any>[]; pagination?: { max_page?: number } };
+    const data = (await r.json()) as { items?: PolarOrderItem[]; pagination?: { max_page?: number } };
     for (const o of data.items ?? []) {
       const cents = Number(o.total_amount ?? o.amount ?? o.net_amount ?? 0);
       out.push({
@@ -263,4 +303,31 @@ export async function getSubscription(env: PolarEnv, subscriptionId: string): Pr
   // subscriptionRow needs a business in the metadata; a subscription made elsewhere may have none.
   const meta = (item.metadata && typeof item.metadata === "object" ? item.metadata : {}) as Record<string, unknown>;
   return subscriptionRow({ type: "subscription.updated", data: { ...item, metadata: { ...meta, business: meta.business ?? "unknown" } } });
+}
+
+/**
+ * A sign-in link to Polar's customer portal for one customer (valid for a short while): there the owner changes the
+ * card, downloads invoices or cancels. Needs the access token's customer_sessions:write scope.
+ */
+export async function customerPortalUrl(env: PolarEnv, customerId: string, returnUrl: string): Promise<string> {
+  if (!env.POLAR_ACCESS_TOKEN) throw new Error("polar_not_configured");
+  const r = await fetch(`${apiBase(env)}/customer-sessions/`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${env.POLAR_ACCESS_TOKEN}`, "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ customer_id: customerId, return_url: returnUrl }),
+  });
+  if (!r.ok) throw new Error(`polar_customer_session_${r.status}`);
+  const data = (await r.json()) as { customer_portal_url?: string };
+  if (!data.customer_portal_url?.startsWith("https://")) throw new Error("polar_customer_session_no_url");
+  return data.customer_portal_url;
+}
+
+/**
+ * Free trial days for a new checkout: through the business's free access (so it is never charged while it still
+ * has it), and at least the standard trial for a first subscription. Polar takes up to 90 days here.
+ */
+export function trialDaysFor(firstTime: boolean, compUntil: string | null, standardDays: number, now = Date.now()): number {
+  const comp = compUntil && !compUntil.startsWith("9999") ? Math.ceil((Date.parse(compUntil) - now) / 86_400_000) : 0;
+  const days = Math.max(firstTime ? standardDays : 0, comp > 0 ? comp : 0);
+  return Math.min(90, days);
 }

@@ -1,17 +1,24 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { SOCIAL_KEYS, SOCIAL_LABEL, normalizeSocial, socialDisplay, type Social } from "../lib/social";
 import { SocialIcon } from "../lib/social-icon";
+import { fillNearText, NEAR_TAG_NAMES, nearPhase, type NearTag } from "../lib/near-text";
+import { israelNow } from "../lib/birthday";
+import { formatAppt, formatTime, israelTime } from "../lib/appointment";
+import { ClinicCalendar, minutesLabel } from "../components/clinic-calendar";
+import { parseServices } from "../lib/calendar";
 import {
   Activity, AlertTriangle, Trash2, Cake, Check, Copy, CreditCard, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode,
   ChevronRight, History, Palette, RefreshCw, RotateCcw, ScanLine, Search, Settings, Share2, Store, UserPlus, Users, UserRound, X,
-  Phone,
+  Phone, MapPin, Megaphone, BarChart3, CalendarDays,
+  type LucideIcon,
 } from "lucide-react";
 import type { Design } from "../lib/design";
 import { averageReward, earnFor, formatMoney, parseAmount, pctLabel } from "../lib/cashback.ts";
-import { CardEditor } from "../components/card-editor";
+import { CardEditor, type Editor as EditorData } from "../components/card-editor";
 import jsQR from "jsqr";
 import { errorText, useLang } from "../lib/i18n";
+import type { SiteLang } from "../lib/i18n-types";
 import { copyText, post, whatsappLink } from "../lib/api";
 import { LangSwitch } from "../components/lang-switch";
 import { InstallApp } from "../components/install-app";
@@ -24,8 +31,8 @@ import { weekChange } from "../lib/weekly";
 import { Brand } from "../components/brand";
 
 type Role = "owner" | "staff";
-type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social; program?: "stamps" | "cashback" | "average"; cashback_bp?: number; cashback_min?: number; currency?: string; avg_cap?: number; pos_only?: number };
-type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; rewards?: number; nextExpiry?: string | null; phone?: string; balance?: number; roundTotal?: number; rewardValue?: number | null };
+type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social; program?: "stamps" | "cashback" | "average" | "appointments"; cashback_bp?: number; cashback_min?: number; currency?: string; avg_cap?: number; pos_only?: number; near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number; near_evening_from?: number; referral_stamps?: number; report_email?: number; appt_extra?: "none" | "stamps" | "points" | "cashback"; appt_points?: number; work_hours?: string | null; appt_slot?: number; services?: string | null };
+type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; rewards?: number; nextExpiry?: string | null; phone?: string; balance?: number; roundTotal?: number; rewardValue?: number | null; apptAt?: string | null };
 type Data = {
   me: { name: string; email: string };
   /** Perkly (a platform admin): manages the card, settings and team of any business. */
@@ -48,26 +55,47 @@ type Data = {
   role: Role | null;
   business: Business | null;
   design?: Design;
-  editor?: any;
+  editor?: EditorData;
   range?: number | "all";
-  customers?: any[];
-  events?: any[];
+  customers?: CustomerRow[];
+  events?: EventRow[];
   stats?: { customers: number; new_customers: number; rewards_ready: number; stamps: number; redemptions: number; open_balance?: number };
   /** Last day, week and month against the same length before it. */
   summary?: Record<Period, Record<string, number>>;
-  team?: any[];
-  invites?: any[];
+  team?: TeamRow[];
+  invites?: InviteRow[];
   alerts?: { type: "customer" | "staff" | "staffFix"; name: string; count: number }[];
-  myRecent?: any[];
+  myRecent?: EventRow[];
 };
+/** One customer in the list (see GET /api/loyalty). */
+type CustomerRow = {
+  id: string; name: string; phone: string; stamps: number; target: number; balance: number; appt_at?: string | null; created: string; source: string;
+  consent_marketing: number; birthday: string | null; has_link: boolean; rewards: number; last_visit: string | null;
+};
+/** One entry of the activity history (several entries can be grouped into one). */
+type EventRow = {
+  id?: string; kind: string; delta: number; amount?: number | null; balance_after?: number | null; created: string; actor_role?: string;
+  stamps_after?: number | null; note?: string | null; customer: string; actor_name?: string | null; branch_name?: string | null;
+  rewards_earned?: number; count?: number;
+  /** When grouped: the time of the first entry in the group. */
+  firstCreated?: string;
+};
+type TeamRow = { id: string; name: string; email: string; role: Role; created: string; revoked: string | null; branch: string | null; brought: number };
+type InviteRow = { id: string; label: string | null; role: Role; created: string; expires: string; branch: string | null };
+/** The dashboard's translate function. */
+type T = (key: string, vars?: Record<string, string | number>) => string;
+/** A dashboard action: the reply's data, or null when it failed (the error is shown already). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- each action answers with its own shape
+type Call = (b: Record<string, unknown>) => Promise<any>;
+
 type Modal =
   | { type: "customer" }
   | { type: "staffLink" }
   | { type: "business" }
-  | { type: "link"; url: string; title: string; note?: string }
-  | { type: "correct"; customer: any }
-  | { type: "remove"; customer: any }
-  | { type: "phone"; customer: any };
+  | { type: "link"; url: string; title: string; note?: string; book?: CardState }
+  | { type: "correct"; customer: CustomerRow | CardState }
+  | { type: "remove"; customer: CustomerRow | CardState }
+  | { type: "phone"; customer: CustomerRow | CardState };
 
 export default function Dashboard() {
   const { lang, setLang, t, dir } = useLang();
@@ -81,9 +109,10 @@ export default function Dashboard() {
   // Opened from the admin's build steps: a link back to them on every screen.
   const [fromAdmin, setFromAdmin] = useState(false);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read once from the browser after hydration (the server can't see it)
     if (new URLSearchParams(window.location.search).get("from") === "admin") setFromAdmin(true);
     const h = window.location.hash.slice(1);
-    if (h === "design" || h === "settings" || h === "team" || h === "customers" || h === "station") setView(h);
+    if (h === "design" || h === "settings" || h === "team" || h === "customers" || h === "station" || h === "calendar") setView(h);
   }, []);
   const [modal, setModal] = useState<Modal | null>(null);
   const [toast, setToast] = useState<{ text: string; bad?: boolean } | null>(null);
@@ -92,7 +121,7 @@ export default function Dashboard() {
   // Pop-up windows work from the keyboard: focus moves in, Tab stays inside, Escape closes, focus returns.
   const dialogRef = useRef<HTMLElement>(null);
   const busyRef = useRef(false);
-  busyRef.current = busy;
+  useEffect(() => { busyRef.current = busy; }, [busy]);
   const modalKey = modal ? modal.type : null;
   useEffect(() => {
     if (!modalKey) return;
@@ -152,6 +181,7 @@ export default function Dashboard() {
     const fromUrl = new URLSearchParams(window.location.search).get("business");
     let saved: string | null = null;
     try { saved = localStorage.getItem("perkly-business"); } catch {}
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read once from the browser after hydration (the server can't see it)
     setBusinessId(fromUrl || saved || "");
   }, []);
 
@@ -169,12 +199,14 @@ export default function Dashboard() {
       setData(next);
       setLoadError("");
       if (next.business && next.business.id !== businessId) setBusinessId(next.business.id);
-      if (next.role === "staff") setView("station");
+      // Staff: the station, or (clinics) the calendar when that's where they are.
+      if (next.role === "staff") setView((v) => (v === "calendar" && next.business?.program === "appointments" ? v : "station"));
     } catch {
       setLoadError(t("err_network"));
     }
   }, [businessId, days, branchView]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loading the data when what's asked for changes
   useEffect(() => { load(); }, [load]);
   // While the dashboard is open (for example on a tablet at the counter), check every 30 seconds whether
   // someone joined: say so, and refresh the overview or the customer list if that is what's on screen.
@@ -221,7 +253,7 @@ export default function Dashboard() {
     setBusy(false);
     if (!result.ok) {
       notify(errorText(lang, result.code), true);
-      if (result.code === "signin") window.location.href = "/login";
+      if (result.code === "signin") window.location.assign("/login");
       return null;
     }
     return result.data;
@@ -239,10 +271,11 @@ export default function Dashboard() {
   // Owners: reports, customers and the staff station. The card design, settings and team are managed by
   // Perkly (a platform admin), who sees those screens too.
   const manage = !!data?.manage;
-  const nav: [any, string][] = isOwner
-    ? [[LayoutDashboard, "overview"], [Users, "customers"], [ScanLine, "station"],
+  const nav: [LucideIcon, string][] = isOwner
+    ? [[LayoutDashboard, "overview"], ...(b?.program === "appointments" ? [[CalendarDays, "calendar"]] as typeof nav : []), [Users, "customers"], [ScanLine, "station"],
        ...(manage ? [[Palette, "design"], [Users, "team"], [Settings, "settings"]] as typeof nav : data?.canDesign ? [[Palette, "design"]] as typeof nav : [])]
-    : [[ScanLine, "station"]];
+    // Staff: the station, and for clinics the calendar (to book; the settings stay with the owner).
+    : [[ScanLine, "station"], ...(b?.program === "appointments" ? [[CalendarDays, "calendar"]] as typeof nav : [])];
 
   // ---------- Loading / empty states ----------
   if (!data) {
@@ -301,7 +334,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="app" dir={dir}>
+    <div className={"app" + (nav.length < 2 ? " single-view" : "") + (view === "station" ? " on-station" : "")} dir={dir}>
       <a className="skip-link" href="#main">{t("skipToContent")}</a>
       <aside className="sidebar">
         <Brand />
@@ -392,7 +425,7 @@ export default function Dashboard() {
           {view === "overview" && isOwner && (
             <>
               <div className="page-head">
-                <div><h1>{t("repTitle")}</h1><p className="muted">{t(b.program === "cashback" ? "repSubtitleCb" : "repSubtitle")}</p></div>
+                <div><h1>{t("repTitle")}</h1><p className="muted">{t(b.program === "cashback" ? "repSubtitleCb" : b.program === "appointments" ? "repSubtitleAppt" : "repSubtitle")}</p></div>
                 <div className="head-actions">
                   {(data.branches?.length ?? 0) > 1 && (
                     <select aria-label={t("branch")} value={branchView} onChange={(e) => setBranchView(e.target.value)}>
@@ -403,10 +436,13 @@ export default function Dashboard() {
                   <button className="btn primary" onClick={() => { setView("station"); setQuery(""); }}><ScanLine size={18} />{t("station")}</button>
                   <button className="btn soft" onClick={() => setModal({ type: "customer" })}><Plus size={18} />{t("newCustomer")}</button>
                   <button className="btn soft" onClick={() => setModal({ type: "staffLink" })}><UserPlus size={18} />{t("staffLinkButton")}</button>
+                  {(isOwner || manage) && <a className="btn soft" href={`/special?b=${encodeURIComponent(b.id)}`}><Megaphone size={18} />{t("spOpen")}</a>}
+                  <a className="btn soft" href={`/report?b=${encodeURIComponent(b.id)}`}><BarChart3 size={18} />{t("rpOpen")}</a>
                 </div>
               </div>
+              {b.program === "appointments" && <TodayAppts customers={customers} t={t} />}
               {data.summary && <Summary summary={data.summary} totals={{ customers: data.stats!.customers, ready: data.stats!.rewards_ready, openBalance: data.stats!.open_balance }} breakdown={data.breakdown} hasBranches={(data.branches?.length ?? 0) > 1} t={t}
-                money={b.program === "cashback" || b.program === "average" ? (n) => formatMoney(n, b.currency === "USD" ? "USD" : "ILS", lang) : undefined} average={b.program === "average"} />}
+                money={b.program === "cashback" || b.program === "average" ? (n) => formatMoney(n, b.currency === "USD" ? "USD" : "ILS", lang) : undefined} average={b.program === "average"} appts={b.program === "appointments"} />}
               {!!data.alerts?.length && <Alerts alerts={data.alerts} t={t} />}
               <section className="overview-grid">
                 <div className="panel card-panel join-panel">
@@ -454,14 +490,15 @@ export default function Dashboard() {
               ) : (
                 <div className="table-wrap">
                   <table>
-                    <thead><tr><th>{t("name")}</th><th>{t("phone")}</th><th>{t("balance")}</th><th>{t("lastVisitCol")}</th>{b.birthdays !== 0 && <th>{t("birthdayCol")}</th>}<th>{t("marketingCol")}</th><th>{t("actions")}</th></tr></thead>
+                    <thead><tr><th>{t("name")}</th><th>{t("phone")}</th><th>{b.program === "appointments" ? t("apptWord") : t("balance")}</th><th>{t("lastVisitCol")}</th>{b.birthdays !== 0 && <th>{t("birthdayCol")}</th>}<th>{t("marketingCol")}</th><th>{t("actions")}</th></tr></thead>
                     <tbody>
                       {filtered.map((c) => (
                         <tr key={c.id}>
                           <td><span className="customer-avatar">{c.name.charAt(0)}</span><strong>{c.name}</strong></td>
                           <td dir="ltr" className="start">{c.phone}</td>
                           <td>
-                            {b.program === "cashback" ? <Num>{formatMoney(c.balance ?? 0, b.currency === "USD" ? "USD" : "ILS", lang)}</Num> : (
+                            {b.program === "appointments" ? <bdi>{c.appt_at ? formatAppt(c.appt_at, lang) : "—"}</bdi>
+                            : b.program === "cashback" ? <Num>{formatMoney(c.balance ?? 0, b.currency === "USD" ? "USD" : "ILS", lang)}</Num> : (
                             <div className="progress-cell">
                               <span className="progress-track"><i style={{ width: Math.min(100, (c.stamps / c.target) * 100) + "%" }} /></span>
                               <Num>{c.stamps}/{c.target}</Num>
@@ -474,7 +511,7 @@ export default function Dashboard() {
                           <td>{c.consent_marketing ? t("yes") : t("no")}</td>
                           <td>
                             <div className="row-actions">
-                              <button className="btn soft small" onClick={() => { setStationPick({ id: c.id, name: c.name, stamps: c.stamps, target: c.target, rewards: c.rewards, rewardReady: c.rewards > 0, phone: c.phone }); setView("station"); }}>
+                              <button className="btn soft small" onClick={() => { setStationPick({ id: c.id, name: c.name, stamps: c.stamps, target: c.target, rewards: c.rewards, rewardReady: c.rewards > 0, phone: c.phone, apptAt: c.appt_at ?? null }); setView("station"); }}>
                                 <ScanLine size={14} />{t("station")}
                               </button>
                               <button className="icon-btn" title={t("newLink")} aria-label={t("newLink")} disabled={busy} onClick={async () => {
@@ -534,7 +571,7 @@ export default function Dashboard() {
           )}
 
           {view === "station" && (
-            <Station key={b.id} business={b} design={data.design!} branches={data.branches ?? []} myBranch={isOwner ? null : data.myBranch ?? null} canFix={isOwner || !!b.staff_adjust} owner={isOwner} t={t} lang={lang} initial={stationPick} onDone={() => load()} notify={notify}
+            <Station key={b.id + ":" + (stationPick?.id ?? "")} business={b} design={data.design!} branches={data.branches ?? []} myBranch={isOwner ? null : data.myBranch ?? null} canFix={isOwner || !!b.staff_adjust} owner={isOwner} t={t} lang={lang} initial={stationPick} onDone={() => load()} notify={notify}
               onRegister={() => setModal({ type: "customer" })} onStaffLink={isOwner ? () => setModal({ type: "staffLink" }) : undefined} myRecent={data.myRecent} />
           )}
 
@@ -542,9 +579,15 @@ export default function Dashboard() {
             <>
               <div className="page-head"><div><h1>{t("design")}</h1><p className="muted">{t("designNoBalance")}</p></div></div>
               <CardEditor key={b.id + ":" + data.editor.publishedVersion} businessId={b.id} target={b.target} editor={data.editor} t={t} lang={lang} notify={notify} reload={load}
-                paid={!!data.access?.ok && !data.access.free} upgradeHref={`/start?b=${encodeURIComponent(b.id)}`} specialDays={manage}
-                cashback={b.program === "cashback" ? { bp: b.cashback_bp ?? 200, currency: b.currency === "USD" ? "USD" : "ILS" } : null} average={b.program === "average"} currency={b.currency === "USD" ? "USD" : "ILS"} />
+                paid={!!data.access?.ok && !data.access.free} upgradeHref={`/start?b=${encodeURIComponent(b.id)}`} specialDays={isOwner || manage}
+                cashback={b.program === "cashback" ? { bp: b.cashback_bp ?? 200, currency: b.currency === "USD" ? "USD" : "ILS" } : null} average={b.program === "average"} appointments={b.program === "appointments"} currency={b.currency === "USD" ? "USD" : "ILS"} />
             </>
+          )}
+
+          {/* The clinic's calendar: owners (and Perkly) only. */}
+          {view === "calendar" && b.program === "appointments" && (
+            <ClinicCalendar business={b} owner={isOwner} t={t} lang={lang} busy={busy} call={call} reload={load} notify={notify}
+              onNewCard={(url, name, when) => setModal({ type: "link", url, title: name, note: t("calNewBooked", { when }) })} />
           )}
 
           {view === "team" && isOwner && manage && (
@@ -583,6 +626,8 @@ export default function Dashboard() {
                 )}
               </section>
               <Branches branches={data.branches ?? []} t={t} busy={busy} call={call} reload={load} />
+              <NearText business={b} t={t} lang={lang} busy={busy} call={call} reload={load} />
+              <Referral business={b} t={t} busy={busy} call={call} reload={load} />
               <section className="panel">
                 <button className="btn soft" onClick={() => setModal({ type: "business" })}><Store size={16} />{t("newBusiness")}</button>
               </section>
@@ -603,7 +648,14 @@ export default function Dashboard() {
                 e.preventDefault();
                 const form = new FormData(e.currentTarget);
                 const r = await call({ action: "register_customer", name: form.get("name"), phone: form.get("phone"), birthday: birthdayFromParts(form.get("bday"), form.get("bmonth")) });
-                if (r) { load(); setModal({ type: "link", url: r.cardUrl, title: String(form.get("name")) }); }
+                if (r) {
+                  load();
+                  // Clinics: straight on to booking the new customer's appointment.
+                  const book = b.program === "appointments"
+                    ? { id: r.id as string, name: String(form.get("name")), stamps: 0, target: b.target, rewards: 0, rewardReady: false, phone: String(form.get("phone")), apptAt: null }
+                    : undefined;
+                  setModal({ type: "link", url: r.cardUrl, title: String(form.get("name")), book });
+                }
               }}>
                 <span className="modal-icon"><Plus /></span>
                 <h2>{t("newCustomer")}</h2>
@@ -651,6 +703,11 @@ export default function Dashboard() {
                 <p>{modal.note ?? (modal.url.includes("/invite/") ? t("inviteCreated") : t("customerCreated"))}</p>
                 <LinkBox url={modal.url} t={t} notify={notify} />
                 {!modal.url.includes("/invite/") && <p className="form-hint">{t("cardLinkHint")}</p>}
+                {modal.book && (
+                  <button type="button" className="btn primary sx-wide" onClick={() => { setStationPick(modal.book!); setModal(null); setView("station"); }}>
+                    <CalendarDays size={18} />{t("calBookNow")}
+                  </button>
+                )}
               </div>
             )}
 
@@ -745,7 +802,7 @@ export default function Dashboard() {
 
 // ---------- Pieces ----------
 
-function Stat({ icon: Icon, color, label, value, note }: { icon: any; color: string; label: string; value: number; note: string }) {
+function Stat({ icon: Icon, color, label, value, note }: { icon: LucideIcon; color: string; label: string; value: number; note: string }) {
   return (
     <article className="stat">
       <div><span className={"stat-icon " + color}><Icon size={18} /></span><span className="stat-label">{label}</span></div>
@@ -759,11 +816,11 @@ function Stat({ icon: Icon, color, label, value, note }: { icon: any; color: str
  * Consecutive actions of the same kind on the same customer (within 15 minutes) become one line,
  * so three quick stamps read "+3" instead of three identical rows.
  */
-function groupEvents(events: any[]): any[] {
-  const out: any[] = [];
+function groupEvents(events: EventRow[]): EventRow[] {
+  const out: EventRow[] = [];
   for (const e of events) {
     const last = out[out.length - 1];
-    const close = last && Math.abs(Date.parse(last.firstCreated) - Date.parse(e.created)) < 15 * 60_000;
+    const close = last && Math.abs(Date.parse(last.firstCreated ?? last.created) - Date.parse(e.created)) < 15 * 60_000;
     if (last && close && last.kind === e.kind && last.customer === e.customer && e.kind === "stamp" && !e.note && !last.note && last.branch_name === e.branch_name) {
       last.delta += e.delta;
       last.rewards_earned = (last.rewards_earned ?? 0) + (e.rewards_earned ?? 0);
@@ -775,7 +832,7 @@ function groupEvents(events: any[]): any[] {
   return out;
 }
 
-function EventList({ events, t, lang, currency = "ILS" }: { events: any[]; t: any; lang: string; currency?: string }) {
+function EventList({ events, t, lang, currency = "ILS" }: { events: EventRow[]; t: T; lang: string; currency?: string }) {
   const fmt = (minor: number) => formatMoney(Math.abs(minor), currency === "USD" ? "USD" : "ILS", lang);
   // Balance card entries: the purchase and what it added, the amount used, or a correction.
   const money = (e: { kind: string; amount?: number | null; delta: number }) =>
@@ -786,17 +843,20 @@ function EventList({ events, t, lang, currency = "ILS" }: { events: any[]; t: an
   const locale = lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB";
   return (
     <div>
-      {groupEvents(events).slice(0, 8).map((e: any, i: number) => (
+      {groupEvents(events).slice(0, 8).map((e, i) => (
         <div className="activity-row" key={e.id ?? i}>
-          <span className={"activity-icon" + (e.kind === "redeem" || e.kind === "spend" ? " reward-icon" : "")}>{e.kind === "redeem" || e.kind === "spend" ? <Gift size={16} /> : e.kind === "adjust" || e.kind === "balance_adjust" ? <Activity size={16} /> : <Plus size={16} />}</span>
+          <span className={"activity-icon" + (e.kind === "redeem" || e.kind === "spend" ? " reward-icon" : "")}>{e.kind === "redeem" || e.kind === "spend" ? <Gift size={16} /> : e.kind === "adjust" || e.kind === "balance_adjust" ? <Activity size={16} /> : e.kind === "appt" || e.kind === "appt_cancel" ? <CalendarDays size={16} /> : e.kind === "visit" ? <Check size={16} /> : <Plus size={16} />}</span>
           <div>
             <strong>{e.customer}</strong>
             <small>
-              {e.kind === "earn" || e.kind === "spend" || e.kind === "balance_adjust" ? <Num>{money(e)}</Num> : <>{t("ev_" + e.kind)} <Num>{e.delta > 0 ? "+" + e.delta : e.delta}</Num></>}
+              {e.kind === "earn" || e.kind === "spend" || e.kind === "balance_adjust" ? <Num>{money(e)}</Num>
+                // The appointments card: what happened, and for a new appointment its day and time.
+                : e.kind === "appt" || e.kind === "appt_cancel" || e.kind === "visit" ? <>{t("ev_" + e.kind)}{e.kind === "appt" && e.note ? <> · <bdi>{formatAppt(e.note, lang)}</bdi></> : null}</>
+                : <>{t("ev_" + e.kind)} <Num>{e.delta > 0 ? "+" + e.delta : e.delta}</Num></>}
               {e.actor_name ? " · " + t("by", { name: e.actor_name }) : ""}
               {e.branch_name ? " · " + e.branch_name : ""}
               {e.rewards_earned ? " · 🎁 " + t("rewardEarnedEv") + (e.rewards_earned > 1 ? " ×" + e.rewards_earned : "") : ""}
-              {e.note ? " · " + e.note : ""}
+              {e.note && e.kind !== "appt" ? " · " + e.note : ""}
             </small>
           </div>
           <time dateTime={e.created}>{new Date(e.created).toLocaleString(locale, { dateStyle: "short", timeStyle: "short" })}</time>
@@ -806,7 +866,7 @@ function EventList({ events, t, lang, currency = "ILS" }: { events: any[]; t: an
   );
 }
 
-function LinkBox({ url, t, notify }: { url: string; t: any; notify: (s: string, bad?: boolean) => void }) {
+function LinkBox({ url, t, notify }: { url: string; t: T; notify: (s: string, bad?: boolean) => void }) {
   return (
     <div className="link-box">
       <input readOnly value={url} dir="ltr" onFocus={(e) => e.currentTarget.select()} aria-label="Link" />
@@ -824,7 +884,7 @@ const SOCIAL_PLACEHOLDER: Record<string, string> = {
 };
 
 function BusinessForm({ t, busy, initial, submitLabel, onSubmit, onInvalid }: {
-  t: any; busy: boolean; initial?: Business; submitLabel: string;
+  t: T; busy: boolean; initial?: Business; submitLabel: string;
   onSubmit: (v: { name: string; reward: string; target: number; color: string; staffAdjust?: boolean; birthdays?: boolean; rewardMode?: string; rewardExpiryDays?: number; social?: Social; program?: string; cashbackBp?: number; cashbackMin?: number; avgCap?: number }) => void;
   onInvalid?: (message: string) => void;
 }) {
@@ -918,12 +978,14 @@ function BusinessForm({ t, busy, initial, submitLabel, onSubmit, onInvalid }: {
 // ---------- Staff station: scan or search, then confirm. The server is the source of truth. ----------
 
 function Station({ business, branches, myBranch, canFix, owner, t, lang, initial, onDone, notify, onRegister, onStaffLink, myRecent }: {
-  business: Business; design?: Design; branches: { id: string; name: string }[]; myBranch: string | null; canFix: boolean; owner: boolean; t: any; lang: any; initial: CardState | null; onDone: () => void;
-  notify: (s: string, bad?: boolean) => void; onRegister: () => void; onStaffLink?: () => void; myRecent?: any[];
+  business: Business; design?: Design; branches: { id: string; name: string }[]; myBranch: string | null; canFix: boolean; owner: boolean; t: T; lang: SiteLang; initial: CardState | null; onDone: () => void;
+  notify: (s: string, bad?: boolean) => void; onRegister: () => void; onStaffLink?: () => void; myRecent?: EventRow[];
 }) {
   const [selected, setSelected] = useState<CardState | null>(initial);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<CardState[]>([]);
+  // Results belong to a search of 2 characters or more; a shorter query shows none.
+  const shown = query.trim().length < 2 ? [] : results;
   const [scanning, setScanning] = useState(false);
   const [busy, setBusy] = useState(false);
   const [qty, setQty] = useState(1);
@@ -934,6 +996,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
   useEffect(() => {
     let saved = "";
     try { saved = localStorage.getItem("perkly-branch:" + business.id) || ""; } catch {}
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read once from the browser after hydration (the server can't see it)
     setBranch(branches.some((x) => x.id === saved) ? saved : "");
   }, [business.id, branches]);
   function pickBranch(id: string) {
@@ -962,6 +1025,31 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
   const [balanceFix, setBalanceFix] = useState<{ value: string; note: string } | null>(null);
   // The "average" card: buy N, the next one free at the average of those purchases.
   const average = business.program === "average";
+  // The appointments card (clinics): the next appointment instead of stamps, and the customer's arrival.
+  const appts = business.program === "appointments";
+  // What the appointments card adds (the owner's choice): a gift punch card, points per visit, or a balance.
+  const apptExtra = appts ? (business.appt_extra ?? "none") : "none";
+  const [apptDate, setApptDate] = useState("");
+  const [apptTime, setApptTime] = useState("");
+  const [apptCancelAsk, setApptCancelAsk] = useState(false);
+  // The clinic's services, the one picked, and the free times on the picked day for its length.
+  const services = useMemo(() => parseServices(business.services), [business.services]);
+  const [apptSvc, setApptSvc] = useState<string | null>(null);
+  const apptSvcObj = services.find((sv) => sv.id === apptSvc) ?? null;
+  const apptMin = apptSvcObj?.min ?? business.appt_slot ?? 30;
+  const [freeTimes, setFreeTimes] = useState<string[] | null>(null);
+  const [freeClosed, setFreeClosed] = useState(false);
+  async function loadFree(date: string, minutes: number) {
+    setFreeTimes(null);
+    const r = await post("/api/loyalty", { action: "appt_free", business: business.id, date, minutes, except: selected?.id });
+    setFreeClosed(r.ok ? !!r.data.closed : false);
+    setFreeTimes(r.ok ? (r.data.times as string[]) : []);
+  }
+  function pickApptDate(date: string) {
+    setApptDate(date);
+    setApptTime("");
+    loadFree(date, apptMin);
+  }
   // Connected to the cashier: cards change only through the cashier; here staff see the card (owners can still correct).
   const posOnly = !!business.pos_only;
   const mayFix = canFix && (!posOnly || owner);
@@ -982,6 +1070,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
   /** Ready for the next customer: back to the start, the search box focused. */
   function next() {
     setSelected(null); setPending(null); setFixing(null); setResult(null); setStep("customer"); setQty(1);
+    setApptDate(""); setApptTime(""); setApptCancelAsk(false); setApptSvc(null); setFreeTimes(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
     setTimeout(() => searchRef.current?.focus(), 50);
   }
@@ -1012,7 +1101,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
 
   useEffect(() => {
     const q = query.trim();
-    if (q.length < 2) { setResults([]); return; }
+    if (q.length < 2) return; // shorter queries show nothing (see `shown` below)
     const timer = setTimeout(async () => setResults(await lookup({ query: q })), 300);
     return () => clearTimeout(timer);
   }, [query]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1052,7 +1141,9 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
     return () => clearInterval(timer);
   }, [scanning]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { setRedeemAsk(false); setArchiveAsk(false); }, [selected?.id]);
+  // A different customer: close the confirmations that were open for the previous one (adjusted while rendering).
+  const [askedFor, setAskedFor] = useState(selected?.id);
+  if (askedFor !== selected?.id) { setAskedFor(selected?.id); setRedeemAsk(false); setArchiveAsk(false); }
 
   async function archiveCustomer(erase = false) {
     if (!selected || busy) return;
@@ -1067,6 +1158,41 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
       next();
       onDone();
     } else {
+      notify(errorText(lang, r.code), true);
+    }
+  }
+
+  /** The appointments card: set or cancel the next appointment, or record that the customer came in. Same safe retry as stamps. */
+  async function actAppt(kind: "appt_set" | "appt_clear" | "visit") {
+    if (!selected || busy) return;
+    if (branches.length > 1 && !myBranch && !branch) { notify(t("err_branch_required"), true); return; }
+    if (kind === "appt_clear" && !apptCancelAsk) { setApptCancelAsk(true); return; }
+    setApptCancelAsk(false);
+    if (kind === "appt_set" && (!apptDate || !apptTime)) { notify(t("apptPick"), true); return; }
+    const key = kind + ":" + apptDate + ":" + apptTime;
+    const requestId = pending && pending.kind === key && pending.customer === selected.id ? pending.requestId : crypto.randomUUID();
+    setPending({ kind: key, customer: selected.id, requestId });
+    setBusy(true);
+    const r = await post("/api/loyalty", { action: kind, business: business.id, customer: selected.id, requestId, date: apptDate, time: apptTime, ...(apptSvc ? { service: apptSvc } : { minutes: apptMin }), branch: myBranch ? undefined : branch || undefined });
+    setBusy(false);
+    if (r.ok) {
+      setPending(null);
+      const card = r.data.card as CardState;
+      setSelected({ ...selected, ...card });
+      const text = r.data.replayed ? t("replayed")
+        : kind === "appt_set" ? t("apptSetDone", { when: formatAppt(card.apptAt!, lang) })
+        : kind === "appt_clear" ? t("apptClearDone")
+        : t("apptVisitDone");
+      // A punch card or points that just reached the reward.
+      const earned = (r.data.earned as number | undefined) ?? 0;
+      setResult({ text: earned ? `${text} · 🎁 ${t("rewardEarnedEv")}` : text, reward: earned > 0 });
+      setCountdown(DONE_SECONDS);
+      setStep("done");
+      onDone();
+    } else if (r.network) {
+      notify(t("err_network"), true);
+    } else {
+      setPending(null);
       notify(errorText(lang, r.code), true);
     }
   }
@@ -1099,7 +1225,9 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
         : average && kind === "stamp" ? t("avgRecorded", { amount: fmt(purchase ?? 0) })
         : earned ? (earned === 1 ? t("earnedSaved") : t("earnedSavedN", { n: earned }))
         : kind === "stamp" ? (count === 1 ? t("stampOk") : t("stampsOk", { n: count! })) : t("redeemOk");
-      setResult({ text: message, reward: !!earned || kind === "redeem" });
+      // An invited friend's first visit: the "bring a friend" bonus was added too.
+      const bonus = r.data.referralBonus as number | undefined;
+      setResult({ text: bonus ? `${message} · 🎁 ${t("referralBonusDone", { n: bonus })}` : message, reward: !!earned || kind === "redeem" || !!bonus });
       setCountdown(DONE_SECONDS);
       setStep("done");
       onDone();
@@ -1178,7 +1306,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
   const fixedBranch = myBranch ? branches.find((x) => x.id === myBranch) : null;
 
   const hour = new Date().getHours();
-  const greeting = hour >= 5 && hour < 12 ? t("sxMorning") : hour >= 12 && hour < 17 ? t("sxAfternoon") : t("sxEvening");
+  const greeting = hour >= 5 && hour < 12 ? t("sxMorning") : hour >= 12 && hour < 17 ? t("sxAfternoon") : hour >= 17 && hour < 22 ? t("sxEvening") : t("sxNight");
   const full = !!selected && selected.stamps >= selected.target; // "block" mode: redeem before stamping again
   const maxQty = business.reward_mode === "bank" ? 10 : Math.min(10, remaining);
   const onlyBranch = branches.length === 1 ? branches[0] : null;
@@ -1230,7 +1358,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
             e.preventDefault();
             const q = query.trim();
             if (q.length < 2) { searchRef.current?.focus(); return; }
-            const found = results.length ? results : await lookup({ query: q });
+            const found = shown.length ? shown : await lookup({ query: q });
             if (found.length === 1) choose(found[0]); else setResults(found);
           }}>
             <label className="search st-search">
@@ -1239,17 +1367,18 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
                 onChange={(e) => setQuery(e.target.value)} />
               {query && <button type="button" className="st-clear" aria-label={t("close")} onClick={() => { setQuery(""); searchRef.current?.focus(); }}><X size={16} /></button>}
             </label>
-            <button type="submit" className="btn soft sx-wide">{t("sxSearch")}<ChevronRight size={16} className="sx-fwd" /></button>
           </form>
-          {(results.length > 0 || query.trim().length >= 2) && (
+          {(shown.length > 0 || query.trim().length >= 2) && (
             <div className="staff-results" role="listbox" aria-label={t("search")}>
-              {results.map((c) => {
+              {shown.map((c) => {
                 const ready = (c.rewards ?? 0) > 0 || c.stamps >= c.target;
                 return (
                   <button key={c.id} role="option" aria-selected={false} className="customer-result" onClick={() => choose(c)}>
                     <span className="st-avatar" aria-hidden="true">{c.name.charAt(0)}</span>
                     <span className="st-result-who"><strong>{c.name}</strong><small dir="ltr">{c.phone}</small></span>
-                    {cashback ? (
+                    {appts ? (
+                      <span className="st-result-count"><CalendarDays size={14} /><bdi>{c.apptAt ? formatAppt(c.apptAt, lang, false) : "—"}</bdi></span>
+                    ) : cashback ? (
                       <span className="st-result-count"><Num>{fmt(c.balance ?? 0)}</Num></span>
                     ) : (
                     <span className="st-result-count">
@@ -1261,7 +1390,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
                   </button>
                 );
               })}
-              {query.trim().length >= 2 && !results.length && <p className="form-hint st-none">{t("noCustomer")}</p>}
+              {query.trim().length >= 2 && !shown.length && <p className="form-hint st-none">{t("noCustomer")}</p>}
             </div>
           )}
           <button className="btn primary big sx-wide sx-register" onClick={onRegister}><UserPlus size={18} />{t("sxRegister")}</button>
@@ -1366,7 +1495,140 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
         );
       })()}
 
-      {selected && !cashback && step === "customer" && (
+      {/* 2c. The appointments card: the next appointment, the arrival, and setting the next one */}
+      {selected && appts && step === "customer" && (() => {
+        // The appointment they came for: one within the next 12 hours (or just past).
+        const arriving = !!selected.apptAt && msUntil(selected.apptAt) < 12 * 3_600_000;
+        return (
+          <section className="sx-screen" aria-label={selected.name}>
+            {who}
+            {branchControl && <div className="sx-chips">{branchControl}</div>}
+            <div className="sx-box">
+              <div className="sx-box-head">
+                <span className="sx-box-icon appt" aria-hidden="true"><CalendarDays size={18} /></span>
+                <strong>{selected.apptAt ? <>{t("apptNextShort")} <bdi>{formatAppt(selected.apptAt, lang)}</bdi></> : t("apptNone")}</strong>
+              </div>
+              <button className={"btn big sx-wide " + (arriving ? "primary" : "soft")} disabled={busy} onClick={() => actAppt("visit")}>
+                <Check size={18} />{busy && pending?.kind.startsWith("visit") ? t("sending") : arriving ? t("apptArrived") : t("apptVisitNoAppt")}
+                {apptExtra === "stamps" ? <small className="sx-plus">{t("apptPlusStamp")}</small> : apptExtra === "points" ? <small className="sx-plus">{t("apptPlusPoints", { n: business.appt_points ?? 10 })}</small> : null}
+              </button>
+            </div>
+            {/* The add-on: progress and a reward to use, or the balance (a payment adds to it, a use takes from it). */}
+            {(apptExtra === "stamps" || apptExtra === "points") && (
+              <div className="sx-box appt-extra">
+                <div className="sx-box-head">
+                  <span className="sx-box-icon" aria-hidden="true"><Gift size={18} /></span>
+                  <strong>
+                    {apptExtra === "points" ? t("apptPointsOf", { s: selected.stamps, t: selected.target }) : t("apptVisitsOf", { s: selected.stamps, t: selected.target })}
+                    {" · "}{business.reward}
+                  </strong>
+                </div>
+                <div className="sx-avgbar" aria-hidden="true"><i style={{ width: `${Math.min(100, (selected.stamps / selected.target) * 100)}%` }} /></div>
+                {!!selected.rewards && redeemButton}
+              </div>
+            )}
+            {apptExtra === "cashback" && (() => {
+              const pay = parseAmount(buyText);
+              const use = parseAmount(useText);
+              const balanceNow = selected.balance ?? 0;
+              return (
+                <div className="sx-box appt-extra">
+                  <div className="sx-box-head">
+                    <span className="sx-box-icon" aria-hidden="true"><Gift size={18} /></span>
+                    <strong>{t("cbBalanceNow", { balance: fmt(balanceNow) })}</strong>
+                  </div>
+                  <form className="appt-pay" onSubmit={(e) => { e.preventDefault(); if (pay) actBalance("purchase", pay).then(() => setBuyText("")); }}>
+                    <label className="cb-amount">
+                      <span className="sr-only">{t("apptPayAmount")}</span>
+                      <input inputMode="decimal" autoComplete="off" dir="ltr" placeholder={t("apptPayAmount")} value={buyText} onChange={(e) => { setBuyText(e.target.value); setPending(null); }} />
+                      <span aria-hidden="true">{currency === "USD" ? "$" : "₪"}</span>
+                    </label>
+                    <button className="btn soft" disabled={busy || !pay}>{t("apptPayRecord")}{pay ? <small className="sx-plus">+{fmt(Math.round((pay * bp) / 10_000))}</small> : null}</button>
+                  </form>
+                  {balanceNow > 0 && balanceNow >= minUse && (
+                    <form className="appt-pay" onSubmit={(e) => { e.preventDefault(); if (use) actBalance("spend", use).then(() => setUseText("")); }}>
+                      <label className="cb-amount">
+                        <span className="sr-only">{t("cbUseAmount")}</span>
+                        <input inputMode="decimal" autoComplete="off" dir="ltr" placeholder={t("cbUseAmount")} value={useText} onChange={(e) => { setUseText(e.target.value); setUseAsk(false); setPending(null); }} />
+                        <span aria-hidden="true">{currency === "USD" ? "$" : "₪"}</span>
+                      </label>
+                      <button className="btn lime" disabled={busy || !use || use > balanceNow}>{useAsk ? t("cbUseAgain", { amount: fmt(use ?? 0) }) : t("cbUse")}</button>
+                    </form>
+                  )}
+                </div>
+              );
+            })()}
+            <h2 className="sx-label">{selected.apptAt ? t("apptChange") : t("apptSetNext")}</h2>
+            <form className="appt-form" onSubmit={(e) => { e.preventDefault(); actAppt("appt_set"); }}>
+              {/* 1. The service (sets the length), 2. the day, 3. a free time that fits. */}
+              {services.length > 0 && (
+                <div className="appt-step">
+                  <span className="appt-step-label">{t("svcPick")}</span>
+                  <div className="svc-chips" role="group" aria-label={t("svcPick")}>
+                    {services.map((sv) => (
+                      <button key={sv.id} type="button" className="svc-chip" aria-pressed={apptSvc === sv.id} onClick={() => { setApptSvc(sv.id); if (apptDate) loadFree(apptDate, sv.min); }}>
+                        {sv.name}<small>{minutesLabel(sv.min, t)}</small>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="appt-step">
+                <span className="appt-step-label">{t("apptDate")}</span>
+                <div className="appt-quick" role="group" aria-label={t("apptQuick")}>
+                  {[0, 1, 7, 14, 28].map((d) => (
+                    <button key={d} type="button" className="chip" aria-pressed={apptDate === dayPlus(d)} onClick={() => pickApptDate(dayPlus(d))}>
+                      {t(d === 0 ? "calToday" : d === 1 ? "apptTomorrow" : d === 7 ? "apptIn1w" : d === 14 ? "apptIn2w" : "apptIn4w")}
+                    </button>
+                  ))}
+                  <label className="chip appt-other-date">
+                    <span>{apptDate && ![0, 1, 7, 14, 28].some((d) => dayPlus(d) === apptDate) ? apptPreviewDate(apptDate, lang) : t("apptOtherDate")}</span>
+                    <input type="date" value={apptDate} min={dayPlus(0)} aria-label={t("apptOtherDate")} onChange={(e) => e.target.value && pickApptDate(e.target.value)} />
+                  </label>
+                </div>
+              </div>
+              {apptDate && (
+                <div className="appt-step">
+                  <span className="appt-step-label">{t("apptTime")}{apptMin ? <small> · {minutesLabel(apptMin, t)}</small> : null}</span>
+                  {freeTimes === null ? <p className="form-hint">{t("sending")}</p>
+                    : freeClosed ? <p className="form-hint">{t("calClosed")}</p>
+                    : freeTimes.length === 0 ? <p className="form-hint">{t("apptNoFree")}</p>
+                    : (
+                      <div className="time-chips" role="group" aria-label={t("apptTime")}>
+                        {freeTimes.map((hm) => (
+                          <button key={hm} type="button" className="time-chip" aria-pressed={apptTime === hm} onClick={() => setApptTime(hm)}><bdi>{hm}</bdi></button>
+                        ))}
+                      </div>
+                    )}
+                  <label className="appt-other-time">{t("apptOtherTime")}<input type="time" step={300} value={apptTime} onChange={(e) => setApptTime(e.target.value)} /></label>
+                </div>
+              )}
+              {apptDate && apptTime && <p className="appt-summary" aria-live="polite">{apptSvcObj ? <b>{apptSvcObj.name} · </b> : null}{t("apptRemindersFor", { when: apptPreview(apptDate, apptTime, lang) })}</p>}
+              <button className="btn primary big sx-wide" disabled={busy || !apptDate || !apptTime}>
+                <CalendarDays size={18} />{busy && pending?.kind.startsWith("appt_set") ? t("sending") : selected.apptAt ? t("apptSaveChange") : t("apptSave")}
+              </button>
+            </form>
+            {selected.apptAt && (
+              apptCancelAsk ? (
+                <div className="sp-confirm" role="group" aria-label={t("apptCancel")}>
+                  <p>{t("apptCancelAsk")}</p>
+                  <div className="form-actions">
+                    <button type="button" className="btn primary small" disabled={busy} onClick={() => actAppt("appt_clear")}>{t("apptCancelYes")}</button>
+                    <button type="button" className="btn soft small" onClick={() => setApptCancelAsk(false)}>{t("cancel")}</button>
+                  </div>
+                </div>
+              ) : (
+                <button type="button" className="text-btn appt-cancel" onClick={() => actAppt("appt_clear")}>{t("apptCancel")}</button>
+              )
+            )}
+            <div className="sx-bar">
+              <button className="btn soft" onClick={next}><ChevronRight size={16} className="sx-back" />{t("sxBack")}</button>
+            </div>
+          </section>
+        );
+      })()}
+
+      {selected && !cashback && !appts && step === "customer" && (
         <section className="sx-screen" aria-label={selected.name}>
           {who}
           <div className="sx-chips">
@@ -1377,7 +1639,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
           <div className="sx-box">
             <div className="sx-box-head">
               <span className="sx-box-icon" aria-hidden="true"><Gift size={18} /></span>
-              <strong>{selected.rewards ? (selected.rewards === 1 ? t("sxRewardReady1") : t("sxRewardReadyN", { n: selected.rewards })) : full ? t("sxRewardReady1") : t("sxNoRewards")}</strong>
+              <strong>{selected.rewards ? (selected.rewards === 1 ? t("sxRewardReady1") : t("sxRewardReadyN", { n: selected.rewards })) : full ? t("sxRewardReady1") : average ? t("avgMore", { k: remaining }) : t("sxMoreTo", { k: remaining, reward: business.reward })}</strong>
             </div>
             {!!selected.rewards && selected.nextExpiry && <small className="form-hint">{t("expiresOnShort", { d: new Date(selected.nextExpiry).toLocaleDateString(lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB", { timeZone: "Asia/Jerusalem" }) })}</small>}
             {posOnly && <p className="pos-note" role="note">{t("posOnlyNote")}</p>}
@@ -1459,7 +1721,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
       )}
 
       {/* 3. Add stamps */}
-      {selected && !cashback && step === "stamp" && (
+      {selected && !cashback && !appts && step === "stamp" && (
         <section className="sx-screen" aria-label={t("sxAddStamps")}>
           {who}
           <h2 className="sx-label">{t("sxPunchCards")}</h2>
@@ -1490,11 +1752,13 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
         <section className="sx-screen sx-done" role="status" aria-live="polite">
           <span className={"sx-done-icon" + (result.reward ? " reward" : "")}>{result.reward ? <Gift size={34} /> : <Check size={34} />}</span>
           <h2>{result.text}</h2>
-          {cashback ? (
+          {appts ? (
+            <p className="muted">{selected.name}{selected.apptAt && !result.text.includes(formatAppt(selected.apptAt, lang)) ? <> · {t("apptNextShort")} <bdi>{formatAppt(selected.apptAt, lang)}</bdi></> : null}</p>
+          ) : cashback ? (
             <p className="muted">{selected.name} · {t("cbBalanceNow", { balance: fmt(selected.balance ?? 0) })}</p>
           ) : (
             <>
-              <p className="muted">{selected.name} · <Num>{t("sxOf", { s: selected.stamps, t: selected.target })}</Num></p>
+              <p className="muted">{selected.name} · <bdi>{t("sxOf", { s: selected.stamps, t: selected.target })}</bdi></p>
               <div className="sx-box sx-done-box">
                 <strong>{selected.rewards ? (selected.rewards === 1 ? t("sxRewardReady1") : t("sxRewardReadyN", { n: selected.rewards })) : t("sxToUnlock", { k: remaining })}</strong>
               </div>
@@ -1513,7 +1777,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
 // ---------- Team: invite staff, revoke access ----------
 
 function Team({ data, t, lang, busy, call, reload, showLink }: {
-  data: Data; t: any; lang: string; busy: boolean; call: (b: Record<string, unknown>) => Promise<any>; reload: () => void; showLink: (url: string) => void;
+  data: Data; t: T; lang: string; busy: boolean; call: Call; reload: () => void; showLink: (url: string) => void;
 }) {
   const locale = lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB";
   return (
@@ -1524,7 +1788,7 @@ function Team({ data, t, lang, busy, call, reload, showLink }: {
         <div className="table-wrap">
           <table>
             <tbody>
-              {(data.team ?? []).map((m: any) => (
+              {(data.team ?? []).map((m) => (
                 <tr key={m.id}>
                   <td><strong>{m.name}</strong><br /><small dir="ltr">{m.email}</small></td>
                   <td>
@@ -1576,7 +1840,7 @@ function Team({ data, t, lang, busy, call, reload, showLink }: {
         {!!data.invites?.length && (
           <>
             <h3 className="sub-head">{t("pendingInvites")}</h3>
-            {data.invites.map((i: any) => (
+            {data.invites.map((i) => (
               <div className="invite-row" key={i.id}>
                 <span><strong>{i.label}</strong><small>{t("expiresOn", { d: new Date(i.expires).toLocaleDateString(locale) })}</small></span>
                 <button className="btn soft small" disabled={busy} onClick={async () => { if (await call({ action: "revoke_invite", invite: i.id })) reload(); }}>{t("cancelInvite")}</button>
@@ -1592,7 +1856,7 @@ function Team({ data, t, lang, busy, call, reload, showLink }: {
 // ---------- Branches (owner) ----------
 
 function Branches({ branches, t, busy, call, reload }: {
-  branches: { id: string; name: string; address?: string | null }[]; t: any; busy: boolean; call: (b: Record<string, unknown>) => Promise<any>; reload: () => void;
+  branches: { id: string; name: string; address?: string | null; lat?: number | null; lng?: number | null }[]; t: T; busy: boolean; call: Call; reload: () => void;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
   return (
@@ -1606,18 +1870,25 @@ function Branches({ branches, t, busy, call, reload }: {
             <form className="inline-form" onSubmit={async (e) => {
               e.preventDefault();
               const f = new FormData(e.currentTarget);
-              if (await call({ action: "rename_branch", branch: br.id, name: f.get("name"), address: f.get("address") })) { setEditing(null); reload(); }
+              if (await call({ action: "rename_branch", branch: br.id, name: f.get("name"), address: f.get("address"), location: f.get("location") ?? "" })) { setEditing(null); reload(); }
             }}>
               <input name="name" defaultValue={br.name} required maxLength={60} autoFocus aria-label={t("branchName")} />
               <input name="address" defaultValue={br.address ?? ""} maxLength={160} placeholder={t("branchAddress")} aria-label={t("branchAddress")} />
+              <label className="branch-place">{t("branchPlace")}
+                <input name="location" id={`place-${br.id}`} dir="ltr" maxLength={2000} inputMode="url" autoComplete="off" placeholder="Google Maps / Waze"
+                  defaultValue={br.lat != null && br.lng != null ? `${br.lat}, ${br.lng}` : ""} />
+                <small className="form-hint">{t("branchPlaceHint")}</small>
+              </label>
+              <HereButton input={`place-${br.id}`} t={t} />
               <button className="btn primary small" disabled={busy}>{t("save")}</button>
               <button type="button" className="btn soft small" onClick={() => setEditing(null)}>{t("cancel")}</button>
             </form>
           ) : (
             <>
-              <span><strong>{br.name}</strong><small className={br.address ? "" : "form-error"}>{br.address || t("branchNoAddress")}</small></span>
+              <span><strong>{br.name}</strong><small className={br.address ? "" : "form-error"}>{br.address || t("branchNoAddress")}</small>
+                <small className={br.lat != null ? "branch-on-map" : "muted"}>{br.lat != null ? <>📍 {t("branchOnMap")}</> : t("branchNoPlace")}</small></span>
               <div className="row-actions">
-                <button className="btn soft small" onClick={() => setEditing(br.id)}>{t("rename")}</button>
+                <button className="btn soft small" onClick={() => setEditing(br.id)}>{t("branchEditPlace")}</button>
                 <button className="btn soft small danger" disabled={busy} onClick={async () => {
                   if (!confirm(t("archiveConfirm", { b: br.name }))) return;
                   if (await call({ action: "archive_branch", branch: br.id })) reload();
@@ -1631,11 +1902,218 @@ function Branches({ branches, t, busy, call, reload }: {
         e.preventDefault();
         const form = e.currentTarget;
         const f = new FormData(form);
-        if (await call({ action: "create_branch", name: f.get("name"), address: f.get("address") })) { form.reset(); reload(); }
+        if (await call({ action: "create_branch", name: f.get("name"), address: f.get("address"), location: f.get("location") ?? "" })) { form.reset(); reload(); }
       }}>
         <input name="name" required maxLength={60} placeholder={t("branchName")} aria-label={t("branchName")} />
         <input name="address" required maxLength={160} placeholder={t("branchAddress")} aria-label={t("branchAddress")} />
+        <input name="location" id="place-new" maxLength={2000} inputMode="url" autoComplete="off" placeholder={t("branchPlace")} aria-label={t("branchPlace")} />
+        <HereButton input="place-new" t={t} />
         <button className="btn primary small" disabled={busy}><Plus size={14} />{t("addBranch")}</button>
+      </form>
+    </section>
+  );
+}
+
+/**
+ * "I'm at the business now": the phone's own location into the place field, with how accurate it is and a
+ * map link to check it. Best from a phone standing inside the business (a computer's location is rough).
+ */
+function HereButton({ input, t }: { input: string; t: T }) {
+  const [state, setState] = useState<{ kind: "busy" | "ok" | "error"; text: string; map?: string } | null>(null);
+  const locate = () => {
+    if (!("geolocation" in navigator)) { setState({ kind: "error", text: t("hereUnsupported") }); return; }
+    setState({ kind: "busy", text: t("hereLooking") });
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude.toFixed(6);
+        const lng = pos.coords.longitude.toFixed(6);
+        const field = document.getElementById(input) as HTMLInputElement | null;
+        if (field) field.value = `${lat}, ${lng}`;
+        const meters = Math.round(pos.coords.accuracy);
+        setState({
+          kind: meters > 100 ? "error" : "ok",
+          text: meters > 100 ? t("hereRough", { m: meters }) : t("hereDone", { m: meters }),
+          map: `https://www.google.com/maps?q=${lat},${lng}`,
+        });
+      },
+      (err) => setState({ kind: "error", text: t(err.code === err.PERMISSION_DENIED ? "hereDenied" : err.code === err.TIMEOUT ? "hereTimeout" : "hereUnavailable") }),
+      { enableHighAccuracy: true, timeout: 20_000, maximumAge: 0 },
+    );
+  };
+  return (
+    <div className="here">
+      <button type="button" className="btn soft small" onClick={locate} disabled={state?.kind === "busy"}><MapPin size={14} />{t("hereButton")}</button>
+      {state && (
+        <small className={state.kind === "error" ? "form-error" : "form-hint"} role="status">
+          {state.text}{state.map && <> · <a href={state.map} target="_blank" rel="noopener noreferrer">{t("hereCheck")}</a></>}
+        </small>
+      )}
+    </div>
+  );
+}
+
+/** "Bring a friend": how many stamps each side gets on the invited friend's first visit (0 = off). */
+function Referral({ business, t, busy, call, reload }: { business: Business; t: T; busy: boolean; call: Call; reload: () => void }) {
+  const [saved, setSaved] = useState(false);
+  const stamps = business.program === "stamps" || !business.program;
+  const value = business.referral_stamps ?? 0;
+  return (
+    <section className="panel">
+      <div className="section-head"><h2><Gift size={18} /> {t("referralTitle")}</h2></div>
+      <p className="form-hint">{t("referralHint")}</p>
+      {!stamps ? <p className="muted">{t("referralStampsOnly")}</p> : (
+        <label className="sr-only" htmlFor="referral-stamps">{t("referralTitle")}</label>
+      )}
+      {stamps && (
+        <select id="referral-stamps" value={value} disabled={busy} onChange={async (e) => {
+          setSaved(false);
+          if (await call({ action: "set_referral", stamps: Number(e.target.value) })) { setSaved(true); reload(); }
+        }}>
+          <option value={0}>{t("referralOff")}</option>
+          <option value={1}>{t("referralOne")}</option>
+          <option value={2}>{t("referralStamps", { n: 2 })}</option>
+          <option value={3}>{t("referralStamps", { n: 3 })}</option>
+        </select>
+      )}
+      {saved && <p className="form-hint" role="status">{t("referralSaved")}</p>}
+    </section>
+  );
+}
+
+/** The appointments card: today's appointments by time, so the clinic sees the day at a glance. */
+function TodayAppts({ customers, t }: { customers: CustomerRow[]; t: T }) {
+  const today = dayPlus(0);
+  const list = customers
+    .filter((c) => c.appt_at && israelDate(c.appt_at) === today)
+    .sort((a, b) => a.appt_at!.localeCompare(b.appt_at!));
+  return (
+    <section className="panel today-appts">
+      <div className="section-head"><h2><CalendarDays size={18} /> {t("apptToday")}</h2></div>
+      {!list.length ? <p className="form-hint">{t("apptTodayNone")}</p> : (
+        <ul>
+          {list.map((c) => (
+            <li key={c.id}><b><bdi>{formatTime(c.appt_at!)}</bdi></b><span>{c.name}</span><small dir="ltr">{c.phone}</small></li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/** The Israel date ("2026-11-25") of a moment. */
+function israelDate(iso: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
+}
+
+/** The appointments card: today plus `days`, as an Israel date for <input type="date">. */
+function dayPlus(days: number): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(Date.now() + days * 86_400_000));
+}
+
+/** Milliseconds from now until `iso` (negative when past). */
+function msUntil(iso: string): number {
+  return Date.parse(iso) - Date.now();
+}
+
+/** "יום ג׳, 25.11" for a picked date. */
+function apptPreviewDate(date: string, lang: string): string {
+  return new Intl.DateTimeFormat(lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB", { timeZone: "UTC", weekday: "short", day: "numeric", month: "numeric" }).format(new Date(`${date}T12:00:00Z`));
+}
+
+/** "יום ג׳, 25.11 · 10:30" for the date and time being picked, or the raw values when they don't make a time. */
+function apptPreview(date: string, time: string, lang: string): string {
+  const at = israelTime(date, time);
+  return at ? formatAppt(at.toISOString(), lang) : `${date} ${time}`;
+}
+
+/** The hour in Israel now (outside render helpers, so components stay pure). */
+function hourNow(): number {
+  return israelNow().hour;
+}
+
+const HOURS = Array.from({ length: 24 }, (_, h) => h);
+
+/** The business's own lock-screen line near a branch (Apple Wallet), with tags for the customer's numbers; optionally another line for the evening. */
+function NearText({ business, t, lang, busy, call, reload }: { business: Business; t: T; lang: string; busy: boolean; call: Call; reload: () => void }) {
+  const [text, setText] = useState(business.near_text ?? "");
+  const [evening, setEvening] = useState(business.near_text_evening ?? "");
+  const [byTime, setByTime] = useState(!!business.near_text_evening);
+  const [morningFrom, setMorningFrom] = useState(business.near_morning_from ?? 6);
+  const [eveningFrom, setEveningFrom] = useState(business.near_evening_from ?? 16);
+  const [saved, setSaved] = useState(false);
+  const ref = useRef<HTMLInputElement>(null);
+  const eveRef = useRef<HTMLInputElement>(null);
+  // Tags go into the field the owner was last typing in.
+  const [target, setTarget] = useState<"main" | "evening">("main");
+  const cash = business.program === "cashback";
+  const tags: [NearTag, string][] = cash
+    ? [["balance", "nearTagBalance"], ["business", "nearTagBusiness"]]
+    : [["missing", "nearTagMissing"], ["reward", "nearTagReward"], ["business", "nearTagBusiness"]];
+  const li = lang === "he" ? 0 : lang === "ar" ? 1 : 2;
+  const add = (key: NearTag) => {
+    const tag = NEAR_TAG_NAMES[key][li];
+    const eve = byTime && target === "evening";
+    const el = eve ? eveRef.current : ref.current;
+    const cur = eve ? evening : text;
+    const at = el?.selectionStart ?? cur.length;
+    const next = (cur.slice(0, at) + `{${tag}}` + cur.slice(at)).slice(0, 120);
+    if (eve) setEvening(next); else setText(next);
+    setSaved(false);
+    requestAnimationFrame(() => { el?.focus(); const pos = Math.min(next.length, at + tag.length + 2); el?.setSelectionRange(pos, pos); });
+  };
+  const fill = (v: string) => fillNearText(v, { missing: 3, reward: business.reward, business: business.name, balance: business.currency === "USD" ? "$20" : "₪20" });
+  const eveningOut = byTime ? evening.trim() : "";
+  const hoursBad = byTime && morningFrom >= eveningFrom;
+  const unchanged = text.trim() === (business.near_text ?? "") && eveningOut === (business.near_text_evening ?? "")
+    && morningFrom === (business.near_morning_from ?? 6) && eveningFrom === (business.near_evening_from ?? 16);
+  const save = async (main: string, eve: string) => {
+    if (await call({ action: "set_near_text", text: main, evening: eve, morningFrom, eveningFrom })) { setSaved(true); reload(); }
+  };
+  const nowWhich = business.near_text_evening ? t(nearPhase(hourNow(), business.near_morning_from ?? 6, business.near_evening_from ?? 16) === "evening" ? "nearEvening" : "nearMorning") : "";
+  const hourSelect = (id: string, value: number, set: (h: number) => void) => (
+    <select id={id} value={value} onChange={(e) => { set(Number(e.target.value)); setSaved(false); }}>
+      {HOURS.map((h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}
+    </select>
+  );
+  return (
+    <section className="panel near-text">
+      <div className="section-head"><h2><MapPin size={18} /> {t("nearTitle")}</h2></div>
+      <p className="form-hint">{t("nearHint")}</p>
+      <form className="near-form" onSubmit={(e) => { e.preventDefault(); if (!hoursBad) save(text, eveningOut); }}>
+        {byTime && (
+          <div className="near-time">
+            <label htmlFor="near-text">{t("nearMorning")}</label>
+            <span className="near-from"><label htmlFor="near-morning-from">{t("nearFrom")}</label>{hourSelect("near-morning-from", morningFrom, setMorningFrom)}</span>
+          </div>
+        )}
+        {!byTime && <label className="sr-only" htmlFor="near-text">{t("nearTitle")}</label>}
+        <input id="near-text" ref={ref} value={text} maxLength={120} onFocus={() => setTarget("main")} onChange={(e) => { setText(e.target.value); setSaved(false); }} placeholder={t("nearPlaceholder")} />
+        <p className="near-preview" aria-live="polite">{text.trim() ? <><b>{t("nearPreview")}</b> {fill(text)}</> : byTime ? t("nearEveningEmpty") : t("nearAutoNow")}</p>
+        <label className="check-row">
+          <input type="checkbox" checked={byTime} onChange={(e) => { setByTime(e.target.checked); setSaved(false); if (!e.target.checked) setTarget("main"); }} />
+          <span>{t("nearByTime")}<small className="form-hint">{t("nearByTimeHint")}</small></span>
+        </label>
+        {byTime && (
+          <>
+            <div className="near-time">
+              <label htmlFor="near-evening">{t("nearEvening")}</label>
+              <span className="near-from"><label htmlFor="near-evening-from">{t("nearFrom")}</label>{hourSelect("near-evening-from", eveningFrom, setEveningFrom)}</span>
+            </div>
+            <input id="near-evening" ref={eveRef} value={evening} maxLength={120} onFocus={() => setTarget("evening")} onChange={(e) => { setEvening(e.target.value); setSaved(false); }} placeholder={t("nearEveningPlaceholder")} />
+            {evening.trim() && <p className="near-preview" aria-live="polite"><b>{t("nearPreview")}</b> {fill(evening)}</p>}
+            {hoursBad && <p className="form-hint form-error" role="alert">{t("nearHoursBad")}</p>}
+          </>
+        )}
+        <div className="near-tags" role="group" aria-label={t("nearAdd")}>
+          <span>{t("nearAdd")}</span>
+          {tags.map(([tag, label]) => <button type="button" key={tag} className="chip" onClick={() => add(tag)}>{t(label)}</button>)}
+        </div>
+        <div className="admin-row">
+          <button className="btn primary small" disabled={busy || unchanged || hoursBad || (byTime && !evening.trim())}>{t("save")}</button>
+          {(business.near_text || business.near_text_evening) && <button type="button" className="btn soft small" disabled={busy} onClick={() => { setText(""); setEvening(""); setByTime(false); save("", ""); }}>{t("nearAuto")}</button>}
+        </div>
+        {nowWhich && <p className="form-hint">{t("nearNowShows", { which: nowWhich })}</p>}
+        {saved && <p className="form-hint" role="status">{t("nearSaved")}</p>}
       </form>
     </section>
   );
@@ -1681,6 +2159,13 @@ const CASHBACK_ROWS: readonly (readonly [string, string, boolean])[] = [
   ["joined", "sumJoined", false],
 ];
 /** The "average" card's summary: purchases (stamps) and their total, free purchases and what they were worth. */
+/** The appointments card: visits, returning and new customers (no stamps or rewards). */
+const APPT_ROWS: readonly (readonly [string, string, boolean])[] = [
+  ["visitors", "sumVisitors", false],
+  ["returning", "sumReturning", false],
+  ["joined", "sumJoined", false],
+];
+
 const AVERAGE_ROWS: readonly (readonly [string, string, boolean])[] = [
   ["stamps", "sumPurchases", false],
   ["sales", "sumSales", true],
@@ -1708,7 +2193,7 @@ function Alerts({ alerts, t }: { alerts: { type: "customer" | "staff" | "staffFi
 
 /** Summary for the owner: this day, week or month against the one before. */
 type BreakdownRow = { id: string | null; name: string | null } & Record<string, number | string | null>;
-function Summary({ summary, totals, breakdown, hasBranches, t, money, average = false }: {
+function Summary({ summary, totals, breakdown, hasBranches, t, money, average = false, appts = false }: {
   summary: Record<Period, Record<string, number>>; totals: { customers: number; ready: number; openBalance?: number };
   breakdown?: { staff: BreakdownRow[]; branches: BreakdownRow[] }; hasBranches?: boolean;
   t: (k: string, v?: Record<string, string | number>) => string;
@@ -1716,6 +2201,8 @@ function Summary({ summary, totals, breakdown, hasBranches, t, money, average = 
   money?: (minor: number) => string;
   /** The "average" card: stamp counts plus purchase totals and the value of free purchases. */
   average?: boolean;
+  /** The appointments card: visits and customers only. */
+  appts?: boolean;
 }) {
   const [period, setPeriod] = useState<Period>("week");
   const cash = !!money && !average;
@@ -1754,13 +2241,13 @@ function Summary({ summary, totals, breakdown, hasBranches, t, money, average = 
       </div>
       <p className="summary-totals">
         <span><Users size={15} /><Num>{totals.customers}</Num> {t("statCustomers")}</span>
-        {cash
+        {appts ? null : cash
           ? <span><Gift size={15} /><Num>{money!(totals.openBalance ?? 0)}</Num> {t("statOpenBalance")}</span>
           : <span><Gift size={15} /><Num>{totals.ready}</Num> {t("statReady")}</span>}
       </p>
       <p className="form-hint">{t("sumNote_" + period)}</p>
       <div className="summary-grid">
-        {(cash ? CASHBACK_ROWS : average ? AVERAGE_ROWS : SUMMARY_ROWS.map(([k, l]) => [k, l, false] as const)).map(([key, label, isMoney]) => {
+        {(appts ? APPT_ROWS : cash ? CASHBACK_ROWS : average ? AVERAGE_ROWS : SUMMARY_ROWS.map(([k, l]) => [k, l, false] as const)).map(([key, label, isMoney]) => {
           const now = Number(s?.[key + "_now"] ?? 0), prev = Number(s?.[key + "_prev"] ?? 0);
           const show = (n: number) => (isMoney ? money!(n) : n);
           const c = weekChange(now, prev);
@@ -1779,7 +2266,7 @@ function Summary({ summary, totals, breakdown, hasBranches, t, money, average = 
           );
         })}
       </div>
-      {breakdown && (
+      {breakdown && !appts && (
         <div className="report-tables">
           {table(t("repByStaff"), t("repStaffCol"), rows(breakdown.staff), t("repUnknown"))}
           {hasBranches && table(t("repByBranch"), t("branch"), rows(breakdown.branches), t("noBranch"))}

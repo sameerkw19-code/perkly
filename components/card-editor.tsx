@@ -1,9 +1,13 @@
 "use client";
 import { formatMoney, pctLabel } from "../lib/cashback.ts";
+import { formatAppt } from "../lib/appointment";
+
+/** The editor's sample appointment (a fixed date, so the preview is the same on the server and in the browser). */
+const SAMPLE_APPT = "2026-11-24T08:30:00.000Z";
 import { useMemo, useState, type ReactNode } from "react";
 import { ChevronDown, ImagePlus, Lock, MessageCircle, Shuffle, Trash2, UploadCloud } from "lucide-react";
 import {
-  FONTS, FONT_SCRIPTS, GRADIENTS, GRADIENT_DIRS, ICON_GROUPS, IMAGE_MIN, LIMITS, NOTICE_DEFAULTS, OFFERED_CARD_LANGS, noticeDefault, PALETTES, cardLang, darken, designChecks, is3d, noticeText, stamp3dUrl,
+  FONTS, FONT_SCRIPTS, GRADIENTS, MISS_YOU_DAYS, GRADIENT_DIRS, ICON_GROUPS, IMAGE_MIN, LIMITS, NOTICE_DEFAULTS, OFFERED_CARD_LANGS, noticeDefault, PALETTES, cardLang, darken, designChecks, is3d, noticeText, stamp3dUrl,
   type AssetMeta, type CardLook, type Design, type FontId, type Layout, type LogoFrame, type Size, type StampIcon, type StampNotice, type Texts,
 } from "../lib/design";
 import { CARD_LANGS, isRtl, type Lang } from "../lib/i18n-types";
@@ -18,10 +22,10 @@ import { PizzaProgress } from "./pizza-progress";
 import { StampBannerPreview } from "./stamp-banner-preview";
 
 type Image = AssetMeta & { kind: string };
-type Editor = { draft: Design; publishedVersion: number; publishedAt: string | null; hasUnpublished: boolean; images: Image[] };
+export type Editor = { draft: Design; publishedVersion: number; publishedAt: string | null; hasUnpublished: boolean; images: Image[] };
 type T = (key: string, vars?: Record<string, string | number>) => string;
 
-const MAX_SIDE = { logo: 660, hero: 1200, wallet: 1125, stamp: 400, stampEmpty: 400, pizza: 700 } as const;
+const MAX_SIDE = { logo: 660, icon: 1024, hero: 1200, wallet: 1125, stamp: 400, stampEmpty: 400, pizza: 700 } as const;
 // Keep in step with MAX_BYTES in app/api/asset/route.ts (800 KB), with a margin for the request.
 const UPLOAD_CAP = 780_000;
 const SIZES: Size[] = ["s", "m", "l"];
@@ -101,12 +105,17 @@ function PaidTag({ t }: { t: T }) {
   return <span className="paid-tag"><Lock size={11} aria-hidden="true" />{t("paidTag")}</span>;
 }
 
-export function CardEditor({ businessId, target, editor, t, lang, notify, reload, paid = true, upgradeHref, setup, specialDays = true, cashback, average = false, currency = "ILS" }: {
+/** What the picture upload routes answer: the new picture (or pictures), or an error code. */
+type UploadReply = { id?: string; ids?: string[]; width?: number; height?: number; code?: string };
+
+export function CardEditor({ businessId, target, editor, t, lang, notify, reload, paid = true, upgradeHref, setup, specialDays = true, cashback, average = false, appointments = false, currency = "ILS" }: {
   businessId: string; target: number; editor: Editor; t: T; lang: Lang;
   /** The balance card: the preview shows a sample balance instead of stamps. */
   cashback?: { bp: number; currency: "ILS" | "USD" } | null;
   /** The "average" card: the preview explains the free purchase's value. */
   average?: boolean;
+  /** The appointments card: the preview shows a sample next appointment instead of stamps. */
+  appointments?: boolean;
   /** The business's currency (the average card's sample worth). */
   currency?: "ILS" | "USD";
   /** Special-day messages are sent by Perkly: hidden for an owner who edits the design. */
@@ -171,7 +180,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
 
   /** One notification text: the business's wording (empty = the default shown greyed out) and how it will read. */
   // Called as a function, not as <NoticeField/>: a component defined here would remount on every keystroke.
-  const noticeField = ({ k, label, notice, placeholder }: { k: "notify" | "notifyReward" | "welcome" | "birthday"; label: string; notice: StampNotice; placeholder: string }) => {
+  const noticeField = ({ k, label, notice, placeholder }: { k: "notify" | "notifyReward" | "welcome" | "birthday" | "missYou"; label: string; notice: StampNotice; placeholder: string }) => {
     const tx = design.texts[textLang];
     const first = design.texts[design.langs[0]];
     const sample = noticeText({ ...tx, title: tx.title || first.title, reward: tx.reward || first.reward }, textLang, notice);
@@ -184,32 +193,35 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
     );
   };
 
-  async function upload(kind: "logo" | "hero" | "wallet" | "stamp" | "stampEmpty" | "pizza", file: File | undefined) {
+  async function upload(kind: "logo" | "hero" | "wallet" | "stamp" | "stampEmpty" | "pizza" | "icon", file: File | undefined) {
     if (!file) return;
     if (!/^image\/(png|jpeg|webp)$/.test(file.type)) { notify(errorText(lang, "image_type"), true); return; }
     setBusy(kind);
     try {
       const photo = kind === "hero" || kind === "wallet" || kind === "pizza";
       // Logos are PNG: Google Wallet needs PNG or JPEG for a business's class logo, and PNG keeps the transparent background.
-      const format = kind === "logo" ? "image/png" : photo ? "image/jpeg" : "image/webp";
-      let blob = await shrink(file, MAX_SIDE[kind], format, !photo && clearWhite);
+      const format = kind === "logo" || kind === "icon" ? "image/png" : photo ? "image/jpeg" : "image/webp";
+      // The notification icon keeps its own background (iOS shows it on a rounded square).
+      let blob = await shrink(file, MAX_SIDE[kind], format, !photo && kind !== "icon" && clearWhite);
       // A PNG is lossless, so a detailed logo can stay large even when small. Shrink again until it fits the upload cap.
-      for (let side = Math.round(MAX_SIDE[kind] * 0.7); kind === "logo" && blob.size > UPLOAD_CAP && side >= 240; side = Math.round(side * 0.7)) {
+      for (let side = Math.round(MAX_SIDE[kind] * 0.7); (kind === "logo" || kind === "icon") && blob.size > UPLOAD_CAP && side >= 240; side = Math.round(side * 0.7)) {
         blob = await shrink(file, side, format, clearWhite);
       }
       if (blob.size > UPLOAD_CAP) { notify(errorText(lang, "image_too_big"), true); return; }
       const r = await fetch(`/api/asset?business=${encodeURIComponent(businessId)}&kind=${kind === "stampEmpty" || kind === "pizza" ? "stamp" : kind}`, {
         method: "POST", headers: { "Content-Type": blob.type }, body: blob, credentials: "same-origin",
       });
-      const data: any = await r.json().catch(() => ({}));
-      if (!r.ok) { notify(errorText(lang, data.code), true); return; }
-      setImages((list) => [{ id: data.id, kind, width: data.width, height: data.height }, ...list]);
-      if (kind === "logo") set({ logo: data.id });
-      if (kind === "hero") set({ hero: data.id });
-      if (kind === "wallet") set({ walletHero: data.id });
-      if (kind === "stamp") setDesign((d) => ({ ...d, stamp: { icon: "image", image: data.id }, look: { ...d.look, progress: "stamps" } }));
-      if (kind === "stampEmpty") setDesign((d) => ({ ...d, stamp: { ...d.stamp, emptyImage: data.id } }));
-      if (kind === "pizza") set({ progressImage: data.id });
+      const data = (await r.json().catch(() => ({}))) as UploadReply;
+      if (!r.ok || !data.id) { notify(errorText(lang, data.code), true); return; }
+      const id = data.id;
+      setImages((list) => [{ id, kind, width: data.width ?? 0, height: data.height ?? 0 }, ...list]);
+      if (kind === "logo") set({ logo: id });
+      if (kind === "icon") set({ notifyIcon: id });
+      if (kind === "hero") set({ hero: id });
+      if (kind === "wallet") set({ walletHero: id });
+      if (kind === "stamp") setDesign((d) => ({ ...d, stamp: { icon: "image", image: id }, look: { ...d.look, progress: "stamps" } }));
+      if (kind === "stampEmpty") setDesign((d) => ({ ...d, stamp: { ...d.stamp, emptyImage: id } }));
+      if (kind === "pizza") set({ progressImage: id });
     } catch {
       notify(t("err_network"), true);
     } finally {
@@ -234,7 +246,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
       const form = new FormData();
       blobs.forEach((b, i) => form.append(`s${i}`, b, `s${i}.jpg`));
       const r = await fetch(`/api/asset/banners?business=${encodeURIComponent(businessId)}`, { method: "POST", body: form, credentials: "same-origin" });
-      const data: any = await r.json().catch(() => ({}));
+      const data = (await r.json().catch(() => ({}))) as UploadReply;
       if (!r.ok) { notify(errorText(lang, data.code), true); return null; }
       return { ...d, walletStamps: data.ids as string[] };
     } catch {
@@ -247,14 +259,14 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
 
   /** Apple Wallet stamp grid: one picture per stamp count, every plan. On failure the pass keeps its banner image. */
   async function withAppleStrips(d: Design): Promise<Design> {
-    if (usesPizza(d, target) || average) return { ...d, appleStamps: [] };
+    if (usesPizza(d, target) || average || appointments) return { ...d, appleStamps: [] };
     setBusy("banners");
     try {
       const blobs = await makeAppleStrips(d, target);
       const form = new FormData();
       blobs.forEach((b, i) => form.append(`s${i}`, b, `s${i}.jpg`));
       const r = await fetch(`/api/asset/banners?set=apple&business=${encodeURIComponent(businessId)}`, { method: "POST", body: form, credentials: "same-origin" });
-      const data: any = await r.json().catch(() => ({}));
+      const data = (await r.json().catch(() => ({}))) as UploadReply;
       return r.ok ? { ...d, appleStamps: data.ids as string[] } : d;
     } catch {
       return d;
@@ -271,7 +283,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
       if (!made) return d;
       const up = async (blob: Blob) => {
         const r = await fetch(`/api/asset?business=${encodeURIComponent(businessId)}&kind=wallet_logo`, { method: "POST", headers: { "Content-Type": "image/png" }, body: blob, credentials: "same-origin" });
-        const data: any = await r.json().catch(() => ({}));
+        const data = (await r.json().catch(() => ({}))) as UploadReply;
         return r.ok ? (data.id as string) : null;
       };
       const [apple, google] = [await up(made.apple), await up(made.google)];
@@ -285,7 +297,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
     if (!setup && !confirm(t("publishConfirm"))) return;
     let next = design;
     // The average card draws its progress bar on the pass itself: no stamp pictures.
-    if (design.walletBanner === "stamps" && !average) {
+    if (design.walletBanner === "stamps" && !average && !appointments) {
       const made = await withStampBanners(design);
       if (!made) return;
       next = made;
@@ -311,6 +323,8 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
     balance: cashback ? { text: formatMoney(demo * 490, cashback.currency, textLang), pct: pctLabel(cashback.bp) } : undefined,
     // A sample worth for the average card: an average basket of 303.09.
     average: average ? { soFar: demo > 0 ? formatMoney(30309, currency, textLang) : undefined } : undefined,
+    // A sample appointment: next week, 10:30.
+    appointment: appointments ? { text: formatAppt(SAMPLE_APPT, textLang) } : undefined,
   };
   const previewDir = isRtl(textLang) ? "rtl" : "ltr";
   const locale = lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB";
@@ -594,8 +608,8 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
             </p>
           )}
           <div className="uploads">
-            {([["logo", "edLogo", "edLogoHint"], ["hero", "edHero", "edHeroHint"], ["wallet", "edWallet", "edWalletHint"]] as const).map(([kind, label, hint]) => {
-              const id = kind === "logo" ? design.logo : kind === "hero" ? design.hero : design.walletHero;
+            {([["logo", "edLogo", "edLogoHint"], ["icon", "edIcon", "edIconHint"], ["hero", "edHero", "edHeroHint"], ["wallet", "edWallet", "edWalletHint"]] as const).map(([kind, label, hint]) => {
+              const id = kind === "logo" ? design.logo : kind === "icon" ? design.notifyIcon ?? null : kind === "hero" ? design.hero : design.walletHero;
               const meta = images.find((i) => i.id === id);
               return (
                 <div className="upload" key={kind} id={"ed-" + kind}>
@@ -603,7 +617,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
                   <div>
                     <b>{t(label)}</b>
                     <small className="form-hint">{t(hint)}</small>
-                    {meta && <small className="form-hint" dir="ltr">{meta.width}×{meta.height}{(kind === "logo" ? Math.min(meta.width, meta.height) : meta.width) < IMAGE_MIN[kind] ? " ⚠" : ""}</small>}
+                    {meta && <small className="form-hint" dir="ltr">{meta.width}×{meta.height}{(kind === "logo" || kind === "icon" ? Math.min(meta.width, meta.height) : meta.width) < IMAGE_MIN[kind] || (kind === "icon" && Math.abs(meta.width - meta.height) > meta.width * 0.05) ? " ⚠" : ""}</small>}
                     <div className="row-actions">
                       {paid ? (
                         <label className="btn soft small">
@@ -616,6 +630,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
                       {id && (
                         <button type="button" className="btn soft small" onClick={() => kind === "logo"
                           ? set({ logo: null, stamp: design.stamp.icon === "logo" ? { icon: "star", image: null } : design.stamp })
+                          : kind === "icon" ? set({ notifyIcon: null })
                           : kind === "hero" ? set({ hero: null }) : set({ walletHero: null })}>
                           <Trash2 size={14} />{t("remove")}
                         </button>
@@ -709,7 +724,18 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
               </div>
             )}
 
-            {(design.walletNotify || design.walletWelcome || design.walletBirthday) && <p className="form-hint">{t("edNotifyVars")}</p>}
+            <h4 className="notify-head">{t("edMsgMissYou")}</h4>
+            <label className="check-row clear-white">
+              <input type="checkbox" checked={design.walletMissYou} onChange={(e) => set({ walletMissYou: e.target.checked })} />
+              <span>{t("edMsgMissYouOn", { days: MISS_YOU_DAYS })}<small className="form-hint">{t("edMsgMissYouHint")}</small></span>
+            </label>
+            {design.walletMissYou && (
+              <div className="stack-form" dir={isRtl(textLang) ? "rtl" : "ltr"}>
+                {noticeField({ k: "missYou", label: t("fMissYou"), notice: { kind: "missyou", name: t("edNotifySampleName") }, placeholder: noticeDefault(textLang, "missyou") })}
+              </div>
+            )}
+
+            {(design.walletNotify || design.walletWelcome || design.walletBirthday || design.walletMissYou) && <p className="form-hint">{t("edNotifyVars")}</p>}
 
             {specialDays && (
               <>

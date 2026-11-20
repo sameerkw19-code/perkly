@@ -6,7 +6,7 @@ const SECURITY_HEADERS: Record<string, string> = {
   "X-Frame-Options": "DENY",
   "Referrer-Policy": "strict-origin-when-cross-origin",
   // Camera is needed only on our own pages (staff scanner).
-  "Permissions-Policy": "camera=(self), microphone=(), geolocation=()",
+  "Permissions-Policy": "camera=(self), microphone=(), geolocation=(self)",
   // Baseline policy. Scripts are not restricted here, because the framework inlines its own.
   "Content-Security-Policy": "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'",
   // Pages opened from here (Polar, Google Wallet) get no handle back to this window.
@@ -25,7 +25,7 @@ async function rangeResponse(request: Request, response: Response, headers: Head
   if (!m || (!m[1] && !m[2])) return null;
   const body = await response.arrayBuffer();
   const size = body.byteLength;
-  let start = m[1] ? Number(m[1]) : Math.max(0, size - Number(m[2]));
+  const start = m[1] ? Number(m[1]) : Math.max(0, size - Number(m[2]));
   let end = m[1] && m[2] ? Math.min(Number(m[2]), size - 1) : size - 1;
   if (!m[1]) end = size - 1;
   if (start >= size || start > end) {
@@ -70,10 +70,11 @@ export default {
   },
 
   // Cron (see "triggers" in wrangler.jsonc): welcome, birthday and special-day messages.
-  async scheduled(_controller: ScheduledController, env: Cloudflare.Env, ctx: ExecutionContext) {
+  async scheduled(controller: ScheduledController, env: Cloudflare.Env, ctx: ExecutionContext) {
     // Imported here: the app's modules are set up lazily, and a cron run has no request to do it first.
+    // The run's own time (the same as now in production; settable when testing a run locally).
     const run = import("../lib/server/customer-messages").then(({ runScheduled }) =>
-      runScheduled(env.DB, env as unknown as Record<string, string | undefined>),
+      runScheduled(env.DB, env as unknown as Record<string, string | undefined>, new Date(controller.scheduledTime || Date.now())),
     );
     ctx.waitUntil(run.catch((e) => console.error("scheduled run failed:", e)));
   },

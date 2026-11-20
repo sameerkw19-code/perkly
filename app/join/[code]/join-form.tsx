@@ -12,7 +12,7 @@ import type { Design } from "../../../lib/design";
 import { textsFor } from "../../../lib/design";
 import { Brand } from "../../../components/brand";
 
-type Business = { name: string; target: number; design: Design; birthdays: boolean; cashback?: { bp: number; min: number; currency: "ILS" | "USD" } | null; average?: boolean };
+type Business = { name: string; target: number; design: Design; birthdays: boolean; cashback?: { bp: number; min: number; currency: "ILS" | "USD" } | null; average?: boolean; appointments?: boolean };
 
 // The card link is kept on this phone after joining, so a customer who left before keeping it can get back.
 // Browser storage can be missing (private mode, blocked): then this simply finds nothing.
@@ -22,7 +22,7 @@ function savedCard(code: string): string {
 }
 const noSubscribe = () => () => {};
 
-export default function JoinForm({ code, business }: { code: string; business: Business | null }) {
+export default function JoinForm({ code, business, invite = null }: { code: string; business: Business | null; invite?: { ref: string; stamps: number } | null }) {
   const { lang, setLang, t, dir } = useLang();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -42,6 +42,7 @@ export default function JoinForm({ code, business }: { code: string; business: B
       terms: form.get("terms") === "on",
       marketing: form.get("marketing") === "on",
       birthday: business?.birthdays ? birthdayFromParts(form.get("bday"), form.get("bmonth")) : "",
+      ...(invite ? { ref: invite.ref } : {}),
     });
     if (result.ok) {
       try { localStorage.setItem(cardKey(code), String(result.data.cardPath).replace(/\?.*$/, "")); } catch {}
@@ -65,13 +66,14 @@ export default function JoinForm({ code, business }: { code: string; business: B
         <form className="auth-card panel" onSubmit={submit}>
           <h1>{t("joinTitle", { b: textsFor(business.design, lang).title || business.name })}</h1>
           <p className="muted">{t("joinIntro")}</p>
+          {invite && <p className="join-invited" role="note">🎁 {t("joinInvited", { n: invite.stamps })}</p>}
           {myCard && (
             <div className="join-have-card">
               <span>{t("joinHaveCard")}</span>
               <a className="btn primary small" href={myCard}>{t("joinOpenCard")}</a>
             </div>
           )}
-          <LoyaltyCard design={business.design} lang={lang} stamps={0} target={business.target} t={t} average={business.average ? {} : undefined}
+          <LoyaltyCard design={business.design} lang={lang} stamps={0} target={business.target} t={t} average={business.average ? {} : undefined} appointment={business.appointments ? { text: null } : undefined}
             balance={business.cashback ? { text: formatMoney(0, business.cashback.currency, lang), pct: pctLabel(business.cashback.bp), min: business.cashback.min > 0 ? formatMoney(business.cashback.min, business.cashback.currency, lang) : undefined } : undefined} />
           <label>{t("name")}<input name="name" required maxLength={80} autoComplete="name" /></label>
           <label>{t("phone")}<input name="phone" type="tel" required maxLength={20} autoComplete="tel" dir="ltr" placeholder={t("phoneHint")} /></label>

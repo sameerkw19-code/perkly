@@ -1,13 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowRight, CalendarHeart, X } from "lucide-react";
+import { ArrowRight, Megaphone, X } from "lucide-react";
 import { Brand } from "../../components/brand";
 import { errorText, useLang } from "../../lib/i18n";
 import { SPECIAL_MAX_TEXT, noticeText, type Texts } from "../../lib/design";
 
-type Item = { id: string; send_at: string; text: string; queued: string | null; recipients: number | null; canceled: string | null; sent: number };
-type Data = { business: { id: string; name: string }; businesses: { id: string; name: string }[]; items: Item[]; walletCustomers: number; walletReady: boolean };
+type Item = { id: string; send_at: string; text: string; queued: string | null; recipients: number | null; canceled: string | null; sent: number; visited?: number; windowDone?: boolean };
+type Data = {
+  business: { id: string; name: string }; businesses: { id: string; name: string }[]; items: Item[];
+  walletCustomers: number; reach?: { google: number; apple: number; total: number }; walletReady: boolean;
+};
 
 /** "YYYY-MM-DDTHH:mm" in the browser's time, for <input type="datetime-local">. */
 function localInput(d: Date): string {
@@ -24,8 +27,11 @@ export default function SpecialView() {
   const [when, setWhen] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
+  const [mode, setMode] = useState<"now" | "later">("now");
+  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read once from the browser after hydration (the server can't see it)
     setBusiness(new URLSearchParams(window.location.search).get("b") ?? "");
     // Tomorrow at 10:00 as a starting point.
     const d = new Date(Date.now() + 86_400_000);
@@ -36,10 +42,11 @@ export default function SpecialView() {
   const load = useCallback(async () => {
     setError("");
     const r = await fetch(`/api/special?business=${encodeURIComponent(business)}`, { credentials: "same-origin" }).catch(() => null);
-    const body: any = r ? await r.json().catch(() => ({})) : {};
+    const body = (r ? await r.json().catch(() => ({})) : {}) as { code?: string };
     if (!r || !r.ok) return setError(errorText(lang, body.code));
     setData(body as Data);
   }, [business, lang]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loading the list when the business changes
   useEffect(() => { load(); }, [load]);
 
   const sample = useMemo(() => {
@@ -57,7 +64,7 @@ export default function SpecialView() {
       credentials: "same-origin",
       body: JSON.stringify({ business: data!.business.id, ...payload }),
     }).catch(() => null);
-    const body: any = r ? await r.json().catch(() => ({})) : {};
+    const body = (r ? await r.json().catch(() => ({})) : {}) as { code?: string };
     setBusy(false);
     if (!r || !r.ok) { setStatus(errorText(lang, body.code)); return false; }
     await load();
@@ -68,6 +75,10 @@ export default function SpecialView() {
     const at = new Date(when);
     if (Number.isNaN(at.getTime())) return setStatus(errorText(lang, "special_time"));
     if (await post({ action: "create", text, sendAt: at.toISOString() })) { setText(""); setStatus(t("spScheduled")); }
+  }
+  async function sendNow() {
+    setConfirming(false);
+    if (await post({ action: "create", text, now: true })) { setText(""); setStatus(t("spSentNow")); }
   }
 
   const fmt = (iso: string) => new Date(iso).toLocaleString(lang === "en" ? "en-GB" : lang === "ar" ? "ar" : "he-IL", { dateStyle: "medium", timeStyle: "short" });
@@ -80,13 +91,13 @@ export default function SpecialView() {
     <div className="special-page" dir={dir} lang={lang}>
       <header className="auth-top">
         <Brand href="/" />
-        <a className="btn soft small" href="/"><ArrowRight size={14} />{t("spBack")}</a>
+        <a className="btn soft small" href={data ? `/?business=${encodeURIComponent(data.business.id)}` : "/"}><ArrowRight size={14} />{t("spBack")}</a>
       </header>
       <main id="main" className="special-main">
         <div className="page-head">
           <div>
-            <p className="eyebrow">Google Wallet</p>
-            <h1><CalendarHeart size={26} /> {t("spTitle")}</h1>
+            <p className="eyebrow">Apple Wallet · Google Wallet</p>
+            <h1><Megaphone size={26} /> {t("spTitle")}</h1>
             <p className="muted">{t("spIntro")}</p>
           </div>
         </div>
@@ -110,16 +121,35 @@ export default function SpecialView() {
                   <small className="form-hint">{t("spVars")}</small>
                 </label>
                 {sample && <p className="special-sample"><strong>{data.business.name}</strong><br />{sample}</p>}
-                <label>
-                  <span>{t("spWhen")}</span>
-                  <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
-                </label>
+                <fieldset className="sp-mode">
+                  <legend className="sr-only">{t("spWhen")}</legend>
+                  <label className="sp-radio"><input type="radio" name="sp-mode" checked={mode === "now"} onChange={() => { setMode("now"); setConfirming(false); }} /><span>{t("spNow")}</span></label>
+                  <label className="sp-radio"><input type="radio" name="sp-mode" checked={mode === "later"} onChange={() => { setMode("later"); setConfirming(false); }} /><span>{t("spLater")}</span></label>
+                </fieldset>
+                {mode === "later" && (
+                  <label>
+                    <span>{t("spWhen")}</span>
+                    <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
+                  </label>
+                )}
               </div>
               <p className="form-hint">
-                {t("spReach", { n: data.walletCustomers })} {t("spLimit")}
+                {t("spReach", { n: data.walletCustomers, apple: data.reach?.apple ?? 0, google: data.reach?.google ?? data.walletCustomers })} {t("spLimit")}
                 {!data.walletReady && <> {t("spNotReady")}</>}
               </p>
-              <button className="btn primary" disabled={busy || !text.trim() || !when} onClick={schedule}>{busy ? t("sending") : t("spSchedule")}</button>
+              {mode === "later" ? (
+                <button className="btn primary" disabled={busy || !text.trim() || !when} onClick={schedule}>{busy ? t("sending") : t("spSchedule")}</button>
+              ) : confirming ? (
+                <div className="sp-confirm" role="alertdialog" aria-labelledby="sp-confirm-text">
+                  <p id="sp-confirm-text">{t("spConfirmNow", { n: data.walletCustomers })}</p>
+                  <div className="admin-row">
+                    <button className="btn primary" disabled={busy} onClick={sendNow} autoFocus>{busy ? t("sending") : t("spYesSend")}</button>
+                    <button className="btn soft" disabled={busy} onClick={() => setConfirming(false)}>{t("cancel")}</button>
+                  </div>
+                </div>
+              ) : (
+                <button className="btn primary" disabled={busy || !text.trim()} onClick={() => setConfirming(true)}>{t("spSendNow")}</button>
+              )}
               {status && <p className="form-hint" role="status">{status}</p>}
             </section>
 
@@ -135,6 +165,11 @@ export default function SpecialView() {
                         <strong>{fmt(i.send_at)}</strong>
                         <p>{i.text}</p>
                         <small className="form-hint">{state(i)}</small>
+                        {i.queued && !i.canceled && (i.recipients ?? 0) > 0 && (
+                          <small className="sp-result">
+                            📈 {t(i.windowDone ? "spResult" : "spResultSoFar", { n: i.visited ?? 0, total: i.recipients ?? 0, pct: Math.round(((i.visited ?? 0) / (i.recipients || 1)) * 100) })}
+                          </small>
+                        )}
                       </div>
                       {!i.queued && !i.canceled && (
                         <button type="button" className="btn soft small" disabled={busy} onClick={() => { if (window.confirm(t("spCancelConfirm"))) post({ action: "cancel", id: i.id }); }}>

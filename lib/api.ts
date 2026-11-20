@@ -1,10 +1,14 @@
 "use client";
 
+// Callers read loosely shaped JSON from our own API, so the types stay open.
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export type ApiResult<T = any> =
   | { ok: true; data: T }
   | { ok: false; code: string; network: boolean; data?: any };
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 /** POST JSON to our API. `network: true` means we never got an answer, so the outcome is unknown. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- same open default as ApiResult
 export async function post<T = any>(url: string, body: unknown): Promise<ApiResult<T>> {
   let response: Response;
   try {
@@ -17,6 +21,7 @@ export async function post<T = any>(url: string, body: unknown): Promise<ApiResu
   } catch {
     return { ok: false, code: "network", network: true };
   }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- JSON from our own API, shape set by T
   let data: any = null;
   try {
     data = await response.json();

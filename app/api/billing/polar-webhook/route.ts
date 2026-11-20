@@ -2,7 +2,7 @@ import { storeSubscription } from "../../../../lib/server/subscription-store";
 import { env, waitUntil } from "cloudflare:workers";
 import { mailReady, sendMail, simpleMail } from "../../../../lib/server/mailer";
 import { getD1 } from "../../../../db";
-import { subscriptionRow, verifyWebhook } from "../../../../lib/server/polar";
+import { setupOrder, subscriptionRow, verifyWebhook } from "../../../../lib/server/polar";
 import { planOf } from "../../../../lib/server/billing";
 import { WHATSAPP_INTL } from "../../../landing/content";
 
@@ -27,6 +27,13 @@ export async function POST(request: Request) {
     event = JSON.parse(raw);
   } catch {
     return new Response("bad json", { status: 400 });
+  }
+  // The one-time setup fee: marks it paid (once).
+  const setup = setupOrder(event);
+  if (setup) {
+    await getD1().prepare("UPDATE businesses SET setup_paid = ?, setup_order = ? WHERE id = ? AND setup_paid IS NULL")
+      .bind(new Date().toISOString(), setup.order, setup.business).run();
+    return new Response("ok");
   }
   const row = subscriptionRow(event);
   if (row) {
