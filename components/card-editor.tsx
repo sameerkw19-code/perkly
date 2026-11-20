@@ -18,7 +18,7 @@ import { PizzaProgress } from "./pizza-progress";
 import { StampBannerPreview } from "./stamp-banner-preview";
 
 type Image = AssetMeta & { kind: string };
-type Editor = { draft: Design; publishedVersion: number; publishedAt: string | null; hasUnpublished: boolean; images: Image[] };
+export type Editor = { draft: Design; publishedVersion: number; publishedAt: string | null; hasUnpublished: boolean; images: Image[] };
 type T = (key: string, vars?: Record<string, string | number>) => string;
 
 const MAX_SIDE = { logo: 660, icon: 1024, hero: 1200, wallet: 1125, stamp: 400, stampEmpty: 400, pizza: 700 } as const;
@@ -100,6 +100,9 @@ async function shrink(file: File, maxSide: number, type: "image/webp" | "image/j
 function PaidTag({ t }: { t: T }) {
   return <span className="paid-tag"><Lock size={11} aria-hidden="true" />{t("paidTag")}</span>;
 }
+
+/** What the picture upload routes answer: the new picture (or pictures), or an error code. */
+type UploadReply = { id?: string; ids?: string[]; width?: number; height?: number; code?: string };
 
 export function CardEditor({ businessId, target, editor, t, lang, notify, reload, paid = true, upgradeHref, setup, specialDays = true, cashback, average = false, currency = "ILS" }: {
   businessId: string; target: number; editor: Editor; t: T; lang: Lang;
@@ -202,16 +205,17 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
       const r = await fetch(`/api/asset?business=${encodeURIComponent(businessId)}&kind=${kind === "stampEmpty" || kind === "pizza" ? "stamp" : kind}`, {
         method: "POST", headers: { "Content-Type": blob.type }, body: blob, credentials: "same-origin",
       });
-      const data: any = await r.json().catch(() => ({}));
-      if (!r.ok) { notify(errorText(lang, data.code), true); return; }
-      setImages((list) => [{ id: data.id, kind, width: data.width, height: data.height }, ...list]);
-      if (kind === "logo") set({ logo: data.id });
-      if (kind === "icon") set({ notifyIcon: data.id });
-      if (kind === "hero") set({ hero: data.id });
-      if (kind === "wallet") set({ walletHero: data.id });
-      if (kind === "stamp") setDesign((d) => ({ ...d, stamp: { icon: "image", image: data.id }, look: { ...d.look, progress: "stamps" } }));
-      if (kind === "stampEmpty") setDesign((d) => ({ ...d, stamp: { ...d.stamp, emptyImage: data.id } }));
-      if (kind === "pizza") set({ progressImage: data.id });
+      const data = (await r.json().catch(() => ({}))) as UploadReply;
+      if (!r.ok || !data.id) { notify(errorText(lang, data.code), true); return; }
+      const id = data.id;
+      setImages((list) => [{ id, kind, width: data.width ?? 0, height: data.height ?? 0 }, ...list]);
+      if (kind === "logo") set({ logo: id });
+      if (kind === "icon") set({ notifyIcon: id });
+      if (kind === "hero") set({ hero: id });
+      if (kind === "wallet") set({ walletHero: id });
+      if (kind === "stamp") setDesign((d) => ({ ...d, stamp: { icon: "image", image: id }, look: { ...d.look, progress: "stamps" } }));
+      if (kind === "stampEmpty") setDesign((d) => ({ ...d, stamp: { ...d.stamp, emptyImage: id } }));
+      if (kind === "pizza") set({ progressImage: id });
     } catch {
       notify(t("err_network"), true);
     } finally {
@@ -236,7 +240,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
       const form = new FormData();
       blobs.forEach((b, i) => form.append(`s${i}`, b, `s${i}.jpg`));
       const r = await fetch(`/api/asset/banners?business=${encodeURIComponent(businessId)}`, { method: "POST", body: form, credentials: "same-origin" });
-      const data: any = await r.json().catch(() => ({}));
+      const data = (await r.json().catch(() => ({}))) as UploadReply;
       if (!r.ok) { notify(errorText(lang, data.code), true); return null; }
       return { ...d, walletStamps: data.ids as string[] };
     } catch {
@@ -256,7 +260,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
       const form = new FormData();
       blobs.forEach((b, i) => form.append(`s${i}`, b, `s${i}.jpg`));
       const r = await fetch(`/api/asset/banners?set=apple&business=${encodeURIComponent(businessId)}`, { method: "POST", body: form, credentials: "same-origin" });
-      const data: any = await r.json().catch(() => ({}));
+      const data = (await r.json().catch(() => ({}))) as UploadReply;
       return r.ok ? { ...d, appleStamps: data.ids as string[] } : d;
     } catch {
       return d;
@@ -273,7 +277,7 @@ export function CardEditor({ businessId, target, editor, t, lang, notify, reload
       if (!made) return d;
       const up = async (blob: Blob) => {
         const r = await fetch(`/api/asset?business=${encodeURIComponent(businessId)}&kind=wallet_logo`, { method: "POST", headers: { "Content-Type": "image/png" }, body: blob, credentials: "same-origin" });
-        const data: any = await r.json().catch(() => ({}));
+        const data = (await r.json().catch(() => ({}))) as UploadReply;
         return r.ok ? (data.id as string) : null;
       };
       const [apple, google] = [await up(made.apple), await up(made.google)];

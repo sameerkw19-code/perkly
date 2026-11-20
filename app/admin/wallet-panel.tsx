@@ -62,6 +62,7 @@ export function WalletPanel() {
     const r = await fetch("/api/admin/wallet", { credentials: "same-origin" });
     setState((await r.json().catch(() => ({ status: "error" }))) as State);
   }
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loading the status once when the panel opens
   useEffect(() => { load(); }, []);
 
   async function submit() {

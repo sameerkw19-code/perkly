@@ -939,6 +939,7 @@ export function useLang() {
       // A ?lang= link (for example from the Arabic marketing page) wins over the saved choice.
       const fromUrl = new URLSearchParams(window.location.search).get("lang");
       const saved = fromUrl && LANGS.includes(fromUrl as SiteLang) ? fromUrl : localStorage.getItem("perkly-language");
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- read once from the browser after hydration (the server can't see it)
       if (saved && allowed.includes(saved as SiteLang)) setLangState(saved as SiteLang);
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps

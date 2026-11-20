@@ -177,6 +177,13 @@ export type PolarOrder = {
  * Reads up to `pages` pages of 100. Field names are read defensively, since the API evolves.
  * Throws "polar_orders_<status>" on an API error (e.g. 401/403 when the token lacks orders:read).
  */
+/** The fields of a Polar order this site reads. */
+type PolarOrderItem = {
+  id?: string; created_at?: string; total_amount?: number; amount?: number; net_amount?: number; currency?: string; status?: string;
+  paid?: boolean; billing_reason?: string; customer?: { email?: unknown }; metadata?: { business?: unknown };
+  subscription?: { metadata?: { business?: unknown } };
+};
+
 export async function listOrders(env: PolarEnv, pages = 3): Promise<PolarOrder[]> {
   if (!env.POLAR_ACCESS_TOKEN) throw new Error("polar_not_configured");
   const out: PolarOrder[] = [];
@@ -185,7 +192,7 @@ export async function listOrders(env: PolarEnv, pages = 3): Promise<PolarOrder[]
       headers: { Authorization: `Bearer ${env.POLAR_ACCESS_TOKEN}`, Accept: "application/json" },
     });
     if (!r.ok) throw new Error(`polar_orders_${r.status}`);
-    const data = (await r.json()) as { items?: Record<string, any>[]; pagination?: { max_page?: number } };
+    const data = (await r.json()) as { items?: PolarOrderItem[]; pagination?: { max_page?: number } };
     for (const o of data.items ?? []) {
       const cents = Number(o.total_amount ?? o.amount ?? o.net_amount ?? 0);
       out.push({

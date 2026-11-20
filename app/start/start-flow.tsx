@@ -132,6 +132,11 @@ function firstStep(signedIn: boolean, business: StartBusiness | null, billingOn:
   return billingOn || !business.canWork ? "pay" : "done";
 }
 
+/** The date this many days from now, as "20 November" (outside render, which must stay pure). */
+function dateInDays(days: number, locale: string): string {
+  return new Date(Date.now() + days * 86_400_000).toLocaleDateString(locale, { day: "numeric", month: "long" });
+}
+
 export default function StartFlow({ signedIn, userName, needsCode, business: initialBusiness, isStaffOnly, billingOn, yearlyOn = false, paidReturn, currency = "ILS" }: {
   signedIn: boolean; userName: string; needsCode: boolean; business: StartBusiness | null; isStaffOnly: boolean; billingOn: boolean; yearlyOn?: boolean; paidReturn: boolean;
   /** The business's currency, or the visitor's market before there is a business. */
@@ -141,6 +146,7 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
   const [plan, setPlan] = useState<"monthly" | "yearly">("monthly");
   // Coming from the yearly side of the pricing switch on the home page: start on the yearly plan.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read once from the browser after hydration (the server can't see it)
     if (yearlyOn && new URLSearchParams(window.location.search).get("plan") === "yearly") setPlan("yearly");
   }, [yearlyOn]);
   // Abroad: English only. In Israel: Hebrew, or English when picked.
@@ -181,8 +187,10 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
   useEffect(() => {
     window.scrollTo(0, 0);
     headingRef.current?.focus({ preventScroll: true });
-    setError("");
   }, [step]);
+  // A new step starts without the previous step's error (adjusted while rendering).
+  const [errorStep, setErrorStep] = useState(step);
+  if (errorStep !== step) { setErrorStep(step); setError(""); }
 
   // Load the business (card, join code, access) for the payment, waiting and done steps.
   useEffect(() => {
@@ -266,7 +274,7 @@ export default function StartFlow({ signedIn, userName, needsCode, business: ini
   }
 
   const current = step === "done" ? STEPS.length : STEPS.indexOf(step === "wait" ? "pay" : step);
-  const chargeDate = new Date(Date.now() + 14 * 86_400_000).toLocaleDateString(lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB", { day: "numeric", month: "long" });
+  const chargeDate = dateInDays(14, lang === "he" ? "he-IL" : lang === "ar" ? "ar" : "en-GB");
   // The server has no window: render without the link first, then fill it in after hydration (a mismatch otherwise).
   const origin = useSyncExternalStore(noSubscribe, () => window.location.origin, () => "");
   const joinUrl = business?.joinCode && origin ? `${origin}/join/${business.joinCode}` : "";

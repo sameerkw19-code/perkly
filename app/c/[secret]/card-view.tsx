@@ -41,6 +41,7 @@ export default function CardView({ card, secret, googleWallet, appleWallet = fal
   useEffect(() => {
     const url = new URL(window.location.href);
     if (url.searchParams.get("welcome") !== "1") return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read once from the browser after hydration (the server can't see it)
     setWelcome(true);
     url.searchParams.delete("welcome");
     window.history.replaceState(null, "", url.pathname + url.search);

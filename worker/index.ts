@@ -25,7 +25,7 @@ async function rangeResponse(request: Request, response: Response, headers: Head
   if (!m || (!m[1] && !m[2])) return null;
   const body = await response.arrayBuffer();
   const size = body.byteLength;
-  let start = m[1] ? Number(m[1]) : Math.max(0, size - Number(m[2]));
+  const start = m[1] ? Number(m[1]) : Math.max(0, size - Number(m[2]));
   let end = m[1] && m[2] ? Math.min(Number(m[2]), size - 1) : size - 1;
   if (!m[1]) end = size - 1;
   if (start >= size || start > end) {

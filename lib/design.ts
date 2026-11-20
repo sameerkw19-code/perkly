@@ -292,6 +292,8 @@ function cleanText(v: unknown, max: number): string {
 /** Strict server-side cleanup. Returns null if the shape is wrong. Asset ownership is checked separately. */
 export function sanitizeDesign(input: unknown): Design | null {
   if (!input || typeof input !== "object") return null;
+  // Untrusted JSON: every field is checked below before use.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const d = input as any;
   const colors = d.colors ?? {};
   if (![colors.bg, colors.fg, colors.stamp].every((c) => typeof c === "string" && HEX.test(c))) return null;
@@ -346,6 +348,8 @@ export function sanitizeDesign(input: unknown): Design | null {
 function sanitizeLook(input: unknown, bg: string): CardLook {
   const base = defaultLook(bg);
   if (!input || typeof input !== "object") return base;
+  // Untrusted JSON: every field is checked below before use.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const l = input as any;
   const size = (v: unknown, fb: Size): Size => (v === "s" || v === "m" || v === "l" ? v : fb);
   const overlay = Number(l.overlay);

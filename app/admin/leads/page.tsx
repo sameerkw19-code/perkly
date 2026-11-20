@@ -16,19 +16,24 @@ type Lead = {
 };
 
 // Requests from the public "talk to us" form (/contact). These are business contacts, not customers of a business.
+/** An ISO time this many days back (outside render, which must stay pure). */
+function daysAgo(days: number): string {
+  return new Date(Date.now() - days * 86_400_000).toISOString();
+}
+
 export default async function AdminLeadsPage() {
   await requireAdminPage();
   const leads = await getD1()
     .prepare("SELECT created, business, contact, phone, email, kind, city, kit, note, lang, consent_marketing FROM leads ORDER BY created DESC LIMIT 300")
     .all<Lead>();
   const rows = leads.results;
-  const week = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const week = daysAgo(7);
 
   return (
     <div className="admin" dir="rtl">
       <AdminHeader active="/admin/leads" />
       <main id="main" tabIndex={-1}>
-        <h1>פניות "דברו איתנו"</h1>
+        <h1>פניות &quot;דברו איתנו&quot;</h1>
         <p className="muted">
           {rows.length} פניות מהטופס ב־perkly.shop/contact, {rows.filter((l) => l.created >= week).length} מהן בשבוע האחרון.
           אחרי השיחה, שלחו לעסק את הקישור לפתיחת חשבון: perkly.shop/start.

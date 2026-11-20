@@ -31,6 +31,7 @@ export default function SpecialView() {
   const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read once from the browser after hydration (the server can't see it)
     setBusiness(new URLSearchParams(window.location.search).get("b") ?? "");
     // Tomorrow at 10:00 as a starting point.
     const d = new Date(Date.now() + 86_400_000);
@@ -41,10 +42,11 @@ export default function SpecialView() {
   const load = useCallback(async () => {
     setError("");
     const r = await fetch(`/api/special?business=${encodeURIComponent(business)}`, { credentials: "same-origin" }).catch(() => null);
-    const body: any = r ? await r.json().catch(() => ({})) : {};
+    const body = (r ? await r.json().catch(() => ({})) : {}) as { code?: string };
     if (!r || !r.ok) return setError(errorText(lang, body.code));
     setData(body as Data);
   }, [business, lang]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loading the list when the business changes
   useEffect(() => { load(); }, [load]);
 
   const sample = useMemo(() => {
@@ -62,7 +64,7 @@ export default function SpecialView() {
       credentials: "same-origin",
       body: JSON.stringify({ business: data!.business.id, ...payload }),
     }).catch(() => null);
-    const body: any = r ? await r.json().catch(() => ({})) : {};
+    const body = (r ? await r.json().catch(() => ({})) : {}) as { code?: string };
     setBusy(false);
     if (!r || !r.ok) { setStatus(errorText(lang, body.code)); return false; }
     await load();
