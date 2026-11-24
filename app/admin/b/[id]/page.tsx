@@ -4,6 +4,7 @@ import { getD1 } from "../../../../db";
 import { liveDesign } from "../../../../lib/server/designs";
 import { STATUS_LABEL, adminStatus, requireAdminPage, shortDate, shortDateTime } from "../../../../lib/server/admin";
 import { AdminActions, ExportBusiness, PolarSync, PaymentLink, PosKeys, AdminCardPreview, ApplePushTest, GoogleSyncTest, KitSentButton, OwnerDesignSwitch } from "./admin-actions";
+import { pctLabel } from "../../../../lib/cashback";
 import { env } from "cloudflare:workers";
 import { planOf } from "../../../../lib/server/billing";
 import { isPlatformAdmin } from "../../../../lib/server/auth";
@@ -44,7 +45,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
 
   const b = await db
     .prepare(
-      `SELECT b.id, b.owner, b.name, b.reward, b.target, b.color, b.created, b.reward_mode, b.suspended, b.suspend_reason, b.comp_until, b.archived, b.kit_due, b.kit_sent, b.owner_designs, b.currency, b.pos_only, b.program, b.near_text,
+      `SELECT b.id, b.owner, b.name, b.reward, b.target, b.color, b.created, b.reward_mode, b.suspended, b.suspend_reason, b.comp_until, b.archived, b.kit_due, b.kit_sent, b.owner_designs, b.currency, b.pos_only, b.program, b.near_text, b.cashback_bp, b.cashback_min,
          s.status, s.plan, s.current_period_end, s.external_subscription, s.updated AS sub_updated, u.email AS owner_email, u.phone AS owner_phone
        FROM businesses b LEFT JOIN subscriptions s ON s.business = b.id LEFT JOIN users u ON u.id = b.owner WHERE b.id = ?`,
     )
@@ -53,7 +54,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
       id: string; name: string; reward: string; target: number; color: string; created: string; reward_mode: string;
       owner: string; suspended: string | null; suspend_reason: string | null; comp_until: string | null; archived: string | null; owner_email: string | null; owner_phone: string | null;
       status: string | null; current_period_end: string | null; external_subscription: string | null; sub_updated: string | null;
-      plan: string | null; kit_due: string | null; kit_sent: string | null; owner_designs: number; currency: string; pos_only: number; program: string; near_text: string | null;
+      plan: string | null; kit_due: string | null; kit_sent: string | null; owner_designs: number; currency: string; pos_only: number; program: string; near_text: string | null; cashback_bp: number; cashback_min: number;
     }>();
   if (!b) notFound();
 
@@ -105,7 +106,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
   const ownerInvite = [...invites.results].reverse().find((i) => i.role === "owner") ?? null;
   const build = {
     id: b.id, name: b.name,
-    details: `${b.reward} · ${b.target} ${b.program === "appointments" ? "(כרטיס תורים)" : b.program === "average" ? "קניות בסבב" : b.program === "cashback" ? "(כרטיס יתרה)" : "חותמות להטבה"}`,
+    details: b.program === "appointments" ? `${b.reward} · כרטיס תורים` : b.program === "cashback" ? `${b.reward} · כרטיס יתרה (${pctLabel(b.cashback_bp)})` : `${b.reward} · ${b.target} ${b.program === "average" ? "קניות בסבב" : "חותמות להטבה"}`,
     designVersion: c.published,
     // A logo, or any design published after the starting one.
     designDone: !!design.logo || (c.published ?? 0) >= 2,
@@ -132,7 +133,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
             <h1>{b.name} <span className={"admin-chip st-" + (b.archived ? "none" : st)}>{b.archived ? "סגור" : STATUS_LABEL[st]}</span></h1>
             <p className="muted">
               <span dir="ltr">{b.owner_email ?? "—"}</span>{b.owner_phone && !withPerkly ? <> · <bdi dir="ltr">{formatPhone(b.owner_phone)}</bdi></> : null}
-              {" · "}נוצר {shortDate(b.created)} · {b.program === "appointments" ? "כרטיס תורים" : `${b.target} ${b.program === "average" ? "קניות בסבב" : "חותמות להטבה"}`} · {b.reward}
+              {" · "}נוצר {shortDate(b.created)} · {b.program === "appointments" ? "כרטיס תורים" : b.program === "cashback" ? `כרטיס יתרה (${pctLabel(b.cashback_bp)})` : `${b.target} ${b.program === "average" ? "קניות בסבב" : "חותמות להטבה"}`} · {b.reward}
             </p>
           </div>
           {!b.archived && (
@@ -244,7 +245,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
           <aside className="admin-col">
             <section className="panel">
               <h2>הכרטיס החי</h2>
-              <AdminCardPreview design={design} target={b.target} />
+              <AdminCardPreview design={design} target={b.target} program={b.program} cashback={{ bp: b.cashback_bp, min: b.cashback_min, currency: b.currency }} />
               <OwnerDesignSwitch business={b.id} on={!!b.owner_designs} />
               <p className="form-hint">כשהמתג פעיל, בעל העסק מעצב את הכרטיס בעצמו (רק את העיצוב).</p>
             </section>
