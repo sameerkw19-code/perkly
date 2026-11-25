@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { RefreshCw, Wallet } from "lucide-react";
+import { ExternalLink, RefreshCw, Wallet } from "lucide-react";
 import { useLang, translate } from "../../../lib/i18n";
 import { LoyaltyCard } from "../../../components/loyalty-card";
 import { averageReward, formatMoney, pctLabel } from "../../../lib/cashback.ts";
@@ -106,11 +106,17 @@ export default function CardView({ card, secret, googleWallet, appleWallet = fal
             {!card.appointment && <small className="form-hint">{t("qrNote")}</small>}
           </div>
           {invite && <InviteFriend invite={invite} business={card.business} t={t} />}
-          {card.links.length > 0 && (
+          {/* The business's own page (a landing page, a menu, online orders) as a button with its own words. */}
+          {card.links.filter((l) => l.key === "link").map((l) => (
+            <a key="own-link" className="btn primary wide card-own-link" href={l.url} target="_blank" rel="noopener noreferrer">
+              <ExternalLink size={16} />{l.label}
+            </a>
+          ))}
+          {card.links.some((l) => l.key !== "link") && (
             <section className="panel social-panel" aria-label={t("socialFollow")}>
               <p><strong>{t("socialFollow")}</strong> · {card.business}</p>
               <div className="social-row">
-                {card.links.map((l) => (
+                {card.links.filter((l) => l.key !== "link").map((l) => (
                   <a key={l.key} href={l.url} target="_blank" rel="noopener noreferrer" aria-label={l.key === "website" ? t("socialWebsite") : l.label} title={l.key === "website" ? t("socialWebsite") : l.label}>
                     <SocialIcon name={l.key} size={22} color={SOCIAL_COLOR[l.key]} />
                   </a>

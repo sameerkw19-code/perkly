@@ -1,4 +1,5 @@
 import { assetIds, cardLang, defaultDesign, noticeOn, noticeText, sanitizeDesign, textsFor, walletStampPicture, type AssetMeta, type Design, type Lang, type StampNotice } from "../design";
+import { parseSocial, passLinks } from "../social";
 
 /** Google Wallet language tags for each card language. */
 export const GOOGLE_TAG: Record<Lang, string> = { he: "he", ar: "ar", en: "en-US", ru: "ru", de: "de", fr: "fr" };
@@ -113,5 +114,8 @@ export async function passLook(db: D1Database, business: BusinessLike, origin: s
     classLook,
     // Google shows the pass on the phone near these places.
     places: (await businessPlaces(db, business.id)).map(({ lat, lng }) => ({ lat, lng })),
+    // The business's links (a landing page, the website, social accounts): opened from the pass.
+    links: passLinks(parseSocial((await db.prepare("SELECT social FROM businesses WHERE id = ?").bind(business.id).first<{ social: string | null }>())?.social), first)
+      .map(({ label, url }) => ({ label, url })),
   };
 }

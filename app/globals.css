@@ -340,6 +340,9 @@ fieldset.birthday{border:0;padding:0;margin:0 0 14px}fieldset.birthday legend{fo
 .social-field{display:grid;gap:6px;font-size:13px}
 .social-field-name{display:flex;align-items:center;gap:7px;font-weight:bold}
 .social-field input{width:100%;text-align:left}
+.social-link-own{display:grid;gap:8px;padding:12px;border:1px solid var(--line, #e5e1f5);border-radius:12px}
+.social-link-own input[name="social_linkLabel"]{text-align:start}
+.card-own-link{gap:8px}
 @media(prefers-reduced-motion:reduce){.social-row a{transition:none}.social-row a:hover{transform:none}}
 .free-bar{background:#f0ecfc;color:#4b3aa8;border-bottom-color:#e2daf9}
 .clear-white{display:flex;gap:10px;align-items:flex-start;margin-top:12px;font-size:13.5px;cursor:pointer}

@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
-import { SOCIAL_KEYS, SOCIAL_LABEL, normalizeSocial, socialDisplay, type Social } from "../lib/social";
+import { LINK_LABEL_MAX, SOCIAL_KEYS, SOCIAL_LABEL, normalizeSocial, socialDisplay, type Social } from "../lib/social";
 import { SocialIcon } from "../lib/social-icon";
 import { fillNearText, NEAR_TAG_NAMES, nearPhase, type NearTag } from "../lib/near-text";
 import { israelNow } from "../lib/birthday";
@@ -903,10 +903,10 @@ function BusinessForm({ t, busy, initial, submitLabel, onSubmit, onInvalid }: {
       let social: Social | undefined;
       if (initial) {
         // Same check as the server, so the owner sees which field to fix before saving.
-        const checked = normalizeSocial(Object.fromEntries(SOCIAL_KEYS.map((k) => [k, String(f.get("social_" + k) ?? "")])));
+        const checked = normalizeSocial({ ...Object.fromEntries(SOCIAL_KEYS.map((k) => [k, String(f.get("social_" + k) ?? "")])), linkLabel: String(f.get("social_linkLabel") ?? "") });
         if (!checked.ok) {
           (form.elements.namedItem("social_" + checked.field) as HTMLInputElement | null)?.focus();
-          onInvalid?.(t("socialBadField", { field: SOCIAL_LABEL[checked.field] }));
+          onInvalid?.(t("socialBadField", { field: checked.field === "link" ? t("socialLinkShort") : checked.field === "website" ? t("socialWebsite") : SOCIAL_LABEL[checked.field] }));
           return;
         }
         social = checked.value;
@@ -959,7 +959,22 @@ function BusinessForm({ t, busy, initial, submitLabel, onSubmit, onInvalid }: {
           <fieldset className="mode-set social-set">
             <legend>{t("socialTitle")}</legend>
             <small className="form-hint">{t("socialHint")}</small>
-            {SOCIAL_KEYS.map((k) => (
+            {/* The business's own page (a landing page, a menu, online orders): a button on the card and a link in the wallet pass. */}
+            <div className="social-link-own">
+              <strong className="social-field-name"><SocialIcon name="link" size={16} />{t("socialLink")}</strong>
+              <small className="form-hint">{t("socialLinkHint")}</small>
+              <label className="social-field">
+                <span className="social-field-name">{t("socialLinkUrl")}</span>
+                <input name="social_link" dir="ltr" maxLength={300} autoComplete="off" spellCheck={false} inputMode="url" placeholder="https://..."
+                  defaultValue={initial.social?.link ?? ""} />
+              </label>
+              <label className="social-field">
+                <span className="social-field-name">{t("socialLinkLabel")}</span>
+                <input name="social_linkLabel" maxLength={LINK_LABEL_MAX} autoComplete="off" placeholder={t("socialLinkLabelPh")}
+                  defaultValue={initial.social?.linkLabel ?? ""} />
+              </label>
+            </div>
+            {SOCIAL_KEYS.filter((k) => k !== "link").map((k) => (
               <label key={k} className="social-field">
                 <span className="social-field-name"><SocialIcon name={k} size={16} />{k === "website" ? t("socialWebsite") : SOCIAL_LABEL[k]}</span>
                 <input name={"social_" + k} dir="ltr" maxLength={300} autoComplete="off" spellCheck={false}

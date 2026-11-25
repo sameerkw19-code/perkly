@@ -30,7 +30,7 @@ const TEXT: Record<SocialLang, Text> = {
     pricing: "מחיר ו־14 ימי ניסיון",
     nav: "קישורים",
     slogan: "כרטיס קטן. קשר גדול.",
-    social: { instagram: "אינסטגרם", tiktok: "טיקטוק", facebook: "פייסבוק", whatsapp: "דברו איתנו בוואטסאפ", website: "האתר", waze: "ניווט" },
+    social: { instagram: "אינסטגרם", tiktok: "טיקטוק", facebook: "פייסבוק", whatsapp: "דברו איתנו בוואטסאפ", website: "האתר", waze: "ניווט", link: "קישור" },
   },
   ar: {
     title: "Perkly | روابط",
@@ -41,7 +41,7 @@ const TEXT: Record<SocialLang, Text> = {
     pricing: "السعر وتجربة مجانية 14 يوماً",
     nav: "روابط",
     slogan: "بطاقة صغيرة. علاقة كبيرة.",
-    social: { instagram: "إنستغرام", tiktok: "تيك توك", facebook: "فيسبوك", whatsapp: "تحدثوا معنا عبر واتساب", website: "الموقع", waze: "الملاحة" },
+    social: { instagram: "إنستغرام", tiktok: "تيك توك", facebook: "فيسبوك", whatsapp: "تحدثوا معنا عبر واتساب", website: "الموقع", waze: "الملاحة", link: "رابط" },
   },
   en: {
     title: "Perkly | Links",
@@ -52,7 +52,7 @@ const TEXT: Record<SocialLang, Text> = {
     pricing: "Pricing and 14-day free trial",
     nav: "Links",
     slogan: "Small card. Big connection.",
-    social: { instagram: "Instagram", tiktok: "TikTok", facebook: "Facebook", whatsapp: "Chat with us on WhatsApp", website: "Website", waze: "Directions" },
+    social: { instagram: "Instagram", tiktok: "TikTok", facebook: "Facebook", whatsapp: "Chat with us on WhatsApp", website: "Website", waze: "Directions", link: "Link" },
   },
 };
 

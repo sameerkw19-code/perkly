@@ -1,10 +1,15 @@
 // Social links: one shape shared by the server (validation) and every page that shows them.
 import { normalizePhone } from "./phone.ts";
 
-export const SOCIAL_KEYS = ["instagram", "tiktok", "facebook", "whatsapp", "website", "waze"] as const;
+export const SOCIAL_KEYS = ["instagram", "tiktok", "facebook", "whatsapp", "website", "waze", "link"] as const;
 export type SocialKey = (typeof SOCIAL_KEYS)[number];
-/** What is stored: instagram/tiktok usernames, a facebook path, a +972… phone, full https URLs for website and waze. */
-export type Social = Partial<Record<SocialKey, string>>;
+/**
+ * What is stored: instagram/tiktok usernames, a facebook path, a +972… phone, full https URLs for website, waze and
+ * link. "link" is the business's own page (a landing page, a menu, online orders) with the words on its button.
+ */
+export type Social = Partial<Record<SocialKey, string>> & { linkLabel?: string };
+/** The longest text on the extra link's button. */
+export const LINK_LABEL_MAX = 30;
 
 export const SOCIAL_LABEL: Record<SocialKey, string> = {
   instagram: "Instagram",
@@ -13,6 +18,7 @@ export const SOCIAL_LABEL: Record<SocialKey, string> = {
   whatsapp: "WhatsApp",
   website: "Website",
   waze: "Waze",
+  link: "Link",
 };
 
 /** Brand colors, used as the icon tint on light backgrounds. */
@@ -23,6 +29,7 @@ export const SOCIAL_COLOR: Record<SocialKey, string> = {
   whatsapp: "#1FA855",
   website: "#5B3FD6",
   waze: "#1AA6D9",
+  link: "#E8590C",
 };
 
 function asUrl(raw: string): URL | null {
@@ -51,6 +58,19 @@ function handle(raw: string, hosts: string[], pattern: RegExp): string | null {
   return pattern.test(s) ? s : null;
 }
 
+/** A web page of the business: https only, no user:password, at most 200 characters. */
+function pageUrl(s: string): string | null {
+  const u = asUrl(s.trim());
+  if (!u || !u.hostname.includes(".") || u.username || u.password) return null;
+  const href = u.href.replace(/^http:/, "https:");
+  return href.length <= 200 ? href : null;
+}
+
+/** The words on the extra link's button: one line, no control characters. */
+function linkLabel(raw: unknown): string {
+  return typeof raw === "string" ? raw.replace(/[\u0000-\u001f<>]/g, " ").replace(/\s+/g, " ").trim().slice(0, LINK_LABEL_MAX) : "";
+}
+
 const NORMALIZE: Record<SocialKey, (raw: string) => string | null> = {
   instagram: (s) => handle(s, ["instagram.com", "instagr.am"], /^[A-Za-z0-9._]{1,30}$/),
   tiktok: (s) => handle(s, ["tiktok.com"], /^[A-Za-z0-9._]{2,24}$/),
@@ -67,18 +87,14 @@ const NORMALIZE: Record<SocialKey, (raw: string) => string | null> = {
     return /^[A-Za-z0-9.\-]{3,80}$/.test(first) ? first : null;
   },
   whatsapp: (s) => normalizePhone(s),
-  website: (s) => {
-    const u = asUrl(s.trim());
-    if (!u || !u.hostname.includes(".") || u.username || u.password) return null;
-    const href = u.href.replace(/^http:/, "https:");
-    return href.length <= 200 ? href : null;
-  },
+  website: (s) => pageUrl(s),
   waze: (s) => {
     const u = asUrl(s.trim());
     if (!u || !onHost(u, ["waze.com", "ul.waze.com"])) return null;
     const href = u.href.replace(/^http:/, "https:");
     return href.length <= 300 ? href : null;
   },
+  link: (s) => pageUrl(s),
 };
 
 /** Validates what an owner typed. Empty fields are dropped. Returns the first bad field on error. */
@@ -92,6 +108,8 @@ export function normalizeSocial(input: unknown): { ok: true; value: Social } | {
     if (!v) return { ok: false, field: key };
     value[key] = v;
   }
+  const label = linkLabel(src.linkLabel);
+  if (value.link && label) value.linkLabel = label;
   return { ok: true, value };
 }
 
@@ -106,6 +124,8 @@ export function parseSocial(json: string | null | undefined): Social {
       const v = NORMALIZE[key](raw[key]);
       if (v) out[key] = v;
     }
+    const label = linkLabel(raw?.linkLabel);
+    if (out.link && label) out.linkLabel = label;
     return out;
   } catch {
     return {};
@@ -132,5 +152,37 @@ export function socialDisplay(key: SocialKey, value: string): string {
 }
 
 export function socialLinks(social: Social, whatsappText?: string) {
-  return SOCIAL_KEYS.filter((k) => social[k]).map((key) => ({ key, label: SOCIAL_LABEL[key], url: socialUrl(key, social[key]!, whatsappText) }));
+  return SOCIAL_KEYS.filter((k) => social[k]).map((key) => ({
+    key,
+    label: key === "link" ? social.linkLabel || hostOf(social.link!) : SOCIAL_LABEL[key],
+    url: socialUrl(key, social[key]!, whatsappText),
+  }));
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
+const PASS_WORDS: Record<"website" | "link" | "waze", Record<string, string>> = {
+  website: { he: "האתר שלנו", ar: "موقعنا", en: "Our website", ru: "Наш сайт", de: "Unsere Website", fr: "Notre site" },
+  link: { he: "לפתיחה", ar: "افتح", en: "Open", ru: "Открыть", de: "Öffnen", fr: "Ouvrir" },
+  waze: { he: "ניווט אלינו ב־Waze", ar: "الوصول إلينا عبر Waze", en: "Directions in Waze", ru: "Маршрут в Waze", de: "Route mit Waze", fr: "Itinéraire avec Waze" },
+};
+
+/**
+ * The links on the back of the wallet pass (Apple) and in its links list (Google), in the card's language.
+ * The business's own link comes first, with the words the business wrote for its button.
+ */
+export function passLinks(social: Social, lang: string): { key: SocialKey; label: string; url: string }[] {
+  const all = socialLinks(social).map((l) => ({
+    ...l,
+    label: l.key === "link" ? social.linkLabel || PASS_WORDS.link[lang] || PASS_WORDS.link.en
+      : l.key === "website" || l.key === "waze" ? PASS_WORDS[l.key][lang] || PASS_WORDS[l.key].en
+      : l.label,
+  }));
+  return [...all.filter((l) => l.key === "link"), ...all.filter((l) => l.key !== "link")];
 }
