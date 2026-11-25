@@ -9,9 +9,10 @@ import { PASS_ICONS } from "./apple-pass-icons";
 import { businessPlaces, liveDesign } from "./designs";
 import { fillNearText, nearTemplate, stampEmoji } from "../near-text";
 import { israelNow } from "../birthday";
-import { apptLabel, formatAppt, noApptText } from "../appointment";
+import { apptLabel, formatAppt, israelTime, noApptText } from "../appointment";
 import { passToken, type AppleConfig } from "./apple-token";
 import { parseSocial, passLinks } from "../social";
+import { daysLeft, formatDue, israelDate, loanWords, nextDue, type Loan } from "../library";
 
 export { appleConfig, passToken, validToken, type AppleConfig } from "./apple-token";
 
@@ -38,14 +39,14 @@ type CustomerRow = {
   id: string; business: string; name: string; stamps: number; target: number; scan_code: string; created: string;
   business_name: string; reward: string; color: string; rewards: number; balance: number; program: string; currency: string;
   round_total: number; avg_cap: number; ready_value: number | null; missyou_at?: string | null; last_event?: string | null; near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number | null; near_evening_from?: number | null; news_text?: string | null; news_at?: string | null;
-  appt_at?: string | null; appt_msg?: string | null; appt_extra?: string | null; social?: string | null;
+  appt_at?: string | null; appt_msg?: string | null; appt_extra?: string | null; social?: string | null; loan_key?: string | null;
 };
 
 /** The customer behind a pass serial (the customer id), or null when it was removed. */
 export async function customerForPass(db: D1Database, serial: string): Promise<CustomerRow | null> {
   return db
     .prepare(
-      `SELECT c.id, c.business, c.name, c.stamps, c.target, c.scan_code, c.created, c.balance, c.round_total, c.missyou_at, c.appt_at, c.appt_msg, (SELECT MAX(e.created) FROM events e WHERE e.customer = c.id) AS last_event, b.program, b.appt_extra, b.currency, b.avg_cap, b.near_text, b.near_text_evening, b.near_morning_from, b.near_evening_from, b.news_text, b.news_at, b.social, b.name AS business_name, b.reward, b.color,
+      `SELECT c.id, c.business, c.name, c.stamps, c.target, c.scan_code, c.created, c.balance, c.round_total, c.missyou_at, c.appt_at, c.appt_msg, c.loan_key, (SELECT MAX(e.created) FROM events e WHERE e.customer = c.id) AS last_event, b.program, b.appt_extra, b.currency, b.avg_cap, b.near_text, b.near_text_evening, b.near_morning_from, b.near_evening_from, b.news_text, b.news_at, b.social, b.name AS business_name, b.reward, b.color,
          (SELECT value FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2) ORDER BY earned, id LIMIT 1) AS ready_value,
          (SELECT COUNT(*) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2))
            + (CASE WHEN b.reward_mode = 'block' AND c.stamps >= c.target THEN 1 ELSE 0 END) AS rewards
@@ -156,7 +157,19 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
   const apptNext = appointments && c.appt_at && Date.parse(c.appt_at) > Date.now() - 3_600_000 ? c.appt_at : null;
   // The appointments card's add-on (the owner's choice): a gift punch card shows the stamp picture like a stamp card.
   const apptExtra = appointments ? c.appt_extra ?? "none" : null;
-  const stampCard = balance === undefined && average === undefined && (!appointments || apptExtra === "stamps");
+  // The library card: the books on loan and the nearest return date instead of stamps; reminders come as notifications.
+  const library = c.program === "library";
+  const loans: Loan[] = library
+    ? (await db.prepare("SELECT id, title, due, extensions FROM loans WHERE customer = ? AND returned IS NULL ORDER BY due, created").bind(c.id).all<Loan>()).results ?? []
+    : [];
+  const LW = loanWords(lang);
+  const firstLoan = nextDue(loans);
+  const today = israelDate(new Date());
+  const dueText = (due: string) => {
+    const left = daysLeft(due, today);
+    return left < 0 ? `${formatDue(due, lang)} · ${LW.late}` : left === 0 ? `${LW.today} · ${formatDue(due, lang, false)}` : formatDue(due, lang);
+  };
+  const stampCard = !library && balance === undefined && average === undefined && (!appointments || apptExtra === "stamps");
   const grid = stampCard ? appleStampPicture(design, c.stamps, c.target) : null;
   const strip = average
     ? await progressStrip({ bg: design.colors.bg, bg2: design.look.bg2, fg: design.colors.fg, fill: design.colors.stamp, done: Math.min(c.stamps, c.target), target: c.target, rtl: lang === "he" || lang === "ar" })
@@ -176,7 +189,9 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
   const own = template ? fillNearText(template, { missing, reward, business: title, balance: balance ?? null }) : "";
   // The automatic line ends with an emoji: 🎁 when a reward is waiting, else the business's stamp (☕, 🍕, ✂️…).
   const emoji = stampEmoji(design.stamp?.icon);
-  const nearText = own || (appointments
+  const nearText = own || (library
+    ? firstLoan ? `${title} · ${LW.label}: ${formatDue(firstLoan.due, lang)} 📚` : `${title} 📚`
+    : appointments
     ? apptNext ? `${title} · ${apptLabel(lang)}: ${formatAppt(apptNext, lang)} 🗓️` : title
     : average
     ? average.ready ? `${N.reward(title, reward)} 🎁` : `${N.round(title, Math.min(c.stamps, c.target), c.target)} ${emoji}`
@@ -199,7 +214,10 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
   const apptField = { key: "appt", label: apptLabel(lang), value: apptNext ? formatAppt(apptNext, lang) : noApptText(lang), changeMessage: `${apptLabel(lang)}: %@` };
   // W3C dates without milliseconds ("2026-11-25T08:30:00Z"), the form Apple's examples use.
   const w3c = (ms: number) => new Date(ms).toISOString().slice(0, 19) + "Z";
-  const relevance = apptNext
+  const loanDay = firstLoan ? israelTime(firstLoan.due, "9:00") : null;
+  const relevance = loanDay && daysLeft(firstLoan!.due, today) >= 0
+    ? { relevantDate: w3c(loanDay.getTime()) }
+    : apptNext
     ? {
         relevantDate: w3c(Date.parse(apptNext)),
         relevantDates: [{ startDate: w3c(Date.parse(apptNext) - 2 * 3_600_000), endDate: w3c(Date.parse(apptNext) + 3_600_000) }],
@@ -225,13 +243,20 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
     barcodes: [{ format: "PKBarcodeFormatQR", message: "perkly:" + c.scan_code, messageEncoding: "iso-8859-1", altText: "Powered by Perkly" }],
     storeCard: {
       // Logo and the customer's name on top, the stamps as a picture, then the stamp count and the rewards ready.
-      headerFields: appointments
+      headerFields: appointments || library
         ? []
         : average
         ? [{ key: "worth", label: average.ready ? L.worthReady : L.worth, value: average.worth ?? "—", textAlignment: "PKTextAlignmentRight" }]
         : design.showCustomerName ? [name] : [],
-      primaryFields: appointments ? [apptField] : average ? [{ key: "round", label: L.round, value: `${Math.min(c.stamps, c.target)} / ${c.target}`, changeMessage: L.roundChanged }] : [],
-      secondaryFields: appointments
+      primaryFields: library
+        ? [{ key: "due", label: firstLoan ? LW.label : LW.books, value: firstLoan ? dueText(firstLoan.due) : LW.none, changeMessage: `${LW.label}: %@` }]
+        : appointments ? [apptField] : average ? [{ key: "round", label: L.round, value: `${Math.min(c.stamps, c.target)} / ${c.target}`, changeMessage: L.roundChanged }] : [],
+      secondaryFields: library
+        ? [
+            ...(firstLoan ? [{ key: "book", label: loans.length > 1 ? `${LW.books} (${loans.length})` : LW.books, value: loans.length > 1 ? `${firstLoan.title} +${loans.length - 1}` : firstLoan.title }] : []),
+            ...(design.showCustomerName ? [{ ...name }] : []),
+          ]
+        : appointments
         ? [
             ...(design.showCustomerName ? [{ ...name, textAlignment: "PKTextAlignmentNatural" }] : []),
             ...(apptExtra === "stamps" ? [{ key: "stamps", label: L.stamps, value: `${Math.min(c.stamps, c.target)}/${c.target}`, changeMessage: L.changed, textAlignment: "PKTextAlignmentRight" }]
@@ -243,11 +268,15 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
         : average
         ? [...(design.showCustomerName ? [{ ...name, textAlignment: "PKTextAlignmentNatural" }] : []), { key: "rewardFront", label: L.reward, value: reward, textAlignment: "PKTextAlignmentRight" }]
         : balance === undefined ? [stamps, ready] : [{ key: "balance", label: L.balance, value: balance, changeMessage: L.balanceChanged }],
-      ...(strip || appointments ? {} : { auxiliaryFields: [{ key: "reward", label: L.reward, value: reward }] }),
+      ...(strip || appointments || library ? {} : { auxiliaryFields: [{ key: "reward", label: L.reward, value: reward }] }),
       backFields: [
         // The business's offers page (or its website), first on the back of the pass, opened with a tap.
         ...links.map((l) => ({ key: `link-${l.key}`, label: l.label, value: l.url, attributedValue: `<a href="${escapeHtml(l.url)}">${escapeHtml(l.label)}</a>` })),
-        ...(appointments && apptExtra !== "stamps" && apptExtra !== "points" ? [] : [{ key: "rewardBack", label: L.reward, value: reward }]),
+        // The library card: the reader's link to see and extend their books, then each book and its return date.
+        ...(library && c.loan_key ? [{ key: "renew", label: LW.renew, value: `${origin}/l/${c.loan_key}`, attributedValue: `<a href="${escapeHtml(`${origin}/l/${c.loan_key}`)}">${escapeHtml(loans.length ? LW.renew : LW.mine)}</a>` }] : []),
+        ...loans.map((l) => ({ key: `loan-${l.id}`, label: l.title, value: `${LW.label} ${dueText(l.due)}${l.extensions ? ` · ${LW.ext} ×${l.extensions}` : ""}` })),
+        ...(library && loans.length && c.appt_msg ? [{ key: "reminder", label: LW.label, value: c.appt_msg, changeMessage: "%@" }] : []),
+        ...(library || (appointments && apptExtra !== "stamps" && apptExtra !== "points") ? [] : [{ key: "rewardBack", label: L.reward, value: reward }]),
         // The appointments card: the latest reminder (the day before, that morning, an hour before) shows as a notification.
         ...(apptNext && c.appt_msg ? [{ key: "reminder", label: apptLabel(lang), value: c.appt_msg, changeMessage: "%@" }] : []),
         // The latest message to customers: when it changes, the iPhone shows it as a notification (changeMessage).

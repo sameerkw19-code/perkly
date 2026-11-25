@@ -9,8 +9,10 @@ import { APPT_MAX_DAYS, israelTime, passedStages } from "../appointment.ts";
 import { parseServices } from "../calendar.ts";
 import { pushAppleCustomer } from "./apple-push";
 import type { Social } from "../social";
+import { LOANS_MAX, LOAN_DAYS_MAX, addDays, cleanTitle, daysLeft, israelDate, passedLoanStages, validDate } from "../library.ts";
+import { ensureLoanKey, extendLoan, openLoans } from "./loans";
 
-export type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust: number; reward_mode: "bank" | "block"; reward_expiry_days: number; birthdays: number; social: Social; owner_designs: number; program: Program; cashback_bp: number; cashback_min: number; currency: string; avg_cap: number; pos_only?: number; near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number; near_evening_from?: number; referral_stamps?: number; report_email?: number; appt_extra?: string; appt_points?: number; work_hours?: string | null; appt_slot?: number; services?: string | null };
+export type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust: number; reward_mode: "bank" | "block"; reward_expiry_days: number; birthdays: number; social: Social; owner_designs: number; program: Program; cashback_bp: number; cashback_min: number; currency: string; avg_cap: number; pos_only?: number; near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number; near_evening_from?: number; referral_stamps?: number; report_email?: number; appt_extra?: string; appt_points?: number; work_hours?: string | null; appt_slot?: number; services?: string | null; loan_days?: number; loan_ext_days?: number; loan_max_ext?: number };
 export type Customer = { id: string; business: string; name: string; phone: string; stamps: number; target: number; scan_code: string; google_wallet?: string | null; balance: number; round_total: number; appt_at?: string | null; appt_service?: string | null; appt_min?: number | null };
 
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -33,8 +35,10 @@ export async function savedRewards(db: D1Database, customerId: string) {
   return { n: row?.n ?? 0, nextExpiry: row?.next_expiry ?? null, nextValue: row?.next_value ?? null };
 }
 
-export async function cardState(db: D1Database, c: Customer, mode: Business["reward_mode"]) {
+export async function cardState(db: D1Database, c: Customer, mode: Business["reward_mode"], program?: string) {
   const saved = await savedRewards(db, c.id);
+  // The library card: the books the reader has now.
+  const loans = program === "library" ? await openLoans(db, c.id) : undefined;
   const rewards = saved.n + (mode === "block" && c.stamps >= c.target ? 1 : 0);
   return {
     id: c.id, name: c.name, stamps: c.stamps, target: c.target, rewards, rewardReady: rewards > 0, nextExpiry: saved.nextExpiry, mode, balance: c.balance ?? 0,
@@ -42,6 +46,7 @@ export async function cardState(db: D1Database, c: Customer, mode: Business["rew
     roundTotal: c.round_total ?? 0, rewardValue: saved.nextValue,
     // The appointments card: the next appointment (ISO), or null.
     apptAt: c.appt_at ?? null, apptService: c.appt_service ?? null, apptMin: c.appt_min ?? null,
+    ...(loans ? { loans } : {}),
   };
 }
 
@@ -80,11 +85,12 @@ export async function cardAction(x: CardActionInput): Promise<Response> {
   // Each kind of card has its own actions.
   const balanceAction = p.action === "purchase" || p.action === "spend" || p.action === "adjust_balance";
   const apptAction = p.action === "appt_set" || p.action === "appt_clear" || p.action === "visit";
+  const loanAction = p.action === "lend" || p.action === "return" || p.action === "renew";
   // The appointments card can add a gift punch card, points per visit, or a balance (the owner's choice).
   const addOn = business.program === "appointments" ? (business.appt_extra ?? "none") : null;
   const stampsCard = business.program === "stamps" || business.program === "average" || addOn === "stamps" || addOn === "points";
   const balanceCard = business.program === "cashback" || addOn === "cashback";
-  const allowed = apptAction ? business.program === "appointments" : balanceAction ? balanceCard : stampsCard;
+  const allowed = loanAction ? business.program === "library" : apptAction ? business.program === "appointments" : balanceAction ? balanceCard : stampsCard;
   if (!allowed) return fail("wrong_program", 409, "This action is for the other kind of card");
   if (p.action === "adjust_balance" && role === "staff" && !business.staff_adjust) return fail("forbidden", 403, "Corrections are owner-only in this business");
   if (p.action === "adjust" && role === "staff" && !business.staff_adjust) return fail("forbidden", 403, "Corrections are owner-only in this business");
@@ -121,7 +127,7 @@ export async function cardAction(x: CardActionInput): Promise<Response> {
     const bonus = added && p.action === "stamp" ? await payReferral(db, business, c!.id, now) : 0;
     if (bonus) extra = { ...extra, referralBonus: bonus };
     const fresh = (await db.prepare("SELECT * FROM customers WHERE id = ?").bind(c!.id).first<Customer>())!;
-    const card = await cardState(db, fresh, business.reward_mode);
+    const card = await cardState(db, fresh, business.reward_mode, business.program);
     const reached = business.reward_mode === "block" ? fresh.stamps >= fresh.target : earned > 0;
     const notice = added && !(addOn === "points" && !reached)
       ? reached
@@ -135,8 +141,54 @@ export async function cardAction(x: CardActionInput): Promise<Response> {
   };
   const refuse = async (code: string) => {
     const fresh = (await db.prepare("SELECT * FROM customers WHERE id = ?").bind(c!.id).first<Customer>())!;
-    return json({ error: code, code, card: await cardState(db, fresh, business.reward_mode) }, 409);
+    return json({ error: code, code, card: await cardState(db, fresh, business.reward_mode, business.program) }, 409);
   };
+
+  if (loanAction) {
+    // The library card: a book lent (with its return date), returned, or extended by the librarian.
+    const unapplied = "AND NOT EXISTS(SELECT 1 FROM events WHERE id = ?)";
+    const today = israelDate(new Date(now));
+    if (p.action === "lend") {
+      const title = cleanTitle(p.title);
+      if (!title) return fail("bad_details", 400, "Write the book's name");
+      const due = p.due === undefined || p.due === null || p.due === "" ? addDays(today, business.loan_days ?? 14) : p.due;
+      if (!validDate(due) || daysLeft(due, today) < 0 || daysLeft(due, today) > LOAN_DAYS_MAX) return fail("loan_date", 400, "The return date must be from today on");
+      const open = await db.prepare("SELECT COUNT(*) AS n FROM loans WHERE customer = ? AND returned IS NULL").bind(c.id).first<{ n: number }>();
+      if ((open?.n ?? 0) >= LOANS_MAX) return fail("loans_max", 409, `At most ${LOANS_MAX} books at once`);
+      await ensureLoanKey(db, c.id);
+      // Reminders whose time already passed (a short loan) are never sent late.
+      const sent = passedLoanStages(due, new Date(now)).join(",") || null;
+      const r = await db.batch([
+        db.prepare(`INSERT INTO loans(id, business, customer, title, due, extensions, sent, created) SELECT ?, ?, ?, ?, ?, 0, ?, ? WHERE NOT EXISTS(SELECT 1 FROM events WHERE id = ?)`)
+          .bind(requestId, business.id, c.id, title, due, sent, now, requestId),
+        event("loan", 0, `${title} → ${due}`),
+      ]);
+      if (r[0].meta.changes) return done({ loan: { id: requestId, title, due } });
+      if (await replayed()) return done({ replayed: true });
+      return refuse("busy_retry");
+    }
+    if (typeof p.loan !== "string" || !UUID.test(p.loan)) return fail("unknown_loan", 404, "Book not found");
+    if (p.action === "return") {
+      const loan = await db.prepare("SELECT title FROM loans WHERE id = ? AND customer = ? AND business = ?").bind(p.loan, c.id, business.id).first<{ title: string }>();
+      if (!loan) return fail("unknown_loan", 404, "Book not found");
+      const r = await db.batch([
+        db.prepare(`UPDATE loans SET returned = ? WHERE id = ? AND customer = ? AND returned IS NULL ${unapplied}`).bind(now, p.loan, c.id, requestId),
+        event("return", 0, loan.title),
+        // No books left: the last reminder leaves the pass too.
+        db.prepare("UPDATE customers SET appt_msg = NULL WHERE id = ? AND NOT EXISTS(SELECT 1 FROM loans WHERE customer = ? AND returned IS NULL)").bind(c.id, c.id),
+      ]);
+      if (r[0].meta.changes) return done();
+      if (await replayed()) return done({ replayed: true });
+      return refuse("already_returned");
+    }
+    // The librarian extends: the reader's limit does not apply.
+    const ext = await extendLoan(db, {
+      business: { id: business.id, loan_days: business.loan_days ?? 14, loan_ext_days: business.loan_ext_days ?? 7, loan_max_ext: business.loan_max_ext ?? 2 },
+      customerId: c.id, loanId: p.loan, requestId, actor: user.id, role, now, limit: false,
+    });
+    if (!ext.ok) return ext.code === "unknown_loan" ? fail("unknown_loan", 404, "Book not found") : refuse(ext.code);
+    return done(ext.replayed ? { replayed: true } : { due: ext.due });
+  }
 
   if (apptAction) {
     // The appointments card: the next appointment, set or cleared, and the customer's arrival (a visit).

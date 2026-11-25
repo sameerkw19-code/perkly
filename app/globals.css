@@ -1010,3 +1010,36 @@ html,body{overflow-x:clip}
 .cal-new label { display: grid; gap: 6px; font-weight: 600; }
 .cal-new input { min-height: 48px; font-size: 16px; }
 .cal-new-btn { margin-top: 10px; width: 100%; min-height: 44px; }
+
+/* ---------- The library card ---------- */
+.lib{display:grid;gap:14px}
+.lib-loans{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.lib-loan{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--line, #e5e1f5);border-radius:12px;background:var(--card, #fff)}
+.lib-loan.late{border-color:#e8a29b;background:color-mix(in srgb, #b4413a 6%, var(--card, #fff))}
+.lib-loan-text{display:grid;gap:2px;min-width:0;flex:1 1 180px}
+.lib-loan-text strong{overflow-wrap:anywhere}
+.lib-loan-text small{color:var(--muted, #6b6880)}
+.lib-loan-actions{display:flex;gap:6px;flex-wrap:wrap}
+.lib-loan-actions .btn{min-height:40px}
+.lib-loan-due{display:grid;gap:2px;justify-items:end;font-size:13px}
+.lib-badge{font-weight:700}
+.lib-badge.late{color:#b4413a}
+.lib-badge.soon{color:#b86e00}
+.lib-badge.ok{color:var(--muted, #6b6880);font-weight:600}
+.lib-lend{display:grid;gap:12px}
+.lib-field{display:grid;gap:6px}
+.lib-field>span{font-weight:700;font-size:14px}
+.lib-field input[type=date]{max-width:170px}
+.lib-titles{display:flex;gap:6px;flex-wrap:wrap}
+.lib-desk{display:grid;gap:16px}
+.lib-search{display:flex;align-items:center;gap:8px;margin:8px 0 12px;padding:0 10px;border:1px solid var(--line, #e5e1f5);border-radius:10px}
+.lib-search input{border:0;flex:1;min-width:0;padding:10px 0;background:transparent}
+.lib-group{display:grid;gap:8px;margin-top:10px}
+.lib-group h3{margin:0;font-size:15px}
+.lib-group.late h3{color:#b4413a}
+.lib-settings{display:grid;gap:10px;max-width:420px}
+.lib-settings label{display:grid;gap:4px}
+.reader-loans h2{display:flex;align-items:center;gap:8px}
+.reader-loans .form-ok{color:#1f7a4d;font-weight:600}
+.lib-no-ext{font-size:12px}
+.loans-title{font-size:20px;margin:4px 0 0;padding-inline-start:10px;border-inline-start:4px solid}

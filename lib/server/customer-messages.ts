@@ -5,6 +5,7 @@
 // well inside the Worker's limits and a failed message is simply tried again later.
 
 import { passProgram } from "./balance-pass";
+import { sendLoanReminders } from "./loan-reminders";
 import { walletConfig, updateLoyaltyObject, type WalletConfig } from "./google-wallet";
 import { liveDesign, passLook } from "./designs";
 import { BIRTHDAY_GIFT_DAYS, MISS_YOU_DAYS, noticeOn, type Design, type StampNotice } from "../design";
@@ -230,9 +231,9 @@ export async function drainOutbox(db: D1Database, config: WalletConfig, nowIso: 
     };
     // A refresh: the current stamps, rewards and look, without a message (a retry, or a new design).
     if (o.kind === "sync") {
-      const program = await passProgram(db, o.customer);
-      // Balance and appointment cards have no stamp banner.
-      const stampsLook = program.balance === undefined && program.appointment === undefined ? { stamps: o.stamps, target: o.target } : undefined;
+      const program = await passProgram(db, o.customer, o.origin);
+      // Balance, appointment and library cards have no stamp banner.
+      const stampsLook = program.balance === undefined && program.appointment === undefined && program.library === undefined ? { stamps: o.stamps, target: o.target } : undefined;
       const full = o.origin ? await passLook(db, business, o.origin, stampsLook).catch(() => null) : null;
       const { notice: _none, ...look } = full ?? { notice: null };
       const result = await updateLoyaltyObject(
@@ -268,7 +269,7 @@ export async function drainOutbox(db: D1Database, config: WalletConfig, nowIso: 
     // Only the stamps and rewards are refreshed with the message; the pass keeps its look.
     const result = await updateLoyaltyObject(
       config,
-      { customerId: o.customer, businessId: o.business, stamps: o.stamps, target: o.target, scanCode: o.scan_code, rewards, ...(await passProgram(db, o.customer)) },
+      { customerId: o.customer, businessId: o.business, stamps: o.stamps, target: o.target, scanCode: o.scan_code, rewards, ...(await passProgram(db, o.customer, o.origin)) },
       look.notice,
     );
     if (result === "updated") await finish(o.id, "sent");
@@ -326,6 +327,7 @@ export async function runScheduled(db: D1Database, env: Env, now = new Date()): 
   await queueSpecialDays(db, nowIso);
   await switchNearTexts(db, today.hour, nowIso);
   await sendApptReminders(db, nowIso).catch((e) => console.error("appointment reminders failed:", e));
+  await sendLoanReminders(db, nowIso).catch((e) => console.error("library reminders failed:", e));
   await sendMonthlyReports(db, env as unknown as MailEnv & { REPORT_EMAILS?: string; PUBLIC_ORIGIN?: string }, now).catch((e) => console.error("monthly report failed:", e));
   const config = walletConfig(env);
   if (!config) return;

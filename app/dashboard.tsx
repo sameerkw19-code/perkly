@@ -6,11 +6,13 @@ import { fillNearText, NEAR_TAG_NAMES, nearPhase, type NearTag } from "../lib/ne
 import { israelNow } from "../lib/birthday";
 import { formatAppt, formatTime, israelTime } from "../lib/appointment";
 import { ClinicCalendar, minutesLabel } from "../components/clinic-calendar";
+import { LibraryDesk, LibraryStation } from "../components/library";
+import type { Loan } from "../lib/library";
 import { parseServices } from "../lib/calendar";
 import {
   Activity, AlertTriangle, Trash2, Cake, Check, Copy, CreditCard, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode,
   ChevronRight, History, Palette, RefreshCw, RotateCcw, ScanLine, Search, Settings, Share2, Store, UserPlus, Users, UserRound, X,
-  Phone, MapPin, Megaphone, BarChart3, CalendarDays,
+  Phone, MapPin, Megaphone, BarChart3, CalendarDays, BookOpen,
   type LucideIcon,
 } from "lucide-react";
 import type { Design } from "../lib/design";
@@ -31,8 +33,8 @@ import { weekChange } from "../lib/weekly";
 import { Brand } from "../components/brand";
 
 type Role = "owner" | "staff";
-type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social; program?: "stamps" | "cashback" | "average" | "appointments"; cashback_bp?: number; cashback_min?: number; currency?: string; avg_cap?: number; pos_only?: number; near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number; near_evening_from?: number; referral_stamps?: number; report_email?: number; appt_extra?: "none" | "stamps" | "points" | "cashback"; appt_points?: number; work_hours?: string | null; appt_slot?: number; services?: string | null };
-type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; rewards?: number; nextExpiry?: string | null; phone?: string; balance?: number; roundTotal?: number; rewardValue?: number | null; apptAt?: string | null };
+type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social; program?: "stamps" | "cashback" | "average" | "appointments" | "library"; cashback_bp?: number; cashback_min?: number; currency?: string; avg_cap?: number; pos_only?: number; near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number; near_evening_from?: number; referral_stamps?: number; report_email?: number; appt_extra?: "none" | "stamps" | "points" | "cashback"; appt_points?: number; work_hours?: string | null; appt_slot?: number; services?: string | null; loan_days?: number; loan_ext_days?: number; loan_max_ext?: number };
+type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; rewards?: number; nextExpiry?: string | null; phone?: string; balance?: number; roundTotal?: number; rewardValue?: number | null; apptAt?: string | null; loans?: Loan[] };
 type Data = {
   me: { name: string; email: string };
   /** Perkly (a platform admin): manages the card, settings and team of any business. */
@@ -200,7 +202,7 @@ export default function Dashboard() {
       setLoadError("");
       if (next.business && next.business.id !== businessId) setBusinessId(next.business.id);
       // Staff: the station, or (clinics) the calendar when that's where they are.
-      if (next.role === "staff") setView((v) => (v === "calendar" && next.business?.program === "appointments" ? v : "station"));
+      if (next.role === "staff") setView((v) => ((v === "calendar" && next.business?.program === "appointments") || (v === "books" && next.business?.program === "library") ? v : "station"));
     } catch {
       setLoadError(t("err_network"));
     }
@@ -272,10 +274,10 @@ export default function Dashboard() {
   // Perkly (a platform admin), who sees those screens too.
   const manage = !!data?.manage;
   const nav: [LucideIcon, string][] = isOwner
-    ? [[LayoutDashboard, "overview"], ...(b?.program === "appointments" ? [[CalendarDays, "calendar"]] as typeof nav : []), [Users, "customers"], [ScanLine, "station"],
+    ? [[LayoutDashboard, "overview"], ...(b?.program === "appointments" ? [[CalendarDays, "calendar"]] as typeof nav : b?.program === "library" ? [[BookOpen, "books"]] as typeof nav : []), [Users, "customers"], [ScanLine, "station"],
        ...(manage ? [[Palette, "design"], [Users, "team"], [Settings, "settings"]] as typeof nav : data?.canDesign ? [[Palette, "design"]] as typeof nav : [])]
     // Staff: the station, and for clinics the calendar (to book; the settings stay with the owner).
-    : [[ScanLine, "station"], ...(b?.program === "appointments" ? [[CalendarDays, "calendar"]] as typeof nav : [])];
+    : [[ScanLine, "station"], ...(b?.program === "appointments" ? [[CalendarDays, "calendar"]] as typeof nav : b?.program === "library" ? [[BookOpen, "books"]] as typeof nav : [])];
 
   // ---------- Loading / empty states ----------
   if (!data) {
@@ -425,7 +427,7 @@ export default function Dashboard() {
           {view === "overview" && isOwner && (
             <>
               <div className="page-head">
-                <div><h1>{t("repTitle")}</h1><p className="muted">{t(b.program === "cashback" ? "repSubtitleCb" : b.program === "appointments" ? "repSubtitleAppt" : "repSubtitle")}</p></div>
+                <div><h1>{t("repTitle")}</h1><p className="muted">{t(b.program === "cashback" ? "repSubtitleCb" : b.program === "appointments" ? "repSubtitleAppt" : b.program === "library" ? "repSubtitleLib" : "repSubtitle")}</p></div>
                 <div className="head-actions">
                   {(data.branches?.length ?? 0) > 1 && (
                     <select aria-label={t("branch")} value={branchView} onChange={(e) => setBranchView(e.target.value)}>
@@ -442,7 +444,7 @@ export default function Dashboard() {
               </div>
               {b.program === "appointments" && <TodayAppts customers={customers} t={t} />}
               {data.summary && <Summary summary={data.summary} totals={{ customers: data.stats!.customers, ready: data.stats!.rewards_ready, openBalance: data.stats!.open_balance }} breakdown={data.breakdown} hasBranches={(data.branches?.length ?? 0) > 1} t={t}
-                money={b.program === "cashback" || b.program === "average" ? (n) => formatMoney(n, b.currency === "USD" ? "USD" : "ILS", lang) : undefined} average={b.program === "average"} appts={b.program === "appointments"} />}
+                money={b.program === "cashback" || b.program === "average" ? (n) => formatMoney(n, b.currency === "USD" ? "USD" : "ILS", lang) : undefined} average={b.program === "average"} appts={b.program === "appointments" || b.program === "library"} />}
               {!!data.alerts?.length && <Alerts alerts={data.alerts} t={t} />}
               <section className="overview-grid">
                 <div className="panel card-panel join-panel">
@@ -497,7 +499,8 @@ export default function Dashboard() {
                           <td><span className="customer-avatar">{c.name.charAt(0)}</span><strong>{c.name}</strong></td>
                           <td dir="ltr" className="start">{c.phone}</td>
                           <td>
-                            {b.program === "appointments" ? <bdi>{c.appt_at ? formatAppt(c.appt_at, lang) : "—"}</bdi>
+                            {b.program === "library" ? "—"
+                            : b.program === "appointments" ? <bdi>{c.appt_at ? formatAppt(c.appt_at, lang) : "—"}</bdi>
                             : b.program === "cashback" ? <Num>{formatMoney(c.balance ?? 0, b.currency === "USD" ? "USD" : "ILS", lang)}</Num> : (
                             <div className="progress-cell">
                               <span className="progress-track"><i style={{ width: Math.min(100, (c.stamps / c.target) * 100) + "%" }} /></span>
@@ -580,7 +583,7 @@ export default function Dashboard() {
               <div className="page-head"><div><h1>{t("design")}</h1><p className="muted">{t("designNoBalance")}</p></div></div>
               <CardEditor key={b.id + ":" + data.editor.publishedVersion} businessId={b.id} target={b.target} editor={data.editor} t={t} lang={lang} notify={notify} reload={load}
                 paid={!!data.access?.ok && !data.access.free} upgradeHref={`/start?b=${encodeURIComponent(b.id)}`} specialDays={isOwner || manage}
-                cashback={b.program === "cashback" ? { bp: b.cashback_bp ?? 200, currency: b.currency === "USD" ? "USD" : "ILS" } : null} average={b.program === "average"} appointments={b.program === "appointments"} currency={b.currency === "USD" ? "USD" : "ILS"} />
+                cashback={b.program === "cashback" ? { bp: b.cashback_bp ?? 200, currency: b.currency === "USD" ? "USD" : "ILS" } : null} average={b.program === "average"} appointments={b.program === "appointments"} library={b.program === "library"} currency={b.currency === "USD" ? "USD" : "ILS"} />
             </>
           )}
 
@@ -588,6 +591,11 @@ export default function Dashboard() {
           {view === "calendar" && b.program === "appointments" && (
             <ClinicCalendar business={b} owner={isOwner} t={t} lang={lang} busy={busy} call={call} reload={load} notify={notify}
               onNewCard={(url, name, when) => setModal({ type: "link", url, title: name, note: t("calNewBooked", { when }) })} />
+          )}
+
+          {/* The library: every book out now (late first); the owner also sets the loan rules. */}
+          {view === "books" && b.program === "library" && (
+            <LibraryDesk business={b} owner={isOwner} t={t} lang={lang} call={call} reload={load} />
           )}
 
           {view === "team" && isOwner && manage && (
@@ -1046,6 +1054,8 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
   const average = business.program === "average";
   // The appointments card (clinics): the next appointment instead of stamps, and the customer's arrival.
   const appts = business.program === "appointments";
+  // The library card: books on loan, return dates and extensions instead of stamps.
+  const library = business.program === "library";
   // What the appointments card adds (the owner's choice): a gift punch card, points per visit, or a balance.
   const apptExtra = appts ? (business.appt_extra ?? "none") : "none";
   const [apptDate, setApptDate] = useState("");
@@ -1647,7 +1657,20 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
         );
       })()}
 
-      {selected && !cashback && !appts && step === "customer" && (
+      {/* 2d. The library card: the reader's books (return, extend) and lending a new one */}
+      {selected && library && step === "customer" && (
+        <section className="sx-screen" aria-label={selected.name}>
+          {who}
+          {branchControl && <div className="sx-chips">{branchControl}</div>}
+          <LibraryStation business={business} customer={selected} t={t} lang={lang} branch={myBranch ? undefined : branch || undefined} notify={notify}
+            onCard={(card, message) => { setSelected({ ...selected, ...card }); if (message) notify(message); onDone(); }} />
+          <div className="sx-bar">
+            <button className="btn soft" onClick={next}><ChevronRight size={16} className="sx-back" />{t("sxBack")}</button>
+          </div>
+        </section>
+      )}
+
+      {selected && !cashback && !appts && !library && step === "customer" && (
         <section className="sx-screen" aria-label={selected.name}>
           {who}
           <div className="sx-chips">

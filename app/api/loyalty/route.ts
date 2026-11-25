@@ -29,6 +29,8 @@ import { normalizeSocial, parseSocial } from "../../../lib/social";
 import { regionFrom } from "../../../lib/server/region";
 import { isKind, startDesign } from "../../../lib/start-design";
 import { activeBranches, cardAction, cardState, type Business, type Customer } from "../../../lib/server/card-actions";
+import { recentTitles } from "../../../lib/server/loans";
+import { LOAN_DAYS_MAX, LOAN_EXT_DAYS_MAX, LOAN_MAX_EXT_MAX } from "../../../lib/library";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +45,7 @@ function validTarget(v: unknown, program?: string): v is number {
 
 async function loadBusiness(db: D1Database, id: string) {
   const row = await db
-    .prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays, social, owner_designs, program, cashback_bp, cashback_min, currency, avg_cap, pos_only, near_text, near_text_evening, near_morning_from, near_evening_from, referral_stamps, report_email, appt_extra, appt_points, work_hours, appt_slot, services FROM businesses WHERE id = ?")
+    .prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays, social, owner_designs, program, cashback_bp, cashback_min, currency, avg_cap, pos_only, near_text, near_text_evening, near_morning_from, near_evening_from, referral_stamps, report_email, appt_extra, appt_points, work_hours, appt_slot, services, loan_days, loan_ext_days, loan_max_ext FROM businesses WHERE id = ?")
     .bind(id)
     .first<Omit<Business, "social"> & { social: string | null }>();
   return row ? { ...row, social: parseSocial(row.social) } : null;
@@ -369,7 +371,7 @@ export async function POST(request: Request) {
     const currency = forClient ? (p.market === "intl" ? "USD" : "ILS") : region.currency;
     const cardLang = forClient || region.israel ? (p.lang === "en" ? "en" : "he") : "en";
     // The kind of card: stamps (default) or a balance card with a percentage back (Perkly picks it for a client).
-    const program: Program = forClient && (p.program === "cashback" || p.program === "average" || p.program === "appointments") ? p.program : "stamps";
+    const program: Program = forClient && (p.program === "cashback" || p.program === "average" || p.program === "appointments" || p.program === "library") ? p.program : "stamps";
     const avgCap = program === "average" && Number.isInteger(p.avgCap) && (p.avgCap as number) >= 0 && (p.avgCap as number) <= AMOUNT_MAX ? (p.avgCap as number) : 0;
     const bp = program === "cashback" && Number.isInteger(p.cashbackBp) && (p.cashbackBp as number) >= BP_MIN && (p.cashbackBp as number) <= BP_MAX ? (p.cashbackBp as number) : 200;
     const minUse = program === "cashback" && Number.isInteger(p.cashbackMin) && (p.cashbackMin as number) >= 0 && (p.cashbackMin as number) <= AMOUNT_MAX ? (p.cashbackMin as number) : 0;
@@ -377,7 +379,7 @@ export async function POST(request: Request) {
       // The currency follows where the owner signs up: shekels in Israel, dollars abroad.
       // Owners design their own card (owner_designs = 1); Perkly can switch that off per business.
       db.prepare("INSERT INTO businesses(id, owner, name, reward, target, color, created, join_code, reward_mode, currency, program, cashback_bp, cashback_min, avg_cap, owner_designs) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)")
-        .bind(id, user.id, name, reward, p.target, p.color, now, randomCode(10), program === "average" || program === "appointments" ? "bank" : mode, currency, program, bp, minUse, avgCap),
+        .bind(id, user.id, name, reward, p.target, p.color, now, randomCode(10), program === "average" || program === "appointments" || program === "library" ? "bank" : mode, currency, program, bp, minUse, avgCap),
       // The starting card: the example look for the business type, in the sign-up language (English abroad).
       // After this the owner (and Perkly) edit it in the design screen.
       db.prepare("INSERT INTO card_designs(id, business, version, data, published, published_by) VALUES(?, ?, 1, ?, ?, ?)")
@@ -446,7 +448,7 @@ export async function POST(request: Request) {
       const denied = adminOnly(); if (denied) return denied;
       const name = str(p.name, 80);
       const reward = str(p.reward, 160);
-      const nextProgram = p.program === "cashback" || p.program === "stamps" || p.program === "average" || p.program === "appointments" ? p.program : business.program;
+      const nextProgram = p.program === "cashback" || p.program === "stamps" || p.program === "average" || p.program === "appointments" || p.program === "library" ? p.program : business.program;
       if (!name || !reward || !validTarget(p.target, nextProgram) || typeof p.color !== "string" || !COLOR.test(p.color)) {
         return fail("bad_details", 400, "Invalid business details");
       }
@@ -465,7 +467,7 @@ export async function POST(request: Request) {
       }
       const socialJson = Object.keys(social).length ? JSON.stringify(social) : null;
       // The kind of card, the percentage back and the minimum balance to use it (the balance card).
-      const program: Program = p.program === "cashback" || p.program === "stamps" || p.program === "average" || p.program === "appointments" ? p.program : business.program;
+      const program: Program = p.program === "cashback" || p.program === "stamps" || p.program === "average" || p.program === "appointments" || p.program === "library" ? p.program : business.program;
       const avgCap = p.avgCap === undefined ? business.avg_cap : p.avgCap;
       if (!Number.isInteger(avgCap) || (avgCap as number) < 0 || (avgCap as number) > AMOUNT_MAX) return fail("bad_details", 400, "Invalid cap");
       const bp = p.cashbackBp === undefined ? business.cashback_bp : p.cashbackBp;
@@ -474,7 +476,7 @@ export async function POST(request: Request) {
       if (!Number.isInteger(minUse) || (minUse as number) < 0 || (minUse as number) > AMOUNT_MAX) return fail("bad_details", 400, "Invalid minimum");
       const statements = [
         db.prepare("UPDATE businesses SET name = ?, reward = ?, target = ?, color = ?, staff_adjust = ?, reward_mode = ?, reward_expiry_days = ?, birthdays = ?, social = ?, program = ?, cashback_bp = ?, cashback_min = ?, avg_cap = ? WHERE id = ?")
-          .bind(name, reward, p.target, p.color, staffAdjust, program === "average" || program === "appointments" ? "bank" : mode, expiry, birthdaysOn, socialJson, program, bp, minUse, avgCap, business.id),
+          .bind(name, reward, p.target, p.color, staffAdjust, program === "average" || program === "appointments" || program === "library" ? "bank" : mode, expiry, birthdaysOn, socialJson, program, bp, minUse, avgCap, business.id),
       ];
       if (business.reward_mode === "block" && mode === "bank") {
         // Switching to collect mode: cards that are full now become a saved reward and start a new round.
@@ -523,7 +525,7 @@ export async function POST(request: Request) {
         const code = p.scan.replace(/^perkly:/, "").slice(0, 100);
         const c = await db.prepare("SELECT * FROM customers WHERE business = ? AND scan_code = ? AND archived IS NULL").bind(business.id, code).first<Customer>();
         if (!c) return fail("unknown_card", 404, "Card not found in this business");
-        return json({ results: [{ ...(await cardState(db, c, business.reward_mode)), phone: role === "owner" ? formatPhone(c.phone) : maskPhone(c.phone) }] });
+        return json({ results: [{ ...(await cardState(db, c, business.reward_mode, business.program)), phone: role === "owner" ? formatPhone(c.phone) : maskPhone(c.phone) }] });
       }
       const q = typeof p.query === "string" ? p.query.trim().slice(0, 60) : "";
       const digits = q.replace(/\D/g, "");
@@ -537,10 +539,38 @@ export async function POST(request: Request) {
         .bind(business.id, "%" + q.replace(/[\\%_]/g, (m) => "\\" + m) + "%", ...(phoneTail ? [phoneTail] : []))
         .all<Customer>();
       return json({
-        results: await Promise.all(rows.results.map(async (c) => ({ ...(await cardState(db, c, business.reward_mode)), phone: role === "owner" ? formatPhone(c.phone) : maskPhone(c.phone) }))),
+        results: await Promise.all(rows.results.map(async (c) => ({ ...(await cardState(db, c, business.reward_mode, business.program)), phone: role === "owner" ? formatPhone(c.phone) : maskPhone(c.phone) }))),
       });
     }
 
+    case "loan_titles": {
+      // The library card: books lent lately, as quick picks when lending (owners and staff).
+      if (business.program !== "library") return fail("wrong_program", 409, "Only for the library card");
+      return json({ titles: await recentTitles(db, business.id) });
+    }
+    case "loan_list": {
+      // The library card: every book out now, nearest return date first (late ones on top). Staff see a masked phone.
+      if (business.program !== "library") return fail("wrong_program", 409, "Only for the library card");
+      const rows = await db
+        .prepare(
+          `SELECT l.id, l.title, l.due, l.extensions, c.id AS customer, c.name, c.phone FROM loans l JOIN customers c ON c.id = l.customer
+           WHERE l.business = ? AND l.returned IS NULL AND c.archived IS NULL ORDER BY l.due, l.created LIMIT 3000`,
+        )
+        .bind(business.id)
+        .all<{ id: string; title: string; due: string; extensions: number; customer: string; name: string; phone: string }>();
+      return json({ loans: rows.results.map((l) => ({ ...l, phone: role === "owner" ? formatPhone(l.phone) : maskPhone(l.phone) })) });
+    }
+    case "set_loans": {
+      // The library card: loan length, one extension, extensions a reader may do from the card (the owner's choice).
+      const denied = ownerOnly(); if (denied) return denied;
+      if (business.program !== "library") return fail("wrong_program", 409, "Only for the library card");
+      const int = (v: unknown, min: number, max: number) => Number.isInteger(v) && (v as number) >= min && (v as number) <= max;
+      if (!int(p.days, 1, LOAN_DAYS_MAX)) return fail("bad_details", 400, `Loan length: 1-${LOAN_DAYS_MAX} days`);
+      if (!int(p.extDays, 1, LOAN_EXT_DAYS_MAX)) return fail("bad_details", 400, `One extension: 1-${LOAN_EXT_DAYS_MAX} days`);
+      if (!int(p.maxExt, 0, LOAN_MAX_EXT_MAX)) return fail("bad_details", 400, `Extensions: 0-${LOAN_MAX_EXT_MAX}`);
+      await db.prepare("UPDATE businesses SET loan_days = ?, loan_ext_days = ?, loan_max_ext = ? WHERE id = ?").bind(p.days, p.extDays, p.maxExt, business.id).run();
+      return json({ ok: true });
+    }
     case "appt_list": {
       // The calendar: every customer's next appointment (owners and staff). Staff see a masked phone.
       if (business.program !== "appointments") return fail("wrong_program", 409, "Only for the appointments card");
@@ -581,6 +611,9 @@ export async function POST(request: Request) {
     case "appt_set":
     case "appt_clear":
     case "visit":
+    case "lend":
+    case "return":
+    case "renew":
       return cardAction({ db, p, business, actorId: user.id, role, memberBranch: membership.branch, now, origin });
 
     case "new_card_link": {

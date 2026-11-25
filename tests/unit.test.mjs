@@ -322,3 +322,45 @@ test("wallet passes: one link, the business's offers page (or its website), in t
   const g = lookFields({ title: "RAZI", reward: "x", heroUrl: null, links: he.map(({ label, url }) => ({ label, url })) });
   assert.deepEqual(g.linksModuleData.uris.map((u) => u.description), ["למבצעים", "Powered by Perkly"]);
 });
+
+// ---- The library card ----
+
+import { addDays as libAddDays, daysLeft, dueLoanStage, extendedDue, formatDue, loanReminder, loanStageTimes, nextDue, passedLoanStages, validDate } from "../lib/library.ts";
+
+test("library: dates, extension from today when late", () => {
+  assert.equal(libAddDays("2026-11-25", 7), "2026-12-02");
+  assert.equal(libAddDays("2026-12-28", 7), "2027-01-04");
+  assert.equal(daysLeft("2026-12-02", "2026-11-25"), 7);
+  assert.equal(daysLeft("2026-11-20", "2026-11-25"), -5);
+  assert.equal(validDate("2026-02-30"), false);
+  assert.equal(validDate("2026-02-28"), true);
+  assert.equal(extendedDue("2026-12-02", "2026-11-25", 7), "2026-12-09");
+  // Late: counted from today, so the reader really gets the days.
+  assert.equal(extendedDue("2026-11-20", "2026-11-25", 7), "2026-12-02");
+  assert.equal(formatDue("2026-12-02", "he", false), "2.12");
+});
+
+test("library: reminders a week before 10:00, the day before 10:00, the day itself 9:00 (Israel time)", () => {
+  const t = loanStageTimes("2026-12-10");
+  assert.equal(new Date(t.w).toISOString(), "2026-12-03T08:00:00.000Z");
+  assert.equal(new Date(t.d1).toISOString(), "2026-12-09T08:00:00.000Z");
+  assert.equal(new Date(t.d0).toISOString(), "2026-12-10T07:00:00.000Z");
+  // Before the first: nothing. After the week mark: the week reminder.
+  assert.equal(dueLoanStage("2026-12-10", [], new Date("2026-12-03T07:59:00Z")), null);
+  assert.deepEqual(dueLoanStage("2026-12-10", [], new Date("2026-12-03T08:01:00Z")), { stage: "w", skip: [] });
+  assert.equal(dueLoanStage("2026-12-10", ["w"], new Date("2026-12-05T10:00:00Z")), null);
+  // The job was down two days: only the latest goes out, the missed one is marked.
+  assert.deepEqual(dueLoanStage("2026-12-10", [], new Date("2026-12-09T09:00:00Z")), { stage: "d1", skip: ["w"] });
+  // After the return day: nothing (no overdue reminders).
+  assert.equal(dueLoanStage("2026-12-10", ["w", "d1"], new Date("2026-12-11T06:00:00Z")), null);
+  // A 3-day loan: the week reminder is already past when lent, so it is skipped.
+  assert.deepEqual(passedLoanStages("2026-11-28", new Date("2026-11-25T10:00:00Z")), ["w"]);
+});
+
+test("library: reminder texts, one or several books, with or without extension", () => {
+  assert.equal(loanReminder("d1", "he", "ספריית העיר", ["דיונה"], "2026-12-10", true), "ספריית העיר: \"דיונה\" צריך לחזור מחר, יום חמישי, 10.12. אפשר להאריך מהכרטיס.");
+  assert.equal(loanReminder("d0", "he", "ספריית העיר", ["דיונה", "הארי פוטר"], "2026-12-10", false), "ספריית העיר: היום יום ההחזרה של \"דיונה\" ו־\"הארי פוטר\".");
+  assert.match(loanReminder("w", "en", "City Library", ["Dune", "Emma", "Ulysses"], "2026-12-10", true), /"Dune" and 2 more are due back in a week/);
+  assert.equal(nextDue([{ id: "a", title: "B", due: "2026-12-10", extensions: 0 }, { id: "b", title: "A", due: "2026-12-03", extensions: 1 }]).id, "b");
+  assert.equal(nextDue([]), null);
+});

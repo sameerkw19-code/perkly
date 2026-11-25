@@ -31,7 +31,7 @@ export default function NewBusinessForm() {
   const [market, setMarket] = useState<"il" | "intl">("il");
   const [cardLang, setCardLang] = useState<"he" | "en">("he");
   // The kind of card: stamps, or a balance card with a percentage of each purchase back.
-  const [program, setProgram] = useState<"stamps" | "cashback" | "average" | "appointments">("stamps");
+  const [program, setProgram] = useState<"stamps" | "cashback" | "average" | "appointments" | "library">("stamps");
   const [pct, setPct] = useState(2);
   const [cbMin, setCbMin] = useState(0);
   // The balance card's line follows the percentage until the admin writes their own.
@@ -73,16 +73,21 @@ export default function NewBusinessForm() {
         </fieldset>
         <fieldset className="admin-kinds">
           <legend>סוג הכרטיס</legend>
-          <button type="button" className={"btn small " + (program === "stamps" ? "primary" : "soft")} aria-pressed={program === "stamps"} onClick={() => { setProgram("stamps"); setTarget((n) => Math.min(n, 30)); if (program === "cashback" || program === "appointments") setReward(""); }}>כרטיס חותמות</button>
+          <button type="button" className={"btn small " + (program === "stamps" ? "primary" : "soft")} aria-pressed={program === "stamps"} onClick={() => { setProgram("stamps"); setTarget((n) => Math.min(n, 30)); if (program === "cashback" || program === "appointments" || program === "library") setReward(""); }}>כרטיס חותמות</button>
           <button type="button" className={"btn small " + (program === "cashback" ? "primary" : "soft")} aria-pressed={program === "cashback"}
             onClick={() => { setProgram("cashback"); setTarget(10); setReward(cbLine(pct)); }}>כרטיס יתרה (אחוז מכל קנייה)</button>
           <button type="button" className={"btn small " + (program === "average" ? "primary" : "soft")} aria-pressed={program === "average"}
             onClick={() => { setProgram("average"); setTarget(4); if (!reward.trim()) setReward("קונים 4, החמישית עלינו לפי ממוצע הקניות"); }}>קנה X, הבאה חינם לפי ממוצע</button>
           <button type="button" className={"btn small " + (program === "appointments" ? "primary" : "soft")} aria-pressed={program === "appointments"}
             onClick={() => { setProgram("appointments"); setTarget(10); setReward("תזכורת לפני כל תור"); }}>כרטיס תורים (קליניקות)</button>
+          <button type="button" className={"btn small " + (program === "library" ? "primary" : "soft")} aria-pressed={program === "library"}
+            onClick={() => { setProgram("library"); setTarget(10); setReward("תזכורת לפני החזרת כל ספר"); }}>כרטיס ספרייה (השאלות)</button>
         </fieldset>
         {program === "appointments" && (
           <p className="form-hint">בלי חותמות והנחות: בכרטיס של הלקוח מופיע התור הבא שלו, והוא מקבל תזכורת יום לפני, בבוקר של אותו יום ושעה לפני. את התור קובעים בעמדת העובד.</p>
+        )}
+        {program === "library" && (
+          <p className="form-hint">בלי חותמות: בכרטיס של הקורא מופיעים הספרים שאצלו ותאריך ההחזרה. תזכורת שבוע לפני, יום לפני וביום ההחזרה, והקורא יכול להאריך מהכרטיס. את ההשאלה רושמים בעמדת העובד.</p>
         )}
         {program === "cashback" && (
           <div className="admin-new-row">
@@ -91,8 +96,8 @@ export default function NewBusinessForm() {
           </div>
         )}
         <label>שם העסק<input required maxLength={80} value={name} onChange={(e) => setName(e.target.value)} /></label>
-        <label>{program === "cashback" ? "תיאור ההטבה בכרטיס" : program === "appointments" ? "שורה קצרה בכרטיס" : "ההטבה"}<input required maxLength={160} value={reward} onChange={(e) => setReward(e.target.value)} placeholder="למשל: קפה חינם" /></label>
-        {program !== "cashback" && program !== "appointments" && <label>{program === "average" ? "כמה קניות בסבב (למשל 4 = הקנייה החמישית חינם)" : "חותמות להטבה"}<input type="number" required min={2} max={program === "average" ? 50 : 30} value={target} onChange={(e) => setTarget(Number(e.target.value))} /></label>}
+        <label>{program === "cashback" ? "תיאור ההטבה בכרטיס" : program === "appointments" || program === "library" ? "שורה קצרה בכרטיס" : "ההטבה"}<input required maxLength={160} value={reward} onChange={(e) => setReward(e.target.value)} placeholder="למשל: קפה חינם" /></label>
+        {program !== "cashback" && program !== "appointments" && program !== "library" && <label>{program === "average" ? "כמה קניות בסבב (למשל 4 = הקנייה החמישית חינם)" : "חותמות להטבה"}<input type="number" required min={2} max={program === "average" ? 50 : 30} value={target} onChange={(e) => setTarget(Number(e.target.value))} /></label>}
         {program === "average" && <label>תקרה להטבה (0 = בלי תקרה)<input name="avgCap" type="number" inputMode="decimal" min={0} step={0.01} dir="ltr" defaultValue={0} /></label>}
         <label>שם הסניף<input name="branchName" maxLength={60} placeholder="ריק = שם העסק" /></label>
         <label>כתובת הסניף<input name="branchAddress" maxLength={160} placeholder="רחוב, מספר ועיר" /></label>
@@ -121,10 +126,11 @@ export default function NewBusinessForm() {
       </form>
       <div className="admin-new-preview" aria-label="תצוגה מקדימה של הכרטיס">
         <p className="muted">הכרטיס ההתחלתי. את העיצוב הסופי עושים במסך הבא.</p>
-        <LoyaltyCard design={design} lang={cardLang} stamps={program === "cashback" || program === "appointments" ? 0 : Math.min(3, target)} target={target} customerName={t("sampleCustomer")} t={t}
+        <LoyaltyCard design={design} lang={cardLang} stamps={program === "cashback" || program === "appointments" || program === "library" ? 0 : Math.min(3, target)} target={target} customerName={t("sampleCustomer")} t={t}
           balance={program === "cashback" ? { text: formatMoney(2450, currency, cardLang), pct: `${pct}%`, min: cbMin > 0 ? formatMoney(Math.round(cbMin * 100), currency, cardLang) : undefined } : undefined}
           average={program === "average" ? { soFar: formatMoney(3800, currency, cardLang) } : undefined}
-          appointment={program === "appointments" ? { text: null } : undefined} />
+          appointment={program === "appointments" ? { text: null } : undefined}
+          library={program === "library" ? { next: null, count: 0 } : undefined} />
       </div>
     </div>
   );

@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { ExternalLink, RefreshCw, Wallet } from "lucide-react";
+import { ReaderLoans } from "../../../components/reader-loans";
+import { formatDue, type Loan } from "../../../lib/library";
 import { useLang, translate } from "../../../lib/i18n";
 import { LoyaltyCard } from "../../../components/loyalty-card";
 import { averageReward, formatMoney, pctLabel } from "../../../lib/cashback.ts";
@@ -13,7 +15,7 @@ import { SOCIAL_COLOR, type SocialKey } from "../../../lib/social";
 import { SocialIcon } from "../../../lib/social-icon";
 import { Brand } from "../../../components/brand";
 
-type Card = { name: string; stamps: number; target: number; scan_code: string; design: Design; rewards: number; nextExpiry: string | null; business: string; links: { key: SocialKey; label: string; url: string }[];
+type Card = { library?: { key: string | null; loans: Loan[]; extDays: number; maxExt: number } | null; name: string; stamps: number; target: number; scan_code: string; design: Design; rewards: number; nextExpiry: string | null; business: string; links: { key: SocialKey; label: string; url: string }[];
   /** The balance card: balance and minimum in minor units, basis points back. */
   cashback?: { balance: number; bp: number; min: number; currency: "ILS" | "USD" } | null;
   /** The appointments card: the next appointment (ISO), or null. */
@@ -86,6 +88,7 @@ export default function CardView({ card, secret, googleWallet, appleWallet = fal
               text: formatMoney(card.cashback.balance, card.cashback.currency, lang), pct: pctLabel(card.cashback.bp),
               min: card.cashback.min > 0 ? formatMoney(card.cashback.min, card.cashback.currency, lang) : undefined,
             } : undefined}
+            library={card.library ? { next: card.library.loans.length ? formatDue([...card.library.loans].sort((a, b) => a.due.localeCompare(b.due))[0].due, lang) : null, count: card.library.loans.length } : undefined}
             appointment={card.appointment ? { text: card.appointment.at ? formatAppt(card.appointment.at, lang) : null, extra: card.appointment.extra } : undefined}
             average={card.average ? {
               soFar: card.stamps > 0 ? formatMoney(averageReward(card.average.roundTotal, card.stamps, card.average.cap ?? 0), card.average.currency, lang) : undefined,
@@ -94,7 +97,8 @@ export default function CardView({ card, secret, googleWallet, appleWallet = fal
             t={t}
             qr={<QrImage text={"perkly:" + card.scan_code} size={336} label={t("showQr")} />}
           />
-          {!card.cashback && (!card.appointment || card.appointment.extra === "stamps" || card.appointment.extra === "points") && card.rewards > 0 && (
+          {card.library && <ReaderLoans loanKey={card.library.key} loans={card.library.loans} maxExt={card.library.maxExt} extDays={card.library.extDays} t={t} lang={lang} />}
+          {!card.cashback && !card.library && (!card.appointment || card.appointment.extra === "stamps" || card.appointment.extra === "points") && card.rewards > 0 && (
             <div className="ready-banner" role="status">
               {t("earned")}
               {card.rewards > 1 && <> · {t("rewardsAvail", { n: card.rewards })}</>}
@@ -103,7 +107,7 @@ export default function CardView({ card, secret, googleWallet, appleWallet = fal
           )}
           <div className="qr-note">
             <p>{t("showQr")}</p>
-            {!card.appointment && <small className="form-hint">{t("qrNote")}</small>}
+            {!card.appointment && !card.library && <small className="form-hint">{t("qrNote")}</small>}
           </div>
           {invite && <InviteFriend invite={invite} business={card.business} t={t} />}
           {/* The business's own page (a landing page, a menu, online orders) as a button with its own words. */}
