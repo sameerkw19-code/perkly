@@ -4,6 +4,7 @@ import { post } from "../../../../lib/api";
 import { normalizePhone } from "../../../../lib/phone";
 import { LAUNCH } from "../../../../lib/pricing";
 import { LoyaltyCard } from "../../../../components/loyalty-card";
+import { formatMoney, pctLabel } from "../../../../lib/cashback";
 import { useLang } from "../../../../lib/i18n";
 import type { Design } from "../../../../lib/design";
 
@@ -256,9 +257,16 @@ export function AdminActions({ business, suspended, compUntil, biz, parts }: { b
 }
 
 /** The business's live card, as customers see it (without a QR). */
-export function AdminCardPreview({ design, target }: { design: Design; target: number }) {
+export function AdminCardPreview({ design, target, program, cashback }: { design: Design; target: number; program?: string; cashback?: { bp: number; min: number; currency: string } }) {
   const { lang, t } = useLang();
-  return <LoyaltyCard design={design} lang={lang} stamps={Math.min(3, target)} target={target} customerName={t("sampleCustomer")} t={t} />;
+  const cur = cashback?.currency === "USD" ? "USD" : "ILS";
+  const noStamps = program === "cashback" || program === "appointments";
+  return (
+    <LoyaltyCard design={design} lang={lang} stamps={noStamps ? 0 : Math.min(3, target)} target={target} customerName={t("sampleCustomer")} t={t}
+      balance={program === "cashback" && cashback ? { text: formatMoney(2450, cur, lang), pct: pctLabel(cashback.bp), min: cashback.min > 0 ? formatMoney(cashback.min, cur, lang) : undefined } : undefined}
+      average={program === "average" ? { soFar: formatMoney(3800, cur, lang) } : undefined}
+      appointment={program === "appointments" ? { text: null } : undefined} />
+  );
 }
 
 /**

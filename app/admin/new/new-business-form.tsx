@@ -4,6 +4,7 @@ import { post } from "../../../lib/api";
 import { LoyaltyCard } from "../../../components/loyalty-card";
 import { useLang } from "../../../lib/i18n";
 import { startDesign, type Kind } from "../../../lib/start-design";
+import { formatMoney } from "../../../lib/cashback";
 
 const KIND_OPTIONS: { key: Kind; label: string }[] = [
   { key: "cafe", label: "בית קפה" },
@@ -32,8 +33,12 @@ export default function NewBusinessForm() {
   // The kind of card: stamps, or a balance card with a percentage of each purchase back.
   const [program, setProgram] = useState<"stamps" | "cashback" | "average" | "appointments">("stamps");
   const [pct, setPct] = useState(2);
+  const [cbMin, setCbMin] = useState(0);
+  // The balance card's line follows the percentage until the admin writes their own.
+  const cbLine = (p: number) => `${p}% מכל קנייה חוזרים אליכם ליתרה`;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const currency = market === "intl" ? "USD" : "ILS";
   const design = useMemo(() => startDesign(kind, name || "שם העסק", reward || "ההטבה", cardLang), [kind, name, reward, cardLang]);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
@@ -68,9 +73,9 @@ export default function NewBusinessForm() {
         </fieldset>
         <fieldset className="admin-kinds">
           <legend>סוג הכרטיס</legend>
-          <button type="button" className={"btn small " + (program === "stamps" ? "primary" : "soft")} aria-pressed={program === "stamps"} onClick={() => setProgram("stamps")}>כרטיס חותמות</button>
+          <button type="button" className={"btn small " + (program === "stamps" ? "primary" : "soft")} aria-pressed={program === "stamps"} onClick={() => { setProgram("stamps"); setTarget((n) => Math.min(n, 30)); if (program === "cashback" || program === "appointments") setReward(""); }}>כרטיס חותמות</button>
           <button type="button" className={"btn small " + (program === "cashback" ? "primary" : "soft")} aria-pressed={program === "cashback"}
-            onClick={() => { setProgram("cashback"); if (!reward.trim()) setReward(`${pct}% מכל קנייה חוזרים אליכם ליתרה`); }}>כרטיס יתרה (אחוז מכל קנייה)</button>
+            onClick={() => { setProgram("cashback"); setTarget(10); setReward(cbLine(pct)); }}>כרטיס יתרה (אחוז מכל קנייה)</button>
           <button type="button" className={"btn small " + (program === "average" ? "primary" : "soft")} aria-pressed={program === "average"}
             onClick={() => { setProgram("average"); setTarget(4); if (!reward.trim()) setReward("קונים 4, החמישית עלינו לפי ממוצע הקניות"); }}>קנה X, הבאה חינם לפי ממוצע</button>
           <button type="button" className={"btn small " + (program === "appointments" ? "primary" : "soft")} aria-pressed={program === "appointments"}
@@ -81,8 +86,8 @@ export default function NewBusinessForm() {
         )}
         {program === "cashback" && (
           <div className="admin-new-row">
-            <label>אחוז חזרה (%)<input type="number" inputMode="decimal" min={0.1} max={50} step={0.1} required dir="ltr" value={pct} onChange={(e) => setPct(Number(e.target.value))} /></label>
-            <label>יתרה מינימלית לשימוש<input name="cashbackMin" type="number" inputMode="decimal" min={0} step={0.01} dir="ltr" defaultValue={0} /></label>
+            <label>אחוז חזרה (%)<input type="number" inputMode="decimal" min={0.1} max={50} step={0.1} required dir="ltr" value={pct} onChange={(e) => { const v = Number(e.target.value); if (reward === cbLine(pct)) setReward(cbLine(v)); setPct(v); }} /></label>
+            <label>יתרה מינימלית לשימוש<input name="cashbackMin" type="number" inputMode="decimal" min={0} step={0.01} dir="ltr" value={cbMin} onChange={(e) => setCbMin(Number(e.target.value))} /></label>
           </div>
         )}
         <label>שם העסק<input required maxLength={80} value={name} onChange={(e) => setName(e.target.value)} /></label>
@@ -116,7 +121,10 @@ export default function NewBusinessForm() {
       </form>
       <div className="admin-new-preview" aria-label="תצוגה מקדימה של הכרטיס">
         <p className="muted">הכרטיס ההתחלתי. את העיצוב הסופי עושים במסך הבא.</p>
-        <LoyaltyCard design={design} lang={cardLang} stamps={Math.min(3, target)} target={target} customerName={t("sampleCustomer")} t={t} />
+        <LoyaltyCard design={design} lang={cardLang} stamps={program === "cashback" || program === "appointments" ? 0 : Math.min(3, target)} target={target} customerName={t("sampleCustomer")} t={t}
+          balance={program === "cashback" ? { text: formatMoney(2450, currency, cardLang), pct: `${pct}%`, min: cbMin > 0 ? formatMoney(Math.round(cbMin * 100), currency, cardLang) : undefined } : undefined}
+          average={program === "average" ? { soFar: formatMoney(3800, currency, cardLang) } : undefined}
+          appointment={program === "appointments" ? { text: null } : undefined} />
       </div>
     </div>
   );
