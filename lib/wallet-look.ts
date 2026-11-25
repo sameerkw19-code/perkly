@@ -19,6 +19,8 @@ export type PassLook = {
   classLook?: ClassLook | null;
   /** The branches on the map: the phone shows the pass when the customer is near one (10 at most). */
   places?: { lat: number; lng: number }[];
+  /** The business's links (its own page first), in the card's language. */
+  links?: { label: string; url: string }[];
 };
 
 export function lookFields(look: PassLook) {
@@ -44,7 +46,12 @@ export function lookFields(look: PassLook) {
       { id: "business", header: look.header ?? look.title, body: look.reward, ...localized },
       ...(look.promo ? [{ id: "promo", body: look.promo, ...promoLocalized }] : []),
     ],
-    linksModuleData: { uris: [{ id: "perkly", uri: "https://perkly.shop", description: "Powered by Perkly" }] },
+    linksModuleData: {
+      uris: [
+        ...(look.links ?? []).slice(0, 7).map((l, i) => ({ id: `link-${i}`, uri: l.url, description: l.label })),
+        { id: "perkly", uri: "https://perkly.shop", description: "Powered by Perkly" },
+      ],
+    },
     // Google's "nearby" notification. An empty list clears places that were removed.
     ...(look.places ? { merchantLocations: look.places.slice(0, 10).map((p) => ({ latitude: p.lat, longitude: p.lng })) } : {}),
   };

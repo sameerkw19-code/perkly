@@ -291,3 +291,31 @@ test("clinic services and the free times that fit them", () => {
   assert.deepEqual(freeStarts(hours, "2026-11-22", 30, 30, [], 650), ["11:00", "11:30"]);
   assert.deepEqual(freeStarts(hours, "2026-11-23", 30, 30, []), [], "closed on Monday");
 });
+
+// ---- The business's own link on the card and the wallet pass ----
+
+import { passLinks, socialLinks } from "../lib/social.ts";
+
+test("social: the business's own link is kept with its button text, and checked like a website", () => {
+  const ok = normalizeSocial({ link: "razi.co.il/sale", linkLabel: "  למבצע   השבוע <b> ", website: "razi.co.il" });
+  assert.equal(ok.ok, true);
+  assert.equal(ok.value.link, "https://razi.co.il/sale");
+  assert.equal(ok.value.linkLabel, "למבצע השבוע b");
+  assert.deepEqual(normalizeSocial({ link: "javascript:alert(1)" }), { ok: false, field: "link" });
+  // Button text without a link is dropped.
+  assert.deepEqual(normalizeSocial({ linkLabel: "להזמנה" }), { ok: true, value: {} });
+  assert.equal(parseSocial(JSON.stringify({ link: "https://a.co/x", linkLabel: "x".repeat(50) })).linkLabel.length, 30);
+});
+
+test("wallet passes: the business's own link comes first, in the card's language", () => {
+  const social = parseSocial(JSON.stringify({ instagram: "razi", website: "https://razi.co.il/", link: "https://razi.co.il/order", linkLabel: "להזמנה אונליין" }));
+  const he = passLinks(social, "he");
+  assert.deepEqual(he.map((l) => [l.key, l.label]), [["link", "להזמנה אונליין"], ["instagram", "Instagram"], ["website", "האתר שלנו"]]);
+  // Without button text: a neutral word on the pass, the address on the web card.
+  const bare = parseSocial(JSON.stringify({ link: "https://www.razi.co.il/order" }));
+  assert.equal(passLinks(bare, "en")[0].label, "Open");
+  assert.equal(socialLinks(bare)[0].label, "razi.co.il");
+  // Google Wallet: the links before "Powered by Perkly".
+  const g = lookFields({ title: "RAZI", reward: "x", heroUrl: null, links: he.map(({ label, url }) => ({ label, url })) });
+  assert.deepEqual(g.linksModuleData.uris.map((u) => u.description), ["להזמנה אונליין", "Instagram", "האתר שלנו", "Powered by Perkly"]);
+});

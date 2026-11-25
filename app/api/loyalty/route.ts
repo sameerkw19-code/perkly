@@ -487,7 +487,11 @@ export async function POST(request: Request) {
           db.prepare("UPDATE customers SET stamps = stamps - target, target = ? WHERE business = ? AND stamps >= target").bind(p.target, business.id),
         );
       }
+      // New links reach the cards already saved in wallets (the iPhone sees card_updated as a change).
+      const linksChanged = JSON.stringify(business.social ?? {}) !== JSON.stringify(social);
+      if (linksChanged) statements.push(db.prepare("UPDATE businesses SET card_updated = ? WHERE id = ?").bind(now, business.id));
       await db.batch(statements);
+      if (linksChanged) await refreshPasses(db, business.id, origin, now);
       return json({ ok: true });
     }
 

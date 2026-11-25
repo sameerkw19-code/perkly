@@ -11,6 +11,7 @@ import { fillNearText, nearTemplate, stampEmoji } from "../near-text";
 import { israelNow } from "../birthday";
 import { apptLabel, formatAppt, noApptText } from "../appointment";
 import { passToken, type AppleConfig } from "./apple-token";
+import { parseSocial, passLinks } from "../social";
 
 export { appleConfig, passToken, validToken, type AppleConfig } from "./apple-token";
 
@@ -37,14 +38,14 @@ type CustomerRow = {
   id: string; business: string; name: string; stamps: number; target: number; scan_code: string; created: string;
   business_name: string; reward: string; color: string; rewards: number; balance: number; program: string; currency: string;
   round_total: number; avg_cap: number; ready_value: number | null; missyou_at?: string | null; last_event?: string | null; near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number | null; near_evening_from?: number | null; news_text?: string | null; news_at?: string | null;
-  appt_at?: string | null; appt_msg?: string | null; appt_extra?: string | null;
+  appt_at?: string | null; appt_msg?: string | null; appt_extra?: string | null; social?: string | null;
 };
 
 /** The customer behind a pass serial (the customer id), or null when it was removed. */
 export async function customerForPass(db: D1Database, serial: string): Promise<CustomerRow | null> {
   return db
     .prepare(
-      `SELECT c.id, c.business, c.name, c.stamps, c.target, c.scan_code, c.created, c.balance, c.round_total, c.missyou_at, c.appt_at, c.appt_msg, (SELECT MAX(e.created) FROM events e WHERE e.customer = c.id) AS last_event, b.program, b.appt_extra, b.currency, b.avg_cap, b.near_text, b.near_text_evening, b.near_morning_from, b.near_evening_from, b.news_text, b.news_at, b.name AS business_name, b.reward, b.color,
+      `SELECT c.id, c.business, c.name, c.stamps, c.target, c.scan_code, c.created, c.balance, c.round_total, c.missyou_at, c.appt_at, c.appt_msg, (SELECT MAX(e.created) FROM events e WHERE e.customer = c.id) AS last_event, b.program, b.appt_extra, b.currency, b.avg_cap, b.near_text, b.near_text_evening, b.near_morning_from, b.near_evening_from, b.news_text, b.news_at, b.social, b.name AS business_name, b.reward, b.color,
          (SELECT value FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2) ORDER BY earned, id LIMIT 1) AS ready_value,
          (SELECT COUNT(*) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2))
            + (CASE WHEN b.reward_mode = 'block' AND c.stamps >= c.target THEN 1 ELSE 0 END) AS rewards
@@ -64,7 +65,7 @@ export async function passUpdated(db: D1Database, customer: { id: string; busine
          SELECT MAX(created) AS t FROM events WHERE customer = ?1
          UNION ALL SELECT MAX(published) FROM card_designs WHERE business = ?2
          UNION ALL SELECT MAX(located) FROM branches WHERE business = ?2
-         UNION ALL SELECT MAX(COALESCE(near_updated, ''), COALESCE(news_at, '')) FROM businesses WHERE id = ?2
+         UNION ALL SELECT MAX(COALESCE(near_updated, ''), COALESCE(news_at, ''), COALESCE(card_updated, '')) FROM businesses WHERE id = ?2
          UNION ALL SELECT MAX(COALESCE(missyou_at, ''), COALESCE(appt_updated, ''), ?3, ?4) FROM customers WHERE id = ?1)`,
     )
     .bind(customer.id, customer.business, customer.created, PASS_FORMAT)
@@ -204,6 +205,7 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
         relevantDates: [{ startDate: w3c(Date.parse(apptNext) - 2 * 3_600_000), endDate: w3c(Date.parse(apptNext) + 3_600_000) }],
       }
     : {};
+  const links = passLinks(parseSocial(c.social), lang);
   const pass = {
     ...(locations.length ? { locations } : {}),
     ...relevance,
@@ -243,6 +245,8 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
         : balance === undefined ? [stamps, ready] : [{ key: "balance", label: L.balance, value: balance, changeMessage: L.balanceChanged }],
       ...(strip || appointments ? {} : { auxiliaryFields: [{ key: "reward", label: L.reward, value: reward }] }),
       backFields: [
+        // The business's links (its own page first): the iPhone opens them from the back of the pass.
+        ...links.map((l) => ({ key: `link-${l.key}`, label: l.label, value: l.url, attributedValue: `<a href="${escapeHtml(l.url)}">${escapeHtml(l.label)}</a>` })),
         ...(appointments && apptExtra !== "stamps" && apptExtra !== "points" ? [] : [{ key: "rewardBack", label: L.reward, value: reward }]),
         // The appointments card: the latest reminder (the day before, that morning, an hour before) shows as a notification.
         ...(apptNext && c.appt_msg ? [{ key: "reminder", label: apptLabel(lang), value: c.appt_msg, changeMessage: "%@" }] : []),
@@ -255,6 +259,10 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
     },
   };
   return buildPkpass(pass, files, config.signer);
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!);
 }
 
 export const PKPASS_TYPE = "application/vnd.apple.pkpass";
