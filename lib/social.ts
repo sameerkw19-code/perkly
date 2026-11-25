@@ -167,22 +167,18 @@ function hostOf(url: string): string {
   }
 }
 
-const PASS_WORDS: Record<"website" | "link" | "waze", Record<string, string>> = {
+const PASS_WORDS: Record<"website" | "link", Record<string, string>> = {
   website: { he: "האתר שלנו", ar: "موقعنا", en: "Our website", ru: "Наш сайт", de: "Unsere Website", fr: "Notre site" },
-  link: { he: "לפתיחה", ar: "افتح", en: "Open", ru: "Открыть", de: "Öffnen", fr: "Ouvrir" },
-  waze: { he: "ניווט אלינו ב־Waze", ar: "الوصول إلينا عبر Waze", en: "Directions in Waze", ru: "Маршрут в Waze", de: "Route mit Waze", fr: "Itinéraire avec Waze" },
+  link: { he: "למבצעים שלנו", ar: "عروضنا", en: "Our offers", ru: "Наши акции", de: "Unsere Angebote", fr: "Nos offres" },
 };
 
 /**
- * The links on the back of the wallet pass (Apple) and in its links list (Google), in the card's language.
- * The business's own link comes first, with the words the business wrote for its button.
+ * The one link on the wallet pass (the back of the Apple pass, Google's links list), in the card's language:
+ * the business's own page (its offers, with the words it wrote for the button), or its website if it has no such page.
+ * Social accounts and Waze stay on the web card only, so the pass leads to the offers.
  */
 export function passLinks(social: Social, lang: string): { key: SocialKey; label: string; url: string }[] {
-  const all = socialLinks(social).map((l) => ({
-    ...l,
-    label: l.key === "link" ? social.linkLabel || PASS_WORDS.link[lang] || PASS_WORDS.link.en
-      : l.key === "website" || l.key === "waze" ? PASS_WORDS[l.key][lang] || PASS_WORDS[l.key].en
-      : l.label,
-  }));
-  return [...all.filter((l) => l.key === "link"), ...all.filter((l) => l.key !== "link")];
+  if (social.link) return [{ key: "link", label: social.linkLabel || PASS_WORDS.link[lang] || PASS_WORDS.link.en, url: social.link }];
+  if (social.website) return [{ key: "website", label: PASS_WORDS.website[lang] || PASS_WORDS.website.en, url: social.website }];
+  return [];
 }

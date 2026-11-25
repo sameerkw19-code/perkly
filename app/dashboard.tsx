@@ -974,14 +974,18 @@ function BusinessForm({ t, busy, initial, submitLabel, onSubmit, onInvalid }: {
                   defaultValue={initial.social?.linkLabel ?? ""} />
               </label>
             </div>
-            {SOCIAL_KEYS.filter((k) => k !== "link").map((k) => (
-              <label key={k} className="social-field">
-                <span className="social-field-name"><SocialIcon name={k} size={16} />{k === "website" ? t("socialWebsite") : SOCIAL_LABEL[k]}</span>
-                <input name={"social_" + k} dir="ltr" maxLength={300} autoComplete="off" spellCheck={false}
-                  inputMode={k === "whatsapp" ? "tel" : "url"} placeholder={SOCIAL_PLACEHOLDER[k]}
-                  defaultValue={initial.social?.[k] ? socialDisplay(k, initial.social[k]!) : ""} />
-              </label>
-            ))}
+            {/* The rest is optional: icons on the web card only. Folded unless one is filled in. */}
+            <details className="social-more" open={SOCIAL_KEYS.some((k) => k !== "link" && initial.social?.[k])}>
+              <summary>{t("socialMore")}</summary>
+              {SOCIAL_KEYS.filter((k) => k !== "link").map((k) => (
+                <label key={k} className="social-field">
+                  <span className="social-field-name"><SocialIcon name={k} size={16} />{k === "website" ? t("socialWebsite") : SOCIAL_LABEL[k]}</span>
+                  <input name={"social_" + k} dir="ltr" maxLength={300} autoComplete="off" spellCheck={false}
+                    inputMode={k === "whatsapp" ? "tel" : "url"} placeholder={SOCIAL_PLACEHOLDER[k]}
+                    defaultValue={initial.social?.[k] ? socialDisplay(k, initial.social[k]!) : ""} />
+                </label>
+              ))}
+            </details>
           </fieldset>
         </>
       )}
