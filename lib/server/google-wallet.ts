@@ -3,7 +3,7 @@
 // so deploying this code before Google approves the account changes nothing for customers.
 
 import { base64url } from "./crypto";
-import type { PassApptExtra, PassAverage } from "./balance-pass";
+import type { PassApptExtra, PassAverage, PassLibrary } from "./balance-pass";
 import { classBody, lookFields, type ClassLook, type PassLook } from "../wallet-look";
 
 export type WalletConfig = { issuerId: string; serviceEmail: string; privateKeyPem: string; classId: string };
@@ -45,6 +45,8 @@ export type LoyaltyCard = {
   appointment?: string;
   /** The appointments card's add-on: visits on a gift punch card, points, or the balance. */
   apptExtra?: PassApptExtra;
+  /** The library card: the nearest return date and the number of books (replaces the stamps), and the extension link. */
+  library?: PassLibrary;
   /** The business's own look on the pass (see passLook). */
   look?: PassLook;
 };
@@ -77,8 +79,30 @@ function label(en: string, he: string, ar: string, others: [ru: string, de: stri
   };
 }
 
+/** The library card: the reader's own "extend your loan" link first in the pass's links. */
+function withRenew<T extends { linksModuleData?: { uris: { id?: string; uri: string; description: string }[] } }>(fields: T, card: LoyaltyCard): T {
+  const url = card.library?.renewUrl;
+  if (!url || !fields.linksModuleData) return fields;
+  const renew = { id: "renew", uri: url, description: card.library!.renewLabel };
+  return { ...fields, linksModuleData: { uris: [renew, ...fields.linksModuleData.uris] } };
+}
+
 /** The fields that change with every stamp. Used both when saving and when updating a pass. */
 function liveFields(card: LoyaltyCard) {
+  if (card.library) {
+    return {
+      loyaltyPoints: {
+        label: "Return by",
+        localizedLabel: label("Return by", "להחזרה עד", "الإرجاع حتى", ["Вернуть до", "Rückgabe bis", "À rendre le"]),
+        balance: { string: card.library.next },
+      },
+      secondaryLoyaltyPoints: {
+        label: "Books",
+        localizedLabel: label("Books", "ספרים", "كتب", ["Книги", "Bücher", "Livres"]),
+        balance: { string: card.library.count },
+      },
+    };
+  }
   if (card.appointment !== undefined) {
     return {
       loyaltyPoints: {
@@ -148,7 +172,7 @@ export function loyaltyObject(config: WalletConfig, card: LoyaltyCard) {
     accountId: safeId(card.customerId),
     accountName: (card.look?.title ?? "Perkly").slice(0, 60),
     ...liveFields(card),
-    ...(card.look ? lookFields(card.look) : {}),
+    ...(card.look ? withRenew(lookFields(card.look), card) : {}),
     barcode: { type: "QR_CODE", value: card.scanCode, alternateText: "" },
   };
 }
@@ -268,7 +292,7 @@ export async function updateLoyaltyObject(config: WalletConfig, card: LoyaltyCar
       method: "PATCH",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       // A new notification replaces the previous one on the back of the pass.
-      body: JSON.stringify({ ...liveFields(card), ...(card.look ? lookFields(card.look) : {}), ...(notice ? { messages: [] } : {}) }),
+      body: JSON.stringify({ ...liveFields(card), ...(card.look ? withRenew(lookFields(card.look), card) : {}), ...(notice ? { messages: [] } : {}) }),
     });
     if (detail) detail.status = r.status;
     if (r.status === 404) return "not_saved";

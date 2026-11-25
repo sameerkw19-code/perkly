@@ -1,7 +1,7 @@
 // The balance card (cashback): shared helpers for the server, the station and the customer's card.
 // Amounts are integers in minor units (agorot or cents), so sums never drift.
 
-export type Program = "stamps" | "cashback" | "average" | "appointments";
+export type Program = "stamps" | "cashback" | "average" | "appointments" | "library";
 export type CashbackCurrency = "ILS" | "USD";
 
 /** Basis points allowed for the percentage back: 0.1% to 50%. */

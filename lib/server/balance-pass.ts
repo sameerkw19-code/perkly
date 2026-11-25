@@ -1,5 +1,18 @@
 import { averageReward, formatMoney, type CashbackCurrency } from "../cashback.ts";
 import { formatAppt, noApptText } from "../appointment.ts";
+import { daysLeft, formatDue, israelDate, loanWords, nextDue, type Loan } from "../library.ts";
+
+/** The library card on a wallet pass: the nearest return date and how many books, plus the reader's extension link. */
+export type PassLibrary = { next: string; count: string; renewUrl?: string; renewLabel: string };
+
+export function passLibrary(loans: Loan[], lang: string, renewUrl?: string): PassLibrary {
+  const W = loanWords(lang);
+  const first = nextDue(loans);
+  if (!first) return { next: W.none, count: "0", renewLabel: W.mine, ...(renewUrl ? { renewUrl } : {}) };
+  const left = daysLeft(first.due, israelDate(new Date()));
+  const next = left < 0 ? `${formatDue(first.due, lang, false)} · ${W.late}` : left === 0 ? `${W.today} · ${formatDue(first.due, lang, false)}` : formatDue(first.due, lang);
+  return { next, count: String(loans.length), renewLabel: W.renew, ...(renewUrl ? { renewUrl } : {}) };
+}
 
 /** The balance card on a wallet pass: the balance as text, or undefined for a stamp card. */
 export function passBalance(b: { program?: string | null; currency?: string | null }, balance: number | null | undefined): string | undefined {
@@ -49,15 +62,20 @@ export function passApptExtra(
   return undefined;
 }
 
-export async function passProgram(db: D1Database, customerId: string): Promise<{ balance?: string; average?: PassAverage; appointment?: string; apptExtra?: PassApptExtra }> {
+export async function passProgram(db: D1Database, customerId: string, origin?: string | null): Promise<{ balance?: string; average?: PassAverage; appointment?: string; apptExtra?: PassApptExtra; library?: PassLibrary }> {
   const row = await db
     .prepare(
-      `SELECT c.stamps, c.target, c.balance, c.round_total, c.appt_at, b.program, b.appt_extra, b.currency, b.avg_cap,
+      `SELECT c.stamps, c.target, c.balance, c.round_total, c.appt_at, c.loan_key, b.program, b.appt_extra, b.currency, b.avg_cap,
          (SELECT value FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2) ORDER BY earned, id LIMIT 1) AS ready_value
        FROM customers c JOIN businesses b ON b.id = c.business WHERE c.id = ?1`,
     )
     .bind(customerId, new Date().toISOString())
-    .first<{ stamps: number; target: number; balance: number; round_total: number; appt_at: string | null; program: string; appt_extra: string | null; currency: string; avg_cap: number; ready_value: number | null }>();
+    .first<{ stamps: number; target: number; balance: number; round_total: number; appt_at: string | null; loan_key: string | null; program: string; appt_extra: string | null; currency: string; avg_cap: number; ready_value: number | null }>();
   if (!row) return {};
+  if (row.program === "library") {
+    const { results } = await db.prepare("SELECT id, title, due, extensions FROM loans WHERE customer = ? AND returned IS NULL").bind(customerId).all<Loan>();
+    const lang = row.currency === "USD" ? "en" : "he";
+    return { library: passLibrary(results ?? [], lang, origin && row.loan_key ? `${origin}/l/${row.loan_key}` : undefined) };
+  }
   return { balance: passBalance(row, row.balance), average: passAverage(row, row, row.ready_value), appointment: passAppointment(row, row.appt_at), apptExtra: passApptExtra(row, row) };
 }

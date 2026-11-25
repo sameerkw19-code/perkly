@@ -260,12 +260,13 @@ export function AdminActions({ business, suspended, compUntil, biz, parts }: { b
 export function AdminCardPreview({ design, target, program, cashback }: { design: Design; target: number; program?: string; cashback?: { bp: number; min: number; currency: string } }) {
   const { lang, t } = useLang();
   const cur = cashback?.currency === "USD" ? "USD" : "ILS";
-  const noStamps = program === "cashback" || program === "appointments";
+  const noStamps = program === "cashback" || program === "appointments" || program === "library";
   return (
     <LoyaltyCard design={design} lang={lang} stamps={noStamps ? 0 : Math.min(3, target)} target={target} customerName={t("sampleCustomer")} t={t}
       balance={program === "cashback" && cashback ? { text: formatMoney(2450, cur, lang), pct: pctLabel(cashback.bp), min: cashback.min > 0 ? formatMoney(cashback.min, cur, lang) : undefined } : undefined}
       average={program === "average" ? { soFar: formatMoney(3800, cur, lang) } : undefined}
-      appointment={program === "appointments" ? { text: null } : undefined} />
+      appointment={program === "appointments" ? { text: null } : undefined}
+      library={program === "library" ? { next: null, count: 0 } : undefined} />
   );
 }
 

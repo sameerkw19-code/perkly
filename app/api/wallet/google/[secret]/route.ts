@@ -48,13 +48,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ secr
   const origin = new URL(request.url).origin;
   const business = await db.prepare("SELECT id, name, reward, color, program, currency FROM businesses WHERE id = ?").bind(row.business_id)
     .first<{ id: string; name: string; reward: string; color: string; program: string; currency: string }>();
-  const { balance, average, appointment, apptExtra } = await passProgram(db, row.customer_id);
-  const look = business ? await passLook(db, business, origin, balance === undefined && appointment === undefined ? { stamps: row.stamps, target: row.target } : undefined).catch(() => undefined) : undefined;
+  const { balance, average, appointment, apptExtra, library } = await passProgram(db, row.customer_id, origin);
+  const look = business ? await passLook(db, business, origin, balance === undefined && appointment === undefined && library === undefined ? { stamps: row.stamps, target: row.target } : undefined).catch(() => undefined) : undefined;
   // The business's own class (name, color, logo) when it has a PNG/JPEG logo; otherwise the shared class.
   const classId = await ensureBusinessClass(config, row.business_id, look?.classLook ?? null);
   const url = await saveUrl(
     classId ? { ...config, classId } : config,
-    { customerId: row.customer_id, businessId: row.business_id, stamps: row.stamps, target: row.target, scanCode: row.scan_code, rewards: row.rewards, balance, average, appointment, apptExtra, look },
+    { customerId: row.customer_id, businessId: row.business_id, stamps: row.stamps, target: row.target, scanCode: row.scan_code, rewards: row.rewards, balance, average, appointment, apptExtra, library, look },
     origin,
   );
   return new Response(null, { status: 302, headers: { Location: url, "Cache-Control": "no-store" } });

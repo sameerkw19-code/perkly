@@ -28,14 +28,14 @@ export function syncGoogleWallet(
         .first<{ id: string; name: string; reward: string; color: string; program: string; currency: string }>();
       // The balance card has no stamp banner: the pass shows the balance and the business's banner image.
       // The average card shows the purchases this round and what the free purchase is worth.
-      const { balance, average, appointment, apptExtra } = await passProgram(db, c.id);
+      const { balance, average, appointment, apptExtra, library } = await passProgram(db, c.id, origin);
       const full = business
-        ? await passLook(db, business, origin, balance === undefined && appointment === undefined ? { stamps: c.stamps, target: c.target, notice } : undefined).catch(() => undefined)
+        ? await passLook(db, business, origin, balance === undefined && appointment === undefined && library === undefined ? { stamps: c.stamps, target: c.target, notice } : undefined).catch(() => undefined)
         : undefined;
       const { notice: message, ...look } = full ?? { notice: null };
       const result = await updateLoyaltyObject(
         config,
-        { customerId: c.id, businessId: c.business, stamps: c.stamps, target: c.target, scanCode: c.scan_code, rewards, balance, average, appointment, apptExtra, look: full ? (look as typeof full) : undefined },
+        { customerId: c.id, businessId: c.business, stamps: c.stamps, target: c.target, scanCode: c.scan_code, rewards, balance, average, appointment, apptExtra, library, look: full ? (look as typeof full) : undefined },
         message,
       );
       if (result === "not_saved") {
