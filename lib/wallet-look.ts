@@ -19,7 +19,7 @@ export type PassLook = {
   classLook?: ClassLook | null;
   /** The branches on the map: the phone shows the pass when the customer is near one (10 at most). */
   places?: { lat: number; lng: number }[];
-  /** The business's links (its own page first), in the card's language. */
+  /** The business's offers page (or its website), in the card's language. */
   links?: { label: string; url: string }[];
 };
 

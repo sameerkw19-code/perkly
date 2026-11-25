@@ -307,15 +307,18 @@ test("social: the business's own link is kept with its button text, and checked 
   assert.equal(parseSocial(JSON.stringify({ link: "https://a.co/x", linkLabel: "x".repeat(50) })).linkLabel.length, 30);
 });
 
-test("wallet passes: the business's own link comes first, in the card's language", () => {
-  const social = parseSocial(JSON.stringify({ instagram: "razi", website: "https://razi.co.il/", link: "https://razi.co.il/order", linkLabel: "להזמנה אונליין" }));
+test("wallet passes: one link, the business's offers page (or its website), in the card's language", () => {
+  const social = parseSocial(JSON.stringify({ instagram: "razi", website: "https://razi.co.il/", waze: "https://waze.com/ul/hsv8wrv", link: "https://razi.co.il/order", linkLabel: "למבצעים" }));
   const he = passLinks(social, "he");
-  assert.deepEqual(he.map((l) => [l.key, l.label]), [["link", "להזמנה אונליין"], ["instagram", "Instagram"], ["website", "האתר שלנו"]]);
+  assert.deepEqual(he.map((l) => [l.key, l.label, l.url]), [["link", "למבצעים", "https://razi.co.il/order"]]);
+  // No offers page: the website. Neither: nothing (social accounts stay on the web card).
+  assert.deepEqual(passLinks(parseSocial(JSON.stringify({ instagram: "razi", website: "https://razi.co.il/" })), "he").map((l) => l.label), ["האתר שלנו"]);
+  assert.deepEqual(passLinks(parseSocial(JSON.stringify({ instagram: "razi" })), "he"), []);
   // Without button text: a neutral word on the pass, the address on the web card.
   const bare = parseSocial(JSON.stringify({ link: "https://www.razi.co.il/order" }));
-  assert.equal(passLinks(bare, "en")[0].label, "Open");
+  assert.equal(passLinks(bare, "en")[0].label, "Our offers");
   assert.equal(socialLinks(bare)[0].label, "razi.co.il");
-  // Google Wallet: the links before "Powered by Perkly".
+  // Google Wallet: the link before "Powered by Perkly".
   const g = lookFields({ title: "RAZI", reward: "x", heroUrl: null, links: he.map(({ label, url }) => ({ label, url })) });
-  assert.deepEqual(g.linksModuleData.uris.map((u) => u.description), ["להזמנה אונליין", "Instagram", "האתר שלנו", "Powered by Perkly"]);
+  assert.deepEqual(g.linksModuleData.uris.map((u) => u.description), ["למבצעים", "Powered by Perkly"]);
 });

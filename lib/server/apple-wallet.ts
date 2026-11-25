@@ -245,7 +245,7 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
         : balance === undefined ? [stamps, ready] : [{ key: "balance", label: L.balance, value: balance, changeMessage: L.balanceChanged }],
       ...(strip || appointments ? {} : { auxiliaryFields: [{ key: "reward", label: L.reward, value: reward }] }),
       backFields: [
-        // The business's links (its own page first): the iPhone opens them from the back of the pass.
+        // The business's offers page (or its website), first on the back of the pass, opened with a tap.
         ...links.map((l) => ({ key: `link-${l.key}`, label: l.label, value: l.url, attributedValue: `<a href="${escapeHtml(l.url)}">${escapeHtml(l.label)}</a>` })),
         ...(appointments && apptExtra !== "stamps" && apptExtra !== "points" ? [] : [{ key: "rewardBack", label: L.reward, value: reward }]),
         // The appointments card: the latest reminder (the day before, that morning, an hour before) shows as a notification.
