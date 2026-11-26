@@ -16,7 +16,7 @@ import { resolvePlace } from "../../../lib/server/geo";
 import { NEAR_TEXT_MAX, nearPhase } from "../../../lib/near-text";
 import { israelNow } from "../../../lib/birthday";
 import { formatTime, israelTime } from "../../../lib/appointment";
-import { freeStarts, parseHours, SERVICE_MAX, toMin, weekdayOf } from "../../../lib/calendar";
+import { freeStarts, parseHours, parseServices, SERVICE_MAX, toMin, weekdayOf } from "../../../lib/calendar";
 
 /** The Israel date ("2026-11-25") of a moment. */
 function israelDateOf(iso: string): string {
@@ -46,7 +46,7 @@ function validTarget(v: unknown, program?: string): v is number {
 
 async function loadBusiness(db: D1Database, id: string) {
   const row = await db
-    .prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays, social, owner_designs, program, cashback_bp, cashback_min, currency, avg_cap, pos_only, near_text, near_text_evening, near_morning_from, near_evening_from, referral_stamps, report_email, appt_extra, appt_points, work_hours, appt_slot, services, loan_days, loan_ext_days, loan_max_ext, pass_size, pass_days, club_pct, service_months, coupon_until FROM businesses WHERE id = ?")
+    .prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays, social, owner_designs, program, cashback_bp, cashback_min, currency, avg_cap, pos_only, near_text, near_text_evening, near_morning_from, near_evening_from, referral_stamps, report_email, appt_extra, appt_points, work_hours, appt_slot, services, loan_days, loan_ext_days, loan_max_ext, pass_size, pass_days, club_pct, service_months, coupon_until, booking_on, booking_key FROM businesses WHERE id = ?")
     .bind(id)
     .first<Omit<Business, "social"> & { social: string | null }>();
   return row ? { ...row, social: parseSocial(row.social) } : null;
@@ -854,13 +854,16 @@ export async function POST(request: Request) {
       const denied = ownerOnly(); if (denied) return denied;
       const list = Array.isArray(p.services) ? p.services : null;
       if (!list || list.length > SERVICE_MAX) return fail("bad_details", 400, "Invalid services");
-      const clean: { id: string; name: string; min: number }[] = [];
+      const clean: { id: string; name: string; min: number; price?: number }[] = [];
+      // Prices are set in the booking settings; this list keeps them.
+      const before = parseServices(business.services) as { id: string; price?: number }[];
       for (const item of list as Record<string, unknown>[]) {
         const name = str(item?.name, 60);
         const min = item?.min;
         if (!name || !Number.isInteger(min) || (min as number) < 5 || (min as number) > 480 || (min as number) % 5) return fail("bad_details", 400, "Each service needs a name and a length");
         const sid = typeof item.id === "string" && /^[a-z0-9]{6,16}$/.test(item.id) ? item.id : randomCode(8);
-        clean.push({ id: sid, name, min: min as number });
+        const price = before.find((s) => s.id === sid)?.price;
+        clean.push({ id: sid, name, min: min as number, ...(Number.isInteger(price) && price! > 0 ? { price } : {}) });
       }
       await db.prepare("UPDATE businesses SET services = ? WHERE id = ?").bind(clean.length ? JSON.stringify(clean) : null, business.id).run();
       return json({ ok: true, services: clean });

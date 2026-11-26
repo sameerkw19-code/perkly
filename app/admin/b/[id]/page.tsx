@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getD1 } from "../../../../db";
 import { liveDesign } from "../../../../lib/server/designs";
 import { STATUS_LABEL, adminStatus, requireAdminPage, shortDate, shortDateTime } from "../../../../lib/server/admin";
-import { AdminActions, ExportBusiness, PolarSync, PaymentLink, PosKeys, AdminCardPreview, ApplePushTest, GoogleSyncTest, KitSentButton, OwnerDesignSwitch } from "./admin-actions";
+import { AdminActions, ExportBusiness, PolarSync, PaymentLink, PosKeys, AdminCardPreview, ApplePushTest, GoogleSyncTest, KitSentButton, OwnerDesignSwitch, BookingSwitch } from "./admin-actions";
 import { pctLabel } from "../../../../lib/cashback";
 
 const SIMPLE_NAMES: Record<string, string> = { pass: "כרטיסייה מראש", gift: "כרטיס מתנה", club: "חבר מועדון", service: "טיפול תקופתי", coupon: "שובר חד־פעמי", attendance: "נוכחות בחוגים" };
@@ -27,7 +27,7 @@ const ACTION_LABEL: Record<string, string> = {
   suspend: "השהיה", unsuspend: "החזרה לפעילות", grant_comp: "גישה חינם", clear_comp: "ביטול גישה חינם",
   update_business: "עריכת פרטים", owner_link: "קישור לבעל העסק", owner_invite: "הזמנה לבעל העסק", staff_invite: "הזמנת עובד", transfer_owner: "העברת בעלות", archive: "סגירה (ארכוב)", restore: "שחזור", export: "ייצוא",
   import: "ייבוא מאתר אחר", reset_data: "איפוס נתונים", kit_sent: "ערכת קופה נשלחה", owner_designs: "עיצוב על ידי בעל העסק",
-  pos_key_create: "מפתח קופה נוצר", pos_key_revoke: "מפתח קופה בוטל", pos_only: "שינוי רק דרך הקופה",
+  pos_key_create: "מפתח קופה נוצר", pos_key_revoke: "מפתח קופה בוטל", pos_only: "שינוי רק דרך הקופה", booking_on: "זימון תורים",
   polar_sync: "סנכרון מ־Polar", polar_link: "חיבור מנוי מ־Polar", polar_unlink: "ניתוק מנוי", delete_business: "מחיקה לצמיתות",
 };
 const POLAR_LABEL: Record<string, string> = {
@@ -47,7 +47,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
 
   const b = await db
     .prepare(
-      `SELECT b.id, b.owner, b.name, b.reward, b.target, b.color, b.created, b.reward_mode, b.suspended, b.suspend_reason, b.comp_until, b.archived, b.kit_due, b.kit_sent, b.owner_designs, b.currency, b.pos_only, b.program, b.near_text, b.cashback_bp, b.cashback_min,
+      `SELECT b.id, b.owner, b.name, b.reward, b.target, b.color, b.created, b.reward_mode, b.suspended, b.suspend_reason, b.comp_until, b.archived, b.kit_due, b.kit_sent, b.owner_designs, b.currency, b.pos_only, b.booking_on, b.booking_key, b.program, b.near_text, b.cashback_bp, b.cashback_min,
          s.status, s.plan, s.current_period_end, s.external_subscription, s.updated AS sub_updated, u.email AS owner_email, u.phone AS owner_phone
        FROM businesses b LEFT JOIN subscriptions s ON s.business = b.id LEFT JOIN users u ON u.id = b.owner WHERE b.id = ?`,
     )
@@ -56,7 +56,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
       id: string; name: string; reward: string; target: number; color: string; created: string; reward_mode: string;
       owner: string; suspended: string | null; suspend_reason: string | null; comp_until: string | null; archived: string | null; owner_email: string | null; owner_phone: string | null;
       status: string | null; current_period_end: string | null; external_subscription: string | null; sub_updated: string | null;
-      plan: string | null; kit_due: string | null; kit_sent: string | null; owner_designs: number; currency: string; pos_only: number; program: string; near_text: string | null; cashback_bp: number; cashback_min: number;
+      plan: string | null; kit_due: string | null; kit_sent: string | null; owner_designs: number; currency: string; pos_only: number; booking_on: number; booking_key: string | null; program: string; near_text: string | null; cashback_bp: number; cashback_min: number;
     }>();
   if (!b) notFound();
 
@@ -250,6 +250,11 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
               <AdminCardPreview design={design} target={b.target} program={b.program} cashback={{ bp: b.cashback_bp, min: b.cashback_min, currency: b.currency }} />
               <OwnerDesignSwitch business={b.id} on={!!b.owner_designs} />
               <p className="form-hint">כשהמתג פעיל, בעל העסק מעצב את הכרטיס בעצמו (רק את העיצוב).</p>
+            </section>
+
+            <section className="panel">
+              <h2>זימון תורים</h2>
+              <BookingSwitch business={b.id} on={!!b.booking_on} bookingKey={b.booking_key} />
             </section>
 
             <section className="panel">

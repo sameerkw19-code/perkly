@@ -717,3 +717,66 @@ test("apple wallet: the 'pass changed' query stays within D1's 8-term compound S
   const terms = (body.match(/UNION ALL/g) ?? []).length + 1;
   assert.ok(terms <= 8, `${terms} terms`);
 });
+
+// ---- Online booking ----
+import * as booking from "../lib/booking.ts";
+
+test("booking: a person's hours come from their special day, then the business's, then their week, then the business's week", () => {
+  const week = [["09:00", "18:00"], ["09:00", "18:00"], ["09:00", "18:00"], ["09:00", "18:00"], ["09:00", "18:00"], ["09:00", "13:00"], null];
+  const dana = { id: "d", hours: null };
+  const avi = { id: "a", hours: JSON.stringify([null, ["12:00", "20:00"], null, null, null, null, null]) };
+  // 2026-11-30 is a Monday.
+  assert.deepEqual(booking.hoursOn("2026-11-30", dana, week, []), ["09:00", "18:00"]);
+  assert.deepEqual(booking.hoursOn("2026-11-30", avi, week, []), ["12:00", "20:00"]);
+  assert.equal(booking.hoursOn("2026-11-29", avi, week, []), null);
+  const holiday = [{ staff: "", date: "2026-11-30", hours: null }];
+  assert.equal(booking.hoursOn("2026-11-30", dana, week, holiday), null);
+  // A person's own special day beats the business's holiday.
+  assert.deepEqual(booking.hoursOn("2026-11-30", avi, week, [...holiday, { staff: "a", date: "2026-11-30", hours: '["10:00","12:00"]' }]), ["10:00", "12:00"]);
+});
+
+test("booking: free times skip busy ones, fit the length, and respect the notice", () => {
+  const day = ["09:00", "12:00"];
+  assert.deepEqual(booking.freeTimes(day, 30, 60, []), ["09:00", "09:30", "10:00", "10:30", "11:00"]);
+  // Busy 10:00-10:45: nothing that overlaps it.
+  assert.deepEqual(booking.freeTimes(day, 30, 60, [[600, 645]]), ["09:00", "11:00"]);
+  assert.deepEqual(booking.freeTimes(day, 30, 30, [[600, 645]], 9 * 60 + 15), ["09:30", "11:00", "11:30"]);
+  assert.deepEqual(booking.freeTimes(null, 30, 30, []), []);
+  // Today: now + notice; tomorrow: free; a notice reaching into tomorrow carries over.
+  assert.equal(booking.earliestOn("2026-11-30", "2026-11-30", 600, 60), 660);
+  assert.equal(booking.earliestOn("2026-12-01", "2026-11-30", 600, 60), -1);
+  assert.equal(booking.earliestOn("2026-12-01", "2026-11-30", 1380, 120), 60);
+  assert.equal(booking.earliestOn("2026-11-29", "2026-11-30", 600, 60), null);
+  assert.ok(booking.inWindow("2026-12-30", "2026-11-30", 30));
+  assert.ok(!booking.inWindow("2026-12-31", "2026-11-30", 30));
+});
+
+test("booking: 'anyone' goes to the free person with the fewest appointments; services and changes are checked", () => {
+  const free = new Map([["a", ["10:00", "10:30"]], ["b", ["10:00"]], ["c", ["11:00"]]]);
+  assert.equal(booking.pickStaff("10:00", free, new Map([["a", 3], ["b", 1]]), ["a", "b", "c"]), "b");
+  assert.equal(booking.pickStaff("10:30", free, new Map(), ["a", "b", "c"]), "a");
+  assert.equal(booking.pickStaff("12:00", free, new Map(), ["a", "b", "c"]), null);
+  assert.deepEqual(booking.unionTimes(free), ["10:00", "10:30", "11:00"]);
+  const all = booking.parseBookServices(JSON.stringify([{ id: "cut", name: "תספורת", min: 30, price: 8000 }, { id: "dye", name: "צבע", min: 60 }, { id: "bad", name: "", min: 30 }]));
+  assert.equal(all.length, 2);
+  assert.deepEqual(booking.pickServices(all, ["dye", "cut"]), { list: all, minutes: 90, price: 8000 });
+  assert.equal(booking.pickServices(all, ["nope"]), null);
+  assert.equal(booking.pickServices(all, []), null);
+  assert.ok(booking.staffServes({ services: null }, ["cut"]));
+  assert.ok(!booking.staffServes({ services: '["dye"]' }, ["cut", "dye"]));
+  const start = new Date(Date.UTC(2026, 11, 2, 10)).toISOString();
+  assert.ok(booking.clientMayChange(start, Date.UTC(2026, 11, 1, 9), 24));
+  assert.ok(!booking.clientMayChange(start, Date.UTC(2026, 11, 1, 11), 24));
+  assert.deepEqual(booking.cleanRules({ days: 9999, notice: 30, auto: false }, { auto: true, days: 30, notice: 60, cancelHours: 24, prices: true }), { auto: false, days: 30, notice: 30, cancelHours: 24, prices: true });
+});
+
+test("booking is a switch: off by default, and every booking screen and API checks it", () => {
+  const sql = readFileSync(new URL("../drizzle/0049_booking.sql", import.meta.url), "utf8");
+  assert.match(sql, /booking_on INTEGER NOT NULL DEFAULT 0/);
+  const pub = readFileSync(new URL("../lib/server/booking.ts", import.meta.url), "utf8");
+  assert.match(pub, /booking_key = \? AND booking_on = 1/);
+  const api = readFileSync(new URL("../app/api/booking/route.ts", import.meta.url), "utf8");
+  assert.match(api, /!b\.booking_on\) return fail\("not_found", 404\)/);
+  // The same time can't be taken twice: the insert checks for an overlap in the same statement.
+  assert.match(pub, /WHERE NOT EXISTS \(SELECT 1 FROM bookings WHERE business = \?2 AND staff = \?4/);
+});
