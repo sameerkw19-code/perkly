@@ -80,6 +80,8 @@ type Props = {
   appointment?: { text: string | null; extra?: "none" | "stamps" | "points" | "cashback" };
   /** The library card: the nearest return date as shown ("יום ד׳, 3.12"), or null with no books, and how many books. */
   library?: { next: string | null; count: number };
+  /** The six simpler cards (pass, gift, club, service, coupon, classes): one line instead of stamps. */
+  face?: { label: string; value: string; sub: string };
 };
 
 /**
@@ -175,7 +177,7 @@ function PassStamp({ design, filled }: { design: Design; filled: boolean }) {
  * Customer card, wallet-pass style. Order (reading direction follows the page language):
  * brand and customer name, reward line, stamp grid, two fields (stamps, rewards), optional QR.
  */
-export function LoyaltyCard({ design, lang, stamps, target, customerName, rewards, qr, balance, average, appointment, library }: Props) {
+export function LoyaltyCard({ face, design, lang, stamps, target, customerName, rewards, qr, balance, average, appointment, library }: Props) {
   // The card speaks the language it is shown in (one the business picked), not the visitor's site language.
   const cl = cardLang(design, lang);
   const t: T = (key, vars) => translate(cl, key, vars);
@@ -219,6 +221,13 @@ export function LoyaltyCard({ design, lang, stamps, target, customerName, reward
           <p className="pcard-hint">{t(appointment.text ? "apptCardHint" : "apptCardNoneHint")}</p>
         </div>
       )}
+      {face && (
+        <div className="pcard-balance pcard-appt">
+          <small>{face.label}</small>
+          <b><Num>{face.value}</Num></b>
+          {face.sub && <p className="pcard-hint">{face.sub}</p>}
+        </div>
+      )}
       {library && (
         <div className="pcard-balance pcard-appt">
           <small>{t("libReturnBy")}</small>
@@ -227,7 +236,7 @@ export function LoyaltyCard({ design, lang, stamps, target, customerName, reward
         </div>
       )}
       {/* The appointments card shows its add-on (if any) below the appointment: points, a punch card or the balance. */}
-      {library ? null : appointment && (!appointment.extra || appointment.extra === "none") ? null : appointment?.extra === "points" ? (
+      {library || face ? null : appointment && (!appointment.extra || appointment.extra === "none") ? null : appointment?.extra === "points" ? (
         <div className="pcard-points">
           <div className="pcard-fields">
             <div className="pcard-field"><small>{t("pointsWord")}</small><b><Num>{Math.min(stamps, target)}/{target}</Num></b></div>
@@ -296,7 +305,7 @@ function StripBar({ design, stamps, target, label }: { design: Design; stamps: n
 }
 
 /** Approximate Apple Wallet store card: logo + header field, strip image with stamps, fields, code. */
-export function ApplePreview({ design, lang, stamps, target, customerName, balance, average, appointment, library }: Props) {
+export function ApplePreview({ face, design, lang, stamps, target, customerName, balance, average, appointment, library }: Props) {
   const cl = cardLang(design, lang);
   const t: T = (key, vars) => translate(cl, key, vars);
   const text = textsFor(design, cl);
@@ -312,12 +321,17 @@ export function ApplePreview({ design, lang, stamps, target, customerName, balan
           : design.showCustomerName && customerName && <div className="ap-f"><small style={label}>{t("customerName")}</small><b>{customerName}</b></div>}
       </div>
       {/* The balance card's strip is the banner image (no stamp grid), and its field is the balance. */}
-      <div className="ap-strip" style={(balance || appointment || library) && (design.walletHero ?? design.hero) ? { backgroundImage: `url(${assetUrl((design.walletHero ?? design.hero)!)})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}>
+      <div className="ap-strip" style={(balance || appointment || library || face) && (design.walletHero ?? design.hero) ? { backgroundImage: `url(${assetUrl((design.walletHero ?? design.hero)!)})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}>
         {average ? <StripBar design={design} stamps={stamps} target={target} label={t("avgRoundWord")} />
-          : !balance && !appointment && !library && <StampGrid design={design} stamps={stamps} target={target} giftLabel={text.gift} />}
+          : !balance && !appointment && !library && !face && <StampGrid design={design} stamps={stamps} target={target} giftLabel={text.gift} />}
       </div>
       <div className="ap-row">
-        {library ? (
+        {face ? (
+          <>
+            <div><small style={label}>{face.label}</small><b><Num>{face.value}</Num></b></div>
+            {face.sub && <div className="end"><small style={label}>&nbsp;</small><b style={{ fontSize: 12, fontWeight: 500 }}>{face.sub}</b></div>}
+          </>
+        ) : library ? (
           <>
             <div><small style={label}>{t("libReturnBy")}</small><b><Num>{library.next ?? t("libNoBooksCard")}</Num></b></div>
             <div className="end"><small style={label}>{t("books")}</small><b><Num>{library.count}</Num></b></div>
@@ -344,7 +358,7 @@ export function ApplePreview({ design, lang, stamps, target, customerName, balan
 }
 
 /** Approximate Google Wallet loyalty card: round logo, fixed header, rows, code, hero image. */
-export function GooglePreview({ design, lang, stamps, target, customerName, balance, average, appointment, library }: Props) {
+export function GooglePreview({ face, design, lang, stamps, target, customerName, balance, average, appointment, library }: Props) {
   const cl = cardLang(design, lang);
   const t: T = (key, vars) => translate(cl, key, vars);
   const text = textsFor(design, cl);
@@ -358,7 +372,9 @@ export function GooglePreview({ design, lang, stamps, target, customerName, bala
         {text.promo && <div className="gw-promo">{text.promo}</div>}
         <div className="gw-row">
           {design.showCustomerName && customerName && <div><small>{t("customerName")}</small><b>{customerName}</b></div>}
-          {library
+          {face
+            ? <div><small>{face.label}</small><b><Num>{face.value}</Num></b></div>
+            : library
             ? <><div><small>{t("libReturnBy")}</small><b><Num>{library.next ?? t("libNoBooksCard")}</Num></b></div><div><small>{t("books")}</small><b><Num>{library.count}</Num></b></div></>
             : appointment
             ? <div><small>{t("apptWord")}</small><b><Num>{appointment.text ?? t("apptNone")}</Num></b></div>
@@ -371,7 +387,7 @@ export function GooglePreview({ design, lang, stamps, target, customerName, bala
         <div className="fake-qr">QR</div>
       </div>
       <div className="gw-hero" style={banner ? { backgroundImage: `url(${assetUrl(banner)})` } : undefined}>
-        {!balance && !average && !appointment && !library && <StampGrid design={design} stamps={stamps} target={target} giftLabel={text.gift} />}
+        {!balance && !average && !appointment && !library && !face && <StampGrid design={design} stamps={stamps} target={target} giftLabel={text.gift} />}
       </div>
     </div>
   );

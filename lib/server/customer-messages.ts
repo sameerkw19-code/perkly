@@ -6,6 +6,7 @@
 
 import { passProgram } from "./balance-pass";
 import { sendLoanReminders } from "./loan-reminders";
+import { sendDueReminders } from "./due-reminders";
 import { walletConfig, updateLoyaltyObject, type WalletConfig } from "./google-wallet";
 import { liveDesign, passLook } from "./designs";
 import { BIRTHDAY_GIFT_DAYS, MISS_YOU_DAYS, noticeOn, type Design, type StampNotice } from "../design";
@@ -233,7 +234,7 @@ export async function drainOutbox(db: D1Database, config: WalletConfig, nowIso: 
     if (o.kind === "sync") {
       const program = await passProgram(db, o.customer, o.origin);
       // Balance, appointment and library cards have no stamp banner.
-      const stampsLook = program.balance === undefined && program.appointment === undefined && program.library === undefined ? { stamps: o.stamps, target: o.target } : undefined;
+      const stampsLook = program.balance === undefined && program.appointment === undefined && program.library === undefined && program.face === undefined ? { stamps: o.stamps, target: o.target } : undefined;
       const full = o.origin ? await passLook(db, business, o.origin, stampsLook).catch(() => null) : null;
       const { notice: _none, ...look } = full ?? { notice: null };
       const result = await updateLoyaltyObject(
@@ -328,6 +329,7 @@ export async function runScheduled(db: D1Database, env: Env, now = new Date()): 
   await switchNearTexts(db, today.hour, nowIso);
   await sendApptReminders(db, nowIso).catch((e) => console.error("appointment reminders failed:", e));
   await sendLoanReminders(db, nowIso).catch((e) => console.error("library reminders failed:", e));
+  await sendDueReminders(db, nowIso).catch((e) => console.error("dated reminders failed:", e));
   await sendMonthlyReports(db, env as unknown as MailEnv & { REPORT_EMAILS?: string; PUBLIC_ORIGIN?: string }, now).catch((e) => console.error("monthly report failed:", e));
   const config = walletConfig(env);
   if (!config) return;

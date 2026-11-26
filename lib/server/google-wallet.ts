@@ -4,6 +4,7 @@
 
 import { base64url } from "./crypto";
 import type { PassApptExtra, PassAverage, PassLibrary } from "./balance-pass";
+import type { Face } from "../programs.ts";
 import { classBody, lookFields, type ClassLook, type PassLook } from "../wallet-look";
 
 export type WalletConfig = { issuerId: string; serviceEmail: string; privateKeyPem: string; classId: string };
@@ -45,6 +46,8 @@ export type LoyaltyCard = {
   appointment?: string;
   /** The appointments card's add-on: visits on a gift punch card, points, or the balance. */
   apptExtra?: PassApptExtra;
+  /** The six simpler cards (pass, gift, club, service, coupon, classes): one line on the pass instead of the stamps. */
+  face?: Face;
   /** The library card: the nearest return date and the number of books (replaces the stamps), and the extension link. */
   library?: PassLibrary;
   /** The business's own look on the pass (see passLook). */
@@ -89,6 +92,9 @@ function withRenew<T extends { linksModuleData?: { uris: { id?: string; uri: str
 
 /** The fields that change with every stamp. Used both when saving and when updating a pass. */
 function liveFields(card: LoyaltyCard) {
+  if (card.face) {
+    return { loyaltyPoints: { label: card.face.label.slice(0, 40), balance: { string: card.face.value.slice(0, 40) } } };
+  }
   if (card.library) {
     return {
       loyaltyPoints: {

@@ -1043,3 +1043,16 @@ html,body{overflow-x:clip}
 .reader-loans .form-ok{color:#1f7a4d;font-weight:600}
 .lib-no-ext{font-size:12px}
 .loans-title{font-size:20px;margin:4px 0 0;padding-inline-start:10px;border-inline-start:4px solid}
+
+/* ---------- The six simpler cards at the station ---------- */
+.smp{display:grid;gap:14px}
+.smp-face{display:grid !important;gap:4px;justify-items:start;text-align:start}
+.smp-face small{font-size:13px;font-weight:700;color:var(--muted, #6b6880)}
+.smp-face strong{font-size:30px;line-height:1.1;font-weight:800}
+.smp-face span{font-size:14px;color:var(--muted, #6b6880)}
+.smp-row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+.smp-row>.btn{flex:1 1 160px;min-height:48px}
+.smp-field{display:grid;gap:6px;flex:1 1 140px}
+.smp-field>span{font-weight:700;font-size:14px}
+.smp-field input{min-height:48px;font-size:18px}
+.smp-big{font-size:20px;font-weight:800;margin:0}

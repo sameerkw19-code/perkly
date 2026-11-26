@@ -13,6 +13,8 @@ import { apptLabel, formatAppt, israelTime, noApptText } from "../appointment";
 import { passToken, type AppleConfig } from "./apple-token";
 import { parseSocial, passLinks } from "../social";
 import { daysLeft, formatDue, israelDate, loanWords, nextDue, type Loan } from "../library";
+import { isSimple } from "../programs";
+import { simpleFaceFor } from "./simple-face";
 
 export { appleConfig, passToken, validToken, type AppleConfig } from "./apple-token";
 
@@ -169,7 +171,9 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
     const left = daysLeft(due, today);
     return left < 0 ? `${formatDue(due, lang)} · ${LW.late}` : left === 0 ? `${LW.today} · ${formatDue(due, lang, false)}` : formatDue(due, lang);
   };
-  const stampCard = !library && balance === undefined && average === undefined && (!appointments || apptExtra === "stamps");
+  // The six simpler cards: one line (label, value, a line under it) instead of the stamps.
+  const face = isSimple(c.program) ? await simpleFaceFor(db, c.id, lang) : null;
+  const stampCard = !library && !face && balance === undefined && average === undefined && (!appointments || apptExtra === "stamps");
   const grid = stampCard ? appleStampPicture(design, c.stamps, c.target) : null;
   const strip = average
     ? await progressStrip({ bg: design.colors.bg, bg2: design.look.bg2, fg: design.colors.fg, fill: design.colors.stamp, done: Math.min(c.stamps, c.target), target: c.target, rtl: lang === "he" || lang === "ar" })
@@ -189,7 +193,9 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
   const own = template ? fillNearText(template, { missing, reward, business: title, balance: balance ?? null }) : "";
   // The automatic line ends with an emoji: 🎁 when a reward is waiting, else the business's stamp (☕, 🍕, ✂️…).
   const emoji = stampEmoji(design.stamp?.icon);
-  const nearText = own || (library
+  const nearText = own || (face
+    ? `${title} · ${face.label}: ${face.value}`
+    : library
     ? firstLoan ? `${title} · ${LW.label}: ${formatDue(firstLoan.due, lang)} 📚` : `${title} 📚`
     : appointments
     ? apptNext ? `${title} · ${apptLabel(lang)}: ${formatAppt(apptNext, lang)} 🗓️` : title
@@ -243,15 +249,22 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
     barcodes: [{ format: "PKBarcodeFormatQR", message: "perkly:" + c.scan_code, messageEncoding: "iso-8859-1", altText: "Powered by Perkly" }],
     storeCard: {
       // Logo and the customer's name on top, the stamps as a picture, then the stamp count and the rewards ready.
-      headerFields: appointments || library
+      headerFields: appointments || library || face
         ? []
         : average
         ? [{ key: "worth", label: average.ready ? L.worthReady : L.worth, value: average.worth ?? "—", textAlignment: "PKTextAlignmentRight" }]
         : design.showCustomerName ? [name] : [],
-      primaryFields: library
+      primaryFields: face
+        ? [{ key: "face", label: face.label, value: face.value, changeMessage: `${face.label}: %@` }]
+        : library
         ? [{ key: "due", label: firstLoan ? LW.label : LW.books, value: firstLoan ? dueText(firstLoan.due) : LW.none, changeMessage: `${LW.label}: %@` }]
         : appointments ? [apptField] : average ? [{ key: "round", label: L.round, value: `${Math.min(c.stamps, c.target)} / ${c.target}`, changeMessage: L.roundChanged }] : [],
-      secondaryFields: library
+      secondaryFields: face
+        ? [
+            ...(face.sub ? [{ key: "faceSub", label: "", value: face.sub }] : []),
+            ...(design.showCustomerName ? [{ ...name }] : []),
+          ]
+        : library
         ? [
             ...(firstLoan ? [{ key: "book", label: loans.length > 1 ? `${LW.books} (${loans.length})` : LW.books, value: loans.length > 1 ? `${firstLoan.title} +${loans.length - 1}` : firstLoan.title }] : []),
             ...(design.showCustomerName ? [{ ...name }] : []),
@@ -268,7 +281,7 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
         : average
         ? [...(design.showCustomerName ? [{ ...name, textAlignment: "PKTextAlignmentNatural" }] : []), { key: "rewardFront", label: L.reward, value: reward, textAlignment: "PKTextAlignmentRight" }]
         : balance === undefined ? [stamps, ready] : [{ key: "balance", label: L.balance, value: balance, changeMessage: L.balanceChanged }],
-      ...(strip || appointments || library ? {} : { auxiliaryFields: [{ key: "reward", label: L.reward, value: reward }] }),
+      ...(strip || appointments || library || face ? {} : { auxiliaryFields: [{ key: "reward", label: L.reward, value: reward }] }),
       backFields: [
         // The business's offers page (or its website), first on the back of the pass, opened with a tap.
         ...links.map((l) => ({ key: `link-${l.key}`, label: l.label, value: l.url, attributedValue: `<a href="${escapeHtml(l.url)}">${escapeHtml(l.label)}</a>` })),
@@ -276,7 +289,9 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
         ...(library && c.loan_key ? [{ key: "renew", label: LW.renew, value: `${origin}/l/${c.loan_key}`, attributedValue: `<a href="${escapeHtml(`${origin}/l/${c.loan_key}`)}">${escapeHtml(loans.length ? LW.renew : LW.mine)}</a>` }] : []),
         ...loans.map((l) => ({ key: `loan-${l.id}`, label: l.title, value: `${LW.label} ${dueText(l.due)}${l.extensions ? ` · ${LW.ext} ×${l.extensions}` : ""}` })),
         ...(library && loans.length && c.appt_msg ? [{ key: "reminder", label: LW.label, value: c.appt_msg, changeMessage: "%@" }] : []),
-        ...(library || (appointments && apptExtra !== "stamps" && apptExtra !== "points") ? [] : [{ key: "rewardBack", label: L.reward, value: reward }]),
+        // Reminders of the simpler cards (service, payment, pass running low or expiring) come as notifications.
+        ...(face && c.appt_msg ? [{ key: "reminder", label: face.label, value: c.appt_msg, changeMessage: "%@" }] : []),
+        ...(library || face || (appointments && apptExtra !== "stamps" && apptExtra !== "points") ? [] : [{ key: "rewardBack", label: L.reward, value: reward }]),
         // The appointments card: the latest reminder (the day before, that morning, an hour before) shows as a notification.
         ...(apptNext && c.appt_msg ? [{ key: "reminder", label: apptLabel(lang), value: c.appt_msg, changeMessage: "%@" }] : []),
         // The latest message to customers: when it changes, the iPhone shows it as a notification (changeMessage).

@@ -7,6 +7,8 @@ import { israelNow } from "../lib/birthday";
 import { formatAppt, formatTime, israelTime } from "../lib/appointment";
 import { ClinicCalendar, minutesLabel } from "../components/clinic-calendar";
 import { LibraryDesk, LibraryStation } from "../components/library";
+import { SimpleSettingsPanel, SimpleStation } from "../components/simple-station";
+import { isSimple, simpleFace, type SimpleProgram } from "../lib/programs";
 import type { Loan } from "../lib/library";
 import { parseServices } from "../lib/calendar";
 import {
@@ -33,8 +35,10 @@ import { weekChange } from "../lib/weekly";
 import { Brand } from "../components/brand";
 
 type Role = "owner" | "staff";
-type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social; program?: "stamps" | "cashback" | "average" | "appointments" | "library"; cashback_bp?: number; cashback_min?: number; currency?: string; avg_cap?: number; pos_only?: number; near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number; near_evening_from?: number; referral_stamps?: number; report_email?: number; appt_extra?: "none" | "stamps" | "points" | "cashback"; appt_points?: number; work_hours?: string | null; appt_slot?: number; services?: string | null; loan_days?: number; loan_ext_days?: number; loan_max_ext?: number };
-type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; rewards?: number; nextExpiry?: string | null; phone?: string; balance?: number; roundTotal?: number; rewardValue?: number | null; apptAt?: string | null; loans?: Loan[] };
+type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social; program?: "stamps" | "cashback" | "average" | "appointments" | "library" | SimpleProgram; cashback_bp?: number; cashback_min?: number; currency?: string; avg_cap?: number; pos_only?: number; near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number; near_evening_from?: number; referral_stamps?: number; report_email?: number; appt_extra?: "none" | "stamps" | "points" | "cashback"; appt_points?: number; work_hours?: string | null; appt_slot?: number; services?: string | null; loan_days?: number; loan_ext_days?: number; loan_max_ext?: number;
+  pass_size?: number; pass_days?: number; club_pct?: number; service_months?: number; coupon_until?: string | null };
+type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; rewards?: number; nextExpiry?: string | null; phone?: string; balance?: number; roundTotal?: number; rewardValue?: number | null; apptAt?: string | null; loans?: Loan[];
+  passLeft?: number; passUntil?: string | null; dueDate?: string | null; dueLabel?: string | null; couponUsed?: string | null; monthCount?: number };
 type Data = {
   me: { name: string; email: string };
   /** Perkly (a platform admin): manages the card, settings and team of any business. */
@@ -72,6 +76,7 @@ type Data = {
 /** One customer in the list (see GET /api/loyalty). */
 type CustomerRow = {
   id: string; name: string; phone: string; stamps: number; target: number; balance: number; appt_at?: string | null; created: string; source: string;
+  pass_left?: number; pass_until?: string | null; due_date?: string | null; due_label?: string | null; coupon_used?: string | null;
   consent_marketing: number; birthday: string | null; has_link: boolean; rewards: number; last_visit: string | null;
 };
 /** One entry of the activity history (several entries can be grouped into one). */
@@ -427,7 +432,7 @@ export default function Dashboard() {
           {view === "overview" && isOwner && (
             <>
               <div className="page-head">
-                <div><h1>{t("repTitle")}</h1><p className="muted">{t(b.program === "cashback" ? "repSubtitleCb" : b.program === "appointments" ? "repSubtitleAppt" : b.program === "library" ? "repSubtitleLib" : "repSubtitle")}</p></div>
+                <div><h1>{t("repTitle")}</h1><p className="muted">{t(b.program === "cashback" ? "repSubtitleCb" : b.program === "appointments" ? "repSubtitleAppt" : b.program === "library" ? "repSubtitleLib" : isSimple(b.program) ? "repSubtitleSimple" : "repSubtitle")}</p></div>
                 <div className="head-actions">
                   {(data.branches?.length ?? 0) > 1 && (
                     <select aria-label={t("branch")} value={branchView} onChange={(e) => setBranchView(e.target.value)}>
@@ -444,7 +449,7 @@ export default function Dashboard() {
               </div>
               {b.program === "appointments" && <TodayAppts customers={customers} t={t} />}
               {data.summary && <Summary summary={data.summary} totals={{ customers: data.stats!.customers, ready: data.stats!.rewards_ready, openBalance: data.stats!.open_balance }} breakdown={data.breakdown} hasBranches={(data.branches?.length ?? 0) > 1} t={t}
-                money={b.program === "cashback" || b.program === "average" ? (n) => formatMoney(n, b.currency === "USD" ? "USD" : "ILS", lang) : undefined} average={b.program === "average"} appts={b.program === "appointments" || b.program === "library"} />}
+                money={b.program === "cashback" || b.program === "average" ? (n) => formatMoney(n, b.currency === "USD" ? "USD" : "ILS", lang) : undefined} average={b.program === "average"} appts={b.program === "appointments" || b.program === "library" || isSimple(b.program)} />}
               {!!data.alerts?.length && <Alerts alerts={data.alerts} t={t} />}
               <section className="overview-grid">
                 <div className="panel card-panel join-panel">
@@ -499,7 +504,8 @@ export default function Dashboard() {
                           <td><span className="customer-avatar">{c.name.charAt(0)}</span><strong>{c.name}</strong></td>
                           <td dir="ltr" className="start">{c.phone}</td>
                           <td>
-                            {b.program === "library" ? "—"
+                            {isSimple(b.program) ? <bdi>{simpleFace(b.program, c, { club_pct: b.club_pct, coupon_until: b.coupon_until, reward: b.reward }, lang, (m) => formatMoney(m, b.currency === "USD" ? "USD" : "ILS", lang)).value}</bdi>
+                            : b.program === "library" ? "—"
                             : b.program === "appointments" ? <bdi>{c.appt_at ? formatAppt(c.appt_at, lang) : "—"}</bdi>
                             : b.program === "cashback" ? <Num>{formatMoney(c.balance ?? 0, b.currency === "USD" ? "USD" : "ILS", lang)}</Num> : (
                             <div className="progress-cell">
@@ -583,7 +589,7 @@ export default function Dashboard() {
               <div className="page-head"><div><h1>{t("design")}</h1><p className="muted">{t("designNoBalance")}</p></div></div>
               <CardEditor key={b.id + ":" + data.editor.publishedVersion} businessId={b.id} target={b.target} editor={data.editor} t={t} lang={lang} notify={notify} reload={load}
                 paid={!!data.access?.ok && !data.access.free} upgradeHref={`/start?b=${encodeURIComponent(b.id)}`} specialDays={isOwner || manage}
-                cashback={b.program === "cashback" ? { bp: b.cashback_bp ?? 200, currency: b.currency === "USD" ? "USD" : "ILS" } : null} average={b.program === "average"} appointments={b.program === "appointments"} library={b.program === "library"} currency={b.currency === "USD" ? "USD" : "ILS"} />
+                cashback={b.program === "cashback" ? { bp: b.cashback_bp ?? 200, currency: b.currency === "USD" ? "USD" : "ILS" } : null} average={b.program === "average"} appointments={b.program === "appointments"} library={b.program === "library"} simple={isSimple(b.program) ? { program: b.program, settings: { club_pct: b.club_pct, coupon_until: b.coupon_until, reward: b.reward } } : undefined} currency={b.currency === "USD" ? "USD" : "ILS"} />
             </>
           )}
 
@@ -605,6 +611,7 @@ export default function Dashboard() {
 
           {view === "settings" && isOwner && manage && (
             <div className="settings-grid">
+              {isSimple(b.program) && <SimpleSettingsPanel key={"smp" + b.id} business={b} t={t} call={call} reload={load} />}
               <section className="panel">
                 <div className="section-head"><h2>{t("settings")}</h2></div>
                 <BusinessForm key={b.id} t={t} busy={busy} initial={b} submitLabel={t("save")} onInvalid={(m) => notify(m, true)} onSubmit={async (values) => {
@@ -1056,6 +1063,8 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
   const appts = business.program === "appointments";
   // The library card: books on loan, return dates and extensions instead of stamps.
   const library = business.program === "library";
+  // The six simpler cards (pass, gift, club, service, coupon, classes): their own controls.
+  const simple = isSimple(business.program);
   // What the appointments card adds (the owner's choice): a gift punch card, points per visit, or a balance.
   const apptExtra = appts ? (business.appt_extra ?? "none") : "none";
   const [apptDate, setApptDate] = useState("");
@@ -1670,7 +1679,20 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
         </section>
       )}
 
-      {selected && !cashback && !appts && !library && step === "customer" && (
+      {/* 2e. The six simpler cards: pass, gift, club, service, coupon, classes */}
+      {selected && simple && step === "customer" && (
+        <section className="sx-screen" aria-label={selected.name}>
+          {who}
+          {branchControl && <div className="sx-chips">{branchControl}</div>}
+          <SimpleStation key={selected.id} business={business} customer={selected} t={t} lang={lang} branch={myBranch ? undefined : branch || undefined} notify={notify}
+            onCard={(card, message) => { setSelected({ ...selected, ...card }); if (message) notify(message); onDone(); }} />
+          <div className="sx-bar">
+            <button className="btn soft" onClick={next}><ChevronRight size={16} className="sx-back" />{t("sxBack")}</button>
+          </div>
+        </section>
+      )}
+
+      {selected && !cashback && !appts && !library && !simple && step === "customer" && (
         <section className="sx-screen" aria-label={selected.name}>
           {who}
           <div className="sx-chips">

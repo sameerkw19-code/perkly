@@ -12,7 +12,10 @@ import SiteAnalytics from "../../components/site-analytics";
 const STEP_ICONS = ["palette", "qr", "stamp"];
 const FIT_ICONS: Record<string, string> = { cafe: "coffee", barber: "scissors", pizza: "pizza" };
 const JOURNEY_ICONS = ["qr", "smartphone", "stamp", "gift"];
-const PRODUCT_ICONS: Record<string, string> = { stamps: "stamp", cashback: "percent", average: "cart", appointments: "calendar", library: "book" };
+const PRODUCT_ICONS: Record<string, string> = {
+  stamps: "stamp", cashback: "percent", average: "cart", appointments: "calendar", library: "book",
+  pass: "ticket", gift: "gift", club: "crown", service: "wrench", coupon: "ticket", attendance: "check",
+};
 
 function Check() {
   return <Icon name="check" size={18} stroke={2.6} className="lp-check" />;

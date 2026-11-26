@@ -9,6 +9,9 @@ import { parseSocial, socialLinks } from "../../../lib/social";
 import CardView from "./card-view";
 import { refCode } from "../../../lib/server/referral";
 import { openLoans } from "../../../lib/server/loans";
+import { simpleFaceFor } from "../../../lib/server/simple-face";
+import { isSimple } from "../../../lib/programs";
+import { cardLang } from "../../../lib/design";
 
 export const dynamic = "force-dynamic";
 // "Add to home screen" opens this card directly.
@@ -67,6 +70,8 @@ export default async function CardPage({ params }: { params: Promise<{ secret: s
     <CardView
       card={{ name: row.name, stamps: row.stamps, target: row.target, scan_code: row.scan_code, design, rewards, nextExpiry: row.next_expiry, business: row.business, links: socialLinks(parseSocial(row.social)),
         cashback: row.program === "cashback" || (row.program === "appointments" && row.appt_extra === "cashback") ? { balance: row.balance, bp: row.cashback_bp, min: row.cashback_min, currency: row.currency === "USD" ? "USD" : "ILS" } : null,
+        // The six simpler cards: one line, in the card's language.
+        face: isSimple(row.program) ? await simpleFaceFor(db, row.id, cardLang(design)) : null,
         library: row.program === "library"
           ? { key: row.loan_key, loans: await openLoans(db, row.id), extDays: row.loan_ext_days, maxExt: row.loan_max_ext }
           : null,
