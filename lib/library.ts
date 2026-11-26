@@ -139,3 +139,9 @@ export function loanReminder(stage: LoanStage, lang: string, library: string, ti
 export function nextDue(loans: Loan[]): Loan | null {
   return loans.length ? [...loans].sort((a, b) => (a.due < b.due ? -1 : a.due > b.due ? 1 : a.title.localeCompare(b.title)))[0] : null;
 }
+
+/** A moment as its Israel date, "26.12.2026": the same text on the server and in every browser (no locale formatting). */
+export function ilDay(iso: string): string {
+  const [y, m, d] = israelDate(new Date(iso)).split("-").map(Number);
+  return `${d}.${m}.${y}`;
+}

@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
+import { ilDay } from "../../../../lib/library";
 import { post } from "../../../../lib/api";
 import { normalizePhone } from "../../../../lib/phone";
 import { LAUNCH } from "../../../../lib/pricing";
@@ -86,12 +87,16 @@ export function OwnerDesignSwitch({ business, on }: { business: string; on: bool
   );
 }
 
+const noSubscribe = () => () => {};
+
 /** Online booking for this business: off by default; off hides the whole booking system (screens, link, wallet button). */
 export function BookingSwitch({ business, on, bookingKey }: { business: string; on: boolean; bookingKey: string | null }) {
   const [busy, setBusy] = useState(false);
   const [value, setValue] = useState(on);
   const [key, setKey] = useState(bookingKey);
-  const link = key ? `${typeof window === "undefined" ? "" : window.location.origin}/book/${key}` : "";
+  // The site's address only in the browser (the server renders the path alone, then the browser fills it in).
+  const origin = useSyncExternalStore(noSubscribe, () => window.location.origin, () => "");
+  const link = key ? `${origin}/book/${key}` : "";
   return (
     <div className="booking-switch">
       <label className="check">
@@ -204,7 +209,7 @@ export function AdminActions({ business, suspended, compUntil, biz, parts }: { b
           {compForever
             ? "פעילה ללא הגבלת זמן, עד שתבטל אותה."
             : compActive
-              ? `פעילה עד ${new Date(compUntil!).toLocaleDateString("he-IL")}. הארכה מתווספת לתאריך הזה.`
+              ? `פעילה עד ${ilDay(compUntil!)}. הארכה מתווספת לתאריך הזה.`
               : "נותן לעסק גישה מלאה בלי מנוי, למספר ימים או ללא הגבלת זמן. רק מנהל יכול לתת אותה."}
         </p>
         <div className="admin-row">
@@ -402,7 +407,7 @@ export function OwnerLink({ business, name, shekels }: { business: string; name:
             }}>{copied ? "הועתק ✓" : "העתקת ההודעה"}</button>
           </div>
           {bad && <small className="form-error" role="alert">מספר הטלפון לא תקין.</small>}
-          <small className="form-hint">תקף עד {new Date(link.expires).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" })}. קישור חדש מבטל את הקודם.</small>
+          <small className="form-hint">תקף עד {ilDay(link.expires)}. קישור חדש מבטל את הקודם.</small>
           <details><summary className="muted">תצוגת ההודעה</summary><pre className="payment-preview" dir={shekels ? "rtl" : "ltr"}>{message}</pre></details>
         </>
       )}
@@ -430,7 +435,7 @@ export function PosKeys({ business, keys, branches, posOnly }: {
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [only, setOnly] = useState(posOnly);
-  const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" }) : "עוד לא");
+  const day = (iso: string | null) => (iso ? ilDay(iso) : "עוד לא");
   return (
     <div className="admin-action pos-keys">
       <p className="muted">מפתח שמערכת הקופה משתמשת בו כדי לרשום קניות בכרטיסים של הלקוחות, לפי הטלפון או הקוד שבכרטיס. ההוראות למתכנת של הקופה: <a href="/pos-api" target="_blank" rel="noopener">perkly.shop/pos-api</a></p>

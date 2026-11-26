@@ -26,6 +26,19 @@ export function monthlyValue(plan: Plan, currency: "ILS" | "USD" = "ILS"): numbe
   if (currency === "USD") return (plan === "yearly" ? 590 / 12 : 59) * USD_TO_ILS;
   return plan === "yearly" ? YEARLY_PRICE_ILS / 12 : MONTHLY_PRICE_ILS;
 }
+/**
+ * What one active subscription really brings in per month, in shekels: its latest paid charge (a discount code like the
+ * launch price shows here), yearly as a twelfth; without a paid charge yet, the list price.
+ */
+export function paidMonthly(
+  business: string, plan: Plan, currency: "ILS" | "USD",
+  orders: { business: string | null; amount: number; currency: string; status: string }[],
+): number {
+  const last = orders.find((o) => o.business === business && o.amount > 0 && (!o.status || ["paid", "succeeded"].includes(o.status)));
+  if (!last) return monthlyValue(plan, currency);
+  const ils = last.currency === "USD" ? last.amount * USD_TO_ILS : last.amount;
+  return plan === "yearly" ? ils / 12 : ils;
+}
 /** Free trial at checkout: the card is taken up front and first charged when the trial ends. */
 export const TRIAL_DAYS = 14;
 

@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { post } from "../../../../lib/api";
 import { normalizePhone } from "../../../../lib/phone";
+import { ilDay } from "../../../../lib/library";
 
 export type BuildData = {
   id: string;
@@ -24,7 +25,8 @@ export type BuildData = {
   mail: boolean;
 };
 
-const day = (iso: string) => new Date(iso).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" });
+// A fixed format, the same on the server and in the browser.
+const day = (iso: string) => ilDay(iso);
 const ERR: Record<string, string> = {
   bad_details: "בדקו את השם והמייל.",
   branch_required: "בחרו סניף.",
