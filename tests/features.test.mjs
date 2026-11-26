@@ -780,3 +780,47 @@ test("booking is a switch: off by default, and every booking screen and API chec
   // The same time can't be taken twice: the insert checks for an overlap in the same statement.
   assert.match(pub, /WHERE NOT EXISTS \(SELECT 1 FROM bookings WHERE business = \?2 AND staff = \?4/);
 });
+
+// ---- The vet's pet file ----
+import * as vet from "../lib/vet.ts";
+
+test("vet: birth dates, ages, weights and the next due date", () => {
+  assert.ok(vet.validBirth("2023-04-10") && vet.validBirth("2023-04"));
+  for (const bad of ["2023-02-30", "1970-01-01", "2023-13", "10/4/2023", ""]) assert.ok(!vet.validBirth(bad), bad);
+  assert.equal(vet.ageText("2023-09-15", "2026-11-26", "he"), "3 שנים וחודשיים");
+  assert.equal(vet.ageText("2025-03", "2026-11-26", "he"), "שנה ו־8 חודשים");
+  assert.equal(vet.ageText("2024-10-01", "2026-11-26", "he"), "שנתיים וחודש");
+  assert.equal(vet.ageText("2025-03", "2026-11-26", "en"), "1 yr 8 mos");
+  assert.equal(vet.ageText("2026-06-30", "2026-11-26", "he"), "4 חודשים");
+  assert.equal(vet.ageText("2027-01-01", "2026-11-26", "he"), null);
+  assert.equal(vet.parseKg("12,4"), 12400);
+  assert.equal(vet.parseKg("0"), null);
+  assert.equal(vet.parseKg("300"), null);
+  assert.equal(vet.kgText(12400, "he"), "12.4 ק״ג");
+  assert.equal(vet.nextDue("2026-01-31", 1), "2026-02-28");
+  assert.equal(vet.nextDue("2026-01-10", 12), "2027-01-10");
+  assert.equal(vet.nextDue(null, 12), null);
+  assert.equal(vet.nextDue("2026-01-10", 12, "2026-05-01"), "2026-05-01");
+});
+
+test("vet: reminders a month, a week and the day before, never late, and never after the date", () => {
+  const due = "2026-12-31";
+  // 10:00 Israel (08:00 UTC in winter) a month before: the month reminder.
+  assert.deepEqual(vet.careStageNow(due, [], new Date("2026-12-01T08:05:00Z")), { stage: "m30", skip: [] });
+  // A due date set 3 days ahead: the month and week reminders already passed, so only "the day before" will come.
+  assert.equal(vet.careStageNow("2026-12-04", [], new Date("2026-12-01T09:00:00Z")).stage, "d7");
+  assert.deepEqual(vet.passedCareStages("2026-12-04", new Date("2026-12-01T09:00:00Z")), ["m30", "d7"]);
+  assert.equal(vet.careStageNow(due, ["m30", "d7", "d1"], new Date("2026-12-30T09:00:00Z")), null);
+  assert.equal(vet.careStageNow(due, [], new Date("2027-01-02T09:00:00Z")), null);
+  const msg = vet.careReminder("d7", "he", "מרפאת רקסי", "בונו", "חיסון כלבת", due);
+  assert.match(msg, /בונו/);
+  assert.match(msg, /31\.12/);
+});
+
+test("the vet file is a switch: off by default, and its API, booklet and reminders check it", () => {
+  const sql = readFileSync(new URL("../drizzle/0050_vet.sql", import.meta.url), "utf8");
+  assert.match(sql, /vet_on INTEGER NOT NULL DEFAULT 0/);
+  assert.match(readFileSync(new URL("../app/api/vet/route.ts", import.meta.url), "utf8"), /!b\.vet_on\) return fail\("not_found", 404\)/);
+  assert.match(readFileSync(new URL("../app/p/[key]/page.tsx", import.meta.url), "utf8"), /b\.vet_on = 1/);
+  assert.match(readFileSync(new URL("../lib/server/vet-reminders.ts", import.meta.url), "utf8"), /b\.vet_on = 1/);
+});

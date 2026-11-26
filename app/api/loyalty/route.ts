@@ -46,7 +46,7 @@ function validTarget(v: unknown, program?: string): v is number {
 
 async function loadBusiness(db: D1Database, id: string) {
   const row = await db
-    .prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays, social, owner_designs, program, cashback_bp, cashback_min, currency, avg_cap, pos_only, near_text, near_text_evening, near_morning_from, near_evening_from, referral_stamps, report_email, appt_extra, appt_points, work_hours, appt_slot, services, loan_days, loan_ext_days, loan_max_ext, pass_size, pass_days, club_pct, service_months, coupon_until, booking_on, booking_key FROM businesses WHERE id = ?")
+    .prepare("SELECT id, name, reward, target, color, join_code, staff_adjust, reward_mode, reward_expiry_days, birthdays, social, owner_designs, program, cashback_bp, cashback_min, currency, avg_cap, pos_only, near_text, near_text_evening, near_morning_from, near_evening_from, referral_stamps, report_email, appt_extra, appt_points, work_hours, appt_slot, services, loan_days, loan_ext_days, loan_max_ext, pass_size, pass_days, club_pct, service_months, coupon_until, booking_on, booking_key, vet_on FROM businesses WHERE id = ?")
     .bind(id)
     .first<Omit<Business, "social"> & { social: string | null }>();
   return row ? { ...row, social: parseSocial(row.social) } : null;

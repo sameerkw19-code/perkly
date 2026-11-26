@@ -222,10 +222,19 @@ export function noticeText(kind: CardNotice, lang: string, startIso: string): st
  */
 export async function syncCard(db: D1Database, customerId: string, now: Date, notice?: { kind: CardNotice; start: string }): Promise<void> {
   const iso = now.toISOString();
-  const next = await db
+  const since = new Date(now.getTime() - 3_600_000).toISOString();
+  const booked = await db
     .prepare(`SELECT start, minutes, services FROM bookings WHERE customer = ? AND status = 'confirmed' AND start > ? ORDER BY start LIMIT 1`)
-    .bind(customerId, new Date(now.getTime() - 3_600_000).toISOString())
+    .bind(customerId, since)
     .first<{ start: string; minutes: number; services: string }>();
+  // The vet's pet file: each animal's next appointment counts too (the earliest one shows on the card).
+  const pet = await db
+    .prepare("SELECT name, appt_at, appt_kind FROM pets WHERE customer = ? AND archived IS NULL AND appt_at > ? ORDER BY appt_at LIMIT 1")
+    .bind(customerId, since)
+    .first<{ name: string; appt_at: string; appt_kind: string | null }>();
+  const next = pet && (!booked || pet.appt_at < booked.start)
+    ? { start: pet.appt_at, minutes: null as number | null, services: JSON.stringify([{ name: pet.name }]) }
+    : booked;
   const c = await db
     .prepare("SELECT c.id, c.business, c.appt_at, c.google_wallet, b.name AS b_name, b.reward, b.color FROM customers c JOIN businesses b ON b.id = c.business WHERE c.id = ?")
     .bind(customerId)

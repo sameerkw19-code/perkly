@@ -13,7 +13,8 @@ import { apptLabel, formatAppt, israelTime, noApptText } from "../appointment";
 import { passToken, type AppleConfig } from "./apple-token";
 import { parseSocial, passLinks } from "../social";
 import { daysLeft, formatDue, israelDate, loanWords, nextDue, type Loan } from "../library";
-import { isSimple } from "../programs";
+import { isSimple, shortDate } from "../programs";
+import { nextCareFor } from "./vet";
 import { simpleFaceFor } from "./simple-face";
 
 export { appleConfig, passToken, validToken, type AppleConfig } from "./apple-token";
@@ -42,8 +43,16 @@ type CustomerRow = {
   business_name: string; reward: string; color: string; rewards: number; balance: number; program: string; currency: string;
   round_total: number; avg_cap: number; ready_value: number | null; missyou_at?: string | null; last_event?: string | null; near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number | null; near_evening_from?: number | null; news_text?: string | null; news_at?: string | null;
   appt_at?: string | null; appt_msg?: string | null; appt_extra?: string | null; social?: string | null; loan_key?: string | null;
-  booking_on?: number | null; booking_key?: string | null;
+  booking_on?: number | null; booking_key?: string | null; vet_on?: number | null; pet_key?: string | null;
 };
+
+/** The vet's labels on the back of the pass. */
+function careLabel(lang: string): string {
+  return lang === "en" ? "Next vaccine or treatment" : lang === "ar" ? "التطعيم أو العلاج القادم" : "החיסון או הטיפול הבא";
+}
+function petsLabel(lang: string): string {
+  return lang === "en" ? "Pet booklet" : lang === "ar" ? "دفتر الحيوانات" : "פנקס החיות";
+}
 
 /** The booking link's label on the back of the pass. */
 function bookLabel(lang: string): string {
@@ -54,7 +63,7 @@ function bookLabel(lang: string): string {
 export async function customerForPass(db: D1Database, serial: string): Promise<CustomerRow | null> {
   return db
     .prepare(
-      `SELECT c.id, c.business, c.name, c.stamps, c.target, c.scan_code, c.created, c.balance, c.round_total, c.missyou_at, c.appt_at, c.appt_msg, c.loan_key, (SELECT MAX(e.created) FROM events e WHERE e.customer = c.id) AS last_event, b.program, b.appt_extra, b.booking_on, b.booking_key, b.currency, b.avg_cap, b.near_text, b.near_text_evening, b.near_morning_from, b.near_evening_from, b.news_text, b.news_at, b.social, b.name AS business_name, b.reward, b.color,
+      `SELECT c.id, c.business, c.name, c.stamps, c.target, c.scan_code, c.created, c.balance, c.round_total, c.missyou_at, c.appt_at, c.appt_msg, c.loan_key, c.pet_key, (SELECT MAX(e.created) FROM events e WHERE e.customer = c.id) AS last_event, b.program, b.appt_extra, b.booking_on, b.booking_key, b.vet_on, b.currency, b.avg_cap, b.near_text, b.near_text_evening, b.near_morning_from, b.near_evening_from, b.news_text, b.news_at, b.social, b.name AS business_name, b.reward, b.color,
          (SELECT value FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2) ORDER BY earned, id LIMIT 1) AS ready_value,
          (SELECT COUNT(*) FROM rewards r WHERE r.customer = c.id AND r.redeemed IS NULL AND (r.expires IS NULL OR r.expires > ?2))
            + (CASE WHEN b.reward_mode = 'block' AND c.stamps >= c.target THEN 1 ELSE 0 END) AS rewards
@@ -164,7 +173,10 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
   const appointments = c.program === "appointments";
   // Online booking (next to any card, when Perkly switched it on): a "book" link on the back, and the next appointment.
   const booking = !!c.booking_on;
-  const apptNext = (appointments || booking) && c.appt_at && Date.parse(c.appt_at) > Date.now() - 3_600_000 ? c.appt_at : null;
+  // The vet's pet file: the animals' next appointment, the nearest vaccine or treatment, and the booklet link.
+  const vet = !!c.vet_on;
+  const careNext = vet ? await nextCareFor(db, c.id, israelDate(new Date())) : null;
+  const apptNext = (appointments || booking || vet) && c.appt_at && Date.parse(c.appt_at) > Date.now() - 3_600_000 ? c.appt_at : null;
   // The appointments card's add-on (the owner's choice): a gift punch card shows the stamp picture like a stamp card.
   const apptExtra = appointments ? c.appt_extra ?? "none" : null;
   // The library card: the books on loan and the nearest return date instead of stamps; reminders come as notifications.
@@ -296,7 +308,9 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
         // The library card: the reader's link to see and extend their books, then each book and its return date.
         // Online booking: the business's booking page, and (on cards that don't show it in front) the next appointment.
         ...(booking && c.booking_key ? [{ key: "book", label: bookLabel(lang), value: `${origin}/book/${c.booking_key}`, attributedValue: `<a href="${escapeHtml(`${origin}/book/${c.booking_key}`)}">${escapeHtml(bookLabel(lang))}</a>` }] : []),
-        ...(booking && !appointments ? [{ key: "bookingNext", label: apptLabel(lang), value: apptNext ? formatAppt(apptNext, lang) : noApptText(lang) }] : []),
+        ...((booking || vet) && !appointments ? [{ key: "bookingNext", label: apptLabel(lang), value: apptNext ? formatAppt(apptNext, lang) : noApptText(lang) }] : []),
+        ...(careNext ? [{ key: "careNext", label: careLabel(lang), value: `${careNext.pet} · ${careNext.name} · ${shortDate(careNext.next, israelDate(new Date()))}` }] : []),
+        ...(vet && c.pet_key ? [{ key: "pets", label: petsLabel(lang), value: `${origin}/p/${c.pet_key}`, attributedValue: `<a href="${escapeHtml(`${origin}/p/${c.pet_key}`)}">${escapeHtml(petsLabel(lang))}</a>` }] : []),
         ...(library && c.loan_key ? [{ key: "renew", label: LW.renew, value: `${origin}/l/${c.loan_key}`, attributedValue: `<a href="${escapeHtml(`${origin}/l/${c.loan_key}`)}">${escapeHtml(loans.length ? LW.renew : LW.mine)}</a>` }] : []),
         ...loans.map((l) => ({ key: `loan-${l.id}`, label: l.title, value: `${LW.label} ${dueText(l.due)}${l.extensions ? ` · ${LW.ext} ×${l.extensions}` : ""}` })),
         ...(library && loans.length && c.appt_msg ? [{ key: "reminder", label: LW.label, value: c.appt_msg, changeMessage: "%@" }] : []),
@@ -305,7 +319,7 @@ export async function customerPass(db: D1Database, config: AppleConfig, c: Custo
         ...(library || face || (appointments && apptExtra !== "stamps" && apptExtra !== "points") ? [] : [{ key: "rewardBack", label: L.reward, value: reward }]),
         // The appointments card: the latest reminder (the day before, that morning, an hour before) shows as a notification.
         // With online booking, also the booking's news (booked, moved, cancelled), even when no appointment is left.
-        ...((apptNext || booking) && c.appt_msg && !library && !face ? [{ key: "reminder", label: apptLabel(lang), value: c.appt_msg, changeMessage: "%@" }] : []),
+        ...((apptNext || booking || vet) && c.appt_msg && !library && !face ? [{ key: "reminder", label: apptLabel(lang), value: c.appt_msg, changeMessage: "%@" }] : []),
         // The latest message to customers: when it changes, the iPhone shows it as a notification (changeMessage).
         ...(news ? [{ key: "news", label: L.news, value: news, changeMessage: "%@" }] : []),
         ...(missYou ? [{ key: "missyou", label: L.news, value: missYou, changeMessage: "%@" }] : []),

@@ -1167,3 +1167,74 @@ html,body{overflow-x:clip}
 .bkd-item.is-short small{flex:1;min-width:0}
 .bk-page .bk-main{margin-block:0 24px;flex:none}
 .bkd-svc .anf-chip.is-on,.bkd-person .anf-chip.is-on{border-color:var(--purple);background:#f0ecfc;color:#5b3fd0}
+/* ---- The vet's pet file ---- */
+.vet{display:grid;gap:12px;min-width:0}
+.vet-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.vet-head h2{display:flex;align-items:center;gap:8px;font-size:17px}
+.vet-tabs{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+.vet-tab{flex:none;display:inline-flex;align-items:center;gap:6px;min-height:42px;padding:0 14px;border:1.5px solid var(--line);border-radius:999px;background:#fff;font:inherit;font-weight:700;cursor:pointer;color:inherit}
+.vet-tab.is-on{border-color:var(--purple);background:#f0ecfc;color:#5b3fd0}
+.vet-tab.add{color:var(--purple);border-style:dashed}
+.vet-form{display:grid;gap:10px}
+.vet-form label{display:grid;gap:4px;font-size:13px;font-weight:600}
+.vet-form .anf-chip,.vet .anf-chip{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 14px;border:1.5px solid var(--line);border-radius:999px;background:#fff;font:inherit;font-weight:600;font-size:13px;cursor:pointer;color:inherit}
+.vet .anf-chip.is-on{border-color:var(--purple);background:#f0ecfc;color:#5b3fd0}
+.vet-pet{display:grid;gap:12px}
+.vet-facts{display:flex;align-items:center;gap:12px}
+.vet-facts>div{display:grid;gap:2px;flex:1;min-width:0}
+.vet-facts b{font-size:18px}
+.vet-facts small{color:var(--muted);font-size:13px}
+.vet-icon{width:48px;height:48px;border-radius:14px;background:#f0ecfc;display:grid;place-items:center;font-size:26px;flex:none}
+.vet-icon.sm{width:36px;height:36px;font-size:20px;border-radius:10px}
+.vet-box{display:grid;gap:8px;padding:14px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.vet-box h3{display:flex;align-items:center;gap:6px;margin:0;font-size:14px}
+.vet-box summary{cursor:pointer;list-style:none}
+.vet-box summary::-webkit-details-marker{display:none}
+.vet-big{margin:0;font-size:18px;font-weight:800;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.vet-big small{font-size:13px;font-weight:600;color:var(--muted)}
+.vet-big small.vet-up{color:#3f7a2a}.vet-big small.vet-down{color:#b45309}
+.vet-inline{display:flex;gap:8px;align-items:center}
+.vet-inline input{width:110px;padding:8px 10px}
+.vet-weights{list-style:none;margin:0;padding:0;display:flex;gap:6px;flex-wrap:wrap}
+.vet-weights li{display:grid;padding:6px 10px;border-radius:9px;background:#f8f7fc;font-size:12px;text-align:center}
+.vet-kind{font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;background:#eef6de;color:#3f5923;white-space:nowrap}
+.vet-kind.is-vaccine{background:#e6f0ff;color:#1d4a7a}
+.vet-kind.is-treatment{background:#fff4e5;color:#7a4b00}
+.vet-care{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.vet-care>li{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border-radius:10px;background:#f8f7fc;border-inline-start:4px solid #d8d3ea}
+.vet-care>li>div:first-child{display:grid;gap:2px;min-width:0}
+.vet-care>li small{color:var(--muted);font-size:12px}
+.vet-care>li.is-late{border-inline-start-color:#d92d20;background:#fef3f2}
+.vet-care>li.is-soon{border-inline-start-color:#e8a33d;background:#fff8ec}
+.vet-badge{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:#eef6de;color:#3f5923;white-space:nowrap}
+.vet-badge.is-late{background:#fee4e2;color:#b42318}
+.vet-badge.is-soon{background:#ffefd5;color:#7a4b00}
+.vet-log{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px;font-size:13px}
+.vet-log li{display:grid;grid-template-columns:70px 1fr auto;gap:8px;align-items:center}
+.vet-log li span{color:var(--muted);font-variant-numeric:tabular-nums}
+.vet-link{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 12px;border-radius:10px;background:#f0ecfc;font-size:13px;font-weight:600}
+.vet-desk{display:grid;gap:16px;max-width:860px}
+.vet-desk h2{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.vet-sub{font-size:13px;margin:14px 0 6px;color:var(--muted)}
+.vet-sub.late{color:#b42318}
+.vet-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.vet-list button{width:100%;display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#fff;font:inherit;color:inherit;text-align:start;cursor:pointer;min-height:56px}
+.vet-list button:hover{border-color:#cbbff5}
+.vet-row-text{display:grid;gap:2px;flex:1;min-width:0}
+.vet-row-text small{color:var(--muted);font-size:12px}
+.vet-booklet{display:grid;gap:12px}
+.vet-booklet h2{font-size:15px;margin:4px 0 8px}
+.vet-booklet details summary{cursor:pointer;font-weight:700;font-size:14px}
+.vet-appt{margin:0;display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:10px 12px;border-radius:10px;background:#f0ecfc}
+.sx-who .btn.small{flex:none}
+.vet-me{display:grid;gap:6px;padding:10px 12px;border-radius:12px;background:#f8f7fc;font-size:13px;font-weight:600}
+.vet-doc{margin:0;display:flex;align-items:center;gap:6px;font-weight:600;color:#3d2f7a}
+.vet-facts small svg{vertical-align:-2px}
+.vet-filter{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.vet-docs{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.vet-docs li{display:flex;align-items:center;gap:8px}
+.vet-docs li input{flex:1;min-width:0}
+.vet-inline input{flex:1;min-width:0;width:auto}
+.vet fieldset,.vet-desk fieldset{border:0;padding:0;margin:0;min-width:0}
+.vet-desk .anf-chip{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 14px;border:1.5px solid var(--line);border-radius:999px;background:#fff;font:inherit;font-weight:600;font-size:13px;cursor:pointer;color:inherit}
+.vet-desk .anf-chip.is-on{border-color:var(--purple);background:#f0ecfc;color:#5b3fd0}
