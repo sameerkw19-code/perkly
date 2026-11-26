@@ -1,6 +1,7 @@
 import { getD1 } from "../../../db";
 import { liveDesign } from "../../../lib/server/designs";
 import { petsOf } from "../../../lib/server/vet";
+import { activeStaff } from "../../../lib/server/booking";
 import { cardLang, textsFor } from "../../../lib/design";
 import { israelDate } from "../../../lib/library";
 import PetBooklet from "./pet-booklet";
@@ -34,14 +35,16 @@ export default async function PetBookletPage({ params }: { params: Promise<{ key
   const design = await liveDesign(db, { id: row.business_id, name: row.name, reward: row.reward, color: row.color });
   const lang = cardLang(design);
   const pets = await petsOf(db, row.business_id, row.id);
+  // The clinic's doctors, by id, for "with Dr. …" (only names, nothing else).
+  const docs = new Map((await activeStaff(db, row.business_id)).map((s) => [s.id, s.name]));
   return (
     <PetBooklet data={{
       title: textsFor(design, lang).title || row.name, lang, today: israelDate(new Date()), bg: design.colors.bg, fg: design.colors.fg,
       pets: pets.map((p) => ({
         id: p.id, name: p.name, species: p.species, breed: p.breed, birth: p.birth, sex: p.sex, grams: p.grams, weighed: p.weighed,
-        appt: upcoming(p.appt_at) ? { at: p.appt_at!, kind: p.appt_kind ?? "visit" } : null,
+        appt: upcoming(p.appt_at) ? { at: p.appt_at!, kind: p.appt_kind ?? "visit", doctor: docs.get(p.appt_staff ?? "") ?? null } : null,
         care: p.care.map((c) => ({ id: c.id, kind: c.kind, name: c.name, last: c.last, next: c.next, months: c.months })),
-        log: p.log.map((l) => ({ id: l.id, date: l.date, name: l.name, kind: l.kind })),
+        log: p.log.map((l) => ({ id: l.id, date: l.date, name: l.name, kind: l.kind, doctor: docs.get(l.staff ?? "") ?? null })),
       })),
     }} />
   );

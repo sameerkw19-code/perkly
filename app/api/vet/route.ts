@@ -7,9 +7,10 @@ import { formatPhone, maskPhone } from "../../../lib/phone";
 import { businessAccess } from "../../../lib/server/billing";
 import { addDays, israelDate, validDate } from "../../../lib/library";
 import { israelTime } from "../../../lib/appointment";
+import { STAFF_MAX } from "../../../lib/booking";
 import { APPT_KINDS, CARE_KINDS, CARE_MAX, nextDue, parseKg, passedCareStages, PETS_MAX, SPECIES, validBirth } from "../../../lib/vet";
 import { ensurePetKey, petsOf } from "../../../lib/server/vet";
-import { syncCard } from "../../../lib/server/booking";
+import { activeStaff, syncCard } from "../../../lib/server/booking";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +52,11 @@ export async function POST(request: Request) {
       ? db.prepare("SELECT c.id, c.pet, c.months, c.next, p.customer FROM pet_care c JOIN pets p ON p.id = c.pet WHERE c.id = ? AND c.business = ? AND c.archived IS NULL")
           .bind(id, b.id).first<{ id: string; pet: string; months: number | null; next: string | null; customer: string }>()
       : null;
-  const answer = async (customer: string) => json({ ok: true, pets: await petsOf(db, b.id, customer), key: await ensurePetKey(db, customer) });
+  // The clinic's doctors: its calendars (shared with online booking). An id given must be one of them; "" or null is none.
+  const doctors = async () => (await activeStaff(db, b.id)).map((s) => ({ id: s.id, name: s.name }));
+  const doctorOf = async (v: unknown): Promise<string | null | undefined> =>
+    v === null || v === undefined || v === "" ? null : typeof v === "string" && (await doctors()).some((d) => d.id === v) ? v : undefined;
+  const answer = async (customer: string) => json({ ok: true, pets: await petsOf(db, b.id, customer), key: await ensurePetKey(db, customer), doctors: await doctors() });
 
   switch (action) {
     case "pets": {
@@ -59,7 +64,7 @@ export async function POST(request: Request) {
       if (!c) return fail("not_found", 404);
       const pets = await petsOf(db, b.id, c.id);
       const key = pets.length ? await ensurePetKey(db, c.id) : null;
-      return json({ pets, key, today });
+      return json({ pets, key, today, doctors: await doctors() });
     }
     case "pet_save": {
       const c = await customerOf(p.customer);
@@ -71,15 +76,18 @@ export async function POST(request: Request) {
       const birth = p.birth === null || p.birth === "" || p.birth === undefined ? null : validBirth(p.birth) && p.birth.slice(0, 7) <= today.slice(0, 7) ? p.birth : undefined;
       if (birth === undefined) return fail("bad_details", 400, "Invalid birth date");
       const sex = p.sex === "m" || p.sex === "f" ? p.sex : null;
+      // The animal's regular doctor (the default for its appointments).
+      const vet = await doctorOf(p.vet);
+      if (vet === undefined) return fail("not_found", 404, "Unknown doctor");
       if (typeof p.id === "string" && p.id) {
-        const r = await db.prepare("UPDATE pets SET name = ?, species = ?, breed = ?, birth = ?, sex = ? WHERE id = ? AND business = ? AND customer = ? AND archived IS NULL")
-          .bind(name, species, breed, birth, sex, p.id, b.id, c.id).run();
+        const r = await db.prepare("UPDATE pets SET name = ?, species = ?, breed = ?, birth = ?, sex = ?, vet = ? WHERE id = ? AND business = ? AND customer = ? AND archived IS NULL")
+          .bind(name, species, breed, birth, sex, vet, p.id, b.id, c.id).run();
         if (!r.meta.changes) return fail("not_found", 404);
       } else {
         const n = await db.prepare("SELECT COUNT(*) AS n FROM pets WHERE customer = ? AND archived IS NULL").bind(c.id).first<{ n: number }>();
         if ((n?.n ?? 0) >= PETS_MAX) return fail("pets_too_many", 409, "Too many animals");
-        await db.prepare("INSERT INTO pets(id, business, customer, name, species, breed, birth, sex, created) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)")
-          .bind(crypto.randomUUID(), b.id, c.id, name, species, breed, birth, sex, nowIso).run();
+        await db.prepare("INSERT INTO pets(id, business, customer, name, species, breed, birth, sex, vet, created) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+          .bind(crypto.randomUUID(), b.id, c.id, name, species, breed, birth, sex, vet, nowIso).run();
       }
       return answer(c.id);
     }
@@ -115,6 +123,8 @@ export async function POST(request: Request) {
       const manual = p.next ? (typeof p.next === "string" && validDate(p.next) ? p.next : undefined) : null;
       if (last === undefined || months === undefined || manual === undefined) return fail("bad_details", 400, "Invalid dates");
       const next = nextDue(last, months, manual);
+      const giver = await doctorOf(p.staff);
+      if (giver === undefined) return fail("not_found", 404, "Unknown doctor");
       // Reminders whose time already passed for this date are marked, so none goes out late.
       const sent = next ? passedCareStages(next, now).join(",") || null : null;
       if (typeof p.id === "string" && p.id) {
@@ -130,7 +140,7 @@ export async function POST(request: Request) {
         await db.batch([
           db.prepare("INSERT INTO pet_care(id, business, pet, kind, name, last, months, next, sent, created) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
             .bind(id, b.id, pet.id, kind, name, last, months, next, sent, nowIso),
-          ...(last ? [db.prepare("INSERT INTO pet_care_log(id, care, pet, date, actor, created) VALUES(?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), id, pet.id, last, user.id, nowIso)] : []),
+          ...(last ? [db.prepare("INSERT INTO pet_care_log(id, care, pet, date, actor, staff, created) VALUES(?, ?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), id, pet.id, last, user.id, giver, nowIso)] : []),
         ]);
       }
       return answer(pet.customer);
@@ -142,8 +152,11 @@ export async function POST(request: Request) {
       const date = typeof p.date === "string" && validDate(p.date) && p.date <= today ? p.date : today;
       const note = typeof p.note === "string" ? p.note.trim().slice(0, 120) || null : null;
       const next = nextDue(date, care.months);
+      // Who gave it (the doctor picked on this screen), for the history.
+      const giver = await doctorOf(p.staff);
+      if (giver === undefined) return fail("not_found", 404, "Unknown doctor");
       await db.batch([
-        db.prepare("INSERT INTO pet_care_log(id, care, pet, date, note, actor, created) VALUES(?, ?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), care.id, care.pet, date, note, user.id, nowIso),
+        db.prepare("INSERT INTO pet_care_log(id, care, pet, date, note, actor, staff, created) VALUES(?, ?, ?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), care.id, care.pet, date, note, user.id, giver, nowIso),
         db.prepare("UPDATE pet_care SET last = ?, next = ?, sent = ? WHERE id = ?").bind(date, next, next ? passedCareStages(next, now).join(",") || null : null, care.id),
       ]);
       return answer(care.customer);
@@ -164,29 +177,78 @@ export async function POST(request: Request) {
       const at = date && time ? israelTime(date, time) : null;
       if (!at || !kind || at.getTime() < now.getTime() - 5 * 60_000 || date! > addDays(today, 400)) return fail("appt_invalid", 400, "Invalid date or time");
       const note = typeof p.note === "string" ? p.note.trim().slice(0, 80) || null : null;
-      await db.prepare("UPDATE pets SET appt_at = ?, appt_kind = ?, appt_note = ? WHERE id = ?").bind(at.toISOString(), kind, note, pet.id).run();
+      // With which doctor. A doctor can't have two animals at the same time, nor an online booking then.
+      const staff = await doctorOf(p.staff);
+      if (staff === undefined) return fail("not_found", 404, "Unknown doctor");
+      if (staff) {
+        const iso = at.toISOString();
+        const clash = await db
+          .prepare(
+            `SELECT 1 FROM pets WHERE appt_staff = ?1 AND appt_at = ?2 AND id != ?3 AND archived IS NULL
+             UNION ALL SELECT 1 FROM bookings WHERE staff = ?1 AND status IN ('pending','confirmed') AND start <= ?2 AND "end" > ?2 LIMIT 1`,
+          )
+          .bind(staff, iso, pet.id)
+          .first();
+        if (clash) return fail("slot_taken", 409, "This doctor is busy then");
+      }
+      await db.prepare("UPDATE pets SET appt_at = ?, appt_kind = ?, appt_note = ?, appt_staff = ? WHERE id = ?").bind(at.toISOString(), kind, note, staff, pet.id).run();
       await syncCard(db, pet.customer, now, { kind: "booked", start: at.toISOString() });
       return answer(pet.customer);
     }
     case "appt_clear": {
       const pet = await petOf(p.pet);
       if (!pet) return fail("not_found", 404);
-      await db.prepare("UPDATE pets SET appt_at = NULL, appt_kind = NULL, appt_note = NULL WHERE id = ?").bind(pet.id).run();
+      await db.prepare("UPDATE pets SET appt_at = NULL, appt_kind = NULL, appt_note = NULL, appt_staff = NULL WHERE id = ?").bind(pet.id).run();
       await syncCard(db, pet.customer, now);
       return answer(pet.customer);
+    }
+    case "doctor_save": {
+      // The clinic's doctors (the owner's): add or rename. They are the clinic's calendars for online booking too.
+      if (role !== "owner") return fail("forbidden", 403, "Owner permission required");
+      const name = str(p.name, 60);
+      if (!name) return fail("bad_details", 400, "A name is needed");
+      if (typeof p.id === "string" && p.id) {
+        const r = await db.prepare("UPDATE booking_staff SET name = ? WHERE id = ? AND business = ? AND archived IS NULL").bind(name, p.id, b.id).run();
+        if (!r.meta.changes) return fail("not_found", 404);
+      } else {
+        const n = await db.prepare("SELECT COUNT(*) AS n FROM booking_staff WHERE business = ? AND archived IS NULL").bind(b.id).first<{ n: number }>();
+        if ((n?.n ?? 0) >= STAFF_MAX) return fail("staff_too_many", 409, "Too many doctors");
+        await db.prepare("INSERT INTO booking_staff(id, business, name, sort, created) VALUES(?, ?, ?, ?, ?)").bind(crypto.randomUUID(), b.id, name, (n?.n ?? 0) + 1, nowIso).run();
+      }
+      return json({ ok: true, doctors: await doctors() });
+    }
+    case "doctor_remove": {
+      // A doctor with upcoming appointments (animals' or online bookings) stays until those move.
+      if (role !== "owner") return fail("forbidden", 403, "Owner permission required");
+      if (typeof p.id !== "string") return fail("bad_request", 400);
+      const busy = await db
+        .prepare(
+          `SELECT (SELECT COUNT(*) FROM pets WHERE appt_staff = ?1 AND archived IS NULL AND appt_at > ?2)
+                + (SELECT COUNT(*) FROM bookings WHERE staff = ?1 AND status IN ('pending','confirmed') AND start > ?2) AS n`,
+        )
+        .bind(p.id, nowIso)
+        .first<{ n: number }>();
+      if ((busy?.n ?? 0) > 0) return fail("staff_busy", 409, "This doctor has upcoming appointments");
+      const live = await db.prepare("SELECT booking_on FROM businesses WHERE id = ?").bind(b.id).first<{ booking_on: number }>();
+      if (live?.booking_on && (await doctors()).length <= 1) return fail("staff_last", 409, "At least one calendar is needed");
+      await db.batch([
+        db.prepare("UPDATE booking_staff SET archived = ? WHERE id = ? AND business = ?").bind(nowIso, p.id, b.id),
+        db.prepare("UPDATE pets SET vet = NULL WHERE vet = ? AND business = ?").bind(p.id, b.id),
+      ]);
+      return json({ ok: true, doctors: await doctors() });
     }
     case "due": {
       // The clinic's list: vaccines and treatments overdue or due in the coming days, and the animals' appointments.
       const days = Number.isInteger(p.days) && (p.days as number) >= 1 && (p.days as number) <= 90 ? (p.days as number) : 30;
       const [care, appts] = await Promise.all([
         db.prepare(
-          `SELECT c.id, c.kind, c.name, c.next, p.id AS pet, p.name AS pet_name, p.species, u.id AS customer, u.name AS owner, u.phone
+          `SELECT c.id, c.kind, c.name, c.next, p.id AS pet, p.name AS pet_name, p.species, p.vet, u.id AS customer, u.name AS owner, u.phone
            FROM pet_care c JOIN pets p ON p.id = c.pet JOIN customers u ON u.id = p.customer
            WHERE c.business = ? AND c.archived IS NULL AND p.archived IS NULL AND u.archived IS NULL AND c.next IS NOT NULL AND c.next <= ? AND c.next >= ?
            ORDER BY c.next LIMIT 300`,
         ).bind(b.id, addDays(today, days), addDays(today, -365)).all(),
         db.prepare(
-          `SELECT p.id AS pet, p.name AS pet_name, p.species, p.appt_at, p.appt_kind, p.appt_note, u.id AS customer, u.name AS owner, u.phone
+          `SELECT p.id AS pet, p.name AS pet_name, p.species, p.vet, p.appt_at, p.appt_kind, p.appt_note, p.appt_staff, u.id AS customer, u.name AS owner, u.phone
            FROM pets p JOIN customers u ON u.id = p.customer
            WHERE p.business = ? AND p.archived IS NULL AND u.archived IS NULL AND p.appt_at > ? AND p.appt_at <= ?
            ORDER BY p.appt_at LIMIT 300`,
@@ -194,7 +256,7 @@ export async function POST(request: Request) {
       ]);
       const phone = (v: unknown) => (role === "owner" ? formatPhone(String(v)) : maskPhone(String(v)));
       return json({
-        today,
+        today, doctors: await doctors(),
         care: (care.results ?? []).map((r) => ({ ...r, phone: phone(r.phone) })),
         appts: (appts.results ?? []).map((r) => ({ ...r, phone: phone(r.phone) })),
       });

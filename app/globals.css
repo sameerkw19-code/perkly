@@ -1227,3 +1227,14 @@ html,body{overflow-x:clip}
 .vet-booklet details summary{cursor:pointer;font-weight:700;font-size:14px}
 .vet-appt{margin:0;display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:10px 12px;border-radius:10px;background:#f0ecfc}
 .sx-who .btn.small{flex:none}
+.vet-me{display:grid;gap:6px;padding:10px 12px;border-radius:12px;background:#f8f7fc;font-size:13px;font-weight:600}
+.vet-doc{margin:0;display:flex;align-items:center;gap:6px;font-weight:600;color:#3d2f7a}
+.vet-facts small svg{vertical-align:-2px}
+.vet-filter{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.vet-docs{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.vet-docs li{display:flex;align-items:center;gap:8px}
+.vet-docs li input{flex:1;min-width:0}
+.vet-inline input{flex:1;min-width:0;width:auto}
+.vet fieldset,.vet-desk fieldset{border:0;padding:0;margin:0;min-width:0}
+.vet-desk .anf-chip{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 14px;border:1.5px solid var(--line);border-radius:999px;background:#fff;font:inherit;font-weight:600;font-size:13px;cursor:pointer;color:inherit}
+.vet-desk .anf-chip.is-on{border-color:var(--purple);background:#f0ecfc;color:#5b3fd0}

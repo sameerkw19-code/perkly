@@ -9,9 +9,9 @@ type Data = {
   title: string; lang: string; today: string; bg: string; fg: string;
   pets: {
     id: string; name: string; species: string; breed: string | null; birth: string | null; sex: string | null; grams: number | null; weighed: string | null;
-    appt: { at: string; kind: string } | null;
+    appt: { at: string; kind: string; doctor: string | null } | null;
     care: { id: string; kind: string; name: string; last: string | null; next: string | null; months: number | null }[];
-    log: { id: string; date: string; name: string; kind: string }[];
+    log: { id: string; date: string; name: string; kind: string; doctor: string | null }[];
   }[];
 };
 
@@ -39,7 +39,7 @@ export default function PetBooklet({ data }: { data: Data | null }) {
                 </div>
               </div>
               {p.appt && (
-                <p className="vet-appt"><b>{t("vet_nextAppt")}:</b> <bdi>{formatAppt(p.appt.at, lang)}</bdi> <span className={"vet-kind is-" + p.appt.kind}>{kindName(p.appt.kind, lang)}</span></p>
+                <p className="vet-appt"><b>{t("vet_nextAppt")}:</b> <bdi>{formatAppt(p.appt.at, lang)}</bdi> <span className={"vet-kind is-" + p.appt.kind}>{kindName(p.appt.kind, lang)}</span>{p.appt.doctor ? <span>{t("bk_with", { name: p.appt.doctor })}</span> : null}</p>
               )}
               {(["vaccine", "treatment"] as const).map((kind) => {
                 const items = p.care.filter((c) => c.kind === kind);
@@ -67,7 +67,7 @@ export default function PetBooklet({ data }: { data: Data | null }) {
               {p.log.length > 0 && (
                 <details>
                   <summary>{t("vet_history")}</summary>
-                  <ul className="vet-log">{p.log.map((l) => <li key={l.id}><span>{shortDate(l.date)}</span><b>{l.name}</b><small>{kindName(l.kind, lang)}</small></li>)}</ul>
+                  <ul className="vet-log">{p.log.map((l) => <li key={l.id}><span>{shortDate(l.date)}</span><b>{l.name}</b><small>{kindName(l.kind, lang)}{l.doctor ? ` · ${l.doctor}` : ""}</small></li>)}</ul>
                 </details>
               )}
             </section>

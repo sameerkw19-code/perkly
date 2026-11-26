@@ -4,8 +4,8 @@
 // periodic treatments (given when, every how many months, due when; "given today"), and each animal's next appointment
 // and what it is for. Also the clinic's list of what is due soon. Owners and staff both work here.
 
-import { useEffect, useState } from "react";
-import { ArrowRight, CalendarClock, Check, Copy, PawPrint, Pencil, Plus, Scale, Syringe, Trash2, X } from "lucide-react";
+import { createContext, useContext, useEffect, useState } from "react";
+import { ArrowRight, CalendarClock, Check, Copy, PawPrint, Pencil, Plus, Scale, Stethoscope, Syringe, Trash2, X } from "lucide-react";
 import { post } from "../lib/api";
 import { errorText } from "../lib/i18n";
 import type { SiteLang } from "../lib/i18n-types";
@@ -17,9 +17,34 @@ type T = (key: string, vars?: Record<string, string | number>) => string;
 type Care = { id: string; pet: string; kind: CareKind; name: string; last: string | null; months: number | null; next: string | null };
 type Pet = {
   id: string; name: string; species: string; breed: string | null; birth: string | null; sex: string | null; grams: number | null; weighed: string | null;
-  appt_at: string | null; appt_kind: string | null; appt_note: string | null;
-  care: Care[]; weights: { grams: number; date: string }[]; log: { id: string; date: string; name: string; kind: string; note: string | null }[];
+  appt_at: string | null; appt_kind: string | null; appt_note: string | null; vet: string | null; appt_staff: string | null;
+  care: Care[]; weights: { grams: number; date: string }[]; log: { id: string; date: string; name: string; kind: string; note: string | null; staff: string | null }[];
 };
+type Doctor = { id: string; name: string };
+
+// The clinic's doctors, and the one working on this screen (remembered on this device): who gives a vaccine, the default
+// for a new appointment.
+const Docs = createContext<{ doctors: Doctor[]; me: string; name: (id: string | null | undefined) => string }>({ doctors: [], me: "", name: () => "" });
+const meKey = (business: string) => `perkly-vet-doctor:${business}`;
+function savedMe(business: string): string {
+  try { return localStorage.getItem(meKey(business)) ?? ""; } catch { return ""; }
+}
+
+/** The doctor picker: chips when there are a few doctors. */
+function DoctorPick({ value, onPick, any }: { value: string; onPick: (id: string) => void; any?: string }) {
+  const { doctors } = useContext(Docs);
+  if (!doctors.length) return null;
+  return (
+    <div className="anf-chips" role="radiogroup">
+      {any !== undefined && <button type="button" role="radio" aria-checked={value === ""} className={"anf-chip" + (value === "" ? " is-on" : "")} onClick={() => onPick("")}>{any}</button>}
+      {doctors.map((d) => (
+        <button key={d.id} type="button" role="radio" aria-checked={value === d.id} className={"anf-chip" + (value === d.id ? " is-on" : "")} onClick={() => onPick(d.id)}>
+          <Stethoscope size={14} aria-hidden="true" />{d.name}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function todayIL(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
@@ -47,23 +72,35 @@ export function VetFile({ businessId, customer, t, lang, notify, onClose }: {
   const [sel, setSel] = useState<string>("");
   const [editing, setEditing] = useState<"new" | "edit" | null>(null);
   const [today] = useState(todayIL);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [me, setMeState] = useState(() => savedMe(businessId));
+  const setMe = (id: string) => { setMeState(id); try { localStorage.setItem(meKey(businessId), id); } catch {} };
   const api = async (action: string, body: Record<string, unknown>) => {
     const r = await post("/api/vet", { business: businessId, action, ...body });
     if (!r.ok) { notify(errorText(lang as SiteLang, r.code), true); return null; }
     if (r.data?.pets) { setPets(r.data.pets); setKey(r.data.key ?? null); }
+    if (r.data?.doctors) setDoctors(r.data.doctors);
     return r.data;
   };
+  const docs = { doctors, me: doctors.some((d) => d.id === me) ? me : "", name: (id: string | null | undefined) => doctors.find((d) => d.id === id)?.name ?? "" };
   // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps -- load when the client changes
   useEffect(() => { setPets(null); api("pets", { customer: customer.id }); }, [customer.id]);
   const pet = pets?.find((p) => p.id === sel) ?? pets?.[0];
   const link = key ? `${typeof location === "undefined" ? "" : location.origin}/p/${key}` : "";
 
   return (
+    <Docs.Provider value={docs}>
     <section className="vet" aria-label={t("vet_file")}>
       <div className="vet-head">
         <h2><PawPrint size={18} aria-hidden="true" /> {t("vet_file")} · {customer.name}</h2>
         {onClose && <button className="icon-btn" aria-label={t("close")} onClick={onClose}><X size={18} /></button>}
       </div>
+      {doctors.length > 1 && (
+        <div className="vet-me">
+          <span>{t("vet_meDoctor")}</span>
+          <DoctorPick value={docs.me} onPick={setMe} />
+        </div>
+      )}
       {pets === null ? <p className="muted">…</p> : (
         <>
           <div className="vet-tabs" role="tablist">
@@ -95,6 +132,7 @@ export function VetFile({ businessId, customer, t, lang, notify, onClose }: {
         </>
       )}
     </section>
+    </Docs.Provider>
   );
 }
 
@@ -106,9 +144,11 @@ function PetForm({ pet, t, lang, onSave, onCancel, onRemove }: {
   const [breed, setBreed] = useState(pet?.breed ?? "");
   const [birth, setBirth] = useState(pet?.birth && pet.birth.length === 10 ? pet.birth : pet?.birth ? `${pet.birth}-01` : "");
   const [sex, setSex] = useState(pet?.sex ?? "");
+  const { doctors, me } = useContext(Docs);
+  const [vet, setVet] = useState(pet ? pet.vet ?? "" : me);
   const [sure, setSure] = useState(false);
   return (
-    <form className="vet-form" onSubmit={async (e) => { e.preventDefault(); await onSave({ name, species, breed, birth: birth || null, sex: sex || null }); }}>
+    <form className="vet-form" onSubmit={async (e) => { e.preventDefault(); await onSave({ name, species, breed, birth: birth || null, sex: sex || null, vet: vet || null }); }}>
       <label>{t("vet_petName")}<input value={name} required maxLength={40} onChange={(e) => setName(e.target.value)} /></label>
       <fieldset className="anf-set">
         <legend>{t("vet_species")}</legend>
@@ -126,6 +166,12 @@ function PetForm({ pet, t, lang, onSave, onCancel, onRemove }: {
         <label>{t("vet_birth")}<input type="date" value={birth} max={todayIL()} onChange={(e) => setBirth(e.target.value)} /></label>
         <label>{t("vet_sex")}<select value={sex} onChange={(e) => setSex(e.target.value)}><option value="">—</option><option value="m">{t("vet_male")}</option><option value="f">{t("vet_female")}</option></select></label>
       </div>
+      {doctors.length > 0 && (
+        <fieldset className="anf-set">
+          <legend>{t("vet_regularDoctor")}</legend>
+          <DoctorPick value={vet} onPick={setVet} any={t("vet_noDoctor")} />
+        </fieldset>
+      )}
       <div className="bkd-row">
         <button className="btn primary small">{t("save")}</button>
         {onCancel && <button type="button" className="btn soft small" onClick={onCancel}>{t("cancel")}</button>}
@@ -143,6 +189,7 @@ type Api = (action: string, body: Record<string, unknown>) => Promise<any>;
 function PetView({ pet, today, t, lang, api, onEdit, notify }: { pet: Pet; today: string; t: T; lang: string; api: Api; onEdit: () => void; notify: (s: string, bad?: boolean) => void }) {
   const [kg, setKg] = useState("");
   const [appt, setAppt] = useState(false);
+  const { me, name: docName } = useContext(Docs);
   const age = ageText(pet.birth, today, lang);
   const prev = pet.weights[1];
   return (
@@ -153,6 +200,7 @@ function PetView({ pet, today, t, lang, api, onEdit, notify }: { pet: Pet; today
           <b>{pet.name}</b>
           <small>{[speciesName(pet.species, lang), pet.breed, pet.sex === "m" ? t("vet_male") : pet.sex === "f" ? t("vet_female") : null, age].filter(Boolean).join(" · ")}</small>
           {pet.birth && <small>{t("vet_born", { d: shortDate(pet.birth.length === 7 ? `${pet.birth}-01` : pet.birth) })}</small>}
+          {docName(pet.vet) && <small><Stethoscope size={12} aria-hidden="true" /> {t("vet_regularDoctor")}: {docName(pet.vet)}</small>}
         </div>
         <button className="icon-btn" aria-label={t("vet_editPet")} onClick={onEdit}><Pencil size={15} /></button>
       </div>
@@ -175,6 +223,7 @@ function PetView({ pet, today, t, lang, api, onEdit, notify }: { pet: Pet; today
         {upcoming(pet.appt_at) ? (
           <>
             <p className="vet-big"><bdi>{formatAppt(pet.appt_at!, lang)}</bdi> <span className={"vet-kind is-" + pet.appt_kind}>{kindName(pet.appt_kind ?? "visit", lang)}</span></p>
+            {docName(pet.appt_staff) && <p className="vet-doc"><Stethoscope size={14} aria-hidden="true" /> {t("bk_with", { name: docName(pet.appt_staff) })}</p>}
             {pet.appt_note && <p className="muted">{pet.appt_note}</p>}
             {!appt && <div className="bkd-row">
               <button className="btn soft small" onClick={() => setAppt(true)}>{t("bk_change")}</button>
@@ -186,13 +235,13 @@ function PetView({ pet, today, t, lang, api, onEdit, notify }: { pet: Pet; today
       </div>
 
       {(["vaccine", "treatment"] as const).map((kind) => (
-        <CareList key={kind} kind={kind} pet={pet} today={today} t={t} lang={lang} api={api} notify={notify} />
+        <CareList key={kind} kind={kind} pet={pet} today={today} t={t} lang={lang} api={api} notify={notify} me={me} />
       ))}
 
       {pet.log.length > 0 && (
         <details className="vet-box">
           <summary><h3>{t("vet_history")}</h3></summary>
-          <ul className="vet-log">{pet.log.map((l) => <li key={l.id}><span>{shortDate(l.date)}</span><b>{l.name}</b><small>{kindName(l.kind, lang)}{l.note ? ` · ${l.note}` : ""}</small></li>)}</ul>
+          <ul className="vet-log">{pet.log.map((l) => <li key={l.id}><span>{shortDate(l.date)}</span><b>{l.name}</b><small>{kindName(l.kind, lang)}{docName(l.staff) ? ` · ${docName(l.staff)}` : ""}{l.note ? ` · ${l.note}` : ""}</small></li>)}</ul>
         </details>
       )}
     </div>
@@ -204,8 +253,11 @@ function ApptForm({ pet, t, lang, onSave, onCancel }: { pet: Pet; t: T; lang: st
   const [time, setTime] = useState("10:00");
   const [kind, setKind] = useState(pet.appt_kind ?? "visit");
   const [note, setNote] = useState("");
+  const { doctors, me } = useContext(Docs);
+  // The appointment's doctor: as before, else the animal's regular doctor, else the one on this screen.
+  const [staff, setStaff] = useState(pet.appt_staff ?? pet.vet ?? me);
   return (
-    <form className="vet-form" onSubmit={async (e) => { e.preventDefault(); await onSave({ date, time, kind, note }); }}>
+    <form className="vet-form" onSubmit={async (e) => { e.preventDefault(); await onSave({ date, time, kind, note, staff: staff || null }); }}>
       <div className="anf-chips" role="radiogroup" aria-label={t("vet_apptKind")}>
         {APPT_KINDS.map((k) => (
           <label key={k} className={"anf-chip" + (kind === k ? " is-on" : "")}>
@@ -217,13 +269,19 @@ function ApptForm({ pet, t, lang, onSave, onCancel }: { pet: Pet; t: T; lang: st
         <label>{t("bk_day")}<input type="date" required min={todayIL()} value={date} onChange={(e) => setDate(e.target.value)} /></label>
         <label>{t("bkd_time")}<input type="time" required step={300} value={time} onChange={(e) => setTime(e.target.value)} /></label>
       </div>
+      {doctors.length > 0 && (
+        <fieldset className="anf-set">
+          <legend>{t("vet_doctor")}</legend>
+          <DoctorPick value={staff} onPick={setStaff} any={t("vet_noDoctor")} />
+        </fieldset>
+      )}
       <label>{t("vet_apptNote")}<input value={note} maxLength={80} onChange={(e) => setNote(e.target.value)} /></label>
       <div className="bkd-row"><button className="btn primary small">{t("save")}</button><button type="button" className="btn soft small" onClick={onCancel}>{t("cancel")}</button></div>
     </form>
   );
 }
 
-function CareList({ kind, pet, today, t, lang, api, notify }: { kind: CareKind; pet: Pet; today: string; t: T; lang: string; api: Api; notify: (s: string, bad?: boolean) => void }) {
+function CareList({ kind, pet, today, t, lang, api, notify, me }: { kind: CareKind; pet: Pet; today: string; t: T; lang: string; api: Api; notify: (s: string, bad?: boolean) => void; me: string }) {
   const items = pet.care.filter((c) => c.kind === kind);
   const [adding, setAdding] = useState(false);
   const [edit, setEdit] = useState<string | null>(null);
@@ -246,7 +304,7 @@ function CareList({ kind, pet, today, t, lang, api, notify }: { kind: CareKind; 
                 {c.next && <small>{t("vet_nextDue", { d: shortDate(c.next, today) })} {badge && <span className={"vet-badge is-" + badge.tone}>{badge.text}</span>}</small>}
               </div>
               <div className="bkd-row">
-                <button className="btn primary small" onClick={async () => { if (await api("care_done", { id: c.id })) notify(t("vet_doneToday", { name: c.name })); }}><Check size={14} />{t("vet_giveToday")}</button>
+                <button className="btn primary small" onClick={async () => { if (await api("care_done", { id: c.id, staff: me || null })) notify(t("vet_doneToday", { name: c.name })); }}><Check size={14} />{t("vet_giveToday")}</button>
                 <button className="icon-btn" aria-label={t("vet_editPet")} onClick={() => setEdit(c.id)}><Pencil size={14} /></button>
               </div>
             </li>
@@ -254,7 +312,7 @@ function CareList({ kind, pet, today, t, lang, api, notify }: { kind: CareKind; 
         })}
       </ul>
       {adding
-        ? <CareForm kind={kind} t={t} lang={lang} onCancel={() => setAdding(false)} onSave={async (v) => { if (await api("care_save", { pet: pet.id, kind, ...v })) { setAdding(false); notify(t("saved")); } }} />
+        ? <CareForm kind={kind} t={t} lang={lang} onCancel={() => setAdding(false)} onSave={async (v) => { if (await api("care_save", { pet: pet.id, kind, staff: me || null, ...v })) { setAdding(false); notify(t("saved")); } }} />
         : <button className="btn soft small" onClick={() => setAdding(true)}><Plus size={14} />{kind === "vaccine" ? t("vet_addVaccine") : t("vet_addTreatment")}</button>}
     </div>
   );
@@ -293,13 +351,19 @@ function CareForm({ kind, care, t, lang, onSave, onCancel, onRemove }: {
   );
 }
 
-type DueCare = { id: string; kind: string; name: string; next: string; pet: string; pet_name: string; species: string; customer: string; owner: string; phone: string };
-type DueAppt = { pet: string; pet_name: string; species: string; appt_at: string; appt_kind: string; appt_note: string | null; customer: string; owner: string; phone: string };
+type DueCare = { id: string; kind: string; name: string; next: string; pet: string; pet_name: string; species: string; vet: string | null; customer: string; owner: string; phone: string };
+type DueAppt = { pet: string; pet_name: string; species: string; vet: string | null; appt_at: string; appt_kind: string; appt_note: string | null; appt_staff: string | null; customer: string; owner: string; phone: string };
 
-/** The clinic's list: what's overdue and due soon, and the animals' coming appointments. A row opens the client's pet file. */
-export function VetDesk({ businessId, t, lang, notify }: { businessId: string; t: T; lang: string; notify: (s: string, bad?: boolean) => void }) {
-  const [data, setData] = useState<{ today: string; care: DueCare[]; appts: DueAppt[] } | null>(null);
+/**
+ * The clinic's list: what's overdue and due soon, and the animals' coming appointments, for everyone or one doctor
+ * (appointments by their doctor, vaccines and treatments by the animal's regular doctor). A row opens the client's pet file.
+ * The owner also keeps the list of doctors here.
+ */
+export function VetDesk({ businessId, owner, t, lang, notify }: { businessId: string; owner: boolean; t: T; lang: string; notify: (s: string, bad?: boolean) => void }) {
+  const [data, setData] = useState<{ today: string; care: DueCare[]; appts: DueAppt[]; doctors: Doctor[] } | null>(null);
   const [open, setOpen] = useState<{ id: string; name: string } | null>(null);
+  const [who, setWho] = useState("");
+  const [manage, setManage] = useState(false);
   const load = async () => {
     const r = await post("/api/vet", { business: businessId, action: "due", days: 30 });
     if (r.ok) setData(r.data); else notify(errorText(lang as SiteLang, r.code), true);
@@ -315,38 +379,49 @@ export function VetDesk({ businessId, t, lang, notify }: { businessId: string; t
     );
   }
   if (!data) return <div className="empty compact">…</div>;
-  const late = data.care.filter((c) => c.next < data.today);
-  const soon = data.care.filter((c) => c.next >= data.today);
+  const docName = (id: string | null | undefined) => data.doctors.find((d) => d.id === id)?.name ?? "";
+  const care = who ? data.care.filter((c) => c.vet === who) : data.care;
+  const appts = who ? data.appts.filter((a) => a.appt_staff === who) : data.appts;
+  const late = care.filter((c) => c.next < data.today);
+  const soon = care.filter((c) => c.next >= data.today);
   const row = (c: DueCare) => {
     const badge = dueBadge(c.next, data.today, t)!;
     return (
       <li key={c.id}>
         <button onClick={() => setOpen({ id: c.customer, name: c.owner })}>
           <span className="vet-icon sm" aria-hidden="true">{SPECIES_ICON[c.species as keyof typeof SPECIES_ICON] ?? "🐾"}</span>
-          <span className="vet-row-text"><b>{c.pet_name} · {c.name}</b><small>{c.owner} <bdi dir="ltr">{c.phone}</bdi></small></span>
+          <span className="vet-row-text"><b>{c.pet_name} · {c.name}</b><small>{c.owner} <bdi dir="ltr">{c.phone}</bdi>{!who && docName(c.vet) ? ` · ${docName(c.vet)}` : ""}</small></span>
           <span className={"vet-badge is-" + badge.tone}>{shortDate(c.next, data.today)} · {badge.text}</span>
         </button>
       </li>
     );
   };
   return (
+    <Docs.Provider value={{ doctors: data.doctors, me: "", name: docName }}>
     <div className="vet-desk">
+      {(data.doctors.length > 1 || owner) && (
+        <div className="vet-filter">
+          {data.doctors.length > 1 && <DoctorPick value={who} onPick={setWho} any={t("vet_allDoctors")} />}
+          {owner && <button className="btn soft small" onClick={() => setManage(!manage)}><Stethoscope size={15} />{t("vet_doctors")}</button>}
+        </div>
+      )}
+      {manage && owner && <DoctorsPanel businessId={businessId} doctors={data.doctors} t={t} lang={lang} notify={notify} onChange={(d) => setData({ ...data, doctors: d })} />}
       <section className="panel">
         <h2><Syringe size={18} aria-hidden="true" /> {t("vet_dueTitle")}</h2>
         <p className="form-hint">{t("vet_dueHint")}</p>
-        {!data.care.length && <p className="muted">{t("vet_dueNone")}</p>}
+        {!care.length && <p className="muted">{t("vet_dueNone")}</p>}
         {late.length > 0 && <><h3 className="vet-sub late">{t("vet_overdue")} ({late.length})</h3><ul className="vet-list">{late.map(row)}</ul></>}
         {soon.length > 0 && <><h3 className="vet-sub">{t("vet_soon")} ({soon.length})</h3><ul className="vet-list">{soon.map(row)}</ul></>}
       </section>
       <section className="panel">
         <h2><CalendarClock size={18} aria-hidden="true" /> {t("vet_apptsTitle")}</h2>
-        {!data.appts.length && <p className="muted">{t("vet_apptsNone")}</p>}
+        {!appts.length && <p className="muted">{t("vet_apptsNone")}</p>}
         <ul className="vet-list">
-          {data.appts.map((a) => (
+          {appts.map((a) => (
             <li key={a.pet}>
               <button onClick={() => setOpen({ id: a.customer, name: a.owner })}>
                 <span className="vet-icon sm" aria-hidden="true">{SPECIES_ICON[a.species as keyof typeof SPECIES_ICON] ?? "🐾"}</span>
-                <span className="vet-row-text"><b>{a.pet_name} · {kindName(a.appt_kind, lang)}</b><small>{a.owner} <bdi dir="ltr">{a.phone}</bdi>{a.appt_note ? ` · ${a.appt_note}` : ""}</small></span>
+                <span className="vet-row-text"><b>{a.pet_name} · {kindName(a.appt_kind, lang)}</b><small>{a.owner} <bdi dir="ltr">{a.phone}</bdi>{!who && docName(a.appt_staff) ? ` · ${docName(a.appt_staff)}` : ""}{a.appt_note ? ` · ${a.appt_note}` : ""}</small></span>
                 <span className={"vet-kind is-" + a.appt_kind}><bdi>{formatAppt(a.appt_at, lang)}</bdi></span>
               </button>
             </li>
@@ -354,5 +429,43 @@ export function VetDesk({ businessId, t, lang, notify }: { businessId: string; t
         </ul>
       </section>
     </div>
+    </Docs.Provider>
+  );
+}
+
+/** The owner's list of doctors: add, rename, remove (not while they have coming appointments). */
+function DoctorsPanel({ businessId, doctors, t, lang, notify, onChange }: {
+  businessId: string; doctors: Doctor[]; t: T; lang: string; notify: (s: string, bad?: boolean) => void; onChange: (d: Doctor[]) => void;
+}) {
+  const [name, setName] = useState("");
+  const api = async (action: string, body: Record<string, unknown>) => {
+    const r = await post("/api/vet", { business: businessId, action, ...body });
+    if (!r.ok) { notify(errorText(lang as SiteLang, r.code), true); return false; }
+    onChange(r.data.doctors);
+    return true;
+  };
+  return (
+    <section className="panel vet-form">
+      <h2><Stethoscope size={18} aria-hidden="true" /> {t("vet_doctors")}</h2>
+      <p className="form-hint">{t("vet_doctorsHint")}</p>
+      <ul className="vet-docs">
+        {doctors.map((d) => <DoctorRow key={d.id} d={d} t={t} api={api} />)}
+      </ul>
+      <form className="vet-inline" onSubmit={async (e) => { e.preventDefault(); if (await api("doctor_save", { name })) { setName(""); notify(t("saved")); } }}>
+        <input value={name} required maxLength={60} placeholder={t("vet_doctorName")} aria-label={t("vet_doctorName")} onChange={(e) => setName(e.target.value)} />
+        <button className="btn primary small"><Plus size={14} />{t("vet_addDoctor")}</button>
+      </form>
+    </section>
+  );
+}
+
+function DoctorRow({ d, t, api }: { d: Doctor; t: T; api: (action: string, body: Record<string, unknown>) => Promise<boolean> }) {
+  const [name, setName] = useState(d.name);
+  return (
+    <li>
+      <input value={name} maxLength={60} onChange={(e) => setName(e.target.value)} aria-label={t("vet_doctorName")} />
+      {name.trim() && name !== d.name && <button className="btn soft small" onClick={() => api("doctor_save", { id: d.id, name })}>{t("save")}</button>}
+      <button className="icon-btn" aria-label={t("bkd_remove")} onClick={() => api("doctor_remove", { id: d.id })}><Trash2 size={15} /></button>
+    </li>
   );
 }

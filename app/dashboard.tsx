@@ -603,7 +603,7 @@ export default function Dashboard() {
           )}
 
           {/* The clinic's calendar: owners (and Perkly) only. */}
-          {view === "pets" && b.vet_on ? <VetDesk businessId={b.id} t={t} lang={lang} notify={notify} /> : null}
+          {view === "pets" && b.vet_on ? <VetDesk businessId={b.id} owner={isOwner} t={t} lang={lang} notify={notify} /> : null}
 
           {view === "booking" && b.booking_on ? (
             <BookingDesk business={b} owner={isOwner} t={t} lang={lang} notify={notify}
