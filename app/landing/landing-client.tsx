@@ -44,6 +44,7 @@ export function SiteNav({ lang }: { lang: Lang }) {
   }, [open]);
 
   const links = [
+    { href: "#products", label: c.products },
     { href: "#how", label: c.how },
     { href: "#examples", label: c.examples },
     { href: "#pricing", label: c.pricing },

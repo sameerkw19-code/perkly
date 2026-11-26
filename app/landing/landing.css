@@ -601,3 +601,31 @@ details.st-glossary dl { margin: 10px 0 0; }
 @media (max-width: 420px) { .lp-journey { grid-template-columns: minmax(0, 1fr); } }
 @media (prefers-reduced-motion: reduce) { .lp-fit li, .lp-journey li { transition: none; } .lp-fit li:hover, .lp-journey li:hover { transform: none; } }
 .pos-code{background:#16151b;color:#f3f2ee;border-radius:12px;padding:14px 16px;overflow-x:auto;font-size:14px;line-height:1.6;text-align:left}.pos-code code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre}
+
+/* ---------- Card types: five kinds of card, each with a small card face ---------- */
+.lp-products-intro { max-width: 680px; margin-top: var(--space-3) !important; }
+.lp-products { list-style: none; padding: 0; margin: var(--space-6) 0 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-4); }
+.lp-product { display: flex; flex-direction: column; gap: var(--space-2); background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: var(--space-4); box-shadow: var(--shadow-sm); min-width: 0; transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
+.lp-product:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+.lp-product-face { --f-bg: #6A4DE3; --f-fg: #fff; --f-sub: rgba(255,255,255,.78); position: relative; display: grid; gap: 2px; background: var(--f-bg); color: var(--f-fg); border-radius: 16px; padding: 14px 14px 12px; margin-bottom: var(--space-2); min-height: 116px; align-content: end; overflow: hidden; box-shadow: inset 0 1px 0 rgba(255,255,255,.18); }
+.lp-product-face::before { content: ""; position: absolute; inset: 0; background: linear-gradient(130deg, rgba(255,255,255,.16), rgba(255,255,255,0) 45%); pointer-events: none; }
+.lp-product-face small { font-size: 12px; color: var(--f-sub); font-weight: 600; }
+.lp-product-face b { font-family: var(--font-display); font-size: 24px; line-height: 1.15; letter-spacing: -0.01em; }
+.lp-product-face span:last-child { font-size: 12.5px; color: var(--f-sub); }
+.lp-product-face-icon { position: absolute; top: 12px; inset-inline-end: 12px; width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; background: rgba(255,255,255,.18); color: var(--f-fg); }
+.lp-product-cashback .lp-product-face { --f-bg: #0E3B2E; --f-sub: #BFE5D5; }
+.lp-product-average .lp-product-face { --f-bg: #B8122E; --f-sub: #FFE3E8; }
+.lp-product-appointments .lp-product-face { --f-bg: #DDF4EC; --f-fg: #0E3B2E; --f-sub: #2D5E4F; }
+.lp-product-appointments .lp-product-face-icon { background: rgba(14,59,46,.1); }
+.lp-product-library .lp-product-face { --f-bg: #7A4A2A; --f-fg: #FFF6EC; --f-sub: #F3DFC8; }
+.lp-product-name { font-size: 19px; }
+.lp-product-fits { margin: 0; font-size: 14px; color: var(--muted); line-height: 1.45; }
+.lp-product-fits strong { color: var(--ink); }
+.lp-product-text { margin: 0; font-size: 15px; line-height: 1.55; }
+.lp-product-points { list-style: none; padding: 0; margin: auto 0 0; display: grid; gap: 6px; padding-top: var(--space-2); }
+.lp-product-points li { display: flex; gap: 6px; align-items: flex-start; font-size: 14px; color: var(--muted); line-height: 1.4; }
+.lp-product-points svg { flex: none; color: var(--green); margin-top: 2px; }
+@media (max-width: 1180px) { .lp-products { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 860px) { .lp-products { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .lp-products { grid-template-columns: minmax(0, 1fr); } }
+@media (prefers-reduced-motion: reduce) { .lp-product { transition: none; } .lp-product:hover { transform: none; } }
