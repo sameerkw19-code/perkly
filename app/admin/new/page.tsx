@@ -16,8 +16,8 @@ export default async function NewBusinessPage() {
       <main id="main" tabIndex={-1}>
         <h1>בניית עסק חדש</h1>
         <p className="muted">ממלאים את פרטי העסק, ומשם עוברים ישר לעיצוב הכרטיס. כשהכרטיס מוכן, שולחים לבעל העסק קישור אישי מדף העסק, והוא פותח חשבון ומקבל את העסק.</p>
-        <ImportBusiness />
         <NewBusinessForm />
+        <ImportBusiness />
       </main>
     </div>
   );

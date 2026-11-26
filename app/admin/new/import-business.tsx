@@ -1,13 +1,14 @@
 "use client";
 import { useState } from "react";
+import { Upload } from "lucide-react";
 
 /** Imports a business exported from another Perkly site (staging): it opens here under Perkly, ready to hand over. */
 export default function ImportBusiness() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   return (
-    <section className="panel">
-      <h2>ייבוא עסק מקובץ</h2>
+    <details className="panel admin-import">
+      <summary><Upload size={16} aria-hidden="true" /> ייבוא עסק מקובץ <span className="muted">· עסק שנבנה באתר הבדיקה</span></summary>
       <p className="muted">עסק שבנית באתר הבדיקה: מורידים אותו שם בדף העסק, בכפתור ייצוא העסק לקובץ, ומעלים את הקובץ כאן. ההגדרות, העיצוב, התמונות והסניפים עוברים. העסק נפתח תחת Perkly עם תקופת הקמה, ומשם שולחים לבעל העסק קישור מסירה.</p>
       <label className="btn soft" style={{ display: "inline-flex", cursor: busy ? "wait" : "pointer" }}>
         {busy ? "מייבא..." : "בחירת קובץ"}
@@ -28,6 +29,6 @@ export default function ImportBusiness() {
         }} />
       </label>
       {error && <p className="form-error" role="alert">{error}</p>}
-    </section>
+    </details>
   );
 }
