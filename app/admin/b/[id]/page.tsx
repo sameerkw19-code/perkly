@@ -5,6 +5,8 @@ import { liveDesign } from "../../../../lib/server/designs";
 import { STATUS_LABEL, adminStatus, requireAdminPage, shortDate, shortDateTime } from "../../../../lib/server/admin";
 import { AdminActions, ExportBusiness, PolarSync, PaymentLink, PosKeys, AdminCardPreview, ApplePushTest, GoogleSyncTest, KitSentButton, OwnerDesignSwitch } from "./admin-actions";
 import { pctLabel } from "../../../../lib/cashback";
+
+const SIMPLE_NAMES: Record<string, string> = { pass: "כרטיסייה מראש", gift: "כרטיס מתנה", club: "חבר מועדון", service: "טיפול תקופתי", coupon: "שובר חד־פעמי", attendance: "נוכחות בחוגים" };
 import { env } from "cloudflare:workers";
 import { planOf } from "../../../../lib/server/billing";
 import { isPlatformAdmin } from "../../../../lib/server/auth";
@@ -106,7 +108,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
   const ownerInvite = [...invites.results].reverse().find((i) => i.role === "owner") ?? null;
   const build = {
     id: b.id, name: b.name,
-    details: b.program === "library" ? `${b.reward} · כרטיס ספרייה` : b.program === "appointments" ? `${b.reward} · כרטיס תורים` : b.program === "cashback" ? `${b.reward} · כרטיס יתרה (${pctLabel(b.cashback_bp)})` : `${b.reward} · ${b.target} ${b.program === "average" ? "קניות בסבב" : "חותמות להטבה"}`,
+    details: b.program in SIMPLE_NAMES ? `${b.reward} · ${SIMPLE_NAMES[b.program]}` : b.program === "library" ? `${b.reward} · כרטיס ספרייה` : b.program === "appointments" ? `${b.reward} · כרטיס תורים` : b.program === "cashback" ? `${b.reward} · כרטיס יתרה (${pctLabel(b.cashback_bp)})` : `${b.reward} · ${b.target} ${b.program === "average" ? "קניות בסבב" : "חותמות להטבה"}`,
     designVersion: c.published,
     // A logo, or any design published after the starting one.
     designDone: !!design.logo || (c.published ?? 0) >= 2,
@@ -133,7 +135,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
             <h1>{b.name} <span className={"admin-chip st-" + (b.archived ? "none" : st)}>{b.archived ? "סגור" : STATUS_LABEL[st]}</span></h1>
             <p className="muted">
               <span dir="ltr">{b.owner_email ?? "—"}</span>{b.owner_phone && !withPerkly ? <> · <bdi dir="ltr">{formatPhone(b.owner_phone)}</bdi></> : null}
-              {" · "}נוצר {shortDate(b.created)} · {b.program === "library" ? "כרטיס ספרייה" : b.program === "appointments" ? "כרטיס תורים" : b.program === "cashback" ? `כרטיס יתרה (${pctLabel(b.cashback_bp)})` : `${b.target} ${b.program === "average" ? "קניות בסבב" : "חותמות להטבה"}`} · {b.reward}
+              {" · "}נוצר {shortDate(b.created)} · {b.program in SIMPLE_NAMES ? SIMPLE_NAMES[b.program] : b.program === "library" ? "כרטיס ספרייה" : b.program === "appointments" ? "כרטיס תורים" : b.program === "cashback" ? `כרטיס יתרה (${pctLabel(b.cashback_bp)})` : `${b.target} ${b.program === "average" ? "קניות בסבב" : "חותמות להטבה"}`} · {b.reward}
             </p>
           </div>
           {!b.archived && (

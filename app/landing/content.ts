@@ -20,14 +20,14 @@ const he = {
   dir: "rtl" as "rtl" | "ltr",
   meta: {
     title: "Perkly — כרטיס נאמנות דיגיטלי לעסקים",
-    description: "כרטיסי נאמנות דיגיטליים בעיצוב העסק שלכם: חותמות, יתרה מכל קנייה, קנה X והבאה חינם, תורים לקליניקות וספרייה. הצטרפות ב־QR, Apple Wallet ו־Google Wallet ולוח בקרה. 14 ימי ניסיון חינם.",
+    description: "כרטיסי נאמנות דיגיטליים בעיצוב העסק שלכם: חותמות, יתרה, קנה X והבאה חינם, תורים, ספרייה, כרטיסייה מראש, כרטיס מתנה, חבר מועדון, טיפול תקופתי, שובר וחוגים. הצטרפות ב־QR, Apple Wallet ו־Google Wallet ולוח בקרה. 14 ימי ניסיון חינם.",
     ogAlt: "Perkly: כרטיס נאמנות דיגיטלי בטלפון של הלקוח",
   },
   nav: { skip: "דלגו לתוכן", products: "סוגי כרטיסים", how: "איך זה עובד", examples: "למי זה מתאים", pricing: "מחיר", faq: "שאלות", login: "כניסה", cta: "התחילו עכשיו", menu: "תפריט", close: "סגירת התפריט", lang: "שפה", home: "Perkly, לדף הבית" },
   hero: {
     badge: "כרטיסי נאמנות דיגיטליים לעסקים",
     title: "הופכים לקוחות מזדמנים ללקוחות חוזרים.",
-    text: "כרטיס חותמות, יתרה, תורים או ספרייה, בעיצוב העסק שלכם. הלקוח שומר אותו בארנק של הטלפון, הצוות מעדכן בסריקה, ואתם רואים מי חוזר.",
+    text: "כרטיס חותמות, יתרה, כרטיסייה, מתנה, מועדון, תורים ועוד, בעיצוב העסק שלכם. הלקוח שומר אותו בארנק של הטלפון, הצוות מעדכן בסריקה, ואתם רואים מי חוזר.",
     cta: "התחילו עכשיו",
     demo: "נסו הדגמה",
     price: "{$m} לחודש",
@@ -91,7 +91,7 @@ const he = {
   },
   products: {
     eyebrow: "סוגי כרטיסים",
-    title: "חמישה כרטיסים, לכל סוג עסק.",
+    title: "11 כרטיסים, לכל סוג עסק.",
     text: "כל עסק בוחר את סוג הכרטיס שמתאים לו. בכולם: עיצוב בצבעים ובלוגו שלכם, הצטרפות ב־QR, Apple Wallet ו־Google Wallet, עמדת עובד ולוח בקרה.",
     forLabel: "למי:",
     items: [
@@ -100,6 +100,12 @@ const he = {
       { key: "average", name: "קנה X, הבאה חינם", fits: "סופרמרקטים, מאפיות, חנויות מזון", text: "מקלידים את סכום כל קנייה. אחרי X קניות, הבאה חינם בשווי הממוצע שלהן.", points: ["אפשר לקבוע תקרה להטבה", "הלקוח רואה כמה קניות נשארו"], face: { label: "קנייה", value: "3/5", sub: "הממוצע עד עכשיו: {$avg}" } },
       { key: "appointments", name: "כרטיס תורים", fits: "קליניקות, מכוני יופי, מטפלים", text: "התור הבא מופיע בכרטיס, ותזכורת מגיעה לטלפון יום לפני, בבוקר ושעה לפני.", points: ["יומן עם שעות פנויות ושירותים", "תוספת לבחירה: חותמות, נקודות או יתרה"], face: { label: "התור הבא", value: "יום ג׳ 10:30", sub: "תזכורת יום לפני" } },
       { key: "library", name: "כרטיס ספרייה", fits: "ספריות, השאלת ציוד", text: "הספרים שאצל הקורא ותאריך ההחזרה בכרטיס, עם תזכורת שבוע לפני, יום לפני וביום עצמו.", points: ["הקורא מאריך מהכרטיס, עד הגבלה שלכם", "רשימת כל הספרים בחוץ ומי באיחור"], face: { label: "להחזרה עד", value: "יום ד׳ 3.12", sub: "2 ספרים אצלך" } },
+      { key: "pass", name: "כרטיסייה מראש", fits: "חדרי כושר, סטודיו, שטיפת רכב, מכבסות", text: "הלקוח קונה כמה כניסות מראש, והכרטיס סופר אחורה עד שנגמרות או עד תאריך התוקף.", points: ["תזכורת כשנשארות 2 כניסות", "ושבוע לפני שהתוקף נגמר"], face: { label: "כניסות שנשארו", value: "7", sub: "בתוקף עד 1.3" } },
+      { key: "gift", name: "כרטיס מתנה", fits: "מסעדות, ספא, חנויות בגדים", text: "קונים בקופה, טוענים סכום, ושולחים את הכרטיס למקבל המתנה. היתרה יורדת בכל קנייה.", points: ["נשמר בארנק של המקבל", "רואים כמה נשאר בכל רגע"], face: { label: "יתרה במתנה", value: "{$gift}", sub: "משתמשים בקנייה בעסק" } },
+      { key: "club", name: "חבר מועדון", fits: "חנויות, בתי מרקחת, רשתות קטנות", text: "הלקוח מציג את הכרטיס ומקבל הנחה קבועה בכל קנייה.", points: ["אתם קובעים את אחוז ההנחה", "הכי פשוט להסביר לצוות"], face: { label: "חבר מועדון", value: "10% הנחה", sub: "מציגים בכל קנייה" } },
+      { key: "service", name: "טיפול תקופתי", fits: "מוסכים, וטרינרים, אופטיקה, טכנאים", text: "תאריך הטיפול הבא בכרטיס, ותזכורת חודש ושבוע לפני.", points: ["\"בוצע היום\" קובע את הבא לבד", "שם הטיפול לבחירתכם"], face: { label: "הטיפול הבא", value: "3.2027", sub: "תזכורת חודש ושבוע לפני" } },
+      { key: "coupon", name: "שובר חד־פעמי", fits: "קמפיינים, פתיחת עסק, לקוחות חדשים", text: "כל מי שמצטרף מהקישור או מה־QR מקבל שובר לשימוש אחד, עד תאריך שתקבעו.", points: ["מומש? מסומן בכרטיס", "לקוח חדש נכנס לרשימה שלכם"], face: { label: "השובר שלך", value: "קפה חינם", sub: "בתוקף עד 31.12" } },
+      { key: "attendance", name: "נוכחות בחוגים", fits: "חוגים, צהרונים, סטודיו לילדים", text: "סימון נוכחות בכל שיעור. ההורה רואה כמה שיעורים היו החודש ומתי התשלום הבא.", points: ["תזכורת יום לפני התשלום", "בלי אפליקציה, בארנק של ההורה"], face: { label: "שיעורים החודש", value: "6", sub: "התשלום הבא: 1.12" } },
     ],
   },
   fit: {
@@ -244,7 +250,7 @@ const ar: Copy = {
   hero: {
     badge: "بطاقات ولاء رقمية للمشاريع",
     title: "نحوّل الزبائن العابرين إلى زبائن دائمين.",
-    text: "بطاقة أختام أو رصيد أو مواعيد أو مكتبة، بتصميم مشروعك. الزبون يحفظها في محفظة الهاتف، الطاقم يحدّثها بمسح الرمز، وأنت ترى من يعود.",
+    text: "بطاقة أختام أو رصيد أو دخولات أو هدية أو نادٍ أو مواعيد وغيرها، بتصميم مشروعك. الزبون يحفظها في محفظة الهاتف، الطاقم يحدّثها بمسح الرمز، وأنت ترى من يعود.",
     cta: "ابدأوا الآن",
     demo: "جرّبوا العرض",
     price: "{$m} شهرياً",
@@ -308,7 +314,7 @@ const ar: Copy = {
   },
   products: {
     eyebrow: "أنواع البطاقات",
-    title: "خمس بطاقات، لكل نوع مشروع.",
+    title: "11 بطاقة، لكل نوع مشروع.",
     text: "كل مشروع يختار نوع البطاقة المناسب له. في جميعها: تصميم بألوانك وشعارك، انضمام عبر QR، Apple Wallet وGoogle Wallet، محطة للموظفين ولوحة تحكم.",
     forLabel: "لمن:",
     items: [
@@ -317,6 +323,12 @@ const ar: Copy = {
       { key: "average", name: "اشترِ X والتالية مجاناً", fits: "سوبرماركت، مخابز، متاجر غذائية", text: "يُكتب مبلغ كل شراء. بعد X مشتريات، التالية مجاناً بقيمة متوسطها.", points: ["يمكن تحديد سقف للمكافأة", "الزبون يرى كم شراءً بقي"], face: { label: "شراء", value: "3/5", sub: "المتوسط حتى الآن: {$avg}" } },
       { key: "appointments", name: "بطاقة مواعيد", fits: "عيادات، مراكز تجميل، معالجون", text: "الموعد القادم يظهر في البطاقة، ويصل تذكير إلى الهاتف قبل يوم، في الصباح وقبل ساعة.", points: ["مفكرة بالساعات المتاحة والخدمات", "إضافة اختيارية: أختام أو نقاط أو رصيد"], face: { label: "الموعد القادم", value: "الثلاثاء 10:30", sub: "تذكير قبل يوم" } },
       { key: "library", name: "بطاقة مكتبة", fits: "مكتبات، إعارة معدات", text: "الكتب التي لدى القارئ وتاريخ الإرجاع في البطاقة، مع تذكير قبل أسبوع وقبل يوم وفي اليوم نفسه.", points: ["القارئ يمدد من البطاقة حتى حدكم", "قائمة كل الكتب المعارة والمتأخرة"], face: { label: "الإرجاع حتى", value: "الأربعاء 3.12", sub: "كتابان لديك" } },
+      { key: "pass", name: "بطاقة دخولات مسبقة", fits: "نوادٍ رياضية، استوديوهات، غسيل سيارات، مغاسل", text: "الزبون يشتري عدة دخولات مسبقاً، والبطاقة تعد تنازلياً حتى تنتهي أو حتى تاريخ الصلاحية.", points: ["تذكير عندما يبقى دخولان", "وقبل أسبوع من انتهاء الصلاحية"], face: { label: "الدخولات المتبقية", value: "7", sub: "صالحة حتى 1.3" } },
+      { key: "gift", name: "بطاقة هدية", fits: "مطاعم، سبا، محلات ملابس", text: "تُشترى في الصندوق، يُشحن مبلغ، وتُرسل البطاقة لمتلقي الهدية. الرصيد ينقص مع كل شراء.", points: ["تُحفظ في محفظة المتلقي", "يرى المتبقي في كل لحظة"], face: { label: "رصيد الهدية", value: "{$gift}", sub: "يُستخدم عند الشراء" } },
+      { key: "club", name: "عضو النادي", fits: "متاجر، صيدليات، سلاسل صغيرة", text: "الزبون يُظهر البطاقة ويحصل على خصم ثابت في كل شراء.", points: ["أنتم تحددون نسبة الخصم", "الأسهل للشرح للطاقم"], face: { label: "عضو النادي", value: "خصم 10%", sub: "تُظهر عند كل شراء" } },
+      { key: "service", name: "خدمة دورية", fits: "كراجات، أطباء بيطريون، بصريات، فنيون", text: "موعد الخدمة القادمة في البطاقة، مع تذكير قبل شهر وقبل أسبوع.", points: ["\"تمت اليوم\" يحدد القادمة تلقائياً", "اسم الخدمة حسب اختياركم"], face: { label: "الخدمة القادمة", value: "3.2027", sub: "تذكير قبل شهر وأسبوع" } },
+      { key: "coupon", name: "قسيمة لمرة واحدة", fits: "حملات، افتتاح مشروع، زبائن جدد", text: "كل من ينضم من الرابط أو QR يحصل على قسيمة لاستخدام واحد، حتى تاريخ تحددونه.", points: ["استُخدمت؟ تظهر في البطاقة", "زبون جديد ينضم لقائمتكم"], face: { label: "قسيمتك", value: "قهوة مجانية", sub: "صالحة حتى 31.12" } },
+      { key: "attendance", name: "حضور الدورات", fits: "دورات، نوادٍ بعد المدرسة، استوديوهات للأطفال", text: "تسجيل الحضور في كل درس. الأهل يرون عدد الدروس هذا الشهر وموعد الدفعة القادمة.", points: ["تذكير قبل يوم من الدفع", "بلا تطبيق، في محفظة الأهل"], face: { label: "دروس هذا الشهر", value: "6", sub: "الدفعة القادمة: 1.12" } },
     ],
   },
   fit: {
@@ -452,14 +464,14 @@ const en: Copy = {
   dir: "ltr",
   meta: {
     title: "Perkly — Digital loyalty cards for small businesses",
-    description: "Digital loyalty cards in your business's own design: stamps, balance back on every purchase, buy X get the next free, appointment reminders and library loans. QR sign-up, Apple Wallet and Google Wallet, and a dashboard. 14-day free trial.",
+    description: "Digital loyalty cards in your business's own design: stamps, balance, buy X get the next free, appointments, library loans, prepaid passes, gift cards, club discounts, periodic service, coupons and classes. QR sign-up, Apple Wallet and Google Wallet, and a dashboard. 14-day free trial.",
     ogAlt: "Perkly: a digital loyalty card on a customer's phone",
   },
   nav: { skip: "Skip to content", products: "Card types", how: "How it works", examples: "Who it's for", pricing: "Pricing", faq: "FAQ", login: "Sign in", cta: "Get started", menu: "Menu", close: "Close menu", lang: "Language", home: "Perkly, home page" },
   hero: {
     badge: "Digital loyalty cards for businesses",
     title: "Turn one-time customers into regulars.",
-    text: "A stamp, balance, appointment or library card in your business's own design. Customers keep it in their phone wallet, staff update it with a scan, and you see who comes back.",
+    text: "A stamp, balance, prepaid, gift, club, appointment card and more, in your business's own design. Customers keep it in their phone wallet, staff update it with a scan, and you see who comes back.",
     cta: "Get started",
     demo: "Try the demo",
     price: "{$m} a month",
@@ -523,7 +535,7 @@ const en: Copy = {
   },
   products: {
     eyebrow: "Card types",
-    title: "Five cards, for every kind of business.",
+    title: "11 cards, for every kind of business.",
     text: "Each business picks the card that fits it. All of them come with your colours and logo, QR sign-up, Apple Wallet and Google Wallet, a staff station and a dashboard.",
     forLabel: "For:",
     items: [
@@ -532,6 +544,12 @@ const en: Copy = {
       { key: "average", name: "Buy X, next one free", fits: "Supermarkets, bakeries, food shops", text: "Staff type each purchase amount. After X purchases, the next is free, worth their average.", points: ["An optional cap on the reward", "Customers see how many purchases are left"], face: { label: "Purchase", value: "3/5", sub: "Average so far: {$avg}" } },
       { key: "appointments", name: "Appointment card", fits: "Clinics, beauty salons, therapists", text: "The next appointment is on the card, with reminders the day before, that morning and an hour before.", points: ["A calendar with free slots and services", "Optional add-on: stamps, points or balance"], face: { label: "Next appointment", value: "Tue 10:30", sub: "Reminder the day before" } },
       { key: "library", name: "Library card", fits: "Libraries, equipment lending", text: "The reader's books and return dates are on the card, with reminders a week before, the day before and on the day.", points: ["Readers extend from the card, within your limit", "Every book out, and who is late"], face: { label: "Return by", value: "Wed 3.12", sub: "2 books with you" } },
+      { key: "pass", name: "Prepaid pass", fits: "Gyms, studios, car washes, laundromats", text: "Customers buy a number of entries upfront; the card counts down until they run out or expire.", points: ["A reminder when 2 entries are left", "And a week before it expires"], face: { label: "Entries left", value: "7", sub: "Valid until 1.3" } },
+      { key: "gift", name: "Gift card", fits: "Restaurants, spas, clothing shops", text: "Bought at the counter: load an amount and send the card to the person receiving it. The balance goes down with every purchase.", points: ["Saved in the recipient's wallet", "Always shows what is left"], face: { label: "Gift balance", value: "{$gift}", sub: "Use it when you buy here" } },
+      { key: "club", name: "Club card", fits: "Shops, pharmacies, small chains", text: "Customers show the card and get a fixed discount on every purchase.", points: ["You set the discount", "The easiest one to explain to staff"], face: { label: "Club member", value: "10% off", sub: "Show it with every purchase" } },
+      { key: "service", name: "Periodic service", fits: "Garages, vets, opticians, technicians", text: "The next service date is on the card, with reminders a month and a week before.", points: ["\"Done today\" sets the next one", "Name the service your way"], face: { label: "Next service", value: "3.2027", sub: "Reminders a month and a week before" } },
+      { key: "coupon", name: "One-time coupon", fits: "Campaigns, openings, new customers", text: "Everyone who joins from the link or QR gets a coupon for one use, until a date you set.", points: ["Used? The card shows it", "New customers join your list"], face: { label: "Your coupon", value: "Free coffee", sub: "Valid until 31.12" } },
+      { key: "attendance", name: "Class attendance", fits: "Classes, after-school clubs, kids' studios", text: "Mark attendance at every lesson. Parents see this month's lessons and the next payment date.", points: ["A reminder the day before payment", "No app, right in the parent's wallet"], face: { label: "Lessons this month", value: "6", sub: "Next payment: 1.12" } },
     ],
   },
   fit: {

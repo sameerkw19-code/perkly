@@ -629,3 +629,16 @@ details.st-glossary dl { margin: 10px 0 0; }
 @media (max-width: 860px) { .lp-products { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .lp-products { grid-template-columns: minmax(0, 1fr); } }
 @media (prefers-reduced-motion: reduce) { .lp-product { transition: none; } .lp-product:hover { transform: none; } }
+/* Eleven cards: four columns on wide screens; a colour per card. */
+.lp-products { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.lp-product-pass .lp-product-face { --f-bg: #1F2A44; --f-sub: #C9D3EC; }
+.lp-product-gift .lp-product-face { --f-bg: #D9467A; --f-sub: #FFE1EC; }
+.lp-product-club .lp-product-face { --f-bg: #F4C542; --f-fg: #3B2A00; --f-sub: #6B5200; }
+.lp-product-club .lp-product-face-icon { background: rgba(59,42,0,.12); }
+.lp-product-service .lp-product-face { --f-bg: #2E3A40; --f-sub: #CFD8DC; }
+.lp-product-coupon .lp-product-face { --f-bg: #F2EEE5; --f-fg: #16151B; --f-sub: #4D4B57; border: 2px dashed #C9C2B1; }
+.lp-product-coupon .lp-product-face-icon { background: rgba(22,21,27,.08); }
+.lp-product-attendance .lp-product-face { --f-bg: #2B7A78; --f-sub: #D3F0EE; }
+@media (max-width: 1180px) { .lp-products { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 860px) { .lp-products { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .lp-products { grid-template-columns: minmax(0, 1fr); } }

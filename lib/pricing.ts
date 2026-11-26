@@ -37,11 +37,11 @@ export function yearlySaving(currency: Currency): number {
 export function fillPrices(text: string, currency: Currency, lang: string): string {
   if (!text.includes("{$")) return text;
   const p = PRICES[currency];
-  // bal and avg: sample amounts on the landing page's card faces (a balance, an average purchase), not prices.
-  const values: Record<string, number> = { m: p.monthly, was: p.was, launch: LAUNCH.price, y: p.yearly, ym: p.yearlyMonthly, k: p.kit, "0": 0, bal: 24, avg: 38 };
+  // bal, avg and gift: sample amounts on the landing page's card faces (a balance, an average purchase), not prices.
+  const values: Record<string, number> = { m: p.monthly, was: p.was, launch: LAUNCH.price, y: p.yearly, ym: p.yearlyMonthly, k: p.kit, "0": 0, bal: 24, avg: 38, gift: 150 };
   return text
     .replace(/\{\$save\}/g, String(yearlySaving(currency)))
-    .replace(/\{\$(launch|was|ym|m|y|k|0|bal|avg)\}/g, (_, key: string) => money(values[key], currency, lang));
+    .replace(/\{\$(launch|was|ym|m|y|k|0|bal|avg|gift)\}/g, (_, key: string) => money(values[key], currency, lang));
 }
 
 /** The same object with every price placeholder filled (strings inside objects, arrays and functions' results stay as they are). */

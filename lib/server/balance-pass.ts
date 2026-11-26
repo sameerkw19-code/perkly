@@ -1,5 +1,7 @@
 import { averageReward, formatMoney, type CashbackCurrency } from "../cashback.ts";
 import { formatAppt, noApptText } from "../appointment.ts";
+import { isSimple, type Face } from "../programs.ts";
+import { simpleFaceFor } from "./simple-face.ts";
 import { daysLeft, formatDue, israelDate, loanWords, nextDue, type Loan } from "../library.ts";
 
 /** The library card on a wallet pass: the nearest return date and how many books, plus the reader's extension link. */
@@ -62,7 +64,7 @@ export function passApptExtra(
   return undefined;
 }
 
-export async function passProgram(db: D1Database, customerId: string, origin?: string | null): Promise<{ balance?: string; average?: PassAverage; appointment?: string; apptExtra?: PassApptExtra; library?: PassLibrary }> {
+export async function passProgram(db: D1Database, customerId: string, origin?: string | null): Promise<{ balance?: string; average?: PassAverage; appointment?: string; apptExtra?: PassApptExtra; library?: PassLibrary; face?: Face }> {
   const row = await db
     .prepare(
       `SELECT c.stamps, c.target, c.balance, c.round_total, c.appt_at, c.loan_key, b.program, b.appt_extra, b.currency, b.avg_cap,
@@ -72,6 +74,10 @@ export async function passProgram(db: D1Database, customerId: string, origin?: s
     .bind(customerId, new Date().toISOString())
     .first<{ stamps: number; target: number; balance: number; round_total: number; appt_at: string | null; loan_key: string | null; program: string; appt_extra: string | null; currency: string; avg_cap: number; ready_value: number | null }>();
   if (!row) return {};
+  if (isSimple(row.program)) {
+    const face = await simpleFaceFor(db, customerId, row.currency === "USD" ? "en" : "he");
+    return face ? { face } : {};
+  }
   if (row.program === "library") {
     const { results } = await db.prepare("SELECT id, title, due, extensions FROM loans WHERE customer = ? AND returned IS NULL").bind(customerId).all<Loan>();
     const lang = row.currency === "USD" ? "en" : "he";

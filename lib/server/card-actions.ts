@@ -11,9 +11,13 @@ import { pushAppleCustomer } from "./apple-push";
 import type { Social } from "../social";
 import { LOANS_MAX, LOAN_DAYS_MAX, addDays, cleanTitle, daysLeft, israelDate, passedLoanStages, validDate } from "../library.ts";
 import { ensureLoanKey, extendLoan, openLoans } from "./loans";
+import { monthAttendance } from "./simple-face";
+import { PASS_LOW, PASS_SIZE_MAX, addMonths, couponState, passUsable, passedDueStages, simpleReminder, type SimpleProgram } from "../programs.ts";
 
-export type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust: number; reward_mode: "bank" | "block"; reward_expiry_days: number; birthdays: number; social: Social; owner_designs: number; program: Program; cashback_bp: number; cashback_min: number; currency: string; avg_cap: number; pos_only?: number; near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number; near_evening_from?: number; referral_stamps?: number; report_email?: number; appt_extra?: string; appt_points?: number; work_hours?: string | null; appt_slot?: number; services?: string | null; loan_days?: number; loan_ext_days?: number; loan_max_ext?: number };
-export type Customer = { id: string; business: string; name: string; phone: string; stamps: number; target: number; scan_code: string; google_wallet?: string | null; balance: number; round_total: number; appt_at?: string | null; appt_service?: string | null; appt_min?: number | null };
+export type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust: number; reward_mode: "bank" | "block"; reward_expiry_days: number; birthdays: number; social: Social; owner_designs: number; program: Program; cashback_bp: number; cashback_min: number; currency: string; avg_cap: number; pos_only?: number; near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number; near_evening_from?: number; referral_stamps?: number; report_email?: number; appt_extra?: string; appt_points?: number; work_hours?: string | null; appt_slot?: number; services?: string | null; loan_days?: number; loan_ext_days?: number; loan_max_ext?: number;
+  pass_size?: number; pass_days?: number; club_pct?: number; service_months?: number; coupon_until?: string | null };
+export type Customer = { id: string; business: string; name: string; phone: string; stamps: number; target: number; scan_code: string; google_wallet?: string | null; balance: number; round_total: number; appt_at?: string | null; appt_service?: string | null; appt_min?: number | null;
+  pass_left?: number; pass_until?: string | null; due_date?: string | null; due_label?: string | null; due_sent?: string | null; coupon_used?: string | null };
 
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -39,6 +43,8 @@ export async function cardState(db: D1Database, c: Customer, mode: Business["rew
   const saved = await savedRewards(db, c.id);
   // The library card: the books the reader has now.
   const loans = program === "library" ? await openLoans(db, c.id) : undefined;
+  // Classes: lessons attended since the 1st of this month (Israel time).
+  const monthCount = program === "attendance" ? await monthAttendance(db, c.id) : undefined;
   const rewards = saved.n + (mode === "block" && c.stamps >= c.target ? 1 : 0);
   return {
     id: c.id, name: c.name, stamps: c.stamps, target: c.target, rewards, rewardReady: rewards > 0, nextExpiry: saved.nextExpiry, mode, balance: c.balance ?? 0,
@@ -47,6 +53,8 @@ export async function cardState(db: D1Database, c: Customer, mode: Business["rew
     // The appointments card: the next appointment (ISO), or null.
     apptAt: c.appt_at ?? null, apptService: c.appt_service ?? null, apptMin: c.appt_min ?? null,
     ...(loans ? { loans } : {}),
+    passLeft: c.pass_left ?? 0, passUntil: c.pass_until ?? null, dueDate: c.due_date ?? null, dueLabel: c.due_label ?? null, couponUsed: c.coupon_used ?? null,
+    ...(monthCount !== undefined ? { monthCount } : {}),
   };
 }
 
@@ -83,14 +91,22 @@ export async function cardAction(x: CardActionInput): Promise<Response> {
     if (!correction || role === "staff") return fail("pos_only", 409, "Cards change through the cashier");
   }
   // Each kind of card has its own actions.
-  const balanceAction = p.action === "purchase" || p.action === "spend" || p.action === "adjust_balance";
+  const balanceAction = p.action === "purchase" || p.action === "spend" || p.action === "adjust_balance" || p.action === "load";
+  // The six simpler cards: which actions each one has.
+  const SIMPLE_ACTIONS: Record<string, SimpleProgram[]> = {
+    pass_sell: ["pass"], pass_use: ["pass"], checkin: ["club", "attendance"], service_done: ["service"],
+    due_set: ["service", "attendance"], due_clear: ["service", "attendance"], coupon_use: ["coupon"],
+  };
+  const simpleAction = typeof p.action === "string" && p.action in SIMPLE_ACTIONS;
   const apptAction = p.action === "appt_set" || p.action === "appt_clear" || p.action === "visit";
   const loanAction = p.action === "lend" || p.action === "return" || p.action === "renew";
   // The appointments card can add a gift punch card, points per visit, or a balance (the owner's choice).
   const addOn = business.program === "appointments" ? (business.appt_extra ?? "none") : null;
   const stampsCard = business.program === "stamps" || business.program === "average" || addOn === "stamps" || addOn === "points";
-  const balanceCard = business.program === "cashback" || addOn === "cashback";
-  const allowed = loanAction ? business.program === "library" : apptAction ? business.program === "appointments" : balanceAction ? balanceCard : stampsCard;
+  const balanceCard = business.program === "cashback" || business.program === "gift" || addOn === "cashback";
+  // A gift card is loaded at the counter, never earned; the other balance cards earn, never load.
+  const balanceOk = p.action === "load" ? business.program === "gift" : p.action === "purchase" ? balanceCard && business.program !== "gift" : balanceCard;
+  const allowed = simpleAction ? SIMPLE_ACTIONS[p.action as string].includes(business.program as SimpleProgram) : loanAction ? business.program === "library" : apptAction ? business.program === "appointments" : balanceAction ? balanceOk : stampsCard;
   if (!allowed) return fail("wrong_program", 409, "This action is for the other kind of card");
   if (p.action === "adjust_balance" && role === "staff" && !business.staff_adjust) return fail("forbidden", 403, "Corrections are owner-only in this business");
   if (p.action === "adjust" && role === "staff" && !business.staff_adjust) return fail("forbidden", 403, "Corrections are owner-only in this business");
@@ -143,6 +159,88 @@ export async function cardAction(x: CardActionInput): Promise<Response> {
     const fresh = (await db.prepare("SELECT * FROM customers WHERE id = ?").bind(c!.id).first<Customer>())!;
     return json({ error: code, code, card: await cardState(db, fresh, business.reward_mode, business.program) }, 409);
   };
+
+  if (simpleAction) {
+    const today = israelDate(new Date(now));
+    const unapplied = "AND NOT EXISTS(SELECT 1 FROM events WHERE id = ?)";
+    /** Runs the change with its event; the reply and the wallets follow (or the replay, or why not). */
+    const apply = async (update: D1PreparedStatement, kind: string, note: string | null, why: string, after?: D1PreparedStatement[]) => {
+      const r = await db.batch([update, event(kind, 0, note), ...(after ?? [])]);
+      if (r[0].meta.changes) return done();
+      if (await replayed()) return done({ replayed: true });
+      return refuse(why);
+    };
+    const program = business.program as SimpleProgram;
+
+    if (p.action === "pass_sell") {
+      // A pass sold at the counter: N entries (the owner's size unless the station says otherwise), valid for the owner's days from today.
+      const count = p.count === undefined ? business.pass_size ?? 10 : p.count;
+      if (!Number.isInteger(count) || (count as number) < 1 || (count as number) > PASS_SIZE_MAX) return fail("bad_details", 400, `1-${PASS_SIZE_MAX} entries`);
+      const until = (business.pass_days ?? 90) > 0 ? addDays(today, business.pass_days!) : null;
+      // An expired pass starts over; otherwise the new entries are added.
+      return apply(
+        db.prepare(
+          `UPDATE customers SET pass_left = CASE WHEN pass_until IS NOT NULL AND pass_until < ?1 THEN ?2 ELSE pass_left + ?2 END, pass_until = ?3,
+             due_sent = ?4, appt_msg = NULL WHERE id = ?5 AND business = ?6 ${unapplied}`,
+        ).bind(today, count, until, until ? passedDueStages("pass", until, new Date(now)).join(",") || null : null, c.id, business.id, requestId),
+        "pass_sell", `+${count}${until ? ` → ${until}` : ""}`, "busy_retry",
+      );
+    }
+    if (p.action === "pass_use") {
+      if (!passUsable(c, today)) return refuse((c.pass_left ?? 0) > 0 ? "pass_expired" : "pass_empty");
+      const left = (c.pass_left ?? 0) - 1;
+      // Few entries left: the customer's phone says so (the pass's reminder field).
+      const low = left === PASS_LOW
+        ? [db.prepare("UPDATE customers SET appt_msg = ?, appt_updated = ? WHERE id = ? AND EXISTS(SELECT 1 FROM events WHERE id = ?)")
+            .bind(simpleReminder("pass", "low", business.currency === "USD" ? "en" : "he", business.name, today, { left }), now, c.id, requestId)]
+        : [];
+      return apply(
+        db.prepare(`UPDATE customers SET pass_left = pass_left - 1 WHERE id = ? AND business = ? AND pass_left = ? AND pass_left > 0 AND (pass_until IS NULL OR pass_until >= ?) ${unapplied}`)
+          .bind(c.id, business.id, c.pass_left ?? 0, today, requestId),
+        "pass_use", String(left), "busy_retry", low,
+      );
+    }
+    if (p.action === "checkin") {
+      // A visit (club card) or a lesson (classes): recorded for the history and the reports; attendance counts it this month.
+      return apply(
+        db.prepare(`UPDATE customers SET business = business WHERE id = ? AND business = ? ${unapplied}`).bind(c.id, business.id, requestId),
+        program === "attendance" ? "attend" : "visit", null, "busy_retry",
+      );
+    }
+    if (p.action === "coupon_use") {
+      const st = couponState(c, { coupon_until: business.coupon_until }, today);
+      if (st !== "valid") return refuse(st === "used" ? "coupon_used" : "coupon_expired");
+      return apply(
+        db.prepare(`UPDATE customers SET coupon_used = ? WHERE id = ? AND business = ? AND coupon_used IS NULL ${unapplied}`).bind(now, c.id, business.id, requestId),
+        "coupon_use", null, "coupon_used",
+      );
+    }
+    if (p.action === "service_done") {
+      // The service was done today: the next one is the owner's months from today, reminders start over.
+      const next = addMonths(today, business.service_months ?? 6);
+      return apply(
+        db.prepare(`UPDATE customers SET due_date = ?, due_sent = ?, appt_msg = NULL WHERE id = ? AND business = ? ${unapplied}`)
+          .bind(next, passedDueStages("service", next, new Date(now)).join(",") || null, c.id, business.id, requestId),
+        "service", `→ ${next}`, "busy_retry",
+      );
+    }
+    if (p.action === "due_set") {
+      // The next service or payment date, set at the station (and for a service, its name).
+      if (!validDate(p.date) || daysLeft(p.date as string, today) < 0 || daysLeft(p.date as string, today) > 3 * 366) return fail("due_date", 400, "Choose a date from today on");
+      const label = program === "service" ? cleanTitle(p.label) || null : null;
+      return apply(
+        db.prepare(`UPDATE customers SET due_date = ?, due_label = ?, due_sent = ?, appt_msg = NULL WHERE id = ? AND business = ? ${unapplied}`)
+          .bind(p.date, label, passedDueStages(program, p.date as string, new Date(now)).join(",") || null, c.id, business.id, requestId),
+        program === "service" ? "service_set" : "pay_set", `${label ? label + " " : ""}${p.date}`, "busy_retry",
+      );
+    }
+    // due_clear
+    return apply(
+      db.prepare(`UPDATE customers SET due_date = NULL, due_label = NULL, due_sent = NULL, appt_msg = NULL WHERE id = ? AND business = ? ${unapplied}`)
+        .bind(c.id, business.id, requestId),
+      "due_clear", null, "busy_retry",
+    );
+  }
 
   if (loanAction) {
     // The library card: a book lent (with its return date), returned, or extended by the librarian.
@@ -277,6 +375,20 @@ export async function cardAction(x: CardActionInput): Promise<Response> {
         balanceEvent("earn", earned, amount, null),
       ]);
       if (r[0].meta.changes) return finish({ earned, amount });
+      if (await replayed()) return finish({ replayed: true });
+      return refuseBalance("busy_retry");
+    }
+
+    if (p.action === "load") {
+      // The gift card: the amount paid at the counter goes onto the card.
+      const amount = parseAmount(p.amount);
+      if (!amount) return fail("bad_amount", 400, "Invalid amount");
+      const r = await db.batch([
+        db.prepare("UPDATE customers SET balance = balance + ? WHERE id = ? AND business = ? AND NOT EXISTS(SELECT 1 FROM events WHERE id = ?)")
+          .bind(amount, c.id, business.id, requestId),
+        balanceEvent("load", amount, amount, null),
+      ]);
+      if (r[0].meta.changes) return finish({ loaded: amount });
       if (await replayed()) return finish({ replayed: true });
       return refuseBalance("busy_retry");
     }

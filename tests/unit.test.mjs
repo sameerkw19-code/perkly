@@ -364,3 +364,36 @@ test("library: reminder texts, one or several books, with or without extension",
   assert.equal(nextDue([{ id: "a", title: "B", due: "2026-12-10", extensions: 0 }, { id: "b", title: "A", due: "2026-12-03", extensions: 1 }]).id, "b");
   assert.equal(nextDue([]), null);
 });
+
+// ---- The six simpler cards ----
+
+import { addMonths, couponState, dueStageNow, passUsable, passedDueStages, simpleFace, simpleReminder } from "../lib/programs.ts";
+
+test("simple cards: months, faces in Hebrew", () => {
+  assert.equal(addMonths("2026-01-31", 1), "2026-02-28");
+  assert.equal(addMonths("2026-11-26", 6), "2027-05-26");
+  const now = new Date("2026-11-26T10:00:00Z");
+  const money = (m) => `${m / 100} ₪`;
+  assert.deepEqual(simpleFace("pass", { pass_left: 7, pass_until: "2027-03-01" }, {}, "he", money, now), { label: "כניסות שנשארו", value: "7", sub: "בתוקף עד 1.3.2027" });
+  assert.equal(simpleFace("pass", { pass_left: 3, pass_until: "2026-11-20" }, {}, "he", money, now).value, "אין כניסות");
+  assert.equal(simpleFace("gift", { balance: 15000 }, {}, "he", money, now).value, "150 ₪");
+  assert.equal(simpleFace("club", {}, { club_pct: 15 }, "he", money, now).value, "15% הנחה");
+  assert.equal(simpleFace("service", { due_date: "2027-03-10", due_label: "טיפול 10,000" }, {}, "he", money, now).label, "טיפול 10,000");
+  assert.equal(simpleFace("coupon", { coupon_used: "x" }, { reward: "קפה חינם" }, "he", money, now).sub, "השובר מומש ✓");
+  assert.equal(simpleFace("attendance", { month_count: 6, due_date: "2026-12-01" }, {}, "he", money, now).sub, "התשלום הבא: 1.12");
+  assert.equal(couponState({}, { coupon_until: "2026-11-25" }, "2026-11-26"), "expired");
+  assert.equal(passUsable({ pass_left: 1, pass_until: "2026-11-26" }, "2026-11-26"), true);
+  assert.equal(passUsable({ pass_left: 0 }, "2026-11-26"), false);
+});
+
+test("simple cards: service a month and a week before, payment the day before, pass a week before expiry", () => {
+  // Service on 2027-03-10: a month before is 2027-02-08 10:00 Israel (08:00Z).
+  assert.equal(dueStageNow("service", "2027-03-10", [], new Date("2027-02-08T07:59:00Z")), null);
+  assert.deepEqual(dueStageNow("service", "2027-03-10", [], new Date("2027-02-08T08:01:00Z")), { stage: "m30", skip: [] });
+  assert.deepEqual(dueStageNow("service", "2027-03-10", [], new Date("2027-03-04T08:01:00Z")), { stage: "d7", skip: ["m30"] });
+  assert.deepEqual(dueStageNow("attendance", "2026-12-01", [], new Date("2026-11-30T08:01:00Z")), { stage: "d1", skip: [] });
+  assert.equal(dueStageNow("attendance", "2026-12-01", ["d1"], new Date("2026-11-30T12:00:00Z")), null);
+  assert.deepEqual(passedDueStages("pass", "2026-11-30", new Date("2026-11-26T10:00:00Z")), ["d7"]);
+  assert.match(simpleReminder("service", "m30", "he", "מוסך כהן", "2027-03-10", { label: "טיפול 10,000" }), /^מוסך כהן: טיפול 10,000 בעוד חודש, 10\.3\.2027/);
+  assert.equal(simpleReminder("pass", "low", "he", "סטודיו", "2026-11-26", { left: 2 }), "סטודיו: נשארו 2 כניסות בכרטיסייה.");
+});
