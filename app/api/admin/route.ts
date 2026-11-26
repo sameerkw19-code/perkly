@@ -9,7 +9,8 @@ import { randomToken, sha256, verifyPassword } from "../../../lib/server/crypto"
 import { allow } from "../../../lib/server/rate-limit";
 import { cancelAtPeriodEnd, findSubscription, getSubscription, polarConfigured } from "../../../lib/server/polar";
 import { storeSubscription } from "../../../lib/server/subscription-store";
-import { applePushReady, pushTokens } from "../../../lib/server/apple-push";
+import { applePushReady, pushAppleBusinessNow, pushTokens } from "../../../lib/server/apple-push";
+import { ensureBookingSetup } from "../../../lib/server/booking";
 import { customerForPass } from "../../../lib/server/apple-wallet";
 import { AVG_TARGET_MAX } from "../../../lib/cashback.ts";
 import { passLook } from "../../../lib/server/designs";
@@ -244,6 +245,17 @@ export async function POST(request: Request) {
       const on = body.on === true ? 1 : 0;
       await db.batch([db.prepare("UPDATE businesses SET pos_only = ? WHERE id = ?").bind(on, businessId), log("pos_only", on ? "on" : "off")]);
       return json({ ok: true, on: !!on });
+    }
+    case "booking_on": {
+      // Online booking for this business (off by default). Off hides every booking screen and the booking link;
+      // the appointments, people and settings stay, so switching it on again brings everything back.
+      const on = body.on === true ? 1 : 0;
+      if (on) await ensureBookingSetup(db, business);
+      await db.batch([db.prepare("UPDATE businesses SET booking_on = ? WHERE id = ?").bind(on, businessId), log("booking_on", on ? "on" : "off")]);
+      await db.prepare("UPDATE businesses SET card_updated = ? WHERE id = ?").bind(nowIso, businessId).run();
+      await pushAppleBusinessNow(db, businessId);
+      const key = await db.prepare("SELECT booking_key FROM businesses WHERE id = ?").bind(businessId).first<{ booking_key: string | null }>();
+      return json({ ok: true, on: !!on, key: key?.booking_key ?? null });
     }
     case "owner_designs": {
       // Whether this business's owner edits their own card design (on by default; Perkly can switch it off).

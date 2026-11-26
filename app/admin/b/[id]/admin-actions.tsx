@@ -86,6 +86,33 @@ export function OwnerDesignSwitch({ business, on }: { business: string; on: bool
   );
 }
 
+/** Online booking for this business: off by default; off hides the whole booking system (screens, link, wallet button). */
+export function BookingSwitch({ business, on, bookingKey }: { business: string; on: boolean; bookingKey: string | null }) {
+  const [busy, setBusy] = useState(false);
+  const [value, setValue] = useState(on);
+  const [key, setKey] = useState(bookingKey);
+  const link = key ? `${typeof window === "undefined" ? "" : window.location.origin}/book/${key}` : "";
+  return (
+    <div className="booking-switch">
+      <label className="check">
+        <input type="checkbox" checked={value} disabled={busy} onChange={async (e) => {
+          const next = e.target.checked;
+          setBusy(true);
+          const r = await post<{ key: string | null }>("/api/admin", { action: "booking_on", business, on: next });
+          setBusy(false);
+          if (r.ok) { setValue(next); if (r.data?.key) setKey(r.data.key); }
+          else window.alert("הפעולה נכשלה. נסה שוב.");
+        }} />
+        <span>זימון תורים אונליין</span>
+      </label>
+      <p className="form-hint">{value
+        ? "פעיל: בעל העסק והצוות רואים את מסך התורים, ללקוחות יש דף הזמנה, ובכרטיס בארנק יש קישור לקביעת תור."
+        : "כבוי: אין זכר למערכת התורים אצל העסק ואצל הלקוחות. תורים והגדרות שכבר נשמרו חוזרים כשמדליקים שוב."}</p>
+      {value && link && <p className="form-hint">דף ההזמנה: <a href={link} target="_blank" rel="noreferrer" dir="ltr">{link.replace(/^https?:\/\//, "")}</a></p>}
+    </div>
+  );
+}
+
 /** Suspend / unsuspend and free-access controls for one business. Reloads the page after each change. */
 type Biz = { id: string; name: string; reward: string; target: number; program?: string; archived: string | null; ownerEmail: string | null; paying: boolean };
 

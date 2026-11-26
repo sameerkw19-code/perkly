@@ -21,7 +21,7 @@ export async function sendApptReminders(db: D1Database, nowIso: string): Promise
       `SELECT c.id, c.business, c.appt_at, c.appt_sent, c.google_wallet, b.name AS b_name, b.reward, b.color
        FROM customers c JOIN businesses b ON b.id = c.business
        WHERE c.appt_at > ? AND c.appt_at <= ? AND c.archived IS NULL
-         AND b.program = 'appointments' AND b.archived IS NULL AND b.suspended IS NULL
+         AND (b.program = 'appointments' OR b.booking_on = 1) AND b.archived IS NULL AND b.suspended IS NULL
        ORDER BY c.appt_at LIMIT ?`,
     )
     .bind(nowIso, until, PER_RUN)
