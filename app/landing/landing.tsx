@@ -12,6 +12,7 @@ import SiteAnalytics from "../../components/site-analytics";
 const STEP_ICONS = ["palette", "qr", "stamp"];
 const FIT_ICONS: Record<string, string> = { cafe: "coffee", barber: "scissors", pizza: "pizza" };
 const JOURNEY_ICONS = ["qr", "smartphone", "stamp", "gift"];
+const PRODUCT_ICONS: Record<string, string> = { stamps: "stamp", cashback: "percent", average: "cart", appointments: "calendar", library: "book" };
 
 function Check() {
   return <Icon name="check" size={18} stroke={2.6} className="lp-check" />;
@@ -157,6 +158,33 @@ export default function Landing({ lang, currency = "ILS" }: { lang: Lang; curren
               </ul>
             </div>
             <HeroScene lang={lang} />
+          </div>
+        </section>
+
+        {/* The five kinds of card */}
+        <section id="products" className="lp-section" aria-labelledby="products-title">
+          <div className="lp-wrap">
+            <span className="lp-eyebrow">{c.products.eyebrow}</span>
+            <h2 id="products-title" className="lp-h2">{c.products.title}</h2>
+            <p className="lp-body lp-products-intro">{c.products.text}</p>
+            <ul className="lp-products">
+              {c.products.items.map((p) => (
+                <li key={p.key} className={"lp-product lp-product-" + p.key}>
+                  <div className="lp-product-face" aria-hidden="true">
+                    <span className="lp-product-face-icon"><Icon name={PRODUCT_ICONS[p.key]} size={18} /></span>
+                    <small>{p.face.label}</small>
+                    <b dir="auto">{p.face.value}</b>
+                    <span>{p.face.sub}</span>
+                  </div>
+                  <h3 className="lp-product-name">{p.name}</h3>
+                  <p className="lp-product-fits"><strong>{c.products.forLabel}</strong> {p.fits}</p>
+                  <p className="lp-product-text">{p.text}</p>
+                  <ul className="lp-product-points">
+                    {p.points.map((x) => <li key={x}><Icon name="check" size={16} />{x}</li>)}
+                  </ul>
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
 
