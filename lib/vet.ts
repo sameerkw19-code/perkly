@@ -93,9 +93,13 @@ export function parseSent(v: string | null | undefined): string[] {
   return (v ?? "").split(",").filter(Boolean);
 }
 
-/** Reminders whose time already passed for this due date (a new date skips them: never sent late). */
-export function passedCareStages(due: string, now: Date): string[] {
-  return CARE_STAGES.filter((s) => israelTime(addDays(due, s.days), "10:00")!.getTime() <= now.getTime()).map((s) => s.key);
+/**
+ * Reminders whose time already passed for this due date (a new date skips them: never sent late). With `given` (the day
+ * it was last given), also those falling on or before that day: a monthly treatment given today gets no "in a month" today.
+ */
+export function passedCareStages(due: string, now: Date, given?: string | null): string[] {
+  const until = Math.max(now.getTime(), given ? israelTime(addDays(given, 1), "0:00")!.getTime() - 1 : 0);
+  return CARE_STAGES.filter((s) => israelTime(addDays(due, s.days), "10:00")!.getTime() <= until).map((s) => s.key);
 }
 
 /** The reminder to send now, if any: the latest one due and unsent (missed ones are marked, not sent). None after the date. */

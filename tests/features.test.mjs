@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { validMonthDay, parseBirthday, birthdayFromParts, formatBirthday, upcomingKeys } from "../lib/birthday.ts";
 import { sanitizeDesign, defaultDesign, designChecks, FONTS, cardLang, textsFor, sanitizeLangs, walletStampPicture, assetIds, is3d, ICON_GROUPS, STAMP_ICONS, STAMP_3D } from "../lib/design.ts";
-import { businessAccess, freeLimitReached, hasPaidDesign, TRIAL_DAYS, YEARLY_PRICE_ILS, MONTHLY_PRICE_ILS, planOf, monthlyValue } from "../lib/server/billing.ts";
+import { businessAccess, freeLimitReached, hasPaidDesign, TRIAL_DAYS, YEARLY_PRICE_ILS, MONTHLY_PRICE_ILS, planOf, monthlyValue, paidMonthly } from "../lib/server/billing.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { PRICES, fillPrices, withPrices, asCurrency, yearlySaving } from "../lib/pricing.ts";
 import { regionFrom } from "../lib/server/region.ts";
@@ -811,6 +811,8 @@ test("vet: reminders a month, a week and the day before, never late, and never a
   assert.equal(vet.careStageNow("2026-12-04", [], new Date("2026-12-01T09:00:00Z")).stage, "d7");
   assert.deepEqual(vet.passedCareStages("2026-12-04", new Date("2026-12-01T09:00:00Z")), ["m30", "d7"]);
   assert.equal(vet.careStageNow(due, ["m30", "d7", "d1"], new Date("2026-12-30T09:00:00Z")), null);
+  // Given just after midnight, a monthly treatment's "in a month" (10:00 that same day) is skipped, the week and day stay.
+  assert.deepEqual(vet.passedCareStages("2026-12-27", new Date("2026-11-26T22:30:00Z"), "2026-11-27"), ["m30"]);
   assert.equal(vet.careStageNow(due, [], new Date("2027-01-02T09:00:00Z")), null);
   const msg = vet.careReminder("d7", "he", "מרפאת רקסי", "בונו", "חיסון כלבת", due);
   assert.match(msg, /בונו/);
@@ -823,4 +825,25 @@ test("the vet file is a switch: off by default, and its API, booklet and reminde
   assert.match(readFileSync(new URL("../app/api/vet/route.ts", import.meta.url), "utf8"), /!b\.vet_on\) return fail\("not_found", 404\)/);
   assert.match(readFileSync(new URL("../app/p/[key]/page.tsx", import.meta.url), "utf8"), /b\.vet_on = 1/);
   assert.match(readFileSync(new URL("../lib/server/vet-reminders.ts", import.meta.url), "utf8"), /b\.vet_on = 1/);
+});
+
+test("admin income: what a subscription really pays (a discount shows), else the list price", () => {
+  const orders = [
+    { business: "hamdan", amount: 99, currency: "ILS", status: "paid" },
+    { business: "hamdan", amount: 0, currency: "ILS", status: "paid" },
+    { business: "yearly", amount: 1990, currency: "ILS", status: "paid" },
+    { business: "failed", amount: 199, currency: "ILS", status: "failed" },
+  ];
+  assert.equal(paidMonthly("hamdan", "monthly", "ILS", orders), 99);
+  assert.equal(paidMonthly("yearly", "yearly", "ILS", orders), 1990 / 12);
+  assert.equal(paidMonthly("failed", "monthly", "ILS", orders), MONTHLY_PRICE_ILS);
+  assert.equal(paidMonthly("new", "monthly", "ILS", []), MONTHLY_PRICE_ILS);
+});
+
+test("pages rendered on the server format dates without the browser's locale (no hydration mismatch)", () => {
+  for (const f of ["../app/billing/billing-view.tsx", "../app/admin/b/[id]/admin-actions.tsx", "../app/admin/b/[id]/build-steps.tsx"]) {
+    const src = readFileSync(new URL(f, import.meta.url), "utf8");
+    assert.ok(!/toLocaleDateString\(/.test(src), f);
+    assert.ok(!/typeof window === "undefined"/.test(src), f);
+  }
 });

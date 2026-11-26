@@ -126,7 +126,7 @@ export async function POST(request: Request) {
       const giver = await doctorOf(p.staff);
       if (giver === undefined) return fail("not_found", 404, "Unknown doctor");
       // Reminders whose time already passed for this date are marked, so none goes out late.
-      const sent = next ? passedCareStages(next, now).join(",") || null : null;
+      const sent = next ? passedCareStages(next, now, last).join(",") || null : null;
       if (typeof p.id === "string" && p.id) {
         const care = await careOf(p.id);
         if (!care || care.pet !== pet.id) return fail("not_found", 404);
@@ -157,7 +157,7 @@ export async function POST(request: Request) {
       if (giver === undefined) return fail("not_found", 404, "Unknown doctor");
       await db.batch([
         db.prepare("INSERT INTO pet_care_log(id, care, pet, date, note, actor, staff, created) VALUES(?, ?, ?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), care.id, care.pet, date, note, user.id, giver, nowIso),
-        db.prepare("UPDATE pet_care SET last = ?, next = ?, sent = ? WHERE id = ?").bind(date, next, next ? passedCareStages(next, now).join(",") || null : null, care.id),
+        db.prepare("UPDATE pet_care SET last = ?, next = ?, sent = ? WHERE id = ?").bind(date, next, next ? passedCareStages(next, now, date).join(",") || null : null, care.id),
       ]);
       return answer(care.customer);
     }

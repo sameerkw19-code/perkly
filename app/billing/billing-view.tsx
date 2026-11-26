@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useLang } from "../../lib/i18n";
 import { withPrices, type Currency } from "../../lib/pricing";
+import { ilDay } from "../../lib/library";
 
 export type BillingBusiness = {
   id: string; name: string; status: string; periodEnd: string | null; compUntil?: string | null;
@@ -120,7 +121,8 @@ export default function BillingView({ businesses, configured, yearly = false, cu
   // The plan choice only matters while some business can still start a subscription.
   const anyToStart = configured && businesses.some((b) => !["active", "trialing"].includes(b.status) && !b.compUntil?.startsWith(FOREVER_YEAR));
   const allLive = businesses.length > 0 && businesses.every((b) => ["active", "trialing"].includes(b.status) || !!b.compUntil?.startsWith(FOREVER_YEAR));
-  const day = (iso: string) => new Date(iso).toLocaleDateString(t.locale);
+  // A fixed format: the server (UTC) and the browser must render the same text.
+  const day = (iso: string) => ilDay(iso);
 
   async function subscribe(businessId: string) {
     const chosen = yearly ? plan : "monthly";
@@ -179,10 +181,10 @@ export default function BillingView({ businesses, configured, yearly = false, cu
               </div>
             )}
             {b.kit === "sent" && <div style={{ fontSize: 14, marginBottom: 6 }}>{t.kitSent}</div>}
-            {b.periodEnd && <div style={{ fontSize: 14, marginBottom: 6 }}>{t.next}: {new Date(b.periodEnd).toLocaleDateString(t.locale)}</div>}
+            {b.periodEnd && <div style={{ fontSize: 14, marginBottom: 6 }}>{t.next}: {day(b.periodEnd)}</div>}
             {b.compUntil && (
               <div style={{ fontSize: 14, marginBottom: 6 }}>
-                {t.comp}: {b.compUntil.startsWith(FOREVER_YEAR) ? t.forever : `${t.until} ${new Date(b.compUntil).toLocaleDateString(t.locale)}`}
+                {t.comp}: {b.compUntil.startsWith(FOREVER_YEAR) ? t.forever : `${t.until} ${day(b.compUntil)}`}
               </div>
             )}
             {b.status === "past_due" && <p role="alert" style={{ fontSize: 14, margin: "6px 0", color: "#b00020", fontWeight: 600 }}>{t.pastDue}</p>}

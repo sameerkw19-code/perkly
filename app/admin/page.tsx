@@ -1,7 +1,8 @@
 import { env } from "cloudflare:workers";
 import { AdminHeader } from "./admin-header";
 import { getD1 } from "../../db";
-import { monthlyValue, planOf } from "../../lib/server/billing";
+import { paidMonthly, planOf } from "../../lib/server/billing";
+import { listOrders, polarConfigured } from "../../lib/server/polar";
 import { WalletPanel } from "./wallet-panel";
 import { STATUS_LABEL, adminStatus, requireAdminPage, shortDate, shortDateTime, type AdminStatus } from "../../lib/server/admin";
 import { asCurrency } from "../../lib/pricing";
@@ -75,25 +76,25 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     db.prepare(
       `SELECT
          (SELECT COUNT(*) FROM businesses WHERE archived IS NULL) AS businesses,
-         (SELECT COUNT(*) FROM businesses WHERE created >= ?1) AS businesses7,
-         (SELECT COUNT(*) FROM customers WHERE archived IS NULL) AS customers,
-         (SELECT COUNT(*) FROM customers WHERE created >= ?2) AS customers30,
-         (SELECT COUNT(*) FROM events WHERE kind IN ('stamp', 'earn', 'visit') AND created >= ?2) AS stamps30,
-         (SELECT COUNT(*) FROM events WHERE kind = 'redeem' AND created >= ?2) AS redeems30,
-         (SELECT COUNT(DISTINCT business) FROM events WHERE created >= ?1) AS activeBiz7`,
+         (SELECT COUNT(*) FROM businesses WHERE archived IS NULL AND created >= ?1) AS businesses7,
+         (SELECT COUNT(*) FROM customers WHERE archived IS NULL AND business IN (SELECT id FROM businesses WHERE archived IS NULL)) AS customers,
+         (SELECT COUNT(*) FROM customers WHERE archived IS NULL AND created >= ?2 AND business IN (SELECT id FROM businesses WHERE archived IS NULL)) AS customers30,
+         (SELECT COUNT(*) FROM events WHERE kind IN ('stamp', 'earn', 'visit') AND created >= ?2 AND business IN (SELECT id FROM businesses WHERE archived IS NULL)) AS stamps30,
+         (SELECT COUNT(*) FROM events WHERE kind = 'redeem' AND created >= ?2 AND business IN (SELECT id FROM businesses WHERE archived IS NULL)) AS redeems30,
+         (SELECT COUNT(DISTINCT business) FROM events WHERE created >= ?1 AND business IN (SELECT id FROM businesses WHERE archived IS NULL)) AS activeBiz7`,
     ).bind(since7, since30).first<{ businesses: number; businesses7: number; customers: number; customers30: number; stamps30: number; redeems30: number; activeBiz7: number }>(),
     db.prepare(
       `SELECT CAST((julianday(?1) - julianday(created)) / 7 AS INTEGER) AS w, COUNT(*) AS n
-       FROM businesses WHERE created >= ?2 GROUP BY w`,
+       FROM businesses WHERE archived IS NULL AND created >= ?2 GROUP BY w`,
     ).bind(nowIso, sinceWeeks).all<{ w: number; n: number }>(),
     db.prepare(
       `SELECT CAST((julianday(?1) - julianday(created)) / 7 AS INTEGER) AS w, COUNT(*) AS n
-       FROM customers WHERE created >= ?2 GROUP BY w`,
+       FROM customers WHERE archived IS NULL AND created >= ?2 AND business IN (SELECT id FROM businesses WHERE archived IS NULL) GROUP BY w`,
     ).bind(nowIso, sinceWeeks).all<{ w: number; n: number }>(),
     // Status counts and revenue always cover every business, whatever the search or filter.
     db.prepare(
-      `SELECT b.suspended, b.comp_until, b.currency, s.status, s.plan FROM businesses b LEFT JOIN subscriptions s ON s.business = b.id WHERE b.archived IS NULL`,
-    ).all<{ suspended: string | null; comp_until: string | null; currency: string; status: string | null; plan: string | null }>(),
+      `SELECT b.id, b.suspended, b.comp_until, b.currency, s.status, s.plan FROM businesses b LEFT JOIN subscriptions s ON s.business = b.id WHERE b.archived IS NULL`,
+    ).all<{ id: string; suspended: string | null; comp_until: string | null; currency: string; status: string | null; plan: string | null }>(),
   ]);
 
   const everything = list.results.map((r) => ({ ...r, st: adminStatus(r, nowIso) }));
@@ -125,7 +126,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   // Yearly subscriptions count as a twelfth of their price.
   const paying = statusRows.results.filter((r) => adminStatus(r, nowIso) === "active");
   const yearlyCount = paying.filter((r) => planOf(r.plan, env) === "yearly").length;
-  const mrr = Math.round(paying.reduce((sum, r) => sum + monthlyValue(planOf(r.plan, env), asCurrency(r.currency)), 0));
+  // The real price each pays (a discount shows), from its latest charge at Polar; the list price when Polar can't be read.
+  const orders = paying.length && polarConfigured(env) ? await listOrders(env, 1).catch(() => []) : [];
+  const mrr = Math.round(paying.reduce((sum, r) => sum + paidMonthly(r.id, planOf(r.plan, env), asCurrency(r.currency), orders), 0));
   const t = totals!;
 
   // Oldest week first, so the chart reads in time order.
