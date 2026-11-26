@@ -257,6 +257,16 @@ export async function POST(request: Request) {
       const key = await db.prepare("SELECT booking_key FROM businesses WHERE id = ?").bind(businessId).first<{ booking_key: string | null }>();
       return json({ ok: true, on: !!on, key: key?.booking_key ?? null });
     }
+    case "vet_on": {
+      // The vet's pet file for this business (off by default). Off hides it everywhere; the animals stay saved.
+      const on = body.on === true ? 1 : 0;
+      await db.batch([
+        db.prepare("UPDATE businesses SET vet_on = ?, card_updated = ? WHERE id = ?").bind(on, nowIso, businessId),
+        log("vet_on", on ? "on" : "off"),
+      ]);
+      await pushAppleBusinessNow(db, businessId);
+      return json({ ok: true, on: !!on });
+    }
     case "owner_designs": {
       // Whether this business's owner edits their own card design (on by default; Perkly can switch it off).
       const on = body.on === true ? 1 : 0;

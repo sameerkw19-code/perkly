@@ -113,6 +113,30 @@ export function BookingSwitch({ business, on, bookingKey }: { business: string; 
   );
 }
 
+/** The vet's pet file for this business: off by default; off hides it from the business and its clients. */
+export function VetSwitch({ business, on }: { business: string; on: boolean }) {
+  const [busy, setBusy] = useState(false);
+  const [value, setValue] = useState(on);
+  return (
+    <div className="booking-switch">
+      <label className="check">
+        <input type="checkbox" checked={value} disabled={busy} onChange={async (e) => {
+          const next = e.target.checked;
+          setBusy(true);
+          const r = await post("/api/admin", { action: "vet_on", business, on: next });
+          setBusy(false);
+          if (r.ok) setValue(next);
+          else window.alert("הפעולה נכשלה. נסה שוב.");
+        }} />
+        <span>תיק וטרינרי (חיות, חיסונים וטיפולים)</span>
+      </label>
+      <p className="form-hint">{value
+        ? "פעיל: בעמדה יש תיק לכל חיה, יש מסך חיסונים וטיפולים קרובים, ובכרטיס של הלקוח יש פנקס חיות עם תזכורות."
+        : "כבוי: אין זכר לתיק הווטרינרי אצל העסק ואצל הלקוחות. מה שכבר נשמר חוזר כשמדליקים שוב."}</p>
+    </div>
+  );
+}
+
 /** Suspend / unsuspend and free-access controls for one business. Reloads the page after each change. */
 type Biz = { id: string; name: string; reward: string; target: number; program?: string; archived: string | null; ownerEmail: string | null; paying: boolean };
 

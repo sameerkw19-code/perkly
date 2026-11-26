@@ -8,6 +8,7 @@ import { formatAppt, formatTime, israelTime } from "../lib/appointment";
 import { ClinicCalendar, minutesLabel } from "../components/clinic-calendar";
 import { LibraryDesk, LibraryStation } from "../components/library";
 import { BookingDesk } from "../components/booking-desk";
+import { VetDesk, VetFile } from "../components/vet";
 import { SimpleSettingsPanel, SimpleStation } from "../components/simple-station";
 import { isSimple, simpleFace, type SimpleProgram } from "../lib/programs";
 import type { Loan } from "../lib/library";
@@ -15,7 +16,7 @@ import { parseServices } from "../lib/calendar";
 import {
   Activity, AlertTriangle, Trash2, Cake, Check, Copy, CreditCard, Download, Gift, LayoutDashboard, Link2, LogOut, Minus, Plus, QrCode,
   ChevronRight, History, Palette, RefreshCw, RotateCcw, ScanLine, Search, Settings, Share2, Store, UserPlus, Users, UserRound, X,
-  Phone, MapPin, Megaphone, BarChart3, CalendarDays, CalendarCheck, BookOpen,
+  Phone, MapPin, Megaphone, BarChart3, CalendarDays, CalendarCheck, BookOpen, PawPrint,
   type LucideIcon,
 } from "lucide-react";
 import type { Design } from "../lib/design";
@@ -37,7 +38,7 @@ import { Brand } from "../components/brand";
 
 type Role = "owner" | "staff";
 type Business = { id: string; name: string; reward: string; target: number; color: string; join_code: string | null; staff_adjust?: number; reward_mode?: "bank" | "block"; reward_expiry_days?: number; birthdays?: number; social?: Social; program?: "stamps" | "cashback" | "average" | "appointments" | "library" | SimpleProgram; cashback_bp?: number; cashback_min?: number; currency?: string; avg_cap?: number; pos_only?: number; near_text?: string | null; near_text_evening?: string | null; near_morning_from?: number; near_evening_from?: number; referral_stamps?: number; report_email?: number; appt_extra?: "none" | "stamps" | "points" | "cashback"; appt_points?: number; work_hours?: string | null; appt_slot?: number; services?: string | null; loan_days?: number; loan_ext_days?: number; loan_max_ext?: number;
-  pass_size?: number; pass_days?: number; club_pct?: number; service_months?: number; coupon_until?: string | null; booking_on?: number; booking_key?: string | null };
+  pass_size?: number; pass_days?: number; club_pct?: number; service_months?: number; coupon_until?: string | null; booking_on?: number; booking_key?: string | null; vet_on?: number };
 type CardState = { id: string; name: string; stamps: number; target: number; rewardReady: boolean; rewards?: number; nextExpiry?: string | null; phone?: string; balance?: number; roundTotal?: number; rewardValue?: number | null; apptAt?: string | null; loans?: Loan[];
   passLeft?: number; passUntil?: string | null; dueDate?: string | null; dueLabel?: string | null; couponUsed?: string | null; monthCount?: number };
 type Data = {
@@ -208,7 +209,7 @@ export default function Dashboard() {
       setLoadError("");
       if (next.business && next.business.id !== businessId) setBusinessId(next.business.id);
       // Staff: the station, or (clinics) the calendar when that's where they are.
-      if (next.role === "staff") setView((v) => ((v === "calendar" && next.business?.program === "appointments") || (v === "books" && next.business?.program === "library") || (v === "booking" && next.business?.booking_on) ? v : "station"));
+      if (next.role === "staff") setView((v) => ((v === "calendar" && next.business?.program === "appointments") || (v === "books" && next.business?.program === "library") || (v === "booking" && next.business?.booking_on) || (v === "pets" && next.business?.vet_on) ? v : "station"));
     } catch {
       setLoadError(t("err_network"));
     }
@@ -281,7 +282,11 @@ export default function Dashboard() {
   const manage = !!data?.manage;
   // Online booking (switched on by Perkly) replaces the appointments card's own calendar.
   const booking = !!b?.booking_on;
-  const sideNav: [LucideIcon, string][] = booking ? [[CalendarCheck, "booking"]] : b?.program === "appointments" ? [[CalendarDays, "calendar"]] : b?.program === "library" ? [[BookOpen, "books"]] : [];
+  const sideNav: [LucideIcon, string][] = [
+    ...(booking ? [[CalendarCheck, "booking"]] as [LucideIcon, string][] : b?.program === "appointments" ? [[CalendarDays, "calendar"]] as [LucideIcon, string][] : b?.program === "library" ? [[BookOpen, "books"]] as [LucideIcon, string][] : []),
+    // The vet's pet file (switched on by Perkly): what's due soon, and each client's animals.
+    ...(b?.vet_on ? [[PawPrint, "pets"]] as [LucideIcon, string][] : []),
+  ];
   const nav: [LucideIcon, string][] = isOwner
     ? [[LayoutDashboard, "overview"], ...sideNav, ...(booking && b?.program === "library" ? [[BookOpen, "books"]] as typeof sideNav : []), [Users, "customers"], [ScanLine, "station"],
        ...(manage ? [[Palette, "design"], [Users, "team"], [Settings, "settings"]] as typeof nav : data?.canDesign ? [[Palette, "design"]] as typeof nav : [])]
@@ -598,6 +603,8 @@ export default function Dashboard() {
           )}
 
           {/* The clinic's calendar: owners (and Perkly) only. */}
+          {view === "pets" && b.vet_on ? <VetDesk businessId={b.id} t={t} lang={lang} notify={notify} /> : null}
+
           {view === "booking" && b.booking_on ? (
             <BookingDesk business={b} owner={isOwner} t={t} lang={lang} notify={notify}
               onNewCard={(url, name, when) => setModal({ type: "link", url, title: name, note: t("calNewBooked", { when }) })} />
@@ -1025,6 +1032,7 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
   notify: (s: string, bad?: boolean) => void; onRegister: () => void; onStaffLink?: () => void; myRecent?: EventRow[];
 }) {
   const [selected, setSelected] = useState<CardState | null>(initial);
+  const [petsOpen, setPetsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<CardState[]>([]);
   // Results belong to a search of 2 characters or more; a shorter query shows none.
@@ -1365,14 +1373,19 @@ function Station({ business, branches, myBranch, canFix, owner, t, lang, initial
       </select>
     );
   const who = selected && (
-    <div className="sx-who">
-      <span className="st-avatar big" aria-hidden="true">{selected.name.charAt(0)}</span>
-      <div className="sx-who-text">
-        <strong>{selected.name}</strong>
-        {selected.phone && <small dir="ltr">{selected.phone}</small>}
+    <>
+      <div className="sx-who">
+        <span className="st-avatar big" aria-hidden="true">{selected.name.charAt(0)}</span>
+        <div className="sx-who-text">
+          <strong>{selected.name}</strong>
+          {selected.phone && <small dir="ltr">{selected.phone}</small>}
+        </div>
+        {/* The vet's pet file for this client (when Perkly switched it on). */}
+        {business.vet_on ? <button className={"btn small " + (petsOpen ? "primary" : "soft")} aria-expanded={petsOpen} onClick={() => setPetsOpen(!petsOpen)}><PawPrint size={16} />{t("vet_file")}</button> : null}
+        <button className="icon-btn" aria-label={t("close")} title={t("close")} onClick={next}><X size={18} /></button>
       </div>
-      <button className="icon-btn" aria-label={t("close")} title={t("close")} onClick={next}><X size={18} /></button>
-    </div>
+      {business.vet_on && petsOpen ? <div className="sx-box"><VetFile businessId={business.id} customer={{ id: selected.id, name: selected.name }} t={t} lang={lang} notify={notify} /></div> : null}
+    </>
   );
   const redeemButton = (
     <button className="btn lime big sx-wide" disabled={busy} onClick={() => act("redeem")}>
