@@ -52,6 +52,8 @@ export type LoyaltyCard = {
   library?: PassLibrary;
   /** The business's own look on the pass (see passLook). */
   look?: PassLook;
+  /** Links before the business's own: online booking, the vet's pet booklet (when Perkly switched those on). */
+  extraLinks?: { id: string; uri: string; description: string }[];
 };
 
 
@@ -85,9 +87,9 @@ function label(en: string, he: string, ar: string, others: [ru: string, de: stri
 /** The library card: the reader's own "extend your loan" link first in the pass's links. */
 function withRenew<T extends { linksModuleData?: { uris: { id?: string; uri: string; description: string }[] } }>(fields: T, card: LoyaltyCard): T {
   const url = card.library?.renewUrl;
-  if (!url || !fields.linksModuleData) return fields;
-  const renew = { id: "renew", uri: url, description: card.library!.renewLabel };
-  return { ...fields, linksModuleData: { uris: [renew, ...fields.linksModuleData.uris] } };
+  const first = [...(url ? [{ id: "renew", uri: url, description: card.library!.renewLabel }] : []), ...(card.extraLinks ?? [])];
+  if (!first.length) return fields;
+  return { ...fields, linksModuleData: { uris: [...first, ...(fields.linksModuleData?.uris ?? [])] } };
 }
 
 /** The fields that change with every stamp. Used both when saving and when updating a pass. */
