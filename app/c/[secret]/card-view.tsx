@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import { ExternalLink, RefreshCw, Wallet } from "lucide-react";
+import { CalendarCheck, ExternalLink, PawPrint, RefreshCw, Wallet } from "lucide-react";
 import { ReaderLoans } from "../../../components/reader-loans";
-import { formatDue, type Loan } from "../../../lib/library";
+import { formatDue, ilDay, type Loan } from "../../../lib/library";
 import type { Face } from "../../../lib/programs";
 import { useLang, translate } from "../../../lib/i18n";
 import { LoyaltyCard } from "../../../components/loyalty-card";
@@ -11,10 +11,12 @@ import { formatAppt } from "../../../lib/appointment";
 import { QrImage } from "../../../components/qr";
 
 import { cardLang, noticeText, textsFor, type Design } from "../../../lib/design";
-import { CARD_LANG_NAME, CARD_LOCALE, isRtl, type Lang } from "../../../lib/i18n-types";
+import { CARD_LANG_NAME, isRtl, type Lang } from "../../../lib/i18n-types";
 import { SOCIAL_COLOR, type SocialKey } from "../../../lib/social";
 import { SocialIcon } from "../../../lib/social-icon";
 import { Brand } from "../../../components/brand";
+import { kindName, SPECIES_ICON } from "../../../lib/vet";
+import { shortDate } from "../../../lib/programs";
 
 type Card = { face?: Face | null; library?: { key: string | null; loans: Loan[]; extDays: number; maxExt: number } | null; name: string; stamps: number; target: number; scan_code: string; design: Design; rewards: number; nextExpiry: string | null; business: string; links: { key: SocialKey; label: string; url: string }[];
   /** The balance card: balance and minimum in minor units, basis points back. */
@@ -22,7 +24,11 @@ type Card = { face?: Face | null; library?: { key: string | null; loans: Loan[];
   /** The appointments card: the next appointment (ISO), or null. */
   appointment?: { at: string | null; extra?: "none" | "stamps" | "points" | "cashback" } | null;
   /** The "average" card: this round's total and the value of the next reward (minor units). */
-  average?: { roundTotal: number; cap?: number; ready: number | null; currency: "ILS" | "USD" } | null };
+  average?: { roundTotal: number; cap?: number; ready: number | null; currency: "ILS" | "USD" } | null;
+  /** Online booking: the booking page, and the next appointment (ISO) on cards that don't show it already. */
+  booking?: { path: string; next: string | null } | null;
+  /** The vet's pet file: the client's animals, each with its next vaccine or treatment and appointment, and the booklet. */
+  vet?: { path: string; pets: { name: string; species: string; care: { name: string; next: string } | null; appt: { at: string; kind: string } | null }[] } | null };
 
 export default function CardView({ card, secret, googleWallet, appleWallet = false, isIOS, invite = null }: { card: Card | null; secret: string; googleWallet: boolean; appleWallet?: boolean; isIOS: boolean; invite?: { stamps: number; link: string } | null }) {
   // The page's own chrome follows the visitor's site language; the card follows its business's languages.
@@ -100,11 +106,35 @@ export default function CardView({ card, secret, googleWallet, appleWallet = fal
             qr={<QrImage text={"perkly:" + card.scan_code} size={336} label={t("showQr")} />}
           />
           {card.library && <ReaderLoans loanKey={card.library.key} loans={card.library.loans} maxExt={card.library.maxExt} extDays={card.library.extDays} t={t} lang={lang} />}
+          {card.vet && (
+            <section className="panel card-pets" aria-label={t("vet_booklet")}>
+              <h2><PawPrint size={18} aria-hidden="true" /> {t("vet_booklet")}</h2>
+              <ul>
+                {card.vet.pets.map((p, i) => (
+                  <li key={i}>
+                    <span className="vet-icon sm" aria-hidden="true">{SPECIES_ICON[p.species as keyof typeof SPECIES_ICON] ?? "🐾"}</span>
+                    <span className="card-pet-text">
+                      <b>{p.name}</b>
+                      {p.appt && <small>{t("vet_nextAppt")}: <bdi>{formatAppt(p.appt.at, lang)}</bdi> · {kindName(p.appt.kind, lang)}</small>}
+                      {p.care && <small>{p.care.name} · {t("vet_nextDue", { d: shortDate(p.care.next) })}</small>}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <a className="btn soft wide" href={card.vet.path}><PawPrint size={16} />{t("vet_booklet")}</a>
+            </section>
+          )}
+          {card.booking && (
+            <section className="panel card-booking" aria-label={t("bk_kicker")}>
+              {card.booking.next && <p><CalendarCheck size={16} aria-hidden="true" /> {t("vet_nextAppt")}: <bdi>{formatAppt(card.booking.next, lang)}</bdi></p>}
+              <a className="btn primary wide" href={card.booking.path}><CalendarCheck size={16} />{t("bk_kicker")}</a>
+            </section>
+          )}
           {!card.cashback && !card.library && !card.face && (!card.appointment || card.appointment.extra === "stamps" || card.appointment.extra === "points") && card.rewards > 0 && (
             <div className="ready-banner" role="status">
               {t("earned")}
               {card.rewards > 1 && <> · {t("rewardsAvail", { n: card.rewards })}</>}
-              {card.nextExpiry && <small className="ready-expiry">{t("expiresOnShort", { d: new Date(card.nextExpiry).toLocaleDateString(CARD_LOCALE[lang]) })}</small>}
+              {card.nextExpiry && <small className="ready-expiry">{t("expiresOnShort", { d: ilDay(card.nextExpiry) })}</small>}
             </div>
           )}
           <div className="qr-note">

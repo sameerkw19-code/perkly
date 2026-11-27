@@ -11,6 +11,7 @@ import { STAFF_MAX } from "../../../lib/booking";
 import { APPT_KINDS, CARE_KINDS, CARE_MAX, nextDue, parseKg, passedCareStages, PETS_MAX, SPECIES, validBirth } from "../../../lib/vet";
 import { ensurePetKey, petsOf } from "../../../lib/server/vet";
 import { activeStaff, syncCard } from "../../../lib/server/booking";
+import { pushAppleCustomersNow } from "../../../lib/server/apple-push";
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +57,15 @@ export async function POST(request: Request) {
   const doctors = async () => (await activeStaff(db, b.id)).map((s) => ({ id: s.id, name: s.name }));
   const doctorOf = async (v: unknown): Promise<string | null | undefined> =>
     v === null || v === undefined || v === "" ? null : typeof v === "string" && (await doctors()).some((d) => d.id === v) ? v : undefined;
-  const answer = async (customer: string) => json({ ok: true, pets: await petsOf(db, b.id, customer), key: await ensurePetKey(db, customer), doctors: await doctors() });
+  // The client's wallet card shows the pet file's nearest item: after a change, the iPhone fetches the card again.
+  const touch = async (customer: string) => {
+    await db.prepare("UPDATE customers SET appt_updated = ? WHERE id = ?").bind(nowIso, customer).run();
+    await pushAppleCustomersNow(db, [customer]);
+  };
+  const answer = async (customer: string, changed = false) => {
+    if (changed) await touch(customer);
+    return json({ ok: true, pets: await petsOf(db, b.id, customer), key: await ensurePetKey(db, customer), doctors: await doctors() });
+  };
 
   switch (action) {
     case "pets": {
@@ -89,7 +98,7 @@ export async function POST(request: Request) {
         await db.prepare("INSERT INTO pets(id, business, customer, name, species, breed, birth, sex, vet, created) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
           .bind(crypto.randomUUID(), b.id, c.id, name, species, breed, birth, sex, vet, nowIso).run();
       }
-      return answer(c.id);
+      return answer(c.id, true);
     }
     case "pet_remove": {
       const pet = await petOf(p.id);
@@ -143,7 +152,7 @@ export async function POST(request: Request) {
           ...(last ? [db.prepare("INSERT INTO pet_care_log(id, care, pet, date, actor, staff, created) VALUES(?, ?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), id, pet.id, last, user.id, giver, nowIso)] : []),
         ]);
       }
-      return answer(pet.customer);
+      return answer(pet.customer, true);
     }
     case "care_done": {
       // Given today (or on a date): into the history, and the next one is due the set months later.
@@ -159,13 +168,13 @@ export async function POST(request: Request) {
         db.prepare("INSERT INTO pet_care_log(id, care, pet, date, note, actor, staff, created) VALUES(?, ?, ?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), care.id, care.pet, date, note, user.id, giver, nowIso),
         db.prepare("UPDATE pet_care SET last = ?, next = ?, sent = ? WHERE id = ?").bind(date, next, next ? passedCareStages(next, now, date).join(",") || null : null, care.id),
       ]);
-      return answer(care.customer);
+      return answer(care.customer, true);
     }
     case "care_remove": {
       const care = await careOf(p.id);
       if (!care) return fail("not_found", 404);
       await db.prepare("UPDATE pet_care SET archived = ? WHERE id = ?").bind(nowIso, care.id).run();
-      return answer(care.customer);
+      return answer(care.customer, true);
     }
     case "appt_set": {
       // The animal's next appointment and what it is for (vaccine, treatment or a visit). Shows on the card, with reminders.

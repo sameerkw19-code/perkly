@@ -64,7 +64,28 @@ export function passApptExtra(
   return undefined;
 }
 
-export async function passProgram(db: D1Database, customerId: string, origin?: string | null): Promise<{ balance?: string; average?: PassAverage; appointment?: string; apptExtra?: PassApptExtra; library?: PassLibrary; face?: Face }> {
+/** The links a pass adds before the business's own: its booking page and the client's pet booklet, when switched on. */
+async function extraLinksFor(db: D1Database, customerId: string, origin: string | null | undefined, lang: string): Promise<{ id: string; uri: string; description: string }[]> {
+  if (!origin) return [];
+  const r = await db
+    .prepare("SELECT b.booking_on, b.booking_key, b.vet_on, b.currency, c.pet_key FROM customers c JOIN businesses b ON b.id = c.business WHERE c.id = ?")
+    .bind(customerId)
+    .first<{ booking_on: number; booking_key: string | null; vet_on: number; currency: string; pet_key: string | null }>();
+  if (!r) return [];
+  lang = r.currency === "USD" ? "en" : lang;
+  const words = lang === "en" ? { book: "Book an appointment", pets: "Pet booklet" } : lang === "ar" ? { book: "لحجز موعد", pets: "دفتر الحيوانات" } : { book: "לקביעת תור", pets: "פנקס החיות" };
+  return [
+    ...(r.booking_on && r.booking_key ? [{ id: "book", uri: `${origin}/book/${r.booking_key}`, description: words.book }] : []),
+    ...(r.vet_on && r.pet_key ? [{ id: "pets", uri: `${origin}/p/${r.pet_key}`, description: words.pets }] : []),
+  ];
+}
+
+export async function passProgram(db: D1Database, customerId: string, origin?: string | null): Promise<{ balance?: string; average?: PassAverage; appointment?: string; apptExtra?: PassApptExtra; library?: PassLibrary; face?: Face; extraLinks?: { id: string; uri: string; description: string }[] }> {
+  // In the card's language: English for a business abroad, Hebrew in Israel (as the other pass texts).
+  return { ...(await passProgramFields(db, customerId, origin)), extraLinks: await extraLinksFor(db, customerId, origin, "he") };
+}
+
+async function passProgramFields(db: D1Database, customerId: string, origin?: string | null): Promise<{ balance?: string; average?: PassAverage; appointment?: string; apptExtra?: PassApptExtra; library?: PassLibrary; face?: Face }> {
   const row = await db
     .prepare(
       `SELECT c.stamps, c.target, c.balance, c.round_total, c.appt_at, c.loan_key, b.program, b.appt_extra, b.currency, b.avg_cap,
