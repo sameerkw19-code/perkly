@@ -642,3 +642,58 @@ details.st-glossary dl { margin: 10px 0 0; }
 @media (max-width: 1180px) { .lp-products { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 860px) { .lp-products { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .lp-products { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- Card types carousel: Apple Wallet-style passes, sideways ---------- */
+.lp-carousel { margin-top: var(--space-6); }
+.lp-carousel-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-3); }
+.lp-carousel-hint { font-size: 14px; color: var(--muted); }
+.lp-carousel-arrows { display: flex; gap: var(--space-2); }
+.lp-carousel-btn { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: #fff; color: var(--ink); display: grid; place-items: center; cursor: pointer; box-shadow: var(--shadow-sm); transition: transform var(--dur-fast) var(--ease), opacity var(--dur-fast); }
+.lp-carousel-btn:hover:not(:disabled) { transform: translateY(-1px); }
+.lp-carousel-btn:disabled { opacity: .35; cursor: default; }
+.lp-carousel-btn:focus-visible, .lp-carousel-track:focus-visible { outline: 3px solid var(--p); outline-offset: 3px; }
+.lp .lp-carousel-track { list-style: none; margin: 0; margin-inline: -28px; padding: 6px 28px 22px; display: grid; grid-auto-flow: column; grid-auto-columns: 300px; gap: 20px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 28px; overscroll-behavior-x: contain; scrollbar-width: thin; -webkit-mask-image: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent); }
+.lp-slide { scroll-snap-align: start; display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.lp-slide .lp-product-points { margin-top: 4px; }
+@media (max-width: 560px) { .lp .lp-carousel-track { grid-auto-columns: 78%; margin-inline: -16px; padding-inline: 16px; scroll-padding-inline: 16px; } .lp-carousel-hint { font-size: 13px; } }
+@media (prefers-reduced-motion: reduce) { .lp-carousel-btn { transition: none; } }
+
+/* The pass: like a store card in Apple Wallet */
+.lp-pass { --pb: #6A4DE3; --pf: #fff; --ps: rgba(255,255,255,.72); --strip: rgba(255,255,255,.1);
+  background: var(--pb); color: var(--pf); border-radius: 14px; padding: 12px 14px 14px; display: grid; gap: 10px; margin-bottom: var(--space-3);
+  box-shadow: 0 1px 0 rgba(255,255,255,.18) inset, 0 18px 30px -18px rgba(22,21,27,.55); position: relative; overflow: hidden; }
+.lp-pass::after { content: ""; position: absolute; inset: 0; background: linear-gradient(160deg, rgba(255,255,255,.16), rgba(255,255,255,0) 40%); pointer-events: none; }
+.lp-pass-top { display: flex; align-items: center; gap: 8px; min-height: 30px; }
+.lp-pass-logo { width: 28px; height: 28px; border-radius: 7px; background: rgba(255,255,255,.2); display: grid; place-items: center; flex: none; }
+.lp-pass-biz { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+.lp-pass-hdr { display: grid; text-align: end; line-height: 1.15; }
+.lp-pass small { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; font-weight: 700; color: var(--ps); }
+.lp-pass-hdr span { font-size: 14px; font-weight: 600; }
+.lp-pass-strip { margin-inline: -14px; min-height: 104px; padding: 12px 16px; background: var(--strip); display: grid; align-items: center; }
+.lp-pass-primary { display: grid; gap: 2px; }
+.lp-pass-primary b { font-size: 30px; line-height: 1.1; font-weight: 600; letter-spacing: -.01em; }
+.lp-pass-sub { font-size: 12.5px; color: var(--ps); }
+.lp-pass-bar { display: block; height: 6px; border-radius: 99px; background: rgba(255,255,255,.25); margin-top: 6px; overflow: hidden; }
+.lp-pass-bar i { display: block; height: 100%; background: currentColor; border-radius: inherit; }
+.lp-pass-dots { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; justify-items: center; }
+.lp-pass-dots span { width: 34px; height: 34px; border-radius: 50%; border: 1.5px dashed rgba(255,255,255,.45); display: grid; place-items: center; }
+.lp-pass-dots span.on { background: #D9F493; border: 0; color: #2A2540; }
+.lp-pass-dots span.gift { border-style: solid; color: #D9F493; }
+.lp-pass-fields { display: flex; justify-content: space-between; gap: 12px; }
+.lp-pass-fields span { display: grid; min-width: 0; }
+.lp-pass-fields span.end { text-align: end; }
+.lp-pass-fields b { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-pass-code { justify-self: center; background: #fff; padding: 6px; border-radius: 8px; margin-top: 2px; }
+/* A colour per kind of card */
+.lp-pass-cashback { --pb: #0E3B2E; --ps: #BFE5D5; }
+.lp-pass-average { --pb: #B8122E; --ps: #FFE3E8; }
+.lp-pass-appointments { --pb: #E6F6F0; --pf: #0E3B2E; --ps: #3C6B5D; --strip: rgba(14,59,46,.06); }
+.lp-pass-library { --pb: #7A4A2A; --pf: #FFF6EC; --ps: #F3DFC8; }
+.lp-pass-pass { --pb: #1F2A44; --ps: #C9D3EC; }
+.lp-pass-gift { --pb: #D9467A; --ps: #FFE1EC; }
+.lp-pass-club { --pb: #F4C542; --pf: #3B2A00; --ps: #6B5200; --strip: rgba(59,42,0,.07); }
+.lp-pass-service { --pb: #2E3A40; --ps: #CFD8DC; }
+.lp-pass-coupon { --pb: #FFF8EC; --pf: #16151B; --ps: #6B6760; --strip: repeating-linear-gradient(135deg, rgba(22,21,27,.04) 0 8px, transparent 8px 16px); border: 2px dashed #D8CDB4; }
+.lp-pass-attendance { --pb: #2B7A78; --ps: #D3F0EE; }
+.lp-pass-appointments .lp-pass-logo, .lp-pass-club .lp-pass-logo, .lp-pass-coupon .lp-pass-logo { background: rgba(0,0,0,.08); }
+.lp-pass-appointments .lp-pass-bar, .lp-pass-club .lp-pass-bar { background: rgba(0,0,0,.12); }
