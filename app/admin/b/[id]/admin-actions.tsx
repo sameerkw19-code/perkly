@@ -142,6 +142,52 @@ export function VetSwitch({ business, on }: { business: string; on: boolean }) {
   );
 }
 
+/** WhatsApp reminders for this business's clients: off by default. Shows whether WhatsApp is connected, and a test send. */
+export function WhatsAppSwitch({ business, on, ready }: { business: string; on: boolean; ready: boolean }) {
+  const [busy, setBusy] = useState(false);
+  const [value, setValue] = useState(on);
+  const [phone, setPhone] = useState("");
+  const [template, setTemplate] = useState("appt");
+  const [lang, setLang] = useState("he");
+  const [out, setOut] = useState("");
+  return (
+    <div className="booking-switch">
+      <label className="check">
+        <input type="checkbox" checked={value} disabled={busy} onChange={async (e) => {
+          const next = e.target.checked;
+          setBusy(true);
+          const r = await post("/api/admin", { action: "wa_on", business, on: next });
+          setBusy(false);
+          if (r.ok) setValue(next);
+          else window.alert("הפעולה נכשלה. נסה שוב.");
+        }} />
+        <span>תזכורות בוואטסאפ ללקוחות</span>
+      </label>
+      <p className="form-hint">{value
+        ? "פעיל: לפני כל תור נשלחת הודעת וואטסאפ אחת ללקוח, ובתיק וטרינרי גם שבוע ויום לפני חיסון או טיפול. לקוח שמשיב \"הסר\" לא מקבל יותר."
+        : "כבוי: לא נשלחות הודעות וואטסאפ ללקוחות של העסק. התזכורות בארנק ממשיכות כרגיל."}</p>
+      {!ready && <p className="form-hint" role="status">⚠️ וואטסאפ עדיין לא מחובר לאתר (חסרים WHATSAPP_TOKEN ו־WHATSAPP_PHONE_ID). עד שיחובר לא תצא אף הודעה.</p>}
+      {ready && (
+        <form className="admin-wa-test" onSubmit={async (e) => {
+          e.preventDefault();
+          setBusy(true);
+          setOut("");
+          const r = await post<{ ready: boolean; sent: boolean; error: string | null }>("/api/admin", { action: "wa_test", business, phone, template, lang });
+          setBusy(false);
+          if (!r.ok) return setOut(r.code === "rate_limited" ? "יותר מדי בדיקות. נסה בעוד שעה." : r.code === "bad_phone" ? "מספר טלפון לא תקין." : "הבדיקה נכשלה.");
+          setOut(r.data.sent ? "נשלחה. בדוק את הוואטסאפ במספר הזה." : `לא נשלחה: ${r.data.error ?? ""}`);
+        }}>
+          <input value={phone} required inputMode="tel" dir="ltr" placeholder="050-0000000" aria-label="מספר לבדיקה" onChange={(e) => setPhone(e.target.value)} />
+          <select value={template} onChange={(e) => setTemplate(e.target.value)} aria-label="תבנית"><option value="appt">תזכורת תור</option><option value="vet">תזכורת וטרינר</option></select>
+          <select value={lang} onChange={(e) => setLang(e.target.value)} aria-label="שפה"><option value="he">עברית</option><option value="ar">ערבית</option><option value="en">אנגלית</option></select>
+          <button className="btn soft small" disabled={busy}>{busy ? "שולח..." : "שליחת בדיקה"}</button>
+          {out && <small className="muted" role="status">{out}</small>}
+        </form>
+      )}
+    </div>
+  );
+}
+
 /** Suspend / unsuspend and free-access controls for one business. Reloads the page after each change. */
 type Biz = { id: string; name: string; reward: string; target: number; program?: string; archived: string | null; ownerEmail: string | null; paying: boolean };
 

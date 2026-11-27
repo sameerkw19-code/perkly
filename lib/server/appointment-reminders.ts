@@ -3,9 +3,10 @@
 // (shown as a notification), and Google Wallet gets it as a message.
 
 import { cardLang, textsFor } from "../design";
-import { dueStage, parseSent, reminderText } from "../appointment";
+import { dueStage, formatAppt, parseSent, reminderText } from "../appointment";
 import { liveDesign } from "./designs";
 import { pushAppleCustomersNow } from "./apple-push";
+import { queueWhatsApp } from "./whatsapp";
 
 /** Customers handled per run. */
 const PER_RUN = 200;
@@ -53,6 +54,11 @@ export async function sendApptReminders(db: D1Database, nowIso: string): Promise
         .bind(`appt:${c.id}:${c.appt_at}:${due.stage}`, c.business, c.id, nowIso, nowIso)
         .run();
     }
+    // WhatsApp (where the admin switched it on): once per appointment (the id), with the first reminder that goes out.
+    await queueWhatsApp(db, {
+      id: `appt:${c.id}:${c.appt_at}`, business: c.business, customer: c.id, template: "appt", lang: t.lang, nowIso, expires: c.appt_at,
+      params: [t.title, formatAppt(c.appt_at, t.lang)],
+    }).catch((e) => console.error("whatsapp queue failed:", c.id, e));
     pushed.push(c.id);
   }
   if (pushed.length) {
