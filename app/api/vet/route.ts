@@ -8,8 +8,8 @@ import { businessAccess } from "../../../lib/server/billing";
 import { addDays, israelDate, validDate } from "../../../lib/library";
 import { israelTime } from "../../../lib/appointment";
 import { STAFF_MAX } from "../../../lib/booking";
-import { APPT_KINDS, CARE_KINDS, CARE_MAX, nextDue, parseKg, passedCareStages, PETS_MAX, SPECIES, validBirth } from "../../../lib/vet";
-import { ensurePetKey, petsOf } from "../../../lib/server/vet";
+import { APPT_KINDS, CARE_KINDS, CARE_MAX, cleanChip, cleanLot, nextDue, parseKg, passedCareStages, PETS_MAX, SPECIES, validBirth } from "../../../lib/vet";
+import { ensurePetKey, parseVetInfo, petsOf } from "../../../lib/server/vet";
 import { activeStaff, syncCard } from "../../../lib/server/booking";
 import { pushAppleCustomersNow } from "../../../lib/server/apple-push";
 
@@ -54,7 +54,18 @@ export async function POST(request: Request) {
           .bind(id, b.id).first<{ id: string; pet: string; months: number | null; next: string | null; customer: string }>()
       : null;
   // The clinic's doctors: its calendars (shared with online booking). An id given must be one of them; "" or null is none.
-  const doctors = async () => (await activeStaff(db, b.id)).map((s) => ({ id: s.id, name: s.name }));
+  const doctors = async () => {
+    const list = await activeStaff(db, b.id);
+    const lic = new Map(((await db.prepare("SELECT id, license FROM booking_staff WHERE business = ? AND archived IS NULL").bind(b.id).all<{ id: string; license: string | null }>()).results ?? []).map((r) => [r.id, r.license]));
+    return list.map((s) => ({ id: s.id, name: s.name, license: lic.get(s.id) ?? null }));
+  };
+  // The clinic's address and phone (for the certificate's header).
+  const clinic = async () => parseVetInfo((await db.prepare("SELECT vet_info FROM businesses WHERE id = ?").bind(b.id).first<{ vet_info: string | null }>())?.vet_info);
+  const noteOf = async (id: unknown) =>
+    typeof id === "string"
+      ? db.prepare("SELECT n.id, n.pet, p.customer FROM pet_notes n JOIN pets p ON p.id = n.pet WHERE n.id = ? AND n.business = ? AND n.archived IS NULL").bind(id, b.id)
+          .first<{ id: string; pet: string; customer: string }>()
+      : null;
   const doctorOf = async (v: unknown): Promise<string | null | undefined> =>
     v === null || v === undefined || v === "" ? null : typeof v === "string" && (await doctors()).some((d) => d.id === v) ? v : undefined;
   // The client's wallet card shows the pet file's nearest item: after a change, the iPhone fetches the card again.
@@ -64,7 +75,7 @@ export async function POST(request: Request) {
   };
   const answer = async (customer: string, changed = false) => {
     if (changed) await touch(customer);
-    return json({ ok: true, pets: await petsOf(db, b.id, customer), key: await ensurePetKey(db, customer), doctors: await doctors() });
+    return json({ ok: true, pets: await petsOf(db, b.id, customer), key: await ensurePetKey(db, customer), doctors: await doctors(), clinic: await clinic() });
   };
 
   switch (action) {
@@ -73,7 +84,7 @@ export async function POST(request: Request) {
       if (!c) return fail("not_found", 404);
       const pets = await petsOf(db, b.id, c.id);
       const key = pets.length ? await ensurePetKey(db, c.id) : null;
-      return json({ pets, key, today, doctors: await doctors() });
+      return json({ pets, key, today, doctors: await doctors(), clinic: await clinic() });
     }
     case "pet_save": {
       const c = await customerOf(p.customer);
@@ -85,18 +96,23 @@ export async function POST(request: Request) {
       const birth = p.birth === null || p.birth === "" || p.birth === undefined ? null : validBirth(p.birth) && p.birth.slice(0, 7) <= today.slice(0, 7) ? p.birth : undefined;
       if (birth === undefined) return fail("bad_details", 400, "Invalid birth date");
       const sex = p.sex === "m" || p.sex === "f" ? p.sex : null;
+      // The record's details: colour and markings, microchip, neutered/spayed.
+      const color = typeof p.color === "string" ? p.color.trim().slice(0, 60) || null : null;
+      const chip = cleanChip(p.chip);
+      if (chip === undefined) return fail("bad_details", 400, "Invalid microchip number");
+      const neutered = p.neutered === true ? 1 : p.neutered === false ? 0 : null;
       // The animal's regular doctor (the default for its appointments).
       const vet = await doctorOf(p.vet);
       if (vet === undefined) return fail("not_found", 404, "Unknown doctor");
       if (typeof p.id === "string" && p.id) {
-        const r = await db.prepare("UPDATE pets SET name = ?, species = ?, breed = ?, birth = ?, sex = ?, vet = ? WHERE id = ? AND business = ? AND customer = ? AND archived IS NULL")
-          .bind(name, species, breed, birth, sex, vet, p.id, b.id, c.id).run();
+        const r = await db.prepare("UPDATE pets SET name = ?, species = ?, breed = ?, birth = ?, sex = ?, vet = ?, color = ?, chip = ?, neutered = ? WHERE id = ? AND business = ? AND customer = ? AND archived IS NULL")
+          .bind(name, species, breed, birth, sex, vet, color, chip, neutered, p.id, b.id, c.id).run();
         if (!r.meta.changes) return fail("not_found", 404);
       } else {
         const n = await db.prepare("SELECT COUNT(*) AS n FROM pets WHERE customer = ? AND archived IS NULL").bind(c.id).first<{ n: number }>();
         if ((n?.n ?? 0) >= PETS_MAX) return fail("pets_too_many", 409, "Too many animals");
-        await db.prepare("INSERT INTO pets(id, business, customer, name, species, breed, birth, sex, vet, created) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-          .bind(crypto.randomUUID(), b.id, c.id, name, species, breed, birth, sex, vet, nowIso).run();
+        await db.prepare("INSERT INTO pets(id, business, customer, name, species, breed, birth, sex, vet, color, chip, neutered, created) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+          .bind(crypto.randomUUID(), b.id, c.id, name, species, breed, birth, sex, vet, color, chip, neutered, nowIso).run();
       }
       return answer(c.id, true);
     }
@@ -134,6 +150,8 @@ export async function POST(request: Request) {
       const next = nextDue(last, months, manual);
       const giver = await doctorOf(p.staff);
       if (giver === undefined) return fail("not_found", 404, "Unknown doctor");
+      const lot = cleanLot(p.lot);
+      if (lot === undefined) return fail("bad_details", 400, "Invalid batch number");
       // Reminders whose time already passed for this date are marked, so none goes out late.
       const sent = next ? passedCareStages(next, now, last).join(",") || null : null;
       if (typeof p.id === "string" && p.id) {
@@ -149,7 +167,7 @@ export async function POST(request: Request) {
         await db.batch([
           db.prepare("INSERT INTO pet_care(id, business, pet, kind, name, last, months, next, sent, created) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
             .bind(id, b.id, pet.id, kind, name, last, months, next, sent, nowIso),
-          ...(last ? [db.prepare("INSERT INTO pet_care_log(id, care, pet, date, actor, staff, created) VALUES(?, ?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), id, pet.id, last, user.id, giver, nowIso)] : []),
+          ...(last ? [db.prepare("INSERT INTO pet_care_log(id, care, pet, date, actor, staff, lot, valid_until, created) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), id, pet.id, last, user.id, giver, lot, next, nowIso)] : []),
         ]);
       }
       return answer(pet.customer, true);
@@ -160,12 +178,17 @@ export async function POST(request: Request) {
       if (!care) return fail("not_found", 404);
       const date = typeof p.date === "string" && validDate(p.date) && p.date <= today ? p.date : today;
       const note = typeof p.note === "string" ? p.note.trim().slice(0, 120) || null : null;
-      const next = nextDue(date, care.months);
+      // The dose's batch (Lot) number, and until when it's valid (the next due date, or one set by hand).
+      const lot = cleanLot(p.lot);
+      if (lot === undefined) return fail("bad_details", 400, "Invalid batch number");
+      const manual = p.validUntil ? (typeof p.validUntil === "string" && validDate(p.validUntil) && p.validUntil > date ? p.validUntil : undefined) : null;
+      if (manual === undefined) return fail("bad_details", 400, "Invalid date");
+      const next = nextDue(date, care.months, manual);
       // Who gave it (the doctor picked on this screen), for the history.
       const giver = await doctorOf(p.staff);
       if (giver === undefined) return fail("not_found", 404, "Unknown doctor");
       await db.batch([
-        db.prepare("INSERT INTO pet_care_log(id, care, pet, date, note, actor, staff, created) VALUES(?, ?, ?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), care.id, care.pet, date, note, user.id, giver, nowIso),
+        db.prepare("INSERT INTO pet_care_log(id, care, pet, date, note, actor, staff, lot, valid_until, created) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), care.id, care.pet, date, note, user.id, giver, lot, next, nowIso),
         db.prepare("UPDATE pet_care SET last = ?, next = ?, sent = ? WHERE id = ?").bind(date, next, next ? passedCareStages(next, now, date).join(",") || null : null, care.id),
       ]);
       return answer(care.customer, true);
@@ -211,18 +234,55 @@ export async function POST(request: Request) {
       await syncCard(db, pet.customer, now);
       return answer(pet.customer);
     }
+    case "note_save": {
+      // A medical history entry: the date, why they came, what was found and done, by which doctor, and whether the owner sees it.
+      const pet = await petOf(p.pet);
+      if (!pet) return fail("not_found", 404);
+      const text = typeof p.text === "string" ? p.text.trim().slice(0, 2000) : "";
+      if (!text) return fail("bad_details", 400, "Write what was done");
+      const reason = typeof p.reason === "string" ? p.reason.trim().slice(0, 120) || null : null;
+      const date = typeof p.date === "string" && validDate(p.date) && p.date <= today ? p.date : today;
+      const staff = await doctorOf(p.staff);
+      if (staff === undefined) return fail("not_found", 404, "Unknown doctor");
+      const shared = p.shared === false ? 0 : 1;
+      if (typeof p.id === "string" && p.id) {
+        const n = await noteOf(p.id);
+        if (!n || n.pet !== pet.id) return fail("not_found", 404);
+        await db.prepare("UPDATE pet_notes SET date = ?, reason = ?, text = ?, staff = ?, shared = ? WHERE id = ?").bind(date, reason, text, staff, shared, n.id).run();
+      } else {
+        await db.prepare("INSERT INTO pet_notes(id, business, pet, date, reason, text, staff, shared, actor, created) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+          .bind(crypto.randomUUID(), b.id, pet.id, date, reason, text, staff, shared, user.id, nowIso).run();
+      }
+      return answer(pet.customer);
+    }
+    case "note_remove": {
+      const n = await noteOf(p.id);
+      if (!n) return fail("not_found", 404);
+      await db.prepare("UPDATE pet_notes SET archived = ? WHERE id = ?").bind(nowIso, n.id).run();
+      return answer(n.customer);
+    }
+    case "clinic_save": {
+      // The clinic's address and phone for the vaccination certificate (the owner's).
+      if (role !== "owner") return fail("forbidden", 403, "Owner permission required");
+      const address = typeof p.address === "string" ? p.address.trim().slice(0, 160) : "";
+      const phone = typeof p.phone === "string" ? p.phone.trim().slice(0, 30) : "";
+      await db.prepare("UPDATE businesses SET vet_info = ? WHERE id = ?").bind(JSON.stringify({ address, phone }), b.id).run();
+      return json({ ok: true, clinic: { address, phone } });
+    }
     case "doctor_save": {
       // The clinic's doctors (the owner's): add or rename. They are the clinic's calendars for online booking too.
       if (role !== "owner") return fail("forbidden", 403, "Owner permission required");
       const name = str(p.name, 60);
       if (!name) return fail("bad_details", 400, "A name is needed");
+      // The doctor's licence number, printed on the vaccination certificate.
+      const license = typeof p.license === "string" ? p.license.trim().slice(0, 30) || null : null;
       if (typeof p.id === "string" && p.id) {
-        const r = await db.prepare("UPDATE booking_staff SET name = ? WHERE id = ? AND business = ? AND archived IS NULL").bind(name, p.id, b.id).run();
+        const r = await db.prepare("UPDATE booking_staff SET name = ?, license = ? WHERE id = ? AND business = ? AND archived IS NULL").bind(name, license, p.id, b.id).run();
         if (!r.meta.changes) return fail("not_found", 404);
       } else {
         const n = await db.prepare("SELECT COUNT(*) AS n FROM booking_staff WHERE business = ? AND archived IS NULL").bind(b.id).first<{ n: number }>();
         if ((n?.n ?? 0) >= STAFF_MAX) return fail("staff_too_many", 409, "Too many doctors");
-        await db.prepare("INSERT INTO booking_staff(id, business, name, sort, created) VALUES(?, ?, ?, ?, ?)").bind(crypto.randomUUID(), b.id, name, (n?.n ?? 0) + 1, nowIso).run();
+        await db.prepare("INSERT INTO booking_staff(id, business, name, license, sort, created) VALUES(?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), b.id, name, license, (n?.n ?? 0) + 1, nowIso).run();
       }
       return json({ ok: true, doctors: await doctors() });
     }
@@ -265,7 +325,7 @@ export async function POST(request: Request) {
       ]);
       const phone = (v: unknown) => (role === "owner" ? formatPhone(String(v)) : maskPhone(String(v)));
       return json({
-        today, doctors: await doctors(),
+        today, doctors: await doctors(), clinic: await clinic(),
         care: (care.results ?? []).map((r) => ({ ...r, phone: phone(r.phone) })),
         appts: (appts.results ?? []).map((r) => ({ ...r, phone: phone(r.phone) })),
       });

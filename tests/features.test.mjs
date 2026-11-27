@@ -823,7 +823,7 @@ test("the vet file is a switch: off by default, and its API, booklet and reminde
   const sql = readFileSync(new URL("../drizzle/0050_vet.sql", import.meta.url), "utf8");
   assert.match(sql, /vet_on INTEGER NOT NULL DEFAULT 0/);
   assert.match(readFileSync(new URL("../app/api/vet/route.ts", import.meta.url), "utf8"), /!b\.vet_on\) return fail\("not_found", 404\)/);
-  assert.match(readFileSync(new URL("../app/p/[key]/page.tsx", import.meta.url), "utf8"), /b\.vet_on = 1/);
+  assert.match(readFileSync(new URL("../app/p/[key]/load.ts", import.meta.url), "utf8"), /b\.vet_on = 1/);
   assert.match(readFileSync(new URL("../lib/server/vet-reminders.ts", import.meta.url), "utf8"), /b\.vet_on = 1/);
 });
 
@@ -846,4 +846,26 @@ test("pages rendered on the server format dates without the browser's locale (no
     assert.ok(!/toLocaleDateString\(/.test(src), f);
     assert.ok(!/typeof window === "undefined"/.test(src), f);
   }
+});
+
+test("vet record: microchip and batch numbers are cleaned and checked", () => {
+  assert.equal(vet.cleanChip("985 112-000 123 456"), "985112000123456");
+  assert.equal(vet.cleanChip("abc123"), "ABC123");
+  assert.equal(vet.cleanChip(""), null);
+  assert.equal(vet.cleanChip(null), null);
+  assert.equal(vet.cleanChip("12"), undefined);
+  assert.equal(vet.cleanChip("985#112"), undefined);
+  assert.equal(vet.cleanLot(" A123/B-4.5 "), "A123/B-4.5");
+  assert.equal(vet.cleanLot(""), null);
+  assert.equal(vet.cleanLot("lot 12"), undefined);
+  assert.equal(vet.cleanLot("x".repeat(31)), undefined);
+});
+
+test("vet record: the owner's booklet and certificate show only the history entries shared with them", () => {
+  const load = readFileSync(new URL("../app/p/[key]/load.ts", import.meta.url), "utf8");
+  assert.match(load, /petsOf\(db, row\.business_id, row\.id, true\)/);
+  const server = readFileSync(new URL("../lib/server/vet.ts", import.meta.url), "utf8");
+  assert.match(server, /sharedOnly \? "AND shared = 1" : ""/);
+  // The booklet itself carries no name or phone; only the printable certificate does.
+  assert.match(readFileSync(new URL("../app/p/[key]/page.tsx", import.meta.url), "utf8"), /data\.owner = \{ name: "", phone: "" \}/);
 });

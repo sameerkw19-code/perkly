@@ -141,3 +141,24 @@ export const CARE_PRESETS: Record<CareKind, { he: string; ar: string; en: string
     { he: "ספירוצרקה", ar: "سبيروسيركا", en: "Spirocerca", months: 1 },
   ],
 };
+
+/** A microchip number: digits (and letters for older chips), 6 to 20, spaces and dashes dropped. Null when empty, undefined when invalid. */
+export function cleanChip(v: unknown): string | null | undefined {
+  if (v === null || v === undefined || v === "") return null;
+  if (typeof v !== "string") return undefined;
+  const s = v.replace(/[\s-]/g, "").toUpperCase();
+  return /^[0-9A-Z]{6,20}$/.test(s) ? s : undefined;
+}
+
+/** A vaccine's batch (Lot) number: letters, digits and - / . up to 30. Null when empty, undefined when invalid. */
+export function cleanLot(v: unknown): string | null | undefined {
+  if (v === null || v === undefined || v === "") return null;
+  if (typeof v !== "string") return undefined;
+  const s = v.trim();
+  return /^[0-9A-Za-z./-]{1,30}$/.test(s) ? s : undefined;
+}
+
+/** A microchip number in groups of three, easier to read and compare. */
+export function chipText(chip: string): string {
+  return /^\d+$/.test(chip) ? chip.replace(/(\d{3})(?=\d)/g, "$1 ") : chip;
+}
