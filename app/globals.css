@@ -1246,3 +1246,133 @@ html,body{overflow-x:clip}
 .card-pet-text{display:grid;gap:2px;min-width:0}
 .card-pet-text small{color:var(--muted);font-size:12px}
 .card-booking p{margin:0;display:flex;align-items:center;gap:6px;font-weight:600}
+
+/* ---- The pet file as a medical record ---- */
+.vet-icon.lg{width:64px;height:64px;font-size:36px;border-radius:18px}
+.vet-record-head{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;padding:16px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,#faf8ff,#fff)}
+.vet-record-id{flex:1;min-width:220px;display:grid;gap:8px}
+.vet-record-id h3{margin:0;font-size:22px;font-family:"Rubik","Heebo","Plex Arabic",system-ui,sans-serif;letter-spacing:-.3px}
+.vet-record-actions{display:flex;gap:8px;flex-wrap:wrap}
+.vet-tags{display:flex;gap:6px;flex-wrap:wrap}
+.vet-tag{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;background:#f3f0f9;color:#4a3f6b;white-space:nowrap}
+.vet-tag.ok{background:#eef6de;color:#3f5923}
+.vet-tag.late{background:#fee4e2;color:#b42318}
+.vet-ids{margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px 16px}
+.vet-ids>div{display:grid;gap:1px;min-width:0}
+.vet-ids dt{font-size:11px;color:var(--muted);letter-spacing:.3px}
+.vet-ids dd{margin:0;font-weight:600;font-size:14px;overflow-wrap:anywhere}
+.vet-ids dd[dir=ltr]{font-variant-numeric:tabular-nums;letter-spacing:.5px;text-align:end;unicode-bidi:plaintext}
+[dir=rtl] .vet-ids dd[dir=ltr]{text-align:right}
+.vet-rtabs{display:flex;gap:2px;overflow-x:auto;border-bottom:1px solid var(--line)}
+.vet-rtab{flex:none;display:inline-flex;align-items:center;gap:4px;padding:10px 14px;min-height:44px;border:0;border-bottom:2.5px solid transparent;background:none;font:inherit;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px}
+.vet-rtab.is-on{color:#5b3fd0;border-bottom-color:var(--purple)}
+.vet-rtab .count{margin-inline-start:2px;padding:1px 7px;font-size:11px}
+.vet-overview,.vet-care-tab{display:grid;gap:12px}
+@media (min-width:760px){.vet-overview{grid-template-columns:1fr 1fr}.vet-overview>.vet-box:last-child:nth-child(odd){grid-column:1/-1}}
+.vet-due{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.vet-due button{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;font:inherit;color:inherit;text-align:start}
+.vet-due button>span:first-child{display:grid;gap:1px}
+.vet-due small{color:var(--muted);font-size:12px}
+.vet-care>li{flex-direction:column;align-items:stretch}
+.vet-care-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.vet-care-row>div:first-child{display:grid;gap:2px;min-width:0}
+.vet-care.read>li{flex-direction:row;align-items:center}
+.vet-dose{padding:12px;border-radius:10px;background:#fff;border:1px dashed #cbbff5}
+.vet-table-wrap{overflow-x:auto;margin:0 -2px}
+.vet-table{font-size:13px}
+.vet-table th{padding:8px 10px}
+.vet-table td{padding:10px;color:var(--ink);vertical-align:top}
+.vet-table td small{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+.vet-table td[dir=ltr]{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+.vet-notes{list-style:none;margin:0;padding:0;display:grid;gap:0}
+.vet-notes>li{position:relative;padding:10px 0 12px;padding-inline-start:18px;border-inline-start:2px solid #e6e1f6;margin-inline-start:6px}
+.vet-notes>li::before{content:"";position:absolute;inset-inline-start:-6px;top:15px;width:10px;height:10px;border-radius:50%;background:var(--purple);box-shadow:0 0 0 3px #fff}
+.vet-note-head{margin:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px}
+.vet-note-head>span:not(.vet-tag){color:#3d2f7a;font-weight:600}
+.vet-note-head>span.muted{color:var(--muted);font-weight:500;display:inline-flex;align-items:center;gap:4px}
+.vet-note-head .icon-btn{width:28px;height:28px;margin-inline-start:auto}
+.vet-note-text{margin:4px 0 0;white-space:pre-wrap;font-size:14px;line-height:1.6}
+.vet-noteform textarea{width:100%;border:1px solid var(--line);border-radius:9px;padding:10px 12px;font:inherit;resize:vertical}
+.vet-form-title{margin:0;font-size:16px}
+.vet-wbars{list-style:none;margin:4px 0 0;padding:0;display:grid;gap:6px}
+.vet-wbars li{display:grid;grid-template-columns:64px 1fr 64px;align-items:center;gap:8px;font-size:12px}
+.vet-wbars li span{color:var(--muted);font-variant-numeric:tabular-nums}
+.vet-wbars li i{display:block;height:8px;border-radius:99px;background:linear-gradient(90deg,#b9a8f3,var(--purple))}
+.vet-wbars li b{font-size:12px;text-align:end}
+.vet-docs-add{display:flex;gap:8px;flex-wrap:wrap}
+.vet-docs-add input{flex:1 1 160px;min-width:0}
+.vet-docs li input[dir=ltr]{flex:0 1 140px}
+.vet-clinic-title{margin-top:14px!important}
+.vet-weights li{gap:1px}
+.vet-weights li span{color:var(--muted);font-size:11px}
+
+/* The client's booklet (pet passport). */
+.pb-logo{width:52px;height:52px;object-fit:contain;border-radius:12px;background:#fff;padding:4px;flex:none}
+.pb-pet{display:grid;gap:14px;padding:18px}
+.pb-id{display:flex;align-items:center;gap:12px}
+.pb-id-text{display:grid;gap:6px;min-width:0}
+.pb-id h2{font-size:22px;font-family:"Rubik","Heebo","Plex Arabic",system-ui,sans-serif}
+.pb-ids{padding:12px;border-radius:12px;background:#f8f7fc}
+.pb-block{display:grid;gap:8px}
+.pb-block h3{margin:0;font-size:14px}
+.pb-cert{justify-self:start}
+
+/* The vaccination certificate (A4). */
+.cert-page{min-height:100vh;background:#ecebf1;padding:16px max(16px,env(safe-area-inset-right,0px)) 40px max(16px,env(safe-area-inset-left,0px));display:grid;justify-items:center;gap:16px;align-content:start}
+.cert-bar{width:100%;max-width:210mm;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.cert{width:100%;max-width:210mm;min-height:297mm;background:#fff;color:#1d1b29;padding:14mm 14mm 10mm;box-shadow:0 8px 30px #2a204014;display:flex;flex-direction:column;gap:14px;font-size:12.5px}
+.cert h1,.cert h2,.cert h3{font-family:"Rubik","Heebo","Plex Arabic",system-ui,sans-serif}
+.cert-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;padding-bottom:12px;border-bottom:2.5px solid #1d1b29}
+.cert-clinic{display:flex;align-items:center;gap:12px;min-width:0}
+.cert-clinic img{width:64px;height:64px;object-fit:contain}
+.cert-clinic h1{font-size:20px;margin:0 0 2px}
+.cert-clinic p{margin:0;line-height:1.45;color:#4b4860}
+.cert-title{text-align:end}
+.cert-title h2{font-size:22px;letter-spacing:-.3px;text-transform:uppercase}
+.cert-title p{margin:2px 0 0;color:#4b4860}
+.cert-boxes{display:grid;grid-template-columns:1fr 2.2fr;gap:10px}
+.cert-box{border:1px solid #c9c6d6;border-radius:6px;padding:10px 12px}
+.cert-box h3,.cert-section h3{margin:0 0 8px;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:#5b3fd0}
+.cert-box dl{margin:0;display:grid;gap:6px}
+.cert-box dl.cols{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 12px}
+.cert-box dl .span{grid-column:1/-1}
+.cert-box dt{font-size:10px;color:#6b6880}
+.cert-box dd{margin:0;font-weight:600;border-bottom:1px dotted #c9c6d6;padding-bottom:2px;min-height:18px;overflow-wrap:anywhere}
+.cert .mono{font-family:ui-monospace,Menlo,Consolas,monospace;letter-spacing:.5px}
+.cert-table{width:100%;border-collapse:collapse;white-space:normal;font-size:12px}
+.cert-table th{background:#f1eefb;color:#2d2840;font-weight:700;font-size:11px;padding:6px 8px;border:1px solid #c9c6d6;border-radius:0}
+.cert-table td{padding:6px 8px;border:1px solid #c9c6d6;color:#1d1b29;font-size:12px;vertical-align:top}
+.cert-table td small{display:block;color:#6b6880;font-size:10px}
+.cert-table tr.blank td{height:28px}
+.cert-table.notes td.text{white-space:pre-wrap;width:60%}
+.cert-weights{margin:0;display:flex;flex-wrap:wrap;gap:6px 16px;color:#4b4860}
+.cert-sign{margin-top:auto;padding-top:10px;border-top:1px solid #c9c6d6}
+.cert-sign>p{margin:0 0 22px;font-weight:600}
+.cert-lines{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.cert-lines div{display:grid;gap:4px}
+.cert-lines span{min-height:24px;border-bottom:1.5px solid #1d1b29;font-weight:600;display:flex;align-items:flex-end}
+.cert-lines small{font-size:10px;color:#6b6880}
+.cert .cert-foot{display:block;margin:0;text-align:center;font-size:10px;color:#8a879a;font-weight:normal}
+@media (max-width:640px){.cert{padding:18px 14px;min-height:0}.cert-boxes{grid-template-columns:1fr}.cert-box dl.cols{grid-template-columns:repeat(2,minmax(0,1fr))}.cert-lines{grid-template-columns:1fr 1fr}.cert-title{text-align:start}.cert-table{font-size:11px}.cert-section{overflow-x:auto}}
+@page{size:A4;margin:0}
+@media print{
+  body{background:#fff}
+  .no-print{display:none!important}
+  .cert-page{padding:0;background:#fff;display:block}
+  .cert{box-shadow:none;max-width:none;width:210mm;min-height:297mm;break-after:page;page-break-after:always;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .cert:last-child{break-after:auto;page-break-after:auto}
+}
+.vet-care>li>.vet-care-row{display:flex}
+[dir=rtl] .vet-table td[dir=ltr],[dir=rtl] .cert-table td[dir=ltr]{text-align:right}
+/* On a phone, each dose is a small card: the name, then label / value lines. */
+@media (max-width:600px){
+  .vet-table.stack thead{display:none}
+  .vet-table.stack,.vet-table.stack tbody,.vet-table.stack tr,.vet-table.stack td{display:block;width:100%}
+  .vet-table.stack tr{padding:10px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:#fff}
+  .vet-table.stack td{border:0;padding:2px 0;white-space:normal}
+  .vet-table.stack td[data-label]{display:flex;justify-content:space-between;gap:10px;font-size:12px}
+  .vet-table.stack td[data-label]::before{content:attr(data-label);color:var(--muted);font-family:"Heebo","Plex Arabic",system-ui,sans-serif;letter-spacing:0;font-weight:500}
+  .vet-table.stack td small{display:inline;margin-inline-start:6px}
+  .vet-table.stack td:first-child{font-size:14px;margin-bottom:4px}
+  [dir=rtl] .vet-table.stack td[dir=ltr]{flex-direction:row-reverse}
+}
