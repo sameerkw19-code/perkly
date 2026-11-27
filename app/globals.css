@@ -722,6 +722,44 @@ html,body{overflow-x:clip}
 .admin-kinds{display:flex;flex-wrap:wrap;gap:8px;border:0;padding:0;margin:0}
 .admin-kinds legend{margin-bottom:6px;font-weight:600}
 .admin-new-preview{position:sticky;top:16px}
+/* New-business form: three numbered steps; card types as grouped radio cards */
+.admin-new-form{gap:0}
+.anf-step{display:grid;gap:12px;padding:4px 0 22px;margin-bottom:20px;border-bottom:1px solid var(--line);min-width:0}
+.anf-step h2{display:flex;align-items:center;gap:10px;font-size:17px}
+.anf-num{width:26px;height:26px;border-radius:50%;background:#f0ecfc;color:var(--purple);display:inline-grid;place-items:center;font-size:13px;font-weight:700;flex:none}
+.anf-set{border:0;padding:0;margin:0;min-width:0;display:grid;gap:14px}
+.anf-set legend{font-weight:600;padding:0;margin-bottom:8px}
+.anf-set legend small{font-weight:normal;font-size:12px}
+.anf-chips{display:flex;flex-wrap:wrap;gap:8px}
+.admin-new-form .anf-chip{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 16px;border:1.5px solid var(--line);border-radius:999px;background:#fff;font-weight:600;font-size:13px;cursor:pointer;transition:border-color .15s,background .15s}
+.anf-chip:hover{border-color:#cbbff5}
+.anf-chip.is-on{border-color:var(--purple);background:#f0ecfc;color:#5b3fd0}
+.anf-chip:has(input:focus-visible),.anf-type:has(input:focus-visible){outline:3px solid #b0a0ed;outline-offset:2px}
+.anf-group{display:grid;gap:8px;min-width:0}
+.anf-group-title{margin:0;font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.4px}
+.anf-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}@media(max-width:560px){.anf-grid{grid-template-columns:minmax(0,1fr)}}
+.admin-new-form .anf-type{position:relative;display:flex;align-items:center;gap:11px;min-height:66px;padding-block:10px;padding-inline:12px 34px;border:1.5px solid var(--line);border-radius:12px;background:#fff;cursor:pointer;transition:border-color .15s,background .15s}
+.anf-type:hover{border-color:#cbbff5}
+.anf-type.is-on{border-color:var(--purple);background:#faf8ff;box-shadow:inset 0 0 0 1px var(--purple)}
+.anf-icon{flex:none;width:38px;height:38px;border-radius:10px;display:grid;place-items:center;background:#f0ecfc;color:var(--purple)}
+.anf-type.is-on .anf-icon{background:var(--purple);color:#fff}
+.anf-text{display:grid;gap:2px;min-width:0}
+.anf-text b{font-size:14px;line-height:1.3}
+.anf-text small{font-size:12px;color:var(--muted);line-height:1.4}
+.anf-rec{position:absolute;top:-9px;inset-inline-start:12px;background:#d9f493;color:#2f4419;font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px;line-height:1.6}
+.anf-tick{position:absolute;top:9px;inset-inline-end:9px;width:20px;height:20px;border-radius:50%;background:var(--purple);color:#fff;display:grid;place-items:center}
+.anf-hint{margin:0;padding:12px 14px;border-radius:10px;background:#f8f7fc;border:1px solid #efedf6;font-size:13px;line-height:1.65;color:#3d3c4a}
+.anf-foot{display:grid;gap:12px}
+.anf-submit{min-height:48px;font-size:14px}
+.admin-import{margin-top:24px;padding:0}
+.admin-import summary{display:flex;align-items:center;gap:8px;min-height:52px;padding:0 20px;cursor:pointer;font-weight:600;list-style:none}
+.admin-import summary::-webkit-details-marker{display:none}
+.admin-import summary::after{content:"";margin-inline-start:auto;width:8px;height:8px;border-inline-end:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);transition:transform .15s}
+.admin-import[open] summary::after{transform:rotate(-135deg)}
+.admin-import summary:focus-visible{outline:3px solid #b0a0ed;outline-offset:2px;border-radius:14px}
+.admin-import summary .muted{font-weight:normal;font-size:13px}
+.admin-import>:not(summary){margin-inline:20px}
+.admin-import>:last-child{margin-bottom:20px}
 @media(max-width:860px){.admin-new{grid-template-columns:1fr}.admin-new-preview{position:static}}
 .account-sub{font-size:15px;margin:10px 0 0}
 /* Balance card: amount fields at the counter */
