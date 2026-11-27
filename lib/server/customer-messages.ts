@@ -8,6 +8,7 @@ import { passProgram } from "./balance-pass";
 import { sendLoanReminders } from "./loan-reminders";
 import { sendDueReminders } from "./due-reminders";
 import { sendVetReminders } from "./vet-reminders";
+import { drainWhatsApp, waConfig } from "./whatsapp";
 import { walletConfig, updateLoyaltyObject, type WalletConfig } from "./google-wallet";
 import { liveDesign, passLook } from "./designs";
 import { BIRTHDAY_GIFT_DAYS, MISS_YOU_DAYS, noticeOn, type Design, type StampNotice } from "../design";
@@ -332,6 +333,7 @@ export async function runScheduled(db: D1Database, env: Env, now = new Date()): 
   await sendLoanReminders(db, nowIso).catch((e) => console.error("library reminders failed:", e));
   await sendDueReminders(db, nowIso).catch((e) => console.error("dated reminders failed:", e));
   await sendVetReminders(db, nowIso).catch((e) => console.error("vet reminders failed:", e));
+  await drainWhatsApp(db, waConfig(env as unknown as Record<string, string | undefined>), nowIso).catch((e) => console.error("whatsapp failed:", e));
   await sendMonthlyReports(db, env as unknown as MailEnv & { REPORT_EMAILS?: string; PUBLIC_ORIGIN?: string }, now).catch((e) => console.error("monthly report failed:", e));
   const config = walletConfig(env);
   if (!config) return;

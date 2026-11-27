@@ -11,6 +11,9 @@ import { cancelAtPeriodEnd, findSubscription, getSubscription, polarConfigured }
 import { storeSubscription } from "../../../lib/server/subscription-store";
 import { applePushReady, pushAppleBusinessNow, pushTokens } from "../../../lib/server/apple-push";
 import { ensureBookingSetup } from "../../../lib/server/booking";
+import { sendTemplate, waConfig } from "../../../lib/server/whatsapp";
+import { WA_TEMPLATES } from "../../../lib/whatsapp.ts";
+import { normalizePhone } from "../../../lib/phone";
 import { customerForPass } from "../../../lib/server/apple-wallet";
 import { AVG_TARGET_MAX } from "../../../lib/cashback.ts";
 import { passLook } from "../../../lib/server/designs";
@@ -256,6 +259,33 @@ export async function POST(request: Request) {
       await pushAppleBusinessNow(db, businessId);
       const key = await db.prepare("SELECT booking_key FROM businesses WHERE id = ?").bind(businessId).first<{ booking_key: string | null }>();
       return json({ ok: true, on: !!on, key: key?.booking_key ?? null });
+    }
+    case "wa_on": {
+      // WhatsApp reminders for this business's clients (off by default). Off: nothing new is queued and what's waiting
+      // is dropped; the clients' own opt-outs stay.
+      const on = body.on === true ? 1 : 0;
+      await db.batch([
+        db.prepare("UPDATE businesses SET wa_on = ? WHERE id = ?").bind(on || null, businessId),
+        ...(on ? [] : [db.prepare("UPDATE wa_outbox SET status = 'cancelled' WHERE business = ? AND status = 'queued'").bind(businessId)]),
+        log("wa_on", on ? "on" : "off"),
+      ]);
+      return json({ ok: true, on: !!on });
+    }
+    case "wa_test": {
+      // Sends one sample reminder now to a number the admin types (to check the token and the approved templates).
+      const cfg = waConfig(env);
+      if (!cfg) return json({ ok: true, ready: false });
+      if (!(await allow(db, `wa_test:${user.id}`, 10, 3600))) return fail("rate_limited", 429, "Too many tests");
+      const phone = normalizePhone(body.phone);
+      if (!phone) return fail("bad_phone", 400, "Invalid phone");
+      const lang = body.lang === "ar" || body.lang === "en" ? body.lang : "he";
+      const vet = body.template === "vet";
+      const params = vet
+        ? [business.name, lang === "he" ? "חיסון כלבת" : lang === "ar" ? "تطعيم داء الكلب" : "Rabies vaccine", lang === "en" ? "Rex" : lang === "ar" ? "ركس" : "רקס", "1.1.2027", "https://perkly.shop/p/test"]
+        : [business.name, lang === "he" ? "יום ה׳, 1.1 · 10:00" : lang === "ar" ? "الخميس 1.1 · 10:00" : "Thu 1 Jan · 10:00"];
+      const r = await sendTemplate(cfg, phone, vet ? WA_TEMPLATES.vet : WA_TEMPLATES.appt, lang, params);
+      await log("wa_test", r.ok ? "sent" : r.error).run();
+      return json({ ok: true, ready: true, sent: r.ok, error: r.ok ? null : r.error });
     }
     case "vet_on": {
       // The vet's pet file for this business (off by default). Off hides it everywhere; the animals stay saved.

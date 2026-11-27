@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { CalendarCheck, ExternalLink, PawPrint, RefreshCw, Wallet } from "lucide-react";
+import { CalendarCheck, ExternalLink, MessageCircle, PawPrint, RefreshCw, Wallet } from "lucide-react";
+import { post } from "../../../lib/api";
 import { ReaderLoans } from "../../../components/reader-loans";
 import { formatDue, ilDay, type Loan } from "../../../lib/library";
 import type { Face } from "../../../lib/programs";
@@ -28,7 +29,9 @@ type Card = { face?: Face | null; library?: { key: string | null; loans: Loan[];
   /** Online booking: the booking page, and the next appointment (ISO) on cards that don't show it already. */
   booking?: { path: string; next: string | null } | null;
   /** The vet's pet file: the client's animals, each with its next vaccine or treatment and appointment, and the booklet. */
-  vet?: { path: string; pets: { name: string; species: string; care: { name: string; next: string } | null; appt: { at: string; kind: string } | null }[] } | null };
+  vet?: { path: string; pets: { name: string; species: string; care: { name: string; next: string } | null; appt: { at: string; kind: string } | null }[] } | null;
+  /** WhatsApp reminders (when the business has them): whether this client gets them, and the end of their number. */
+  whatsapp?: { on: boolean; phone: string } | null };
 
 export default function CardView({ card, secret, googleWallet, appleWallet = false, isIOS, invite = null }: { card: Card | null; secret: string; googleWallet: boolean; appleWallet?: boolean; isIOS: boolean; invite?: { stamps: number; link: string } | null }) {
   // The page's own chrome follows the visitor's site language; the card follows its business's languages.
@@ -130,6 +133,7 @@ export default function CardView({ card, secret, googleWallet, appleWallet = fal
               <a className="btn primary wide" href={card.booking.path}><CalendarCheck size={16} />{t("bk_kicker")}</a>
             </section>
           )}
+          {card.whatsapp && <WhatsAppPref secret={secret} pref={card.whatsapp} t={t} />}
           {!card.cashback && !card.library && !card.face && (!card.appointment || card.appointment.extra === "stamps" || card.appointment.extra === "points") && card.rewards > 0 && (
             <div className="ready-banner" role="status">
               {t("earned")}
@@ -202,6 +206,23 @@ function InviteFriend({ invite, business, t }: { invite: { stamps: number; link:
           try { await navigator.clipboard.writeText(invite.link); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {}
         }}>{copied ? t("friendCopied") : t("friendCopy")}</button>
       </div>
+    </section>
+  );
+}
+
+/** The client turns WhatsApp reminders off (or back on) for their number. */
+function WhatsAppPref({ secret, pref, t }: { secret: string; pref: { on: boolean; phone: string }; t: (k: string, v?: Record<string, string | number>) => string }) {
+  const [on, setOn] = useState(pref.on);
+  const [busy, setBusy] = useState(false);
+  return (
+    <section className="panel card-wa" aria-label={t("wa_title")}>
+      <p><MessageCircle size={16} aria-hidden="true" /> {on ? <span>{t("wa_on")} <bdi dir="ltr">{pref.phone}</bdi></span> : t("wa_off")}</p>
+      <button className="btn soft small" disabled={busy} onClick={async () => {
+        setBusy(true);
+        const r = await post("/api/card-wa", { secret, on: !on });
+        setBusy(false);
+        if (r.ok) setOn(!on);
+      }}>{on ? t("wa_stop") : t("wa_start")}</button>
     </section>
   );
 }

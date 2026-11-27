@@ -3,15 +3,18 @@
 
 import { cardLang, textsFor } from "../design";
 import { addDays, israelDate } from "../library.ts";
+import { israelTime } from "../appointment.ts";
+import { shortDate } from "../programs.ts";
 import { careReminder, careStageNow, parseSent } from "../vet.ts";
 import { liveDesign } from "./designs";
 import { pushAppleCustomersNow } from "./apple-push";
+import { publicOrigin, queueWhatsApp } from "./whatsapp";
 
 const PER_RUN = 300;
 
 type Row = {
   id: string; customer: string; business: string; next: string; sent: string | null; name: string; pet: string;
-  google_wallet: string | null; b_name: string; reward: string; color: string;
+  google_wallet: string | null; pet_key: string | null; b_name: string; reward: string; color: string;
 };
 
 export async function sendVetReminders(db: D1Database, nowIso: string): Promise<number> {
@@ -19,7 +22,7 @@ export async function sendVetReminders(db: D1Database, nowIso: string): Promise<
   const today = israelDate(now);
   const { results } = await db
     .prepare(
-      `SELECT c.id, p.customer, c.business, c.next, c.sent, c.name, p.name AS pet, u.google_wallet, b.name AS b_name, b.reward, b.color
+      `SELECT c.id, p.customer, c.business, c.next, c.sent, c.name, p.name AS pet, u.google_wallet, u.pet_key, b.name AS b_name, b.reward, b.color
        FROM pet_care c JOIN pets p ON p.id = c.pet JOIN customers u ON u.id = p.customer JOIN businesses b ON b.id = c.business
        WHERE c.archived IS NULL AND p.archived IS NULL AND u.archived IS NULL AND c.next >= ?1 AND c.next <= ?2
          AND b.vet_on = 1 AND b.archived IS NULL AND b.suspended IS NULL
@@ -51,6 +54,14 @@ export async function sendVetReminders(db: D1Database, nowIso: string): Promise<
         .prepare("INSERT OR IGNORE INTO wallet_outbox(id, business, customer, kind, not_before, created) VALUES(?, ?, ?, 'appt', ?, ?)")
         .bind(`vet:${r.id}:${r.next}:${due.stage}`, r.business, r.customer, nowIso, nowIso)
         .run();
+    }
+    // WhatsApp (where the admin switched it on): a week and a day before.
+    if (due.stage === "d7" || due.stage === "d1") {
+      await queueWhatsApp(db, {
+        id: `vet:${r.id}:${r.next}:${due.stage}`, business: r.business, customer: r.customer, template: "vet", lang: t.lang, nowIso,
+        expires: israelTime(addDays(r.next, 1), "0:00")!.toISOString(),
+        params: [t.title, r.name, r.pet, shortDate(r.next), `${publicOrigin()}/p/${r.pet_key ?? ""}`],
+      }).catch((e) => console.error("whatsapp queue failed:", r.id, e));
     }
     pushed.add(r.customer);
   }

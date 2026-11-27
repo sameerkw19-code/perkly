@@ -9,6 +9,7 @@ import { PRICES, fillPrices, withPrices, asCurrency, yearlySaving } from "../lib
 import { regionFrom } from "../lib/server/region.ts";
 import { lookFields } from "../lib/wallet-look.ts";
 import { usesPizza, slicePath, slicesPath, PIZZA_MAX } from "../lib/pizza.ts";
+import * as wa from "../lib/whatsapp.ts";
 
 // ---- Birthdays ----
 
@@ -868,4 +869,27 @@ test("vet record: the owner's booklet and certificate show only the history entr
   assert.match(server, /sharedOnly \? "AND shared = 1" : ""/);
   // The booklet itself carries no name or phone; only the printable certificate does.
   assert.match(readFileSync(new URL("../app/p/[key]/page.tsx", import.meta.url), "utf8"), /data\.owner = \{ name: "", phone: "" \}/);
+});
+
+test("whatsapp: numbers, stop and start words, retries, and the template texts", () => {
+  assert.equal(wa.waTo("+972501234567"), "972501234567");
+  assert.equal(wa.waTo("0501234567"), null);
+  assert.equal(wa.waFrom("972501234567"), "+972501234567");
+  assert.equal(wa.waFrom("abc"), null);
+  for (const w of ["STOP", "stop.", " הסר ", "הסרה", "إيقاف", "الغاء"]) assert.equal(wa.waCommand(w), "stop", w);
+  for (const w of ["START", "הפעל", "تشغيل"]) assert.equal(wa.waCommand(w), "start", w);
+  assert.equal(wa.waCommand("תודה, אגיע"), null);
+  assert.equal(wa.waRetryAfter(400, 1), null);
+  assert.equal(wa.waRetryAfter(429, 1), 5 * 60_000);
+  assert.equal(wa.waRetryAfter(503, 3), null);
+  assert.equal(wa.waLang("ru"), "en");
+  // Meta refuses a template that starts or ends with a variable; every language has the same variables.
+  for (const [name, langs] of Object.entries(wa.WA_TEMPLATE_TEXT)) {
+    const vars = (b) => (b.match(/\{\{\d\}\}/g) ?? []).join();
+    for (const [l, { body, footer }] of Object.entries(langs)) {
+      assert.ok(!/^\{\{/.test(body) && !/\}\}$/.test(body.trim()), `${name}/${l} starts or ends with a variable`);
+      assert.equal(vars(body), vars(langs.he.body), `${name}/${l} variables`);
+      assert.ok(footer.length > 0 && footer.length <= 60, `${name}/${l} footer`);
+    }
+  }
 });

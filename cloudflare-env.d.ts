@@ -7,6 +7,18 @@ declare namespace Cloudflare {
     PLATFORM_ADMIN_USER_IDS?: string;
     /** Optional. When set, creating a new owner account requires this code. Set with `wrangler secret put`. */
     SIGNUP_CODE?: string;
+    /**
+     * WhatsApp reminders (Meta WhatsApp Cloud API). Set with `wrangler secret put --env production`. Without the token
+     * and phone number id no WhatsApp message is sent. The verify token and app secret are for Meta's webhook
+     * (delivery status, and clients replying "STOP").
+     */
+    WHATSAPP_TOKEN?: string;
+    WHATSAPP_PHONE_ID?: string;
+    WHATSAPP_VERIFY_TOKEN?: string;
+    WHATSAPP_APP_SECRET?: string;
+    WHATSAPP_API_VERSION?: string;
+    /** Local tests only: a stand-in for Meta's API. */
+    WHATSAPP_API_BASE?: string;
     /** Polar billing. Set with `wrangler secret put`. POLAR_SANDBOX=1 uses the sandbox API. */
     POLAR_ACCESS_TOKEN?: string;
     POLAR_PRODUCT_ID?: string;

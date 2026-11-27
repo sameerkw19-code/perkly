@@ -3,14 +3,15 @@ import { notFound } from "next/navigation";
 import { getD1 } from "../../../../db";
 import { liveDesign } from "../../../../lib/server/designs";
 import { STATUS_LABEL, adminStatus, requireAdminPage, shortDate, shortDateTime } from "../../../../lib/server/admin";
-import { AdminActions, ExportBusiness, PolarSync, PaymentLink, PosKeys, AdminCardPreview, ApplePushTest, GoogleSyncTest, KitSentButton, OwnerDesignSwitch, BookingSwitch, VetSwitch } from "./admin-actions";
+import { AdminActions, ExportBusiness, PolarSync, PaymentLink, PosKeys, AdminCardPreview, ApplePushTest, GoogleSyncTest, KitSentButton, OwnerDesignSwitch, BookingSwitch, VetSwitch, WhatsAppSwitch } from "./admin-actions";
+import { waConfig } from "../../../../lib/server/whatsapp";
 import { pctLabel } from "../../../../lib/cashback";
 
 const SIMPLE_NAMES: Record<string, string> = { pass: "כרטיסייה מראש", gift: "כרטיס מתנה", club: "חבר מועדון", service: "טיפול תקופתי", coupon: "שובר חד־פעמי", attendance: "נוכחות בחוגים" };
 import { env } from "cloudflare:workers";
 import { planOf } from "../../../../lib/server/billing";
 import { isPlatformAdmin } from "../../../../lib/server/auth";
-import { formatPhone } from "../../../../lib/phone";
+import { formatPhone, maskPhone } from "../../../../lib/phone";
 import { mailReady } from "../../../../lib/server/mailer";
 import { BuildSteps } from "./build-steps";
 
@@ -27,7 +28,7 @@ const ACTION_LABEL: Record<string, string> = {
   suspend: "השהיה", unsuspend: "החזרה לפעילות", grant_comp: "גישה חינם", clear_comp: "ביטול גישה חינם",
   update_business: "עריכת פרטים", owner_link: "קישור לבעל העסק", owner_invite: "הזמנה לבעל העסק", staff_invite: "הזמנת עובד", transfer_owner: "העברת בעלות", archive: "סגירה (ארכוב)", restore: "שחזור", export: "ייצוא",
   import: "ייבוא מאתר אחר", reset_data: "איפוס נתונים", kit_sent: "ערכת קופה נשלחה", owner_designs: "עיצוב על ידי בעל העסק",
-  pos_key_create: "מפתח קופה נוצר", pos_key_revoke: "מפתח קופה בוטל", pos_only: "שינוי רק דרך הקופה", booking_on: "זימון תורים", vet_on: "תיק וטרינרי",
+  pos_key_create: "מפתח קופה נוצר", pos_key_revoke: "מפתח קופה בוטל", pos_only: "שינוי רק דרך הקופה", booking_on: "זימון תורים", vet_on: "תיק וטרינרי", wa_on: "תזכורות וואטסאפ", wa_test: "בדיקת וואטסאפ",
   polar_sync: "סנכרון מ־Polar", polar_link: "חיבור מנוי מ־Polar", polar_unlink: "ניתוק מנוי", delete_business: "מחיקה לצמיתות",
 };
 const POLAR_LABEL: Record<string, string> = {
@@ -47,7 +48,7 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
 
   const b = await db
     .prepare(
-      `SELECT b.id, b.owner, b.name, b.reward, b.target, b.color, b.created, b.reward_mode, b.suspended, b.suspend_reason, b.comp_until, b.archived, b.kit_due, b.kit_sent, b.owner_designs, b.currency, b.pos_only, b.booking_on, b.booking_key, b.vet_on, b.program, b.near_text, b.cashback_bp, b.cashback_min,
+      `SELECT b.id, b.owner, b.name, b.reward, b.target, b.color, b.created, b.reward_mode, b.suspended, b.suspend_reason, b.comp_until, b.archived, b.kit_due, b.kit_sent, b.owner_designs, b.currency, b.pos_only, b.booking_on, b.booking_key, b.vet_on, b.wa_on, b.program, b.near_text, b.cashback_bp, b.cashback_min,
          s.status, s.plan, s.current_period_end, s.external_subscription, s.updated AS sub_updated, u.email AS owner_email, u.phone AS owner_phone
        FROM businesses b LEFT JOIN subscriptions s ON s.business = b.id LEFT JOIN users u ON u.id = b.owner WHERE b.id = ?`,
     )
@@ -56,10 +57,16 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
       id: string; name: string; reward: string; target: number; color: string; created: string; reward_mode: string;
       owner: string; suspended: string | null; suspend_reason: string | null; comp_until: string | null; archived: string | null; owner_email: string | null; owner_phone: string | null;
       status: string | null; current_period_end: string | null; external_subscription: string | null; sub_updated: string | null;
-      plan: string | null; kit_due: string | null; kit_sent: string | null; owner_designs: number; currency: string; pos_only: number; booking_on: number; booking_key: string | null; vet_on: number; program: string; near_text: string | null; cashback_bp: number; cashback_min: number;
+      plan: string | null; kit_due: string | null; kit_sent: string | null; owner_designs: number; currency: string; pos_only: number; booking_on: number; booking_key: string | null; vet_on: number; wa_on: number | null; program: string; near_text: string | null; cashback_bp: number; cashback_min: number;
     }>();
   if (!b) notFound();
 
+  const waReady = !!waConfig(env);
+  const WA_STATUS: Record<string, string> = { queued: "ממתינה", sending: "נשלחת", sent: "נשלחה", delivered: "נמסרה", read: "נקראה", failed: "נכשלה", expired: "פג תוקף", cancelled: "בוטלה" };
+  const waSent = (await db
+    .prepare("SELECT id, phone, template, lang, status, error, created FROM wa_outbox WHERE business = ? ORDER BY created DESC LIMIT 15")
+    .bind(id)
+    .all<{ id: string; phone: string; template: string; lang: string; status: string; error: string | null; created: string }>()).results ?? [];
   const [team, counts, recent, log, design, posKeys, branchList] = await Promise.all([
     db.prepare(
       `SELECT m.user, u.email, u.name, m.role, m.created, m.revoked, br.name AS branch
@@ -260,6 +267,28 @@ export default async function AdminBusinessPage({ params }: { params: Promise<{ 
             <section className="panel">
               <h2>תיק וטרינרי</h2>
               <VetSwitch business={b.id} on={!!b.vet_on} />
+            </section>
+
+            <section className="panel">
+              <h2>תזכורות וואטסאפ</h2>
+              <WhatsAppSwitch business={b.id} on={b.wa_on === 1} ready={waReady} />
+              {waSent.length > 0 && (
+                <div className="table-wrap">
+                  <table className="admin-wa-log">
+                    <thead><tr><th>מתי</th><th>לקוח</th><th>תבנית</th><th>מצב</th></tr></thead>
+                    <tbody>
+                      {waSent.map((m) => (
+                        <tr key={m.id}>
+                          <td>{shortDateTime(m.created)}</td>
+                          <td dir="ltr">{maskPhone(m.phone)}</td>
+                          <td>{m.template === "perkly_vet_reminder" ? "וטרינר" : "תור"} · {m.lang}</td>
+                          <td title={m.error ?? ""}>{WA_STATUS[m.status] ?? m.status}{m.error && (m.status === "failed" || m.status === "queued") ? <> · <bdi dir="ltr">{m.error.slice(0, 60)}</bdi></> : null}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </section>
 
             <section className="panel">

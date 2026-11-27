@@ -1414,3 +1414,9 @@ html,body{overflow-x:clip}
   .vet-table.stack td:first-child{font-size:14px;margin-bottom:4px}
   [dir=rtl] .vet-table.stack td[dir=ltr]{flex-direction:row-reverse}
 }
+.card-wa{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 14px}
+.card-wa p{margin:0;display:flex;align-items:center;gap:6px;font-size:13px}
+.card-wa p svg{color:#1e9e5a;flex:none}
+.admin-wa-test{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px}
+.admin-wa-test input{flex:1 1 140px;min-width:0}
+.admin-wa-log{font-size:12px}
